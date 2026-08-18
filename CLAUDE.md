@@ -1872,6 +1872,100 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **ONE QUESTION, ASKED OF A PARAMETER, ANSWERED ON ONE SIDE OF THE WIRE** (F2-234,
+  measured 2026-08-18). Executing F2-233's filed **4 BCM services**, the population was re-derived
+  from the gate's own printed output first (F2-221): 7 sites, all four controllers binding the
+  ENTITY (checked, not assumed). All were open, and reading one of them found a SECOND instrument
+  finding of exactly F2-233's shape. `BcmComplianceMappingService#assessCompliance` stamps
+  `assessedAt` from the server's clock and copied `assessedBy` out of the request — F2-223's
+  split attribution on an ISO 22301 / SAMA OPRES / NCEMA register, with the UI half being
+  `window.prompt('Reviewer name')` and **`?? ''` on Cancel**, so the recorded assessor could be
+  anybody or the empty string. 🔑 **It survived F2-223's sweep because the actor half reaches
+  its setter as a BARE SCALAR PARAMETER**: `SplitAttributionContractTest`'s `REQUEST_VALUE` needs a
+  named receiver (`req.`/`body.`/…) and `m.setAssessedBy(assessedBy)` names none — the
+  wire-ness lives at the CALL SITE, where the controller passes `body.assessedBy()`. **F2-222
+  established exactly that rule** (*"whether a scalar parameter is caller data is a fact about its
+  call sites"*) **and taught it to the STAMPING side only.** Same structural asymmetry F2-233 found
+  for fallbacks one slice earlier, where the accepting side had carried the mirror since F2-219 and
+  the stamping side never did. **Assume a third instance exists.**
+  ⚠⚠ **MY OWN MEASUREMENT REPEATED F2-187'S RECORDED MISTAKE AND I NEARLY BELIEVED IT.**
+  The first resolver matched `.<method>(` in **any** controller without resolving the receiver's
+  type, so `approve` picked up every unrelated `approve(` in the tree and reported ~20 sites "from
+  the wire" that were almost entirely cross-contamination. F2-187's words are *"a method-NAME
+  fallback silently clears the methods most likely to be duplicated elsewhere — resolve per
+  owner type."* Resolved to a field DECLARED of the service's own type, the honest answer is **13 of
+  92**; the other **79 correctly take the actor from `actor(auth)` / `userIdOf(auth)` /
+  `currentPrincipalName()`**, which is why that gate's green was mostly earned. The classifier then
+  removes 2 as ASSIGNMENT and `REFERENCE_TAIL` 1 as a document reference, leaving **9 filed with NO
+  verdicts** (F2-188).
+  ⚠ **`appointedByReso` is a demonstrated false positive and it is the negative control.** The
+  wide `By[A-Z]\w*` branch exists so `approvedByLegalName` pairs; it also matches a field whose own
+  javadoc reads *"Board-resolution code that appointed this member."* A board-resolution CODE is not
+  a person. Pin such a narrowing in **both** directions — 6 must-pair, 4 must-not-pair —
+  because a narrowing that is too wide silently SHRINKS the population, which reads exactly like a
+  clean tree.
+  ⚠⚠ **THE LIVE HALF: A CREATE THAT SKIPPED AN EVIDENCE REQUIREMENT, AND F2-220 HAD FIXED
+  THE IDENTICAL TWO LINES IN THE SAME FILE.** `BcmRemediationService#createCapa` had
+  `if (status == null) setStatus("OPEN")` plus a MEMBERSHIP test, so `CLOSED` was accepted: probed
+  live as `compliance`, `POST /api/v1/bcm/capas {"status":"CLOSED"}` answered **200** while
+  `POST /capas/{id}/transition {"to":"CLOSED"}` answers **400 — "Cannot CLOSE without
+  evidence"** for the identical edge, and a caller-chosen `closureDate` was stored on an action never
+  closed. The row was then unmovable (`updateCapa` refuses a CLOSED CAPA, `transitionCapa` has
+  `case "CLOSED" -> false`), so a `BCM:WRITE` holder could manufacture a record only `BCM:APPROVE`
+  can touch. 🔑 **F2-220 closed `createGap` eighty lines above, with this primitive, under a
+  comment naming this exact defect** — not a sibling file, not a sibling module, the same file.
+  F2-215's headline at its sharpest.
+  ⚠⚠ **A CREATE WITH NO VOCABULARY TEST AT ALL, OVER A COLUMN WITH NO CHECK, PRODUCES A ROW
+  NO ROUTE CAN EVER MOVE.** `BcmService#createPlan` was a bare `save(req)`: `status=APPROVED`
+  answered **201** and so did `status=TOTALLY_MADE_UP`, and since `bcm.bcm_plans` has **zero CHECK
+  constraints** on a NOT NULL `status` and every transition guard is an equality test against a named
+  state, that row is **permanently untransitionable by every route** (F2-220's `platform.issues`
+  shape, creatable on demand through the API). `updatePlan` wrote the status unconditionally, so
+  `PUT` performed DRAFT → APPROVED at **200** under the same `BCM:WRITE` the guarded route
+  carries — no escalation, the machine was simply the only control (F2-219's shape). The page
+  already offered all four lifecycle buttons row-conditionally, so the form's status select was a
+  second unguarded way to do what they do properly; removing it costs nothing.
+  ⚠ **An ECHO is accepted, a CHANGE is refused** (F2-231's shape): a form that round-trips the
+  row still works, and an omitted status leaves the stored state alone rather than nulling a NOT NULL
+  column (F2-213's reset-is-worse-than-a-null).
+  ⚠ **And the fifth field of five: `BcpPlanService#create` left `currentVersion` a DEFAULT one
+  line below the four F2-220 had just scrubbed**, so a new continuity plan could claim **v7** with no
+  `BcpVersion` row — and `snapshot()` derives the next number from the versions table, so the
+  first approval would silently reduce 7 → 1. `addSection` stored caller-supplied
+  `lastEditedAt`/`lastEditedBy`, an edit history for a section never edited. ⚠ Its two provenance
+  markers (`template:<code>`, `BIA generator`, 21 of 120 rows) are written by paths that build the
+  entity directly, never through `addSection` — checked, not assumed, which is what made
+  clearing safe.
+  ⚠⚠ **AN EXISTING TEST ASSERTED THE DEFECT AS CORRECT — FOURTH INSTANCE.**
+  `assess_setsStatusReviewerTimestamp` passed `"BCM Manager"` and asserted
+  `getAssessedBy()).isEqualTo("BCM Manager")`: that the value the CALLER passed is the value STORED,
+  which is precisely what was wrong. After F2-159, F2-175 and F2-227. Repurposed the way F2-223
+  repurposed its own — keep the half that protects the record, assert the attribution now comes
+  from the principal.
+  ⚠ **The work list is now EMPTY (`BASELINE_CONTRADICTED_SERVICES` 4 → 0) and that is
+  exactly what a rotted detector produces** (F2-219: a floor of `>= BASELINE - n` cannot fail at 0).
+  What carries the weight is the three reverse legs — every `BY_DESIGN`, `CLOSED_ELSEWHERE` and
+  `FILED_OWNER_DECISION` entry must still name something the scan finds, so a detector that stops
+  matching fails 15 assertions rather than reporting success. Do not simplify them away.
+  ⚠ **Two of my own errors, both caught only by running things.** The mutation harness reported
+  one **ANCHOR-MISS** because an anchor spanned two lines with `\n` against a **CRLF** file —
+  the CRLF trap for the **fourth** time in this lineage (F2-212, F2-219, F2-229), in a harness whose
+  own docstring states the rule; anchor-miss being a distinct non-zero outcome is the only reason it
+  was visible. And my new gate leg failed on a **correct** tree because the javadoc explaining the
+  removal of `assessedBy` NAMES the field it removed — the detector read the epitaph as the
+  corpse (F2-193). **Strip comments in every scan, including one you wrote this hour.**
+  ⚠ **Two probe bugs, both mine and both loud:** a guessed field name (`planTitleEn`; it is
+  `titleEn`, resolvable from the entity) gave a 400 that reads exactly like the fix having broken, and
+  asserting `200` where the controller returns `201` made a leg fail on a correct server.
+  ⚙ **Filed:** the **9** parameter-borne splits with no verdicts — read
+  `SupplierResilienceTestService#approve` first, whose controller passes
+  `body.getOrDefault("approverName", "admin")` so an omitted approver is recorded as the literal
+  **`admin`**; `bcm.bcm_plans` still has **no CHECK** on `status` (now cheap, since this slice closed
+  its only open writers — F2-183); **two plan registers for one concept** (`bcm_plans` legacy vs
+  `bcp_plans` canonical, both live since the T1.1 carve-out, F2-196's shape); and
+  `bcm.bcp_sections.last_edited_by` holding an **invented officer name on 72 of 120 rows** in a
+  *server* register (F2-207's cast of 65) — an owner decision, since repair rewrites live rows.
+
 - ⚠⚠ **ROUGHLY A THIRD OF WHAT A WORK LIST REPORTS IS THE INSTRUMENT** (F2-233, measured
   2026-08-18). Executing F2-231's filed 11-service work list, **every one was read** and the population
   split almost evenly between the code being wrong and the detector being wrong:

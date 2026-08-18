@@ -70,8 +70,12 @@ export async function getMapping(id: number): Promise<BcmComplianceMapping> {
   return api.get<BcmComplianceMapping>(`${BASE}/${id}`);
 }
 
-export async function assess(id: number, status: ComplianceStatus, assessedBy: string, notes: string): Promise<BcmComplianceMapping> {
-  return api.post<BcmComplianceMapping>(`${BASE}/${id}/assess`, { status, assessedBy, notes });
+// F2-234 — there is no `assessedBy` here on purpose. The server takes the assessing identity from
+// the authenticated principal; sending one would be a field the server ignores. It used to be a
+// window.prompt asking the operator to TYPE the reviewer's name, with `?? ''` on Cancel, so the
+// recorded assessor of an ISO 22301 / SAMA OPRES / NCEMA requirement could be anybody at all.
+export async function assess(id: number, status: ComplianceStatus, notes: string): Promise<BcmComplianceMapping> {
+  return api.post<BcmComplianceMapping>(`${BASE}/${id}/assess`, { status, notes });
 }
 
 export async function attachEvidence(id: number, evidenceId: number): Promise<BcmComplianceMapping> {

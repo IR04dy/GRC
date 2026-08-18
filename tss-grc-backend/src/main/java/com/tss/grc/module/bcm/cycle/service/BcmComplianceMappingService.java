@@ -1,6 +1,8 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.bcm.cycle.entity.BcmComplianceMapping;
 import com.tss.grc.module.bcm.cycle.repository.BcmComplianceMappingRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -38,6 +40,8 @@ public class BcmComplianceMappingService {
         "ISO_22301", "SAMA_OPRES", "DGA", "NCEMA", "INTERNAL", "CUSTOM");
     public static final Set<String> STATUSES = Set.of(
         "NOT_ASSESSED", "COMPLIANT", "PARTIAL", "NON_COMPLIANT", "NOT_APPLICABLE");
+    /** F2-234 — the state a mapping is CREATED in; every other STATUS is assessCompliance()'s. */
+    private static final String INITIAL_COMPLIANCE_STATUS = "NOT_ASSESSED";
     public static final Set<String> WORKFLOWS = Set.of(
         "GOVERNANCE", "BIA", "BCP", "DRP", "EXERCISE", "CRISIS",
         "CALL_TREE", "STRATEGY", "TRAINING", "EVIDENCE", "OTHER");
@@ -66,7 +70,21 @@ public class BcmComplianceMappingService {
         validate(body, /*creating*/ true);
         body.setId(null);
         body.setOrganisationId(TenantContext.getCurrentTenant());
-        if (body.getComplianceStatus() == null) body.setComplianceStatus("NOT_ASSESSED");
+        // F2-234 — a DEFAULT, not a guard, and validate() only tested MEMBERSHIP of STATUSES, so a
+        // mapping could be created COMPLIANT: an ISO 22301 / SAMA OPRES / NCEMA requirement
+        // recorded as met without assessCompliance() ever running — no assessor, no clock, and no
+        // "Compliance assessed" audit row. A mapping is BORN unassessed; assessing it is an act.
+        // ⚠ Safe to refuse rather than coerce (F2-182): the CHECK already rejects anything outside
+        // STATUSES, and POST /api/v1/bcm/compliance has NO frontend client at all — bcmCompliance.ts
+        // declares list/get/assess/attach-evidence/attach-gap and no create — so no request that
+        // succeeds today starts failing. All 412 rows in dev and prod are NOT_ASSESSED.
+        body.setComplianceStatus(ServerOwnedState.requireInitial(
+            body.getComplianceStatus(), INITIAL_COMPLIANCE_STATUS, "a BCM compliance mapping",
+            "POST /api/v1/bcm/compliance/{id}/assess"));
+        // assessCompliance()'s stamps. A mapping created carrying an assessment date and an
+        // assessor's name is a record of an assessment that was never made.
+        body.setAssessedAt(null);
+        body.setAssessedBy(null);
         if (body.getIsPlaceholder() == null)    body.setIsPlaceholder(true);
 
         // Uniqueness check (framework + requirement_code per tenant)
@@ -130,19 +148,42 @@ public class BcmComplianceMappingService {
      * NON_COMPLIANT status may carry an attached gap (set separately via
      * {@link #attachGap}).
      */
+    /**
+     * F2-234 — <b>the split attribution.</b> This method stamps {@code assessedAt} from the
+     * server's own clock and used to copy {@code assessedBy} out of the request body, so one
+     * attribution had two owners: the server said WHEN, the caller said WHO. That is F2-223's
+     * defect on the ISO 22301 / SAMA OPRES / NCEMA compliance register, and the UI's half was
+     * {@code window.prompt('Reviewer name')} with {@code ?? ''} on Cancel — so the assessor of a
+     * regulator-facing BCM requirement could be anybody, or the empty string.
+     *
+     * <p>🔑 <b>It survived F2-223's sweep because the actor reached the setter as a BARE SCALAR
+     * PARAMETER.</b> {@code SplitAttributionContractTest}'s {@code REQUEST_VALUE} needs a named
+     * receiver ({@code req.}/{@code body.}/…), and {@code m.setAssessedBy(assessedBy)} names none —
+     * the wire-ness lives at the CALL SITE, where {@code BcmComplianceMappingController} passes
+     * {@code body.assessedBy()}. F2-222 established exactly that ("whether a scalar parameter is
+     * caller data is a fact about its call sites") and taught it to the STAMPING side only. One
+     * question, asked of a parameter, answered on one side of the wire.
+     */
     @Transactional
-    public BcmComplianceMapping assessCompliance(Long id, String status, String assessedBy, String notes) {
+    public BcmComplianceMapping assessCompliance(Long id, String status, String notes) {
         if (status == null || !STATUSES.contains(status))
             throw new IllegalArgumentException("complianceStatus must be one of " + STATUSES);
+        String assessor = CurrentActor.username();
+        if (assessor == null || assessor.isBlank())
+            throw new IllegalStateException(
+                "A compliance assessment with no identified assessor is not an assessment.");
         BcmComplianceMapping m = get(id);
         m.setComplianceStatus(status);
-        m.setAssessedBy(assessedBy);
+        m.setAssessedBy(assessor);
         if (notes != null) m.setNotes(notes);
         m.setAssessedAt(LocalDateTime.now());
         m.setUpdatedAt(m.getAssessedAt());
         BcmComplianceMapping saved = repo.save(m);
+        // F2-223's rule: the trail reads off the SAVED ROW, never the caller's claim — a trail that
+        // quotes the claim is what makes a forged attribution invisible to whoever audits it.
         audit.log("CUSTOM", "BcmComplianceMapping", saved.getId(),
-            "Compliance assessed: " + saved.getRequirementCode() + " → " + status);
+            "Compliance assessed: " + saved.getRequirementCode() + " → "
+            + saved.getComplianceStatus() + " by " + saved.getAssessedBy());
         return saved;
     }
 

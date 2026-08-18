@@ -78,10 +78,13 @@ export function BcmComplianceMappingPage() {
       isAr ? 'الحالة (COMPLIANT/PARTIAL/NON_COMPLIANT/NOT_APPLICABLE)' : 'Status (COMPLIANT/PARTIAL/NON_COMPLIANT/NOT_APPLICABLE)',
       m.complianceStatus) as ComplianceStatus | null;
     if (!status) return;
-    const reviewer = window.prompt(isAr ? 'المراجع' : 'Reviewer name') ?? '';
+    // F2-234 — the "Reviewer name" prompt is gone. It asked the operator to TYPE who assessed an
+    // ISO 22301 / SAMA OPRES / NCEMA requirement and sent the answer as the recorded assessor, with
+    // `?? ''` on Cancel, while the server stamped the assessment TIME from its own clock. The
+    // server now takes the assessor from the authenticated principal (F2-223's rule).
     const notes    = window.prompt(isAr ? 'ملاحظات (اختياري)' : 'Notes (optional)') ?? '';
     try {
-      await assess(m.id, status, reviewer, notes);
+      await assess(m.id, status, notes);
       toast.success(isAr ? 'تم التقييم' : 'Assessed');
       await reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }

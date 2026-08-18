@@ -23,7 +23,7 @@ import java.util.Map;
  *   POST   /api/v1/bcm/compliance
  *   PATCH  /api/v1/bcm/compliance/{id}
  *   POST   /api/v1/bcm/compliance/{id}/attach-evidence  {evidenceId: 42}
- *   POST   /api/v1/bcm/compliance/{id}/assess          {status, assessedBy, notes}
+ *   POST   /api/v1/bcm/compliance/{id}/assess          {status, notes}
  *   POST   /api/v1/bcm/compliance/{id}/attach-gap      {gapId: 17}
  * </pre>
  */
@@ -35,7 +35,13 @@ import java.util.Map;
 public class BcmComplianceMappingController {
 
     public record AttachEvidenceBody(Long evidenceId) {}
-    public record AssessBody(String status, String assessedBy, String notes) {}
+    /**
+     * F2-234 — {@code assessedBy} is gone on purpose. The server takes the assessing identity from
+     * the authenticated principal; a field the server ignores tells the caller their value matters
+     * (F2-184), and one it TRUSTED let the caller name the assessor of a regulator-facing BCM
+     * requirement while the server stamped the time itself.
+     */
+    public record AssessBody(String status, String notes) {}
     public record AttachGapBody(Long gapId) {}
 
     private final BcmComplianceMappingService service;
@@ -79,7 +85,7 @@ public class BcmComplianceMappingController {
     @PostMapping("/{id}/assess")
     @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmComplianceMapping assess(@PathVariable Long id, @RequestBody AssessBody body) {
-        return service.assessCompliance(id, body.status(), body.assessedBy(), body.notes());
+        return service.assessCompliance(id, body.status(), body.notes());
     }
 
     @PostMapping("/{id}/attach-gap")

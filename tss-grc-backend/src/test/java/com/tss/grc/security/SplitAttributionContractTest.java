@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -261,6 +262,29 @@ class SplitAttributionContractTest {
         Pattern.compile("(?:By[A-Z]\\w*|By|erUserId|erName|erEmail|erId|er"
                         + "|orUserId|orName|orEmail|orId|or)$");
 
+    /**
+     * F2-234 — the {@code By[A-Z]\w*} branch above is deliberately wide (it exists so
+     * {@code approvedByLegalName} pairs), and that width also matches {@code appointedByReso},
+     * whose entity javadoc reads <i>"Board-resolution code that appointed this member — links back
+     * to the resolution register for traceability"</i>. A board-resolution CODE is a document
+     * reference, not a person, so pairing it with {@code appointedAt} would be a gate failing on
+     * correct code (F2-214).
+     *
+     * <p>⚠ This is a NAME LIST, which is the instrument class this programme repeatedly finds
+     * measures its own vocabulary (F2-217). It is tolerable only because it is scoped to the
+     * {@code By<Suffix>} branch and pinned in BOTH directions by
+     * {@link #theBySuffixBranchPairsPeopleAndNotDocuments()} — add a document noun here and the
+     * must-pair half must still hold.
+     */
+    private static final Pattern REFERENCE_TAIL = Pattern.compile(
+        "By(?:Reso(?:lution)?|Ref(?:erence)?|Doc(?:ument)?|Code|Circular|Letter|Memo|Minute"
+        + "|Decision|Order|Instrument|Policy|Clause|Article)\\w*$");
+
+    /** An actor-shaped field that is not a document reference. */
+    static boolean isActorField(String field) {
+        return ACTOR_TAIL.matcher(field).find() && !REFERENCE_TAIL.matcher(field).find();
+    }
+
     private static final Pattern SETTER = Pattern.compile("\\.\\s*set([A-Z]\\w*)\\s*\\(");
 
     /**
@@ -322,7 +346,7 @@ class SplitAttributionContractTest {
                 String arg = balancedArg(body, sm.start());
                 if (TIME_TAIL.matcher(field).find() && isServerClock(arg, body)) {
                     clockKeys.addAll(verbKeys(field));
-                } else if (ACTOR_TAIL.matcher(field).find() && REQUEST_VALUE.matcher(arg).find()) {
+                } else if (isActorField(field) && REQUEST_VALUE.matcher(arg).find()) {
                     callerActors.put(field, verbKeys(field));
                 }
             }
@@ -338,8 +362,20 @@ class SplitAttributionContractTest {
     /** (name, body) for every brace-bodied method, at any indentation. */
     static List<String[]> methodsOf(String src) {
         List<String[]> out = new ArrayList<>();
+        for (String[] m : methodsWithParams(src)) out.add(new String[]{m[0], m[2]});
+        return out;
+    }
+
+    /**
+     * (name, parameter-list text, body) — the parameter list {@link #methodsOf} throws away.
+     *
+     * <p>GAP 10 (F2-234) needs it: an actor half can reach its setter as a bare scalar PARAMETER,
+     * and whether that parameter is caller data is a fact about the method's CALL SITES.
+     */
+    static List<String[]> methodsWithParams(String src) {
+        List<String[]> out = new ArrayList<>();
         Matcher m = Pattern.compile(
-            "\\n\\s{4,}(?:public|private|protected)\\s+[^;{=]*?\\b(\\w+)\\s*\\([^;{]*?\\)"
+            "\\n\\s{4,}(?:public|private|protected)\\s+[^;{=]*?\\b(\\w+)\\s*\\(([^;{]*?)\\)"
             + "(?:\\s*throws\\s[\\w., ]+)?\\s*\\{", Pattern.DOTALL).matcher(src);
         while (m.find()) {
             int depth = 0;
@@ -348,17 +384,104 @@ class SplitAttributionContractTest {
                 if (src.charAt(j) == '{') depth++;
                 else if (src.charAt(j) == '}' && --depth == 0) break;
             }
-            out.add(new String[]{m.group(1), src.substring(m.end(), Math.min(j, src.length()))});
+            out.add(new String[]{m.group(1), m.group(2),
+                                 src.substring(m.end(), Math.min(j, src.length()))});
         }
         return out;
+    }
+
+    /** Declared parameter names, in declaration order. */
+    static List<String> paramNames(String paramText) {
+        List<String> out = new ArrayList<>();
+        for (String raw : paramText.split(",(?![^<>]*>)")) {
+            String p = raw.trim().replaceAll("@\\w+(\\([^)]*\\))?\\s*", "").trim();
+            if (p.isEmpty()) continue;
+            String[] bits = p.split("\\s+");
+            if (bits.length >= 2) out.add(bits[bits.length - 1]);
+        }
+        return out;
+    }
+
+    /**
+     * GAP 10 (F2-234) — actor halves that reach the setter as a bare scalar parameter, paired with a
+     * server clock for the same verb. Returned as {@code method::field::paramIndex} so
+     * {@link #scanTree} can resolve the parameter at the call sites; the wire-ness is not decidable
+     * from this file alone, which is exactly why the shape was invisible.
+     */
+    static List<String> paramBorneCandidatesIn(String strippedSource) {
+        List<String> out = new ArrayList<>();
+        for (String[] m : methodsWithParams(strippedSource)) {
+            List<String> ps = paramNames(m[1]);
+            String body = m[2];
+            Set<String> clockKeys = new LinkedHashSet<>();
+            Map<String, String> paramActors = new LinkedHashMap<>();
+            Matcher sm = SETTER.matcher(body);
+            while (sm.find()) {
+                String field = Character.toLowerCase(sm.group(1).charAt(0)) + sm.group(1).substring(1);
+                String arg = balancedArg(body, sm.start()).trim();
+                if (TIME_TAIL.matcher(field).find() && isServerClock(arg, body)) {
+                    clockKeys.addAll(verbKeys(field));
+                } else if (isActorField(field) && !REQUEST_VALUE.matcher(arg).find()
+                           && ps.contains(arg) && classify(field) == Bucket.CANDIDATE) {
+                    paramActors.put(field, arg);
+                }
+            }
+            for (Map.Entry<String, String> e : paramActors.entrySet()) {
+                if (verbKeys(e.getKey()).stream().anyMatch(clockKeys::contains))
+                    out.add(m[0] + "::" + e.getKey() + "::" + ps.indexOf(e.getValue()));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * True when a call site of {@code cls#method} passes a request value at {@code idx}.
+     *
+     * <p>⚠ <b>Resolve per OWNER TYPE, never by method name.</b> A first draft of this measurement
+     * matched {@code .<method>(} in any controller, so {@code approve} picked up every unrelated
+     * {@code approve(} in the tree and produced ~20 "from the wire" verdicts that were almost all
+     * cross-contamination — F2-187's recorded mistake ("a method-NAME fallback silently clears the
+     * methods most likely to be duplicated elsewhere"), repeated. With the receiver resolved to a
+     * field declared of this service's type the honest answer was 13 of 92.
+     */
+    static boolean anyCallSitePassesARequestValue(String cls, String method, int idx,
+                                                  Collection<String> controllerSources) {
+        if (idx < 0) return false;
+        for (String src : controllerSources) {
+            Matcher fld = Pattern.compile(
+                "\\b(?:private|protected)\\s+final\\s+" + Pattern.quote(cls) + "\\s+(\\w+)\\s*[;=]")
+                .matcher(src);
+            Set<String> receivers = new LinkedHashSet<>();
+            while (fld.find()) receivers.add(fld.group(1));
+            for (String recv : receivers) {
+                Matcher call = Pattern.compile(
+                    "\\b" + Pattern.quote(recv) + "\\s*\\.\\s*" + Pattern.quote(method) + "\\s*\\(")
+                    .matcher(src);
+                while (call.find()) {
+                    String[] parts = balancedArg(src, call.start()).split(",(?![^()]*\\))");
+                    if (idx < parts.length && REQUEST_VALUE.matcher(parts[idx]).find()) return true;
+                }
+            }
+        }
+        return false;
     }
 
     static String strip(String s) {
         return COMMENTS.matcher(s).replaceAll("");
     }
 
+    /**
+     * Every split-attribution site in the tree, keyed {@code Class#method::field}.
+     *
+     * <p>Two passes, because GAP 10 is not decidable from one file. Pass 1 is the original
+     * same-method shape ({@code setXBy(req.x())}). Pass 2 takes the parameter-borne candidates and
+     * asks the CONTROLLERS what they pass — F2-222's rule that whether a scalar parameter is caller
+     * data is a fact about its call sites, which had been taught to the STAMPING side of this
+     * question and never to the accepting side.
+     */
     private static Map<String, String> scanTree() {
-        Map<String, String> hits = new LinkedHashMap<>();
+        Map<String, String> sources = new LinkedHashMap<>();
+        Map<String, String> controllers = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(MAIN)) {
             for (Path p : files.filter(f -> f.toString().endsWith(".java")).toList()) {
                 String src;
@@ -367,12 +490,27 @@ class SplitAttributionContractTest {
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
-                if (!src.contains(".set")) continue;
                 String cls = p.getFileName().toString().replace(".java", "");
-                for (String hit : splitsIn(strip(src))) hits.put(cls + "#" + hit, p.toString());
+                if (cls.endsWith("Controller")) controllers.put(cls, strip(src));
+                if (src.contains(".set")) sources.put(cls + " " + p, strip(src));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+
+        Map<String, String> hits = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : sources.entrySet()) {
+            String cls = e.getKey().substring(0, e.getKey().indexOf(' '));
+            String path = e.getKey().substring(e.getKey().indexOf(' ') + 1);
+            for (String hit : splitsIn(e.getValue())) hits.put(cls + "#" + hit, path);
+            for (String cand : paramBorneCandidatesIn(e.getValue())) {
+                int cut = cand.lastIndexOf("::");
+                int idx = Integer.parseInt(cand.substring(cut + 2));
+                String site = cand.substring(0, cut);
+                String method = site.substring(0, site.indexOf("::"));
+                if (anyCallSitePassesARequestValue(cls, method, idx, controllers.values()))
+                    hits.put(cls + "#" + site, path);
+            }
         }
         return hits;
     }
@@ -399,7 +537,41 @@ class SplitAttributionContractTest {
      * re-open this set to park a finding — read it, then either fix it or give it a
      * {@link #BY_DESIGN} reason that survives {@link #noReasonIsABareLabel()}.
      */
-    private static final Set<String> WORK_LIST = Set.of();
+    private static final Set<String> WORK_LIST = Set.of(
+        // ⚙ F2-234 — the nine sites GAP 10's widening surfaced, DELIBERATELY WITHOUT REASONS.
+        //
+        // 🔑 The gate could not see any of them because the actor half reaches its setter as a bare
+        // scalar PARAMETER, and REQUEST_VALUE needs a named receiver (req./body./…). The wire-ness
+        // lives at the CALL SITE. F2-222 established exactly that rule and taught it to the STAMPING
+        // side of this question only — so one question, asked of a parameter, was answered on one
+        // side of the wire. The same structural asymmetry F2-233 found for fallbacks one slice
+        // earlier: a rule present on the accepting side and absent on the stamping side, or here the
+        // reverse. Assume a third instance exists.
+        //
+        // Measured: 92 parameter-borne candidates paired with a server clock, 13 resolve FROM THE
+        // WIRE, of which the classifier removes 2 as ASSIGNMENT (NdiSubmissionPackageService's
+        // preparerName/preparerEmail), REFERENCE_TAIL removes 1 as a document reference
+        // (CommitteeMemberRegistryService#renew::appointedByReso), and F2-234 fixed the BCM one. The
+        // other 79 correctly take the actor from actor(auth) / userIdOf(auth) / currentPrincipalName(),
+        // which is why this gate's green was mostly earned.
+        //
+        // ⚠ Do NOT write reasons for these here first. F2-188 measured that failure mode at five
+        // claims, five false, and fluency was what made them look verified. Two of the nine are
+        // plausibly BY_DESIGN — a data-sharing agreement's counterparty signer is by definition NOT a
+        // platform principal (F2-218's "an M&A letter-of-intent signing date genuinely is the
+        // caller's") — and that is a GUESS, which is exactly why it is on the list rather than in the
+        // adjudicated map. SupplierResilienceTestService is the one to read first: its controller
+        // passes body.getOrDefault("approverName", "admin"), so an omitted approver is recorded as
+        // the literal "admin".
+        "CommitteeActionItemService#complete::completedBy",
+        "DataSharingAgreementService#activate::counterpartySigner",
+        "DataSharingAgreementService#activate::signerName",
+        "FourthPartyExposureService#validate::validatorName",
+        "MaterialTopicService#approve::approvedBy",
+        "NdiImprovementPlanService#approve::approverName",
+        "NdiMaturityAssessmentService#approve::approverName",
+        "NdiMaturityAssessmentService#markUnderReview::reviewerName",
+        "SupplierResilienceTestService#approve::approverName");
 
     @Test
     @DisplayName("no NEW method stamps WHEN from the server's clock and takes WHO from the request")
@@ -428,16 +600,22 @@ class SplitAttributionContractTest {
      * it must catch AND every shape it must not.
      */
     @Test
-    @DisplayName("the unadjudicated work list stays empty — F2-224 read all ten")
+    @DisplayName("the unadjudicated work list only ever decreases — F2-234 re-opened it at nine")
     void theWorkListOnlyDecreases() {
         Set<String> found = new TreeSet<>(scanTree().keySet());
         Set<String> stillOpen = new TreeSet<>(WORK_LIST);
         stillOpen.retainAll(found);
 
-        assertThat(stillOpen)
-            .as("F2-224 adjudicated all ten of F2-223's sites: eight fixed, two moved to "
-                + "BY_DESIGN. Park nothing here — read it and fix or classify it.")
-            .isEmpty();
+        // ⚠ F2-234 — this assertion WAS isEmpty(), because F2-224 had adjudicated all ten of
+        // F2-223's sites. It is a ceiling again, and the reason matters: the question was right and
+        // the ANSWER was under-measured, so the figure moves and says why (F2-205), rather than the
+        // question being re-scoped (F2-204). GAP 10's widening found nine sites the detector could
+        // never have reported. Decrease-only from here — read one, fix or classify it, lower this.
+        assertThat(stillOpen.size())
+            .as("nine parameter-borne splits, filed by F2-234 without verdicts. Each needs its "
+                + "controller read: the parameter is caller data at some call sites and the "
+                + "principal at others, and only the call site can say which. %s", stillOpen)
+            .isLessThanOrEqualTo(9);
 
         Set<String> stale = new TreeSet<>(WORK_LIST);
         stale.removeAll(found);
@@ -830,6 +1008,71 @@ class SplitAttributionContractTest {
         // participant is unambiguously the performer. That is the whole reason a classifier
         // triages a population and never decides a verdict (F2-225's own lesson, kept honest
         // here rather than papered over by special-casing the word "participant").
+    }
+
+    /**
+     * F2-234 — GAP 10's two halves, pinned in both directions.
+     *
+     * <p>F2-225's rule: <b>verify a widening by what it ADDS.</b> The parameter-borne pass can only
+     * add sites, so the risk is entirely in the narrowings — and a narrowing that is too wide
+     * silently SHRINKS the population, which reads exactly like a clean tree.
+     */
+    @Test
+    @DisplayName("the By<Suffix> branch pairs people and not documents")
+    void theBySuffixBranchPairsPeopleAndNotDocuments() {
+        // MUST still pair — the wide branch exists for these (F2-223's CrisisCommsTemplateService
+        // site was lost for a whole slice because a literal tail list missed approvedByLegalName).
+        assertThat(isActorField("approvedByLegalName")).isTrue();
+        assertThat(isActorField("approvedBy")).isTrue();
+        assertThat(isActorField("acApprovedBy")).isTrue();
+        assertThat(isActorField("reviewedByUserId")).isTrue();
+        assertThat(isActorField("executorName")).isTrue();
+        assertThat(isActorField("assessedBy")).isTrue();
+
+        // MUST NOT pair — a document reference is not a person. CommitteeMemberTerm's own javadoc:
+        // "Board-resolution code that appointed this member — links back to the resolution register".
+        assertThat(isActorField("appointedByReso")).isFalse();
+        assertThat(isActorField("appointedByResolution")).isFalse();
+        assertThat(isActorField("approvedByCircular")).isFalse();
+        assertThat(isActorField("supersededByDocument")).isFalse();
+
+        // And the classifier's two buckets must keep removing what they removed when this was
+        // measured: 13 wire-resolved candidates minus these is what produced the nine.
+        assertThat(classify("preparerName")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("preparerEmail")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("approverName")).isEqualTo(Bucket.CANDIDATE);
+    }
+
+    /**
+     * F2-234 — the site this slice closed must stay closed, and the closure must be visible to the
+     * WIDENED detector rather than only to a behaviour test.
+     *
+     * <p>🔑 Written as a structural leg because the defect was structural: the BCM compliance
+     * register stamped {@code assessedAt} from the server's clock and took {@code assessedBy} from a
+     * scalar parameter the controller filled from {@code body.assessedBy()}. If the request field
+     * ever comes back, this fails without anyone having to notice the split.
+     */
+    @Test
+    @DisplayName("the BCM compliance assessment takes its assessor from the principal")
+    void theBcmComplianceAssessmentIsNotSplit() throws IOException {
+        assertThat(scanTree().keySet())
+            .as("F2-234 closed this by resolving the assessor from CurrentActor; the widened "
+                + "detector is what proves the closure rather than a behaviour test alone")
+            .doesNotContain("BcmComplianceMappingService#assessCompliance::assessedBy");
+
+        // ⚠ STRIP COMMENTS FIRST. This leg failed on its first run against a correct tree, because
+        // the javadoc on AssessBody explains the removal by NAMING the field it removed — so the
+        // detector read the epitaph as the corpse. F2-193 recorded exactly this ("a detector that
+        // cannot tell a quotation from a claim forces every correction to paraphrase away its own
+        // evidence") and it recurs here in a leg written after quoting it. Nth instance in this
+        // lineage of a check satisfied by something other than its claim.
+        String controller = strip(Files.readString(
+            MAIN.resolve("module/bcm/cycle/controller/BcmComplianceMappingController.java"),
+            StandardCharsets.UTF_8));
+        assertThat(controller)
+            .as("the request record must not declare an assessedBy at all — a field the server "
+                + "ignores tells the caller their value matters (F2-184)")
+            .doesNotContain("assessedBy");
     }
 
     private enum Bucket { NOISE, ASSIGNMENT, CANDIDATE }
