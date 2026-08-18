@@ -1872,6 +1872,85 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE ORDERING THAT FINDS THE LIVE MEMBERS OF THIS FAMILY IS *WHICH FIELD THE CALLER
+  OMITS* — NOT THE BODY'S WIDTH AND NOT WHAT THE INITIALISER ASSERTS** (F2-239, measured
+  2026-08-18). Executing F2-238's filed 28-site `PUT` work list, the population was re-derived
+  (F2-221): 14 routes across 12 services, **all binding the ENTITY** (resolved from the
+  controllers), 10 with a frontend write client. **4 of 28 are live.** 🔑 **F2-238 ranked its
+  own filing by what the initialiser asserts, and so named one field that is not reachable and
+  the wrong half of the other**: `GhgEmissionRecord#coveragePercent` (→ 100.00) IS sent by its
+  only caller, and the live `AuthorityDocument#isPlaceholder` is the **CITATION's** — a
+  different entity, edited by a *second form on the same page* with inputs for three fewer
+  fields. **Harm-if-reached and reach are two orderings and they disagree; carry both.**
+  ⚠⚠ **THE SHARPEST RESET CONTRADICTS THE REQUEST THAT PRODUCED IT.** The register's exact
+  6-key edit body took a planted citation from `seq=300 / placeholder=False / AR_OFFICIAL` to
+  `seq=0 / placeholder=True / EN_ONLY`. Measured identical in dev and prod over 214 live
+  citations: **207 are not placeholders, 212 carry a non-zero `sequence_order`, 207 are past
+  EN_ONLY** — and document 9 alone holds **167 citations spanning 100..4360, 159 distinct**, so
+  editing one NCA ECC requirement paragraph moved it above section 1-1-1 (`OrderBySequenceOrderAsc`
+  server-side, `citationsToTree` client-side) and badged a transcribed sub-control a placeholder.
+  The citation form **has** Arabic inputs and sends them (`title_ar` on 214 of 214,
+  `requirement_text_ar` on 196), so **a human translating a requirement into Arabic and pressing
+  Save recorded it English-only** — house rule 7, and F2-213's reset-is-worse-than-a-null one step
+  further: this reset asserts the absence of the exact data the caller just supplied.
+  🔑 **The correct artefact was 20 lines above the wrong one in the same file** — `createCitation`
+  already defaults all five fields and *inherits* `isPlaceholder` from the parent document, which
+  `updateCitation` discarded on every edit.
+  ⚠⚠ **AND THE OTHER HALF WAS NOT A RESET AT ALL — BOTH ITS WRITE ROUTES REFUSED.**
+  `ChangeTask.titleAr` is `@NotBlank` (F2-30) on an entity bound with `@Valid`, so `POST
+  /changes/{id}/tasks` with the add-form's body and `PUT /changes/tasks/{id}` with the panel's
+  `{status: next}` both answered **400 "titleAr: Field must not be blank"**: **neither the "Add
+  task" button nor the status toggle on the change implementation checklist had ever worked.** The
+  same PUT with `titleAr` echoed back answers 200 and collapses `sort_order` 300 → 0 — the reset
+  sitting behind the 400. 🔑 **A reachability derivation that stops at the caller's BODY cannot see
+  that the route REFUSES it** — F2-238's the-throw-was-holding-the-write-shut from the other side,
+  in a mechanism with no hand-written guard in it, because bean validation runs before the service
+  is entered and **cannot tell an OMITTED mandatory field from a BLANK one.**
+  🔑 **F2-105 DIAGNOSED THIS EXACT MECHANISM, WROTE ELEVEN LINES EXPLAINING IT, AND FIXED IT IN THE
+  FRONTEND** — the PIR card resends `{...change}` under a comment saying it *"400'd on every save
+  from the day F2-30 landed"*. That closes one caller; it is not a defence (F2-237), and **the
+  write-up is what made the two siblings in the same controller look covered** (F2-215): a reader
+  who finds the mechanism explained does not then ask which other routes share it.
+  ⚙ **The fix, and where the invariant belongs.** Remove the initialiser, own the default on the
+  create path (9 initialisers, 3 entities — and **0 `new X()` producers**, checked, so the service
+  creates are the whole population); **drop `@Valid` from a partial-update PUT** and put the
+  mandatory-field invariant on the ROW (`requireNotBlank` refuses a BLANK title with a 400 naming
+  the field while an OMITTED one leaves the stored value alone), keeping it on the CREATE routes
+  where a full entity genuinely arrives; and give the add-task form the Arabic input house rule 7
+  requires, which is what makes the create's 400 correct rather than the defect.
+  ⚠ **`ClosedVocabulary` per COLUMN for the translation status**: `updateCitation` validated
+  nothing, so a caller reached a CHECK-constrained column and got the CHECK's 409 rather than a 400
+  — and the collation is case-INSENSITIVE, so `'ar_official'` was **accepted and stored verbatim**
+  while the badge, tone map and label lookup all compare case-sensitively (F2-179; probed pre-fix).
+  `require` not `coerce` (F2-182). It also retires a **seventh hand-rolled vocabulary** that
+  `HandRolledVocabularyMirrorTest` never listed.
+  ⚠⚠ **THE NEW GATE LEG IS A HARD ZERO WITH AN EMPTY EXEMPTION MAP, AND THE ANNOTATION ORDER IS
+  THE TRAP.** `noPartialUpdateRouteBindsAnEntityWithValid`: **172 PUT/PATCH routes take a body, 94
+  bind an entity, 9 of 411 entities declare a bean-validated mandatory field, exactly 2 routes were
+  in the intersection.** A hard zero is safe because the better fix is always available — bind a
+  purpose-built request record (F2-213's structural direction), which puts the route outside the
+  population by construction — so there is no correct code for it to fail on (F2-214). ⚠ It passed
+  on its first run, which is also what a rotted regex looks like: restoring master's controller makes
+  it fail naming both routes and nothing else. **The house idiom is `@Valid @RequestBody T x`, and a
+  pattern anchored on `@RequestBody` looking only FORWARDS reported 0 of 2** — indistinguishable from
+  a clean tree, the quiet direction again.
+  ⚠ **Two derivation errors of mine, in OPPOSITE directions** (F2-228's rule: two such errors produce
+  an answer neither earns). Attributing FE call sites by wrapper NAME **over**-reported — `NdiPage`'s
+  `updateCapa` is `lib/ndiGaps.ts`'s, over a different register, which is F2-187's recorded mistake.
+  Resolving by import statement then **under**-reported, missing `changeApi.updateTask`: a
+  **NAMESPACED** member of an api-group object, where the imported name is the group and not the
+  method. Both shapes are needed.
+  ⚙ **Filed:** the residual **19-site work list**, ordered by reach rather than by initialiser
+  severity, with the 4 sites whose route has no FE write client at all named as least urgent (read
+  the route and probe it; do not write 19 reasons — F2-188);
+  `platform.authority_document_citations` has a CHECK on `translation_status` and **none** on
+  `sequence_order`, `weight`, `mandatory` or `is_placeholder` — cheap now that this slice closed the
+  only open writer (F2-183), and `weight` is `decimal(5,2)` with no declared range; `createCitation`
+  defaults `sequenceOrder` to 0 while the FE create sends nothing, so every UI-added requirement
+  paragraph lands at the top of its regulation (a product question, not this family's defect); and
+  the structural root, now measured at **94 entity-bound PUT/PATCH routes** — a purpose-built request
+  record per endpoint would make resets, refusals and mass assignment alike unrepresentable, which is
+  an owner decision.
 - ⚠⚠ **A `PATCH` WHOSE OMITTED FIELDS ARE WRITTEN IS A CONTRACT VIOLATION, AND WHERE THE
   NEVER-FIRING GUARD'S BODY IS A `throw` THE ROUTE REFUSES INSTEAD — THE THROW WAS HOLDING THE
   WRITE SHUT** (F2-238, measured 2026-08-18). Executing F2-237's filed 46-site work list, the
