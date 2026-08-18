@@ -1872,6 +1872,74 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A RAW CONTROL BYTE IN SOURCE MAKES THE FILE INVISIBLE TO EVERY GREP-BASED
+  INSTRUMENT IN THIS REPO, AND EVERY MEASUREMENT HERE IS A GREP-BASED INSTRUMENT** (F2-235,
+  measured 2026-08-18). Grepping `SplitAttributionContractTest` to re-read F2-234's work list, the
+  tool answered **`binary file matches (found "\0" byte around offset 27186)`** and returned **no
+  lines**, for a pattern occurring many times in that file. ripgrep classifies a NUL-bearing file as
+  **binary**: a content-mode search prints that line and nothing else, and a search whose pattern
+  does not match prints **nothing at all** — indistinguishable from a clean file. Census over the
+  three trees every instrument scans (**3,557 files**): **3 files held raw control bytes.**
+  🔑 **All three were BEHAVIOUR-PRESERVING, which is exactly why they survived a 4,073-test green
+  build** — a raw 0x00 inside a Java string literal is legal (JLS: a `StringCharacter` is any
+  `InputCharacter` but `"` and `\`), and in a JS regex literal `[\s<NUL>-<0x1F>]` denotes precisely
+  the range `[\s\x00-\x1f]` does. Nothing failed and no test could notice.
+  ⚠⚠ **The sharpest instance had been unreadable since the commit that created the thing worth
+  reading.** `KbArticlePage.tsx` holds `sanitiseUrl`, the strict URL-scheme allowlist for markdown
+  links rendered through `dangerouslySetInnerHTML` — the guard that stops
+  `[click me](javascript:alert(1))` executing with the reader's session — and its NUL + 0x1F have
+  been there since **`957b679e`**, whose message reads *"3 real bug fixes: … KB stored-XSS (#120)"*.
+  🔑 **The one frontend file most worth reading in a security sweep was the file no security sweep
+  could read.** And `git diff --stat` reports it `Bin 6962 -> 8366 bytes`, so **git will not show a
+  textual diff for it either** — the collapse was invisible in code review as well as in every scan.
+  ⚠ **The other two are the reusable pair.** One was **F2-234's own escape collapse, one slice
+  earlier**, in the gate that measures split attribution — so the instrument was unreadable by the
+  tool used to measure everything else. One (`IntakeSystemSubmissionTest`, a raw 0x01) was
+  **deliberate**, F2-175's C0-control payload fixture, and therefore not a defect — but written raw,
+  the test's whole subject was invisible to a reader, who saw `\"v2\" model` with an unexplained gap.
+  Rewritten `\001`: identical at runtime, legible in the diff. 🔑 **A deliberate control byte is the
+  argument FOR the hard zero, not against it** — it kept its behaviour and gained a reader.
+  ⚠⚠ **The guard was sound, had NO TEST OF ANY KIND, and the comment on its load-bearing line
+  denied the mechanism that keeps it shut.** `renderMarkdown` escapes `&`/`<`/`>` across the whole
+  document in step 1 and rewrites links in step 3, and that ORDERING closes the vector the allowlist
+  cannot see: written with real entities, `&#106;avascript&#58;alert(1)` contains **no colon at all**,
+  so `!trimmed.includes(':')` — the relative-path fallback — **accepts it**, and a browser decoding
+  the attribute would get `javascript:` back. What makes it inert is that step 1 already turned `&`
+  into `&amp;`. **Move step 1 below step 3 and the guard opens with no other change.** The comment
+  there read *"the HTML-escape pass above already handled <, >, & **but the raw URL never passed
+  through it**"* — false, in the one direction that matters (F2-184's shape, on the sentence a reader
+  consults before touching the pipeline).
+  ⚠⚠ **THE MUTATION HARNESS SHOWED THE OBVIOUS BLOCKED-VECTOR ASSERTIONS DO NOT DEPEND ON THE
+  MECHANISMS THEY APPEAR TO TEST.** Deleting the leading-control strip leaves every
+  `<TAB>javascript:` case **still blocked** — the colon rule does that work — and deleting
+  `.toLowerCase()` leaves `JavaScript:` blocked for the same reason; both mutations SURVIVED. Their
+  only observable effect is on a **legitimate** URL (`<TAB>https://sama.gov.sa`,
+  `HTTPS://SAMA.GOV.SA`), so two POSITIVE vectors had to be added before either could be killed.
+  🔑 **A test that blocks the right things can still be blind to why** — and the code comment
+  naming the tab as *"a real XSS bypass in older WebKit"* points at the strip, which is not the
+  defence. 6 killed / 0 survived / 0 anchor-miss; a 7th **withdrawn as invalid** rather than counted,
+  because it weakened one of my own assertions and you can always delete an assertion (F2-206).
+  ⚠⚠ **MY OWN GATE FILE CONTAINED TWO RAW CONTROL BYTES AND WOULD HAVE FAILED ITS OWN
+  INVARIANT.** I wrote the self-test's NUL and 0x1F literally and they landed on disk faithfully.
+  Fixed as the octal escapes `\0` and `\037`, which is the claim the gate makes; the new test builds
+  its control characters with `String.fromCharCode`. 🔑 **A test that pins this defect must not be
+  able to contain it** — and an escape is the only form that survives every tool between an author
+  and a file, which is the same rule as *write scan scripts with a file write, never a heredoc*.
+  ⚠ `config/ScannableSourceContractTest` is a **hard zero with NO exemption map**, and that is safe
+  rather than strict (F2-214): Java and TypeScript both offer an escape for every control character,
+  so a raw one is never the only way to express an intent — there is no correct code for it to fail
+  on. Four legs: the invariant over a **derived** population (walk, never list); a **per-root** floor
+  rather than one total, because the wrong answers are *a root that stops resolving* and *a scan that
+  reaches one tree* (2,000 / 400 / 700 against measured 2,286 / 446 / 825 — F2-215: a floor must sit
+  above the largest WRONG answer); a **synthetic self-test** that the detector fires on 0x00 and 0x1F
+  and not on tab/CR/LF (F2-195); and a leg naming **the three files by path**, since a count can be
+  satisfied by the wrong files while a walk that resolves the backend but not the frontend passes.
+  ⚙ **Filed:** `DB-11072026.sql` at the repo root is a 13 MB **UTF-16LE** dump (13.4 M NUL bytes) and
+  **untracked** — not in the repo, but local `*.sql` sweeps skip it; excluded by root scoping rather
+  than by name. And the `//evil.com` protocol-relative case is **REFUTED as a finding**: `/` admits it
+  and the comment says *"same-origin relative paths"*, but a KB author who can write a link can
+  already write `https://evil.com`, so it grants nothing — noted only because the comment overstates
+  what `/` means.
 - ⚠⚠ **ONE QUESTION, ASKED OF A PARAMETER, ANSWERED ON ONE SIDE OF THE WIRE** (F2-234,
   measured 2026-08-18). Executing F2-233's filed **4 BCM services**, the population was re-derived
   from the gate's own printed output first (F2-221): 7 sites, all four controllers binding the

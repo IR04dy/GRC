@@ -492,7 +492,7 @@ class SplitAttributionContractTest {
                 }
                 String cls = p.getFileName().toString().replace(".java", "");
                 if (cls.endsWith("Controller")) controllers.put(cls, strip(src));
-                if (src.contains(".set")) sources.put(cls + " " + p, strip(src));
+                if (src.contains(".set")) sources.put(cls + "\0" + p, strip(src));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -500,8 +500,8 @@ class SplitAttributionContractTest {
 
         Map<String, String> hits = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : sources.entrySet()) {
-            String cls = e.getKey().substring(0, e.getKey().indexOf(' '));
-            String path = e.getKey().substring(e.getKey().indexOf(' ') + 1);
+            String cls = e.getKey().substring(0, e.getKey().indexOf('\0'));
+            String path = e.getKey().substring(e.getKey().indexOf('\0') + 1);
             for (String hit : splitsIn(e.getValue())) hits.put(cls + "#" + hit, path);
             for (String cand : paramBorneCandidatesIn(e.getValue())) {
                 int cut = cand.lastIndexOf("::");
