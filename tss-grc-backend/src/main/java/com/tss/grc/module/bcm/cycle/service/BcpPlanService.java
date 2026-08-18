@@ -175,7 +175,13 @@ public class BcpPlanService {
         body.setApprovedBy(null);
         body.setApprovedAt(null);
         body.setPublishedAt(null);      // transition()'s; see BcpPlan#publishedAt
-        if (body.getCurrentVersion() == null) body.setCurrentVersion(1);
+        // F2-234 — F2-220 closed status/approvedBy/approvedAt/publishedAt on THIS create and left
+        // currentVersion as a DEFAULT one line below them, so a caller could file a brand-new plan
+        // claiming to be at v7 with no BcpVersion row behind it. snapshot() owns this counter: it
+        // derives the next number from the versions table, so the first approval would silently
+        // reduce 7 → 1. The version on a continuity plan is what a recovery team cites.
+        // 🔑 F2-215: a reader who finds four fields scrubbed does not ask what the fifth is.
+        body.setCurrentVersion(1);
         if (body.getPlanCode() == null || body.getPlanCode().isBlank()) {
             body.setPlanCode(nextCode(body.getPlanType()));
         }
@@ -258,6 +264,16 @@ public class BcpPlanService {
         body.setId(null);
         body.setOrganisationId(org);
         body.setPlanId(planId);
+        // F2-234 — updateSection() stamps lastEditedAt from the server's clock and lastEditedBy
+        // from the acting principal. A section that has just been ADDED has never been edited, so
+        // it cannot carry either; accepting them let a caller claim an edit history for a record
+        // with none. The CREATE is recorded by the audit row below, and BaseEntity's createdAt.
+        // ⚠ The two provenance markers in this column ("template:<code>", "BIA generator", 21 of
+        // 120 rows in dev and prod) are written by paths that build BcpSection directly —
+        // BcmLibraryController and generateFromBia — never through addSection, whose only caller
+        // is its own route. Checked, not assumed: clearing here cannot break either generator.
+        body.setLastEditedAt(null);
+        body.setLastEditedBy(null);
         BcpSection saved = sections.save(body);
         audit.log("CREATE", "BcpSection", saved.getId(),
             "Section added: " + plan.getPlanCode() + " / " + saved.getSectionKey());

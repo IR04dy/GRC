@@ -55,6 +55,16 @@ public class BcmRemediationService {
     private static final Set<String> CAPA_STATUSES = Set.of(
         "OPEN", "ASSIGNED", "IN_PROGRESS", "EVIDENCE_SUBMITTED", "UNDER_REVIEW",
         "CLOSED", "OVERDUE", "REOPENED");
+    /**
+     * F2-234 — the state a CAPA is CREATED in; every other CAPA_STATUS is transitionCapa()'s.
+     *
+     * <p>🔑 <b>F2-220 fixed {@link #createGap} in THIS FILE, with this primitive, under a comment
+     * naming this exact defect — and left the identical two lines in {@link #createCapa} eighty
+     * lines below.</b> Not a sibling file and not a sibling module: the same file. F2-215's
+     * headline at its sharpest — fixing the instance you noticed leaves the remainder looking
+     * covered, because the mechanism that covers it is visibly present.
+     */
+    private static final String INITIAL_CAPA_STATUS = "OPEN";
     private static final Set<String> CAPA_PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
 
     private final BcmLessonLearnedRepository lessons;
@@ -252,9 +262,20 @@ public class BcmRemediationService {
             throw new IllegalArgumentException("progressPercent must be 0..100");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("OPEN");
-        if (!CAPA_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-234 — a DEFAULT, not a guard, followed by a MEMBERSHIP test that admitted CLOSED.
+        // transitionCapa() refuses to CLOSE without evidence ("Cannot CLOSE without evidence")
+        // and walks OPEN → ASSIGNED → IN_PROGRESS → EVIDENCE_SUBMITTED → UNDER_REVIEW → CLOSED;
+        // a create naming the state skipped the ladder AND the evidence requirement. It also
+        // produced a row nothing could move: updateCapa() refuses to edit a CLOSED CAPA and
+        // transitionCapa() has `case "CLOSED" -> false`, so only BCM:APPROVE reopenCapa() could.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_CAPA_STATUS, "a BCM corrective action",
+            "POST /api/v1/bcm/capas/{id}/transition"));
+        // closureDate is transitionCapa()'s stamp on CLOSE and reopenCapa() clears it; a CAPA
+        // that has never been closed cannot carry one. progressPercent is deliberately NOT
+        // cleared — it is the owner's own progress report, validated 0..100 and defaulted to 0,
+        // and refusing it would be a gate failing on correct code (F2-214).
+        body.setClosureDate(null);
         BcmCorrectiveAction saved = capas.save(body);
         audit("BcmCorrectiveAction", saved.getId(), saved.getTitleEn(), "CREATE", null, saved.getStatus(),
             "CAPA created: " + saved.getTitleEn());

@@ -141,6 +141,17 @@ class ServerStampedFieldContractTest {
         + "value only because the row already holds it. Supplying the value is the entire point of "
         + "creating a setting; there is no decision, no attribution and no state being reached."),
 
+        // F2-234 — both BCM CAPA sites, and the narrowing that keeps this gate off correct code.
+        Map.entry("BcmRemediationService::BcmCorrectiveAction#progressPercent",
+        "transitionCapa() stamps progressPercent = 100 on CLOSE, but that is a COMPLETION side "
+        + "effect, not ownership of the field: the rest of the time it is the action owner's own "
+        + "progress report, validated 0..100 by both createCapa() and updateCapa() and defaulted to "
+        + "0 on create. Reporting progress is exactly what the owner of a corrective action does, so "
+        + "refusing it would be a gate failing on correct code (F2-214) — and the completion stamp "
+        + "is still unreachable from either write path, because F2-234 made the create land at OPEN "
+        + "and updateCapa() refuses to edit a CLOSED CAPA at all. The dangerous halves of the same "
+        + "intersection WERE closed: status now goes through ServerOwnedState.requireInitial and "
+        + "closureDate is cleared on create."),
         Map.entry("SgiCommitmentService::SgiCommitment#currentValue",
         "refreshValue() pulls current_value from a linked ESG_METRIC or GHG_TOTAL source, and gates "
         + "on value_source != MANUAL. For a MANUAL commitment the class javadoc states that a human "
@@ -338,11 +349,22 @@ class ServerStampedFieldContractTest {
      * less true story — F2-228's headline, where two detector errors in opposite directions produced a
      * green neither earned.
      *
-     * <p>The remaining FOUR are the BCM cluster, still a work list with no verdicts: their controllers
-     * all bind the ENTITY (checked, not assumed), so they are genuinely open, and every one needs its
-     * own live probe.
+     * <p>⚙ <b>F2-234: 4 → 0, and the work list is EMPTY for the first time.</b> All four BCM services
+     * were read and probed. Three are gone from the population outright — {@code BcmService}'s legacy
+     * plan create and update, {@code BcmComplianceMappingService}'s create, and
+     * {@code BcpPlanService}'s {@code currentVersion} and {@code addSection} edit stamps. The fourth,
+     * {@code BcmRemediationService}, keeps a {@link #BY_DESIGN} verdict for {@code progressPercent}
+     * while the dangerous halves of the same intersection ({@code status}, {@code closureDate}) were
+     * closed.
+     *
+     * <p>⚠ <b>An empty work list is exactly what a rotted detector also produces</b> (F2-219: an
+     * anti-vacuity floor of {@code >= BASELINE - n} can never fail once the baseline is 0). What keeps
+     * this honest is not the number but the three reverse legs — every {@link #BY_DESIGN},
+     * {@link #CLOSED_ELSEWHERE} and {@link #FILED_OWNER_DECISION} entry must still name something the
+     * scan finds, so a detector that stops matching fails 15 assertions rather than reporting success.
+     * Do not "simplify" those away on the grounds that the count is zero.
      */
-    private static final int BASELINE_CONTRADICTED_SERVICES = 4;
+    private static final int BASELINE_CONTRADICTED_SERVICES = 0;
 
 
     // ── source plumbing ──────────────────────────────────────────────────────

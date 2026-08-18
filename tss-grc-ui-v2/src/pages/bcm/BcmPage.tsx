@@ -213,7 +213,11 @@ export function BcmPage() {
     { kind: 'text',   key: 'planNameAr',     label: `${t('bcmFldPlanName')} (${t('fldTitleArLbl').match(/\(([^)]+)\)/)?.[1] ?? 'AR'})`, maxLength: 200, span: 6 },
     { kind: 'select', key: 'planType',       label: t('bcmFldPlanType'), options: PLAN_TYPE_OPTIONS, span: 6 },
     { kind: 'text',   key: 'version',        label: t('fldVersion'), placeholder: '1.0', span: 6 },
-    { kind: 'select', key: 'status',         label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 6 },
+    // F2-234 — no status select here. This form was a second, unguarded way to do exactly what the
+    // four row actions below already do properly: Submit for review / Approve / Invoke / Restore,
+    // each of which enforces the ISO 22301 order and each of which is offered only from the states
+    // it is legal from. The server now refuses a status change on this route, so leaving the field
+    // would offer a control that 400s — and a create could no longer name its own state anyway.
     { kind: 'date',   key: 'nextReviewDate', label: t('fldNextReviewDate'), span: 6 },
   ];
 

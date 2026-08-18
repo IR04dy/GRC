@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.bcm.entity.BcmExercise;
 import com.tss.grc.module.bcm.entity.BcmPlan;
 import com.tss.grc.module.bcm.entity.BiaRecord;
@@ -73,6 +74,19 @@ public class BcmService {
             .orElseThrow(() -> new EntityNotFoundException("BCM Plan not found: " + id));
     }
 
+    /**
+     * F2-234 — the state a legacy BCM plan is CREATED in. Every other status belongs to one of
+     * the four guarded lifecycle routes below, each of which refuses out-of-order calls.
+     *
+     * <p>⚠ {@code bcm.bcm_plans} has <b>zero CHECK constraints</b> on a NOT NULL {@code status}
+     * (measured 2026-08-18, dev and prod identical: 10 rows, DRAFT 7 / APPROVED 3). The create
+     * had no vocabulary test of any kind, so an arbitrary string was storable — and each
+     * transition guard is an equality test against a named state, so such a row would be
+     * <b>permanently untransitionable by every route</b>. That is F2-220's {@code platform.issues}
+     * shape, creatable on demand through the API.
+     */
+    private static final String INITIAL_PLAN_STATUS = "DRAFT";
+
     @Transactional
     public BcmPlan createPlan(BcmPlan req) {
         // Mass-assignment defense — controller accepts the entity via
@@ -80,6 +94,9 @@ public class BcmService {
         // merge() into a potentially cross-tenant row.
         req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_PLAN_STATUS, "a BCM plan",
+            "POST /api/v1/bcm/legacy-plans/{id}/submit-for-review"));
         return planRepo.save(req);
     }
 
@@ -90,7 +107,17 @@ public class BcmService {
         existing.setPlanNameAr(req.getPlanNameAr());
         existing.setPlanType(req.getPlanType());
         existing.setVersion(req.getVersion());
-        existing.setStatus(req.getStatus());
+        // F2-234 — this wrote the status unconditionally, so the ordinary edit route performed
+        // exactly the transitions submitForReview/approve/invoke/restore guard, under the SAME
+        // permission (BCM:WRITE) — so there is no escalation to find: the object-level machine
+        // was the only control and the update sat beside it without one (F2-219's shape).
+        // An ECHO is accepted so a form that round-trips the row still works; a CHANGE is not
+        // (F2-231: the refusal cannot break a request that was not performing a transition).
+        if (req.getStatus() != null && !req.getStatus().equals(existing.getStatus()))
+            throw new IllegalArgumentException(
+                "A BCM plan's status is not editable here (" + existing.getStatus() + " → "
+                + req.getStatus() + "). Use submit-for-review / approve / invoke / restore, "
+                + "which enforce the ISO 22301 lifecycle order.");
         existing.setNextReviewDate(req.getNextReviewDate());
         return planRepo.save(existing);
     }
