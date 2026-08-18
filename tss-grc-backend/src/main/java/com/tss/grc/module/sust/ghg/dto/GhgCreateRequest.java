@@ -38,6 +38,12 @@ public record GhgCreateRequest(
         @Size(max = 255) String ownerName,
         @Size(max = 255) String ownerEmail
 ) {
+    /**
+     * The create-path default for coverage, F2-240 — a record whose coverage the submitter did not
+     * state is taken as fully covering its source, which is what the entity's initialiser meant.
+     */
+    static final BigDecimal DEFAULT_COVERAGE_PERCENT = new BigDecimal("100.00");
+
     public GhgEmissionRecord toEntity() {
         GhgEmissionRecord e = new GhgEmissionRecord();
         e.setReportingYear(reportingYear);
@@ -54,7 +60,13 @@ public record GhgCreateRequest(
         e.setEmissionFactorUnit(emissionFactorUnit);
         e.setEmissionFactorId(emissionFactorId);
         if (emissionValueTco2e != null) e.setEmissionValueTco2e(emissionValueTco2e);
-        if (coveragePercent != null) e.setCoveragePercent(coveragePercent);
+        // F2-240 — this create path OWNS the coverage default, because the entity no longer
+        // initialises it. That initialiser was `new BigDecimal("100.00")`, and it made
+        // `GhgEmissionRecordService#update`'s `!= null` guard un-fireable — so a PUT omitting the
+        // key raised an ISAE 3410 assurance input to FULL coverage (8 of 18 live dev rows and 7 of
+        // 17 in prod sit between 48% and 89%). A reset that MANUFACTURES an assurance is the
+        // sharpest member of this family: it does not lose a fact, it asserts one.
+        e.setCoveragePercent(coveragePercent != null ? coveragePercent : DEFAULT_COVERAGE_PERCENT);
         e.setVerificationProvider(verificationProvider);
         e.setMethodology(methodology);
         e.setNotes(notes);

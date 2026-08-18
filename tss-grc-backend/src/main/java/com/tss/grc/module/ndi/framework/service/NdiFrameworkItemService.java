@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -63,6 +64,13 @@ public class NdiFrameworkItemService {
         req.setOrganisationId(org());
         if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("ACTIVE");
         if (req.getPriority() == null || req.getPriority().isBlank()) req.setPriority("MEDIUM");
+        // F2-240 — these two defaults were the ENTITY's initialisers, and status/priority above
+        // were not. Two of four covered here, the other two left to the field declaration: the
+        // shape F2-215 measured, where the mechanism a reader finds present makes the remainder
+        // look covered. Both columns are NOT NULL, and while `mandatory` is only display state,
+        // `weight` is a scoring input, so an omitted default is a 500 on create either way.
+        if (req.getMandatory() == null) req.setMandatory(false);
+        if (req.getWeight() == null) req.setWeight(BigDecimal.ONE);
         validate(req);
         return repo.save(req);
     }

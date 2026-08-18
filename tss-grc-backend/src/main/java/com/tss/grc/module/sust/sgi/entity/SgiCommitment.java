@@ -66,7 +66,12 @@ public class SgiCommitment {
 
     // ── SGI-C (V296) — current_value source lineage ──────────────────────
     /** MANUAL (default) | ESG_METRIC | GHG_TOTAL — provenance of current_value. */
-    @Column(name = "value_source", nullable = false, length = 20) private String valueSource = "MANUAL";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by SgiCommitmentService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(name = "value_source", nullable = false, length = 20) private String valueSource;
     /** FK-by-convention to sust.esg_metric when {@code value_source = ESG_METRIC}. */
     @Column(name = "source_metric_id") private Long sourceMetricId;
     /** GHG scope 1..3 to narrow a {@code GHG_TOTAL} refresh; null = all scopes. */

@@ -58,7 +58,12 @@ public class SustainabilityEvidence {
     @Column(name = "valid_to")    private LocalDate validTo;
     @Column(name = "expiry_date") private LocalDate expiryDate;
 
-    @Column(nullable = false, length = 20)              private String confidentiality = "INTERNAL";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by SustainabilityEvidenceService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false, length = 20)              private String confidentiality;
     @Column(name = "verification_status",   length = 30) private String verificationStatus;
     @Column(name = "verification_provider", length = 120) private String verificationProvider;
     @Column(name = "verification_date")                   private LocalDate verificationDate;

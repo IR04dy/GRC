@@ -376,6 +376,13 @@ class CorrectiveActionServiceTest {
     @Test
     void aggregate_countsByType() {
         CorrectiveAction car = action("OPEN", "Sara");
+        // F2-240 — say CORRECTIVE out loud. This line used to be absent: the fixture leaned on
+        // `CorrectiveAction`'s `actionType = "CORRECTIVE"` initialiser, which is the very thing that
+        // made `update`'s `if (req.getActionType() != null)` guard un-fireable, so removing it took
+        // this assertion from 1 to 0. The sibling below always stated its type — a fixture where one
+        // of two values comes from the entity and the other from the test cannot tell you which half
+        // is load-bearing (F2-179), and here the silent half was the defect.
+        car.setActionType("CORRECTIVE");
         CorrectiveAction par = action("OPEN", "Sara");
         par.setActionType("PREVENTIVE");
         when(repo.findByOrganisationIdAndStatusIn(eq(ORG_ID), any()))

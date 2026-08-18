@@ -37,6 +37,16 @@ public record ClimateRiskCreateRequest(
         @Size(max = 255) String ownerEmail,
         LocalDate reviewDate
 ) {
+    /**
+     * The create-path defaults for the three axes, F2-240.
+     *
+     * <p>Named rather than inlined so the test that pins them, and any future second create path,
+     * read the same values instead of a second copy of the numbers.
+     */
+    static final String DEFAULT_TIME_HORIZON = "MEDIUM";
+    static final short DEFAULT_LIKELIHOOD = 3;
+    static final short DEFAULT_IMPACT = 3;
+
     public ClimateRiskOpportunity toEntity() {
         ClimateRiskOpportunity e = new ClimateRiskOpportunity();
         e.setKind(kind);
@@ -46,9 +56,15 @@ public record ClimateRiskCreateRequest(
         e.setTitleAr(titleAr);
         e.setDescriptionEn(descriptionEn);
         e.setDescriptionAr(descriptionAr);
-        if (timeHorizon != null) e.setTimeHorizon(timeHorizon);
-        if (likelihood != null) e.setLikelihood(likelihood);
-        if (impact != null) e.setImpact(impact);
+        // F2-240 — this create path OWNS these three defaults, because the entity no longer
+        // initialises them. It used to: the initialiser served the create and simultaneously made
+        // `ClimateRiskOpportunityService#update`'s `!= null` guard un-fireable, so a PUT that
+        // omitted an axis reset a TCFD / IFRS S2 assessment's rating (12, 10 and 7 of 17 live rows
+        // in dev and prod carry a value these defaults would overwrite). All three columns are
+        // NOT NULL, so an omitted default here is a 500 on create, not a null.
+        e.setTimeHorizon(timeHorizon != null ? timeHorizon : DEFAULT_TIME_HORIZON);
+        e.setLikelihood(likelihood != null ? likelihood : DEFAULT_LIKELIHOOD);
+        e.setImpact(impact != null ? impact : DEFAULT_IMPACT);
         e.setFinancialImpactSar(financialImpactSar);
         e.setRelatedService(relatedService);
         e.setRelatedSupplier(relatedSupplier);

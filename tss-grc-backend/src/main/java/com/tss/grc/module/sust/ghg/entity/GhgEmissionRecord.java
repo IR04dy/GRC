@@ -61,7 +61,12 @@ public class GhgEmissionRecord {
     @Column(name = "value_source", nullable = false, length = 20) private String valueSource = "ASSERTED";
 
     @Column(name = "coverage_percent", nullable = false, precision = 5, scale = 2)
-    private BigDecimal coveragePercent = new BigDecimal("100.00");
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by GhgCreateRequest#toEntity, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    private BigDecimal coveragePercent;
 
     @Column(nullable = false)                                  private Boolean verified = false;
     @Column(name = "verification_provider", length = 120)      private String verificationProvider;

@@ -55,9 +55,24 @@ public class NdiFrameworkItem {
     @Column(name = "evidence_guidance_ar", columnDefinition = "NVARCHAR(MAX)") private String evidenceGuidanceAr;
 
     @Column(name = "scoring_method", length = 40)               private String scoringMethod;  // LEVEL_0_5 | BINARY | PERCENT | RUBRIC
-    @Column(nullable = false, precision = 5, scale = 2)         private BigDecimal weight = BigDecimal.ONE;
-    @Column(nullable = false, length = 20)                      private String priority = "MEDIUM";
-    @Column(nullable = false)                                   private Boolean mandatory = false;
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by NdiFrameworkItemService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false, precision = 5, scale = 2)         private BigDecimal weight;
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by NdiFrameworkItemService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false, length = 20)                      private String priority;
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by NdiFrameworkItemService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false)                                   private Boolean mandatory;
     @Column(name = "owner_role", length = 80)                   private String ownerRole;
     @Column(name = "review_frequency", length = 30)             private String reviewFrequency;
 
@@ -69,7 +84,12 @@ public class NdiFrameworkItem {
     @Column(name = "is_official_import", nullable = false) private Boolean isOfficialImport = false;
     @Column(name = "is_placeholder",     nullable = false) private Boolean isPlaceholder    = true;
 
-    @Column(nullable = false, length = 20) private String status = "ACTIVE";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by NdiFrameworkItemService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false, length = 20) private String status;
     @Column(name = "effective_date") private LocalDate effectiveDate;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
