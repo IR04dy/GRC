@@ -1117,14 +1117,14 @@ function MaturityTab() {
     try { await returnMaturity(it.id!, reason); toast.info(isAr ? 'أُعيد للتعديل' : 'Returned'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
+  // F2-236 — no prompt for the approver. The server records the authenticated principal, so
+  // asking the operator to type a name only invited them to type somebody else's.
   async function onApprove(it: NdiMaturityAssessment) {
-    const approverName = await dialog.prompt({
+    if (!(await dialog.confirm({
       title: isAr ? 'اعتماد البند' : 'Approve item',
-      label: isAr ? 'اسم المعتمد' : 'Approver name',
-      required: true,
-    });
-    if (!approverName) return;
-    try { await approveMaturity(it.id!, approverName); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
+      body: isAr ? 'سيُسجَّل الاعتماد باسمك.' : 'The approval will be recorded in your name.',
+    }))) return;
+    try { await approveMaturity(it.id!); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function onReopen(it: NdiMaturityAssessment) {
@@ -1453,14 +1453,15 @@ function ComplianceTab() {
     try { await returnCompliance(it.id!, reason); toast.info(isAr ? 'أُعيد' : 'Returned'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
+  // F2-236 — the server never read this name: NdiComplianceAssessmentService#approve takes no
+  // actor parameter at all, so the required prompt asserted that the answer mattered when it was
+  // discarded on arrival.
   async function onApprove(it: NdiComplianceAssessment) {
-    const approverName = await dialog.prompt({
+    if (!(await dialog.confirm({
       title: isAr ? 'اعتماد البند' : 'Approve item',
-      label: isAr ? 'اسم المعتمد' : 'Approver name',
-      required: true,
-    });
-    if (!approverName) return;
-    try { await approveCompliance(it.id!, approverName); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
+      body: isAr ? 'سيُسجَّل الاعتماد باسمك.' : 'The approval will be recorded in your name.',
+    }))) return;
+    try { await approveCompliance(it.id!); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function onReopen(it: NdiComplianceAssessment) {
@@ -3378,7 +3379,7 @@ function ImprovementTab() {
   async function onApprove() {
     if (!currentPlan) return;
     try {
-      await approvePlan(currentPlan.id!, 'admin');
+      await approvePlan(currentPlan.id!);
       toast.success(isAr ? 'تم الاعتماد' : 'Approved');
       await loadPlan(currentPlan);
     } catch (e) {

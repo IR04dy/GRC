@@ -53,8 +53,9 @@ public class NdiImprovementPlanController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize(APPROVE)
-    public NdiImprovementPlan approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approverName"));
+    public NdiImprovementPlan approve(@PathVariable Long id) {
+        // F2-236 — no body: the approver is the authenticated principal.
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/transition")

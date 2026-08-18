@@ -77,7 +77,7 @@ export function DataSharingPage() {
   }
 
   async function onSubmit(id: number)   { try { setBusyId(id); await submitDsa(id);   toast.success(t('dsaSubmitted'));  await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
-  async function onActivate(id: number) { try { setBusyId(id); await activateDsa(id, 'admin', 'counterparty'); toast.success(t('dsaActivated')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
+  async function onActivate(id: number) { try { setBusyId(id); await activateDsa(id); toast.success(t('dsaActivated')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
   async function onExpire(id: number)   { if(!window.confirm(t('dsaExpireConfirm'))) return; try { setBusyId(id); await expireDsa(id); toast.success(t('dsaExpired')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
   async function onTerminate(id: number){ const reason = window.prompt(t('dsaTerminatePrompt'), ''); if(!reason||!reason.trim()) return; try { setBusyId(id); await terminateDsa(id, reason.trim()); toast.success(t('dsaTerminated')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
 

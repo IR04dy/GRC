@@ -83,6 +83,15 @@ class SplitAttributionContractTest {
      * an entry whose site is fixed must be deleted in the same commit (F2-218).
      */
     private static final Map<String, String> BY_DESIGN = Map.of(
+        "DataSharingAgreementService#activate::counterpartySigner",
+        "BY DESIGN — the COUNTERPARTY's signatory is a person at the other organisation and can "
+        + "never be a principal in this platform, so this half of the pair is legitimately caller "
+        + "data even though activate() stamps signedAt from the server's clock. Verified against "
+        + "the register rather than guessed: all 8 live rows in dev and prod name an external "
+        + "party — an NCA liaison officer, a MoCI director, a university dean, a vendor DPO. Its "
+        + "SIBLING signerName is OUR signatory and was closed by F2-236, so this entry records a "
+        + "field-level boundary inside one method, not a whole-method exemption. The literal "
+        + "'counterparty' the frontend used to send is gone.",
         "VendorBcpAttestationService#doSubmit::submittedByContactEmail",
         "BY DESIGN — VERIFIED, not guessed. doSubmit has two callers: submitAttestation (the "
         + "TPRM Lead transcribing a vendor's reply) and submitByToken, whose route is "
@@ -563,15 +572,17 @@ class SplitAttributionContractTest {
         // adjudicated map. SupplierResilienceTestService is the one to read first: its controller
         // passes body.getOrDefault("approverName", "admin"), so an omitted approver is recorded as
         // the literal "admin".
-        "CommitteeActionItemService#complete::completedBy",
-        "DataSharingAgreementService#activate::counterpartySigner",
-        "DataSharingAgreementService#activate::signerName",
-        "FourthPartyExposureService#validate::validatorName",
-        "MaterialTopicService#approve::approvedBy",
-        "NdiImprovementPlanService#approve::approverName",
-        "NdiMaturityAssessmentService#approve::approverName",
-        "NdiMaturityAssessmentService#markUnderReview::reviewerName",
-        "SupplierResilienceTestService#approve::approverName");
+        // F2-236 — EMPTY. All nine were read; eight were confirmed live and fixed (the actor now
+        // comes from CurrentActor.requireUsername/requireUserId), and the ninth,
+        // DataSharingAgreementService#activate::counterpartySigner, moved to BY_DESIGN below with a
+        // verified reason rather than a guessed one.
+        //
+        // ⚠ An empty work list is also what a rotted detector produces (F2-219). What carries the
+        // weight here is not this figure but the two reverse legs — every BY_DESIGN entry must still
+        // name a site the scan finds, and the parameter-borne resolver has its own must-pair /
+        // must-not-pair corpus — so a detector that stops matching fails those rather than reporting
+        // success.
+        );
 
     @Test
     @DisplayName("no NEW method stamps WHEN from the server's clock and takes WHO from the request")
@@ -615,7 +626,7 @@ class SplitAttributionContractTest {
             .as("nine parameter-borne splits, filed by F2-234 without verdicts. Each needs its "
                 + "controller read: the parameter is caller data at some call sites and the "
                 + "principal at others, and only the call site can say which. %s", stillOpen)
-            .isLessThanOrEqualTo(9);
+            .isLessThanOrEqualTo(0);
 
         Set<String> stale = new TreeSet<>(WORK_LIST);
         stale.removeAll(found);

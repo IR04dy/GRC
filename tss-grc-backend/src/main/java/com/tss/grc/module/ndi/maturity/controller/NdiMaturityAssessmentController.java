@@ -86,11 +86,11 @@ public class NdiMaturityAssessmentController {
     @PreAuthorize(WRITE)
     public NdiMaturityAssessment submit(@PathVariable Long id) { return service.submit(id); }
 
-    /** Body: {@code { "reviewerName": "..." }} (optional). */
+    /** F2-236 — no body: the reviewer is the authenticated principal. */
     @PostMapping("/{id}/mark-under-review")
     @PreAuthorize(WRITE)
-    public NdiMaturityAssessment markUnderReview(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.markUnderReview(id, body == null ? null : body.get("reviewerName"));
+    public NdiMaturityAssessment markUnderReview(@PathVariable Long id) {
+        return service.markUnderReview(id);
     }
 
     /** Body: {@code { "reason": "..." }} required. */
@@ -100,11 +100,11 @@ public class NdiMaturityAssessmentController {
         return service.returnForChanges(id, body == null ? null : body.get("reason"));
     }
 
-    /** Body: {@code { "approverName": "..." }} (optional). */
+    /** F2-236 — no body: the approver is the authenticated principal. */
     @PostMapping("/{id}/approve")
     @PreAuthorize(APPROVE)
-    public NdiMaturityAssessment approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approverName"));
+    public NdiMaturityAssessment approve(@PathVariable Long id) {
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/reopen")

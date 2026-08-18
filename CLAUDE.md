@@ -1872,6 +1872,87 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE SERVER STAMPS *WHEN* FROM ITS OWN CLOCK AND THE CALLER NAMES *WHO*, AND TWO
+  CONTROLLERS DEFAULTED THAT NAME TO A LITERAL** (F2-236, measured 2026-08-18). Executing F2-234's
+  filed nine parameter-borne splits, every one was read — the service **and its controller**, since
+  the wire-ness of a scalar parameter lives at the call site: **8 confirmed and fixed, 1 BY DESIGN, 0
+  unread.** Probed **28/28 pre-fix and 28/28 post-fix** as `compliance`.
+  ⚠⚠ **A DEFAULT OF `"admin"` IS NOT A PLACEHOLDER — IT IS A REAL PLATFORM_ADMIN USERNAME.**
+  `SupplierResilienceTestController` read `body.getOrDefault("approverName", "admin")`, so an omitted
+  approver did not leave an ISO 22301 supplier-resilience approval blank, it attributed it to the most
+  privileged account in the platform. `FourthPartyExposureController` defaulted to **`"system"`**,
+  which reads as an *automated* validation of a SAMA fourth-party concentration record when a human
+  performed it — or when nobody did. **And the frontend passed the literal `'admin'` at FOUR call
+  sites**, plus `'counterparty'` as a PDPL data-sharing signature. 🔑 **When you find a
+  caller-supplied actor, look at what the caller sends when it says nothing: the default is the value
+  that will be in most of the rows.**
+  ⚠ The other live shapes: `POST /api/v1/committees/action-items/{id}/complete` stored
+  **`completedBy: 9999`, a user id that does not exist**; and
+  `POST /api/sustainability/materiality/{id}/approve` **REQUIRED** `approvedBy` and never verified it
+  — a 400 when omitted, beside its own clock — the fourth register in this lineage to demand an
+  attribution and then trust it (F2-223, F2-224, F2-226). **No escalation anywhere**: every guard is
+  the one that register's other writes carry, so the machine was never the issue and the attribution
+  was the whole of it.
+  ⚠⚠ **CLOSING THE GUARDED ROUTE MAKES THE ORDINARY UPDATE ROUTE A BYPASS, AND ONLY THE OTHER
+  GATE CAN SEE IT.** `ServerStampedFieldContractTest` went red on this slice's own fix: once
+  `markUnderReview` stamped `reviewerName` from the principal, `NdiMaturityAssessmentService#update`
+  writing that field from the request became a contradiction it could report **for the first time** —
+  and a real bypass, since under the same `NDI:WRITE` the edit route could overwrite the recorded
+  reviewer with anything. 🔑 **Two instruments in series, and the second only became able to see
+  the site because the first was closed — so after converting an attribution, RUN THE OTHER GATE.**
+  ⚠ The verdict there is per field **and per window** (F2-222's shape): `reviewer_name` is an
+  ASSIGNMENT before the review — measured, 8 of 16 live rows in dev and prod hold an office name with
+  `reviewed_at` NULL — and the ATTRIBUTION after it. `update` keeps the assignment, refuses a CHANGE
+  once `reviewedAt` is stamped, and accepts an ECHO of the stored value so a form that round-trips the
+  row keeps working (F2-231). Refusing assignment outright would be a gate driving a fix that fails on
+  correct data (F2-214); tolerating the change would have made the whole slice pointless.
+  ⚠⚠ **THE CORRECT ARTEFACT WAS THE ADJACENT CONTROLLER IN THE SAME PACKAGE.**
+  `SupplierResilienceController` — the file beside `SupplierResilienceTestController` — has always
+  passed `usernameOf(auth), userIdOf(auth)` for its own two approvals. N-th instance in this lineage
+  of the right pattern sitting next to the wrong one, and the first where both are sibling controllers
+  over sibling registers of one module.
+  ⚙ **One primitive, eight call sites:** `CurrentActor.requireUsername(act)` / `requireUserId(act)`,
+  added to the class whose `organisationId()` already establishes the fail-fast idiom rather than
+  hand-rolling a ninth null check. **Refusing is deliberately louder than recording a blank: a
+  governance record whose approver is `""` or `"admin"` reads as an attribution, so it is worse than
+  one that could not be written.**
+  ⚠ **The BY DESIGN survivor is now VERIFIED, not guessed.** F2-234 filed
+  `DataSharingAgreementService#activate::counterpartySigner` as *"plausibly BY_DESIGN … and that is a
+  GUESS"*. It holds: all **8 live rows in both databases name an external party** — an NCA liaison
+  officer, a MoCI director, a university dean, a vendor DPO — and that person can never be a
+  principal here. Its sibling `signerName` is OUR signatory and was closed, so the verdict is a
+  **field-level boundary inside one method**, never a whole-method exemption.
+  ⚠⚠ **AN EIGHTH SITE NO GATE REPORTED, FOUND BY READING THE FRONTEND.** `NdiPage`'s
+  compliance-assessment Approve opened a `required: true` prompt for `approverName` and sent it to
+  `NdiComplianceAssessmentService#approve`, **which takes no actor parameter and never has** — so the
+  server discarded it on arrival. F2-225's shape: a required field the server ignores tells the caller
+  their value matters. 🔑 **A prompt asking for an attribution is a locator for this family, and
+  it finds sites on both sides: ones the server wrongly trusts AND ones it silently drops.**
+  ⚠⚠ **THE FIFTH TEST ASSERTING THE DEFECT AS CORRECT, ONE LINE BELOW ITS OWN STATEMENT OF THE
+  RULE.** `CreateNamesNoDecisionTest` read `assertThat(live.getSignerName()).isEqualTo("Real Signer")`
+  — that the value the CALLER passed is the value STORED — directly under the comment *"activate()
+  stamps the signature date from the clock — that is the whole reason a create may not name it."*
+  After F2-159, F2-175, F2-227 and F2-234. Repurposed the way F2-223 and F2-234 repurposed theirs.
+  ⚙ **Four of my own errors, every one caught by running something.** (a) **Four of seven route paths
+  were guessed and wrong** — `/api/scm/resilience/tests`, `/api/privacy/data-sharing`,
+  `/api/scm/fourth-party`, `/api/sustainability/materiality`, `/api/ndi/plans`; resolve from
+  `@RequestMapping`, the rule recurring since F2-198. (b) The prod database is
+  **`TSS_GRC_Deployment`**, not the name I guessed. (c) The probe hit **two different unique indexes**
+  on its second run — `UQ_action_item_code` and `uq_ndi_mat_cycle_item` — until each slot was
+  **derived from the index** rather than fixed (F2-217: re-runnability is a different property from
+  cleaning up, and a unique-index violation reads exactly like the fix having broken). (d) A planted
+  committee row 400'd on **`titleAr must not be blank`** although the column is nullable — the
+  recorded landmine that a constraint on an `@Entity` field is enforced by Hibernate on save, and
+  house rule 7 in the same breath.
+  ⚙ **Filed:** the **office-versus-person meaning** now carried by five columns whose every populated
+  value is an office title (`CIO`, `CISO`, `President of the Authority`, `Chair, Data Governance
+  Committee`) while the platform now records a username — F2-222 filed the same shape for
+  `policy.documents.approver_name`, and recording *which body* authorised something is a second field
+  and an owner decision; `ndi.improvement_plan` holding **1 approver with no `approved_at`** and
+  `ndi.maturity_assessment` **8 reviewers with no `reviewed_at`**, i.e. attributions with no clock, so
+  those rows never went through the routes that stamp both; and
+  `scm.fourth_party_exposures.validator_name` holding **5 invented person names** on live rows in a
+  *server* register (F2-207's measured cast of 65) — repair rewrites live rows, so owner decision.
 - ⚠⚠ **A RAW CONTROL BYTE IN SOURCE MAKES THE FILE INVISIBLE TO EVERY GREP-BASED
   INSTRUMENT IN THIS REPO, AND EVERY MEASUREMENT HERE IS A GREP-BASED INSTRUMENT** (F2-235,
   measured 2026-08-18). Grepping `SplitAttributionContractTest` to re-read F2-234's work list, the

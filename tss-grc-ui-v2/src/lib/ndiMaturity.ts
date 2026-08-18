@@ -100,14 +100,16 @@ export function updateMaturity(id: number, body: Partial<NdiMaturityAssessment>)
 }
 
 export function submitMaturity(id: number) { return api.post<NdiMaturityAssessment>(`${BASE}/${id}/submit`); }
-export function markUnderReviewMaturity(id: number, reviewerName?: string) {
-  return api.post<NdiMaturityAssessment>(`${BASE}/${id}/mark-under-review`, { reviewerName });
+// F2-236 — no reviewerName: the server takes the reviewer from the authenticated principal.
+export function markUnderReviewMaturity(id: number) {
+  return api.post<NdiMaturityAssessment>(`${BASE}/${id}/mark-under-review`);
 }
 export function returnMaturity(id: number, reason: string) {
   return api.post<NdiMaturityAssessment>(`${BASE}/${id}/return`, { reason });
 }
-export function approveMaturity(id: number, approverName?: string) {
-  return api.post<NdiMaturityAssessment>(`${BASE}/${id}/approve`, { approverName });
+// F2-236 — no approverName: the server takes the approver from the authenticated principal.
+export function approveMaturity(id: number) {
+  return api.post<NdiMaturityAssessment>(`${BASE}/${id}/approve`);
 }
 export function reopenMaturity(id: number) { return api.post<NdiMaturityAssessment>(`${BASE}/${id}/reopen`); }
 export function deleteMaturity(id: number) { return api.delete<void>(`${BASE}/${id}`); }

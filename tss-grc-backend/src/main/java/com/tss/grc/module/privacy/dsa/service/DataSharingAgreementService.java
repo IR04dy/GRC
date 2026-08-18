@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.dsa.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.privacy.dsa.entity.DataSharingAgreement;
@@ -80,13 +81,22 @@ public class DataSharingAgreementService {
     }
 
     @Transactional
-    public DataSharingAgreement activate(Long id, String signerName, String counterpartySigner) {
+    /**
+     * F2-236 — {@code signerName} is the authenticated principal; {@code counterpartySigner} stays
+     * caller data <b>by design</b>, because the counterparty's signatory is a person at another
+     * organisation and can never be a principal here (measured: all 8 live rows name an external
+     * party — an NCA liaison officer, a MoCI director, a university dean).
+     *
+     * <p>This method stamps {@code signedAt} from the server's clock, so the signing it records is
+     * THIS call; the frontend passed the literals {@code 'admin'} and {@code 'counterparty'}.
+     */
+    public DataSharingAgreement activate(Long id, String counterpartySigner) {
         DataSharingAgreement a = get(id);
         if (!"IN_REVIEW".equals(a.getStatus()) && !"DRAFT".equals(a.getStatus()))
             throw new IllegalStateException("activate only allowed from DRAFT|IN_REVIEW (was " + a.getStatus() + ")");
         a.setStatus("ACTIVE");
         a.setSignedAt(LocalDateTime.now());
-        if (signerName != null) a.setSignerName(signerName);
+        a.setSignerName(CurrentActor.requireUsername("a data-sharing agreement signature"));
         if (counterpartySigner != null) a.setCounterpartySigner(counterpartySigner);
         return repo.save(a);
     }

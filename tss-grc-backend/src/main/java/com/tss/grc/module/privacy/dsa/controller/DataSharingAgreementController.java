@@ -50,7 +50,7 @@ public class DataSharingAgreementController {
     @PostMapping("/{id}/activate")
     @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement activate(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.activate(id, body.get("signerName"), body.get("counterpartySigner"));
+        return service.activate(id, body == null ? null : body.get("counterpartySigner"));
     }
 
     @PostMapping("/{id}/expire")

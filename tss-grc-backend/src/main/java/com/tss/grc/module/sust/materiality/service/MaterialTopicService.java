@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.materiality.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -155,19 +156,22 @@ public class MaterialTopicService {
     }
 
     @Transactional
-    public MaterialTopic approve(Long id, String approvedBy) {
+    public MaterialTopic approve(Long id) {
         MaterialTopic cur = get(id);
         if (!"SCORED".equals(cur.getStatus())) {
             throw new IllegalTransitionException(cur.getStatus(), "APPROVED", Set.of("SCORED"));
         }
-        if (approvedBy == null || approvedBy.isBlank())
-            throw new IllegalArgumentException("approvedBy required.");
+        // F2-236 — the approver is the principal. This method REQUIRED an `approvedBy` it never
+        // verified (a 400 when omitted) while stamping approvedAt from its own clock: the third
+        // register in this lineage to demand an attribution and then trust it.
         cur.setStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
-        cur.setApprovedBy(approvedBy);
+        cur.setApprovedBy(CurrentActor.requireUsername("a material-topic approval"));
         MaterialTopic saved = repo.save(cur);
+        // The trail reads off the SAVED ROW, never the caller's claim (F2-223: a trail that quotes
+        // the claim is what makes a forged attribution invisible to whoever audits it).
         audit.log("APPROVE", "MaterialTopic", saved.getId(),
-                "Material topic approved by " + approvedBy);
+                "Material topic approved by " + saved.getApprovedBy());
         return saved;
     }
 

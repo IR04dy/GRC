@@ -113,8 +113,10 @@ export function updateMaterialTopic(id: number, b: Partial<MaterialTopic>) { ret
 export function scoreMaterialTopic(id: number, impactMateriality: number, financialMateriality: number) {
   return api.post<MaterialTopic>(`${BASE}/${id}/score`, { impactMateriality, financialMateriality });
 }
-export function approveMaterialTopic(id: number, approvedBy: string) {
-  return api.post<MaterialTopic>(`${BASE}/${id}/approve`, { approvedBy });
+// F2-236 — no approvedBy. The server required this field and never verified it, while stamping
+// approvedAt from its own clock; it now takes the approver from the authenticated principal.
+export function approveMaterialTopic(id: number) {
+  return api.post<MaterialTopic>(`${BASE}/${id}/approve`);
 }
 export function archiveMaterialTopic(id: number) {
   return api.post<MaterialTopic>(`${BASE}/${id}/archive`);

@@ -78,11 +78,11 @@ public class MaterialTopicController {
         return service.score(id, asBd(impactRaw), asBd(financialRaw));
     }
 
-    /** Body: {@code { "approvedBy": "Name" }}. */
+    /** F2-236 — no body: the approver is the authenticated principal. */
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public MaterialTopic approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approvedBy"));
+    public MaterialTopic approve(@PathVariable Long id) {
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/archive")

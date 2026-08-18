@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.plan.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
@@ -134,16 +135,18 @@ public class NdiImprovementPlanService {
         return plans.save(p);
     }
 
-    public NdiImprovementPlan approve(Long id, String approverName) {
+    /** F2-236 — the approver is the authenticated principal; the frontend passed the literal
+     *  {@code 'admin'}. The trail reads off the saved row, not the caller's claim. */
+    public NdiImprovementPlan approve(Long id) {
         NdiImprovementPlan p = get(id);
         if (!INITIAL_STATUS.equals(p.getStatus()))
             throw new IllegalStateException("Only DRAFT plans can be approved (was " + p.getStatus() + ")");
         p.setStatus("APPROVED");
-        p.setApproverName(approverName);
+        p.setApproverName(CurrentActor.requireUsername("an improvement-plan approval"));
         p.setApprovedAt(LocalDateTime.now());
         NdiImprovementPlan saved = plans.save(p);
         audit.publishTransition("PLAN", saved.getId(), saved.getPlanCode(), saved.getCycleId(),
-            "DRAFT", "APPROVED", "Plan approved by " + approverName);
+            "DRAFT", "APPROVED", "Plan approved by " + saved.getApproverName());
         return saved;
     }
 

@@ -78,7 +78,7 @@ export function ResilienceTestsPage() {
     catch { toast.danger(t('srtActionFailed')); } finally { setBusyId(null); }
   }
   async function onApprove(id: number) {
-    setBusyId(id); try { await approveSrt(id, 'admin'); toast.success(t('srtApproved')); await reload(); }
+    setBusyId(id); try { await approveSrt(id); toast.success(t('srtApproved')); await reload(); }
     catch { toast.danger(t('srtActionFailed')); } finally { setBusyId(null); }
   }
   async function onCancel(id: number) {

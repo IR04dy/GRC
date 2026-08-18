@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.fourthparty.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.OrderedVocabulary;
@@ -154,11 +155,16 @@ public class FourthPartyExposureService {
     }
 
     @Transactional
-    public FourthPartyExposure validate(Long id, String validatorName) {
+    /**
+     * F2-236 — the validator is the authenticated principal. The controller defaulted to the
+     * literal {@code "system"}, which reads as an automated validation of a SAMA fourth-party
+     * concentration record when a human performed it — or when nobody did.
+     */
+    public FourthPartyExposure validate(Long id) {
         FourthPartyExposure ex = get(id);
         ex.setStatus(VALIDATED);
         ex.setLastValidatedAt(LocalDateTime.now());
-        ex.setValidatorName(validatorName);
+        ex.setValidatorName(CurrentActor.requireUsername("a fourth-party validation"));
         return repo.save(ex);
     }
 

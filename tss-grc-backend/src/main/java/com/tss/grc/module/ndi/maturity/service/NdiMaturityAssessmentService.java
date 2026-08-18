@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.maturity.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.framework.entity.NdiFrameworkItem;
@@ -126,7 +127,26 @@ public class NdiMaturityAssessmentService {
         if (req.getAssessorName() != null)        cur.setAssessorName(req.getAssessorName());
         if (req.getAssessorEmail() != null)       cur.setAssessorEmail(req.getAssessorEmail());
         if (req.getDomainOwnerName() != null)     cur.setDomainOwnerName(req.getDomainOwnerName());
-        if (req.getReviewerName() != null)        cur.setReviewerName(req.getReviewerName());
+        // F2-236 — `reviewer_name` carries TWO meanings on this column, and only one of them is the
+        // caller's. Before the review it is an ASSIGNMENT (measured: 8 of 16 live rows in dev and
+        // prod name an office — "Chief Data Officer" — with reviewed_at NULL, so no review has
+        // happened); from markUnderReview() onwards it is the ATTRIBUTION of who actually reviewed,
+        // stamped from the principal beside reviewedAt.
+        //
+        // So this route keeps the assignment and freezes the attribution. Without the freeze,
+        // closing markUnderReview() would have been pointless: the ordinary edit route, under the
+        // same NDI:WRITE, could overwrite the recorded reviewer with anything (F2-222's shape — a
+        // control's record defeated through an adjacent route with the same permission). An ECHO of
+        // the stored value is still accepted, so a form that round-trips the row keeps working
+        // (F2-231).
+        if (req.getReviewerName() != null && !req.getReviewerName().equals(cur.getReviewerName())) {
+            if (cur.getReviewedAt() != null)
+                throw new IllegalArgumentException(
+                    "The reviewer of this assessment was recorded when it was marked under review ("
+                    + cur.getReviewerName() + ") and is not editable here. Reopen the assessment to "
+                    + "reassign it.");
+            cur.setReviewerName(req.getReviewerName());
+        }
         if (req.getReviewerEmail() != null)       cur.setReviewerEmail(req.getReviewerEmail());
         if (req.getNotes() != null)               cur.setNotes(req.getNotes());
 
@@ -167,12 +187,13 @@ public class NdiMaturityAssessmentService {
     }
 
     @Transactional
-    public NdiMaturityAssessment markUnderReview(Long id, String reviewerName) {
+    /** F2-236 — the reviewer is the authenticated principal, not the request body. */
+    public NdiMaturityAssessment markUnderReview(Long id) {
         NdiMaturityAssessment cur = get(id);
         if (!"SUBMITTED".equals(cur.getStatus())) {
             throw new IllegalTransitionException(cur.getStatus(), "UNDER_REVIEW", Set.of("SUBMITTED"));
         }
-        if (reviewerName != null && !reviewerName.isBlank()) cur.setReviewerName(reviewerName);
+        cur.setReviewerName(CurrentActor.requireUsername("a maturity review"));
         cur.setStatus("UNDER_REVIEW");
         cur.setReviewedAt(LocalDateTime.now());
         NdiMaturityAssessment saved = repo.save(cur);
@@ -201,7 +222,8 @@ public class NdiMaturityAssessmentService {
     }
 
     @Transactional
-    public NdiMaturityAssessment approve(Long id, String approverName) {
+    /** F2-236 — the approver is the authenticated principal, not the request body. */
+    public NdiMaturityAssessment approve(Long id) {
         NdiMaturityAssessment cur = get(id);
         if (!"UNDER_REVIEW".equals(cur.getStatus())) {
             throw new IllegalTransitionException(cur.getStatus(), "APPROVED", Set.of("UNDER_REVIEW"));
@@ -214,10 +236,10 @@ public class NdiMaturityAssessmentService {
         }
         cur.setStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
-        if (approverName != null && !approverName.isBlank()) cur.setApproverName(approverName);
+        cur.setApproverName(CurrentActor.requireUsername("a maturity approval"));
         NdiMaturityAssessment saved = repo.save(cur);
         audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
-            saved.getCycleId(), "UNDER_REVIEW", "APPROVED", "Approved by " + approverName);
+            saved.getCycleId(), "UNDER_REVIEW", "APPROVED", "Approved by " + saved.getApproverName());
         return saved;
     }
 
