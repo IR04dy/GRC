@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.regulatory.service;
 
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.regulatory.entity.AuthorityDocument;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +56,30 @@ public class AuthorityDocumentService {
      */
     private static final Set<String> CREATABLE_STATUSES = Set.of("DRAFT", "ACTIVE");
     private static final String INITIAL_STATUS = "ACTIVE";
-    private static final Set<String> TRANSLATION_STATUSES = Set.of(
+    /**
+     * F2-239 — the translation vocabulary, one declaration per COLUMN because there are two CHECK
+     * constraints and a {@link ClosedVocabulary} names the one it mirrors. That name is what makes
+     * the set checkable against the schema, so {@code ClosedVocabularyPinTest} compares both against
+     * the migration SQL by reflection.
+     *
+     * <p>⚠ This replaced a hand-rolled {@code Set<String>} that was consulted on the DOCUMENT paths
+     * and on neither CITATION path — so a caller could store any string in
+     * {@code authority_document_citations.translation_status} and get the 409 the CHECK raises rather
+     * than a 400 naming the field. Worse, the column collates case-INSENSITIVELY (F2-179), so
+     * {@code 'ar_official'} was ACCEPTED and stored verbatim, where every reader — the badge, the
+     * tone map, the label lookup — compares case-sensitively. Probed live before the fix.
+     *
+     * <p>{@code require}, not {@code coerce}, per F2-182's test: the CHECK is already refusing
+     * everything outside the vocabulary, so every value that succeeds today is a case-variant of a
+     * legal token and no working request can start failing.
+     */
+    private static final ClosedVocabulary DOC_TRANSLATION = ClosedVocabulary.of(
+        "translationStatus", "ck_authdoc_translation",
         "EN_ONLY", "AR_AUTO", "AR_HUMAN_REVIEWED", "AR_OFFICIAL");
+    private static final ClosedVocabulary CITATION_TRANSLATION = ClosedVocabulary.of(
+        "translationStatus", "ck_citation_translation",
+        "EN_ONLY", "AR_AUTO", "AR_HUMAN_REVIEWED", "AR_OFFICIAL");
+    private static final String INITIAL_TRANSLATION = "EN_ONLY";
 
     private final AuthorityDocumentRepository documents;
     private final AuthorityDocumentCitationRepository citations;
@@ -98,9 +122,7 @@ public class AuthorityDocumentService {
             body.getStatus(), CREATABLE_STATUSES, INITIAL_STATUS, "an authority document",
             "POST /api/v1/regulatory/authority-documents/{id}/transition"));
         body.setSupersededById(null);   // transition()'s, and only when it reaches SUPERSEDED
-        if (body.getTranslationStatus() == null) body.setTranslationStatus("EN_ONLY");
-        if (!TRANSLATION_STATUSES.contains(body.getTranslationStatus()))
-            throw new IllegalArgumentException("Invalid translation status: " + body.getTranslationStatus());
+        body.setTranslationStatus(DOC_TRANSLATION.orDefault(body.getTranslationStatus(), INITIAL_TRANSLATION));
         if (documents.findByOrganisationIdAndCodeAndVersion(org(), body.getCode(), body.getVersion()).isPresent())
             throw new IllegalArgumentException("Authority document already exists: " + body.getCode() + " v" + body.getVersion());
         body.setId(null);
@@ -126,11 +148,8 @@ public class AuthorityDocumentService {
         if (body.getEffectiveDateG() != null)  d.setEffectiveDateG(body.getEffectiveDateG());
         if (body.getEffectiveDateH() != null)  d.setEffectiveDateH(body.getEffectiveDateH());
         if (body.getNotes() != null)           d.setNotes(body.getNotes());
-        if (body.getTranslationStatus() != null) {
-            if (!TRANSLATION_STATUSES.contains(body.getTranslationStatus()))
-                throw new IllegalArgumentException("Invalid translation status: " + body.getTranslationStatus());
-            d.setTranslationStatus(body.getTranslationStatus());
-        }
+        if (body.getTranslationStatus() != null)
+            d.setTranslationStatus(DOC_TRANSLATION.require(body.getTranslationStatus()));
         if (body.getIsPlaceholder() != null)   d.setIsPlaceholder(body.getIsPlaceholder());
         d.setUpdatedAt(LocalDateTime.now());
         return documents.save(d);
@@ -212,11 +231,20 @@ public class AuthorityDocumentService {
         body.setId(null);
         body.setOrganisationId(org());
         body.setAuthorityDocumentId(authorityDocumentId);
+        // F2-239 — these are the ONLY defaults for these five columns, because the entity no longer
+        // carries initialisers (an initialiser makes `updateCitation`'s null-guards unfirable). Every
+        // one is NOT NULL, so dropping a line here turns a silent reset into a 500 on create;
+        // NeverFiringNullGuardContractTest asserts the (entity, field, writer) triples both ways.
         if (body.getDepth() == null)          body.setDepth(0);
         if (body.getSequenceOrder() == null)  body.setSequenceOrder(0);
+        if (body.getWeight() == null)         body.setWeight(BigDecimal.ONE);
         if (body.getMandatory() == null)      body.setMandatory(true);
+        // Inherited from the parent document on purpose: a citation transcribed into a document that
+        // is itself a placeholder is a placeholder. That reasoning predates F2-239 and is the reason
+        // this create was already the right shape — it was `updateCitation` that discarded it.
         if (body.getIsPlaceholder() == null)  body.setIsPlaceholder(d.getIsPlaceholder());
-        if (body.getTranslationStatus() == null) body.setTranslationStatus("EN_ONLY");
+        body.setTranslationStatus(
+            CITATION_TRANSLATION.orDefault(body.getTranslationStatus(), INITIAL_TRANSLATION));
         return citations.save(body);
     }
 
@@ -236,7 +264,14 @@ public class AuthorityDocumentService {
         if (body.getMandatory() != null)          c.setMandatory(body.getMandatory());
         if (body.getSequenceOrder() != null)      c.setSequenceOrder(body.getSequenceOrder());
         if (body.getIsPlaceholder() != null)      c.setIsPlaceholder(body.getIsPlaceholder());
-        if (body.getTranslationStatus() != null)  c.setTranslationStatus(body.getTranslationStatus());
+        // F2-239 — these three guards now mean what they read. Before the entity's initialisers were
+        // removed each one was true on every request, so the register's own edit form (six keys, and
+        // none of these three) moved the paragraph to the top of the regulation, marked a transcribed
+        // requirement a placeholder, and recorded it EN_ONLY in the same request that carried its
+        // Arabic text. Measured, dev = prod: 207 of 214 live citations are not placeholders, 212 of
+        // 214 have a non-zero sequence_order, 207 of 214 are past EN_ONLY.
+        if (body.getTranslationStatus() != null)
+            c.setTranslationStatus(CITATION_TRANSLATION.require(body.getTranslationStatus()));
         c.setUpdatedAt(LocalDateTime.now());
         return citations.save(c);
     }

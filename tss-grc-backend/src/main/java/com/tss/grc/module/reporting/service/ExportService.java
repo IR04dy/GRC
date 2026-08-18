@@ -281,7 +281,7 @@ public class ExportService {
             .filter(x -> x.getOrganisationId().equals(org) && !Boolean.TRUE.equals(x.getIsDeleted()))
             .orElseThrow(() -> new EntityNotFoundException("Change request not found: " + changeId));
         List<ChangeApproval> approvals = changeApprovalRepo.findByChangeRequestIdOrderByDecidedAtAsc(changeId);
-        List<ChangeTask> tasks = changeTaskRepo.findByChangeRequestIdOrderBySortOrderAsc(changeId);
+        List<ChangeTask> tasks = changeTaskRepo.findByChangeRequestIdOrderBySortOrderAscIdAsc(changeId);
         List<ChangeLink> links = changeLinkRepo.findByChangeRequestId(changeId);
 
         long approve = approvals.stream().filter(a -> "APPROVE".equalsIgnoreCase(a.getDecision())).count();
