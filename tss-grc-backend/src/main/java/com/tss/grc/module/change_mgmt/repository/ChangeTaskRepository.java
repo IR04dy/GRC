@@ -9,7 +9,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ChangeTaskRepository extends JpaRepository<ChangeTask, Long> {
-    List<ChangeTask> findByChangeRequestIdOrderBySortOrderAsc(Long changeRequestId);
+    /**
+     * The implementation checklist, in the order an implementer works through it.
+     *
+     * <p>F2-239 — the {@code IdAsc} tie-break is not decoration. Every task the UI creates carries
+     * {@code sort_order = 0} (the add-task form has no ordering input), so ties are the normal case
+     * and without a second key their relative order is whatever the database happens to return —
+     * F2-197's "declaration order presented as meaning". {@code ChangeConditionRepository}'s sibling
+     * finder has always ended {@code OrderBySortOrderAscIdAsc}; this one did not.
+     */
+    List<ChangeTask> findByChangeRequestIdOrderBySortOrderAscIdAsc(Long changeRequestId);
 
     /**
      * CH-5: overdue, still-open tasks for a tenant — dueAt in the past and the task

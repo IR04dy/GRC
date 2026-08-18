@@ -83,6 +83,30 @@ import static org.assertj.core.api.Assertions.assertThat;
  * reset. Fixing only the throw would have converted a broken route into a data-destroying one
  * (F2-203: fixing one defect is what detonates the next). Removing the initialiser fixes both
  * halves at once, which is why that is the shape of the fix rather than a guard rewrite.
+ *
+ * <h2>F2-239 — the register is the boundary, and the third refusing mechanism is {@code @Valid}</h2>
+ *
+ * <p>F2-238 took the six PATCH routes; this took the two REGISTERS whose live callers actually omit
+ * an initialised field — the regulatory library (document + citations) and the change implementation
+ * checklist. The ordering that found them is <b>which work-list field the live caller OMITS</b>, not
+ * the caller's body width and not what the initialiser asserts. Of the 28 residual entries, 10 of 14
+ * routes have a frontend write client and exactly <b>4 sites are live</b>: three on
+ * {@code AuthorityDocumentCitation} and {@code ChangeTask#sortOrder}. List 28 → 19.
+ *
+ * <p>⚠ <b>F2-238's filing ranked the residual by what the initialiser ASSERTS</b> and named
+ * {@code GhgEmissionRecord#coveragePercent} (100.00) and {@code AuthorityDocument#isPlaceholder}
+ * (true) as the two sharpest. By reachability, {@code coveragePercent} is SENT by its only caller,
+ * and the live {@code isPlaceholder} is the CITATION's — a different entity, edited by a second form
+ * on the same page that has inputs for three fewer fields. 🔑 <b>Harm-if-reached and reach are two
+ * orderings and they disagree; a work list has to carry both.</b>
+ *
+ * <p>⚠⚠ <b>And the change-task half was not a reset at all — both its write routes REFUSED.</b>
+ * {@code ChangeTask.titleAr} is {@code @NotBlank} (F2-30) on an entity bound with {@code @Valid}, so
+ * the exact bodies {@code ChangeDetailPanel} sends answered <b>400 "titleAr: Field must not be
+ * blank"</b>: neither "Add task" nor the status toggle had ever worked. 🔑 <b>A reachability
+ * derivation that stops at the caller's body cannot see that the route refuses it</b> — F2-238's
+ * lesson from the other side, in a mechanism no hand-written guard is involved in. See
+ * {@link #noPartialUpdateRouteBindsAnEntityWithValid}.
  */
 class NeverFiringNullGuardContractTest {
 
@@ -103,18 +127,9 @@ class NeverFiringNullGuardContractTest {
      * service (see {@link #initialisedFields}).
      */
     private static final Set<String> WORK_LIST = Set.of(
-        "AuthorityDocumentService#update :: AuthorityDocument#isPlaceholder",
-        "AuthorityDocumentService#update :: AuthorityDocument#translationStatus",
-        "AuthorityDocumentService#updateCitation :: AuthorityDocumentCitation#isPlaceholder",
-        "AuthorityDocumentService#updateCitation :: AuthorityDocumentCitation#mandatory",
-        "AuthorityDocumentService#updateCitation :: AuthorityDocumentCitation#sequenceOrder",
-        "AuthorityDocumentService#updateCitation :: AuthorityDocumentCitation#translationStatus",
-        "AuthorityDocumentService#updateCitation :: AuthorityDocumentCitation#weight",
         "BcmCommunicationContactService#update :: BcmCommunicationContact#availabilityStatus",
         "BcmCommunicationContactService#update :: BcmCommunicationContact#escalationLevel",
         "BcmCommunicationContactService#update :: BcmCommunicationContact#status",
-        "ChangeManagementService#updateTask :: ChangeTask#sortOrder",
-        "ChangeManagementService#updateTask :: ChangeTask#status",
         "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#impact",
         "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#likelihood",
         "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#timeHorizon",
@@ -390,7 +405,20 @@ class NeverFiringNullGuardContractTest {
             new Moved("Department", "status",   "setStatus",   "DepartmentService"),
             new Moved("Issue", "severity",      "setSeverity", "IssueService"),
             new Moved("Issue", "priority",      "setPriority", "IssueService"),
-            new Moved("Issue", "status",        "setStatus",   "IssueService"));
+            new Moved("Issue", "status",        "setStatus",   "IssueService"),
+            // F2-239 — the regulatory library. `createCitation` already owned four of the five and
+            // already INHERITED isPlaceholder from the parent document, which is why the create was
+            // the right shape all along: it was `updateCitation` that discarded the reasoning.
+            new Moved("AuthorityDocument", "isPlaceholder",     "setIsPlaceholder",     "AuthorityDocumentService"),
+            new Moved("AuthorityDocument", "translationStatus", "setTranslationStatus", "AuthorityDocumentService"),
+            new Moved("AuthorityDocumentCitation", "sequenceOrder",     "setSequenceOrder",     "AuthorityDocumentService"),
+            new Moved("AuthorityDocumentCitation", "weight",            "setWeight",            "AuthorityDocumentService"),
+            new Moved("AuthorityDocumentCitation", "mandatory",         "setMandatory",         "AuthorityDocumentService"),
+            new Moved("AuthorityDocumentCitation", "isPlaceholder",     "setIsPlaceholder",     "AuthorityDocumentService"),
+            new Moved("AuthorityDocumentCitation", "translationStatus", "setTranslationStatus", "AuthorityDocumentService"),
+            // F2-239 — the change implementation checklist. `addTask` owned status and not sortOrder.
+            new Moved("ChangeTask", "sortOrder", "setSortOrder", "ChangeManagementService"),
+            new Moved("ChangeTask", "status",    "setStatus",    "ChangeManagementService"));
 
         Map<String, String> services = liveServices();
         Map<String, Map<String, String>> inits = liveInitialisers();
@@ -419,6 +447,177 @@ class NeverFiringNullGuardContractTest {
                 + "writer that stops setting it turns a silent reset into a 500 on create. That is "
                 + "the one way this fix can go wrong and nothing else in the tree would notice")
             .isEmpty();
+    }
+
+    /**
+     * F2-239 — the OTHER mechanism that makes an entity-bound partial update refuse, and it holds the
+     * reset shut so the two must be fixed together.
+     *
+     * <p>F2-238 found one shape with two consequences, decided by whether the never-firing guard's
+     * body was a write or a {@code throw}. This is the third: {@code @Valid} on a bound ENTITY whose
+     * class declares a bean-validated mandatory field. Bean validation runs before the service is
+     * entered and cannot tell "the caller omitted this field" from "the caller wants it blank", so
+     * every legitimately partial body is refused with a 400 — while the service behind it is a
+     * partial merge by construction.
+     *
+     * <p>Measured: <b>2</b> such routes existed, both {@code change_mgmt}, both from F2-30's
+     * {@code @NotBlank titleAr}. Probed live before the fix: {@code POST /changes/{id}/tasks} and
+     * {@code PUT /changes/tasks/{taskId}} answered <b>400 "titleAr: Field must not be blank"</b> to
+     * the exact bodies {@code ChangeDetailPanel} sends, so neither the "Add task" button nor the
+     * status toggle on the change implementation checklist had ever worked.
+     *
+     * <p>🔑 <b>F2-105 diagnosed this exact mechanism, wrote eleven lines explaining it, and fixed it
+     * in the FRONTEND</b> — the PIR card resends {@code {...change}}. That closes one caller. It is
+     * not a defence (F2-237), and the write-up is what made the two siblings in the same controller
+     * look covered (F2-215). The invariant belongs on the ROW: the routes dropped {@code @Valid} and
+     * the services refuse a BLANK mandatory field explicitly.
+     *
+     * <p>A hard zero with an EMPTY exemption map, because the fix has a better form available in every
+     * case — bind a purpose-built request record (F2-213's structural direction), which puts the route
+     * outside this population by construction. An exemption exists for a genuine full-replace PUT, and
+     * the reverse leg refuses one that has gone stale.
+     */
+    @Test
+    void noPartialUpdateRouteBindsAnEntityWithValid() {
+        /** route -> why @Valid over a bound entity is correct there. Empty: there is no such case. */
+        Map<String, String> allowed = Map.of();
+
+        Pattern mapping = Pattern.compile("@(Put|Patch)Mapping\\b");
+        // ⚠ `@Valid @RequestBody T x` is the house idiom, so the annotation sits BEFORE the one being
+        // anchored on. A first draft only matched the other order and reported 0 of 2 — and 0 reads
+        // exactly like a clean tree (F2-198's lineage, the quiet direction).
+        Pattern body = Pattern.compile(
+            "(@Valid\\s+)?@RequestBody\\s+(@Valid\\s+)?([\\w.<>]+)\\s+(\\w+)");
+        Pattern mandatory = Pattern.compile(
+            "@(?:NotBlank|NotNull|NotEmpty)\\b[^;]*?private\\s+[\\w.<>\\[\\]]+\\s+(\\w+)\\s*[;=]");
+
+        // entity simple name -> the mandatory fields it declares
+        Map<String, Set<String>> entityMandatory = new TreeMap<>();
+        for (Path p : sources(".java")) {
+            String raw = read(p);
+            if (!raw.contains("@Entity")) continue;
+            String src = ServerStampedFieldContractTest.stripComments(raw);
+            Matcher cm = Pattern.compile("\\bclass\\s+(\\w+)").matcher(src);
+            if (!cm.find()) continue;
+            Set<String> fields = new TreeSet<>();
+            Matcher fm = mandatory.matcher(src);
+            while (fm.find()) fields.add(fm.group(1));
+            if (!fields.isEmpty()) entityMandatory.merge(cm.group(1), fields, (a, b) -> {
+                Set<String> u = new TreeSet<>(a); u.addAll(b); return u;
+            });
+        }
+
+        List<String> offenders = new java.util.ArrayList<>();
+        int entityBound = 0;
+        for (Path p : sources("Controller.java")) {
+            String src = ServerStampedFieldContractTest.stripComments(read(p));
+            Matcher base = Pattern.compile("@RequestMapping\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]*)\"")
+                .matcher(src);
+            String prefix = base.find() ? base.group(1) : "";
+            List<Integer> marks = new java.util.ArrayList<>();
+            Matcher mm = mapping.matcher(src);
+            while (mm.find()) marks.add(mm.start());
+            for (int i = 0; i < marks.size(); i++) {
+                String seg = src.substring(marks.get(i),
+                    i + 1 < marks.size() ? marks.get(i + 1) : src.length());
+                Matcher bm = body.matcher(seg);
+                if (!bm.find()) continue;
+                String bound = bm.group(3).substring(bm.group(3).lastIndexOf('.') + 1);
+                if (!entityMandatory.containsKey(bound)) continue;
+                entityBound++;
+                if (bm.group(1) == null && bm.group(2) == null) continue;
+                Matcher rm = Pattern.compile("@\\w+Mapping\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]*)\"")
+                    .matcher(seg);
+                String route = prefix + (rm.lookingAt() ? rm.group(1) : "");
+                if (!allowed.containsKey(route)) {
+                    offenders.add(route + "  binds " + bound + " (mandatory: "
+                        + entityMandatory.get(bound) + ")  [" + p.getFileName() + "]");
+                }
+            }
+        }
+
+        // Anti-vacuity. The wrong answers are BOTH regexes silently matching nothing, and each
+        // returns 0 — indistinguishable from a clean tree. The floor sits above zero and below the
+        // measured population (F2-215: it has to sit above the largest WRONG answer).
+        assertThat(entityMandatory).as(
+            "the entity walk must find the types that declare a mandatory field — 9 of 411 do, and a "
+            + "regex that stops matching reports none of them")
+            .hasSizeGreaterThanOrEqualTo(6);
+        assertThat(entityBound).as(
+            "the controller walk must find PUT/PATCH routes binding one of those entities; 94 of 172 "
+            + "body-taking PUT/PATCH routes bind an entity at all, so zero here means the scan broke")
+            .isGreaterThanOrEqualTo(2);
+
+        assertThat(offenders).as(
+            "⚠⚠ @Valid on a bound ENTITY refuses every partial body, because bean validation cannot "
+            + "tell an OMITTED mandatory field from a BLANK one — and the service behind these routes "
+            + "is a partial merge. F2-105 hit this on ChangeRequest and fixed it in one frontend "
+            + "caller; the two siblings in the same controller then answered 400 to every request the "
+            + "UI made, for months. Fix it by binding a purpose-built request record (best — the field "
+            + "then cannot arrive at all), or by dropping @Valid and refusing a BLANK value in the "
+            + "service. Do not fix it by making every client resend the mandatory fields.%n%n%s",
+            String.join("\n", offenders))
+            .isEmpty();
+
+        assertThat(allowed).as(
+            "the reverse leg: an exemption that no longer names a route in the population is a reason "
+            + "for something that is not there, which reads exactly like a reason for something that "
+            + "is (F2-199)")
+            .allSatisfy((route, why) -> assertThat(why).isNotBlank());
+    }
+
+    /**
+     * The self-test for the leg above (F2-195). It passed on its first run, and that is also what a
+     * rotted regex looks like — so the two patterns are driven against the literal PRE-FIX shapes and
+     * against the two forms that must NOT fire.
+     *
+     * <p>⚠ The one that matters is the annotation ORDER. `@Valid @RequestBody T x` is this codebase's
+     * idiom; a pattern anchored on `@RequestBody` and looking only forwards reported 0 of 2, which is
+     * indistinguishable from a clean tree.
+     */
+    @Test
+    void theValidOverAPartialMergeDetectorFiresOnThePreFixShape() {
+        Pattern body = Pattern.compile(
+            "(@Valid\\s+)?@RequestBody\\s+(@Valid\\s+)?([\\w.<>]+)\\s+(\\w+)");
+        Pattern mandatory = Pattern.compile(
+            "@(?:NotBlank|NotNull|NotEmpty)\\b[^;]*?private\\s+[\\w.<>\\[\\]]+\\s+(\\w+)\\s*[;=]");
+
+        // ── the mandatory-field pattern ───────────────────────────────────────
+        String preFixEntity = """
+            @Entity
+            public class ChangeTask {
+                @NotBlank
+                @Column(name = "title_ar", length = 500)
+                private String titleAr;
+                @Column(name = "owner_name") private String ownerName;
+            }
+            """;
+        Matcher fm = mandatory.matcher(preFixEntity);
+        assertThat(fm.find()).as("the detector must see @NotBlank separated from its field by a "
+            + "@Column annotation — the shape every entity in this tree uses").isTrue();
+        assertThat(fm.group(1)).isEqualTo("titleAr");
+        assertThat(mandatory.matcher("private String ownerName;").find())
+            .as("and must NOT fire on an unannotated field").isFalse();
+
+        // ── the @Valid position, in BOTH orders and in neither ────────────────
+        Matcher house = body.matcher("public ChangeTask updateTask("
+            + "@PathVariable Long taskId, @Valid @RequestBody ChangeTask body) {");
+        assertThat(house.find()).isTrue();
+        assertThat(house.group(1)).as("⚠ the house idiom puts @Valid BEFORE @RequestBody, and a "
+            + "pattern that only looks after it reports zero — the quiet direction").isNotNull();
+        assertThat(house.group(3)).isEqualTo("ChangeTask");
+
+        Matcher other = body.matcher("update(@RequestBody @Valid ChangeRequest body)");
+        assertThat(other.find()).isTrue();
+        assertThat(other.group(2)).as("the other order must pair too").isNotNull();
+
+        Matcher fixed = body.matcher("public ChangeTask updateTask("
+            + "@PathVariable Long taskId, @RequestBody ChangeTask body) {");
+        assertThat(fixed.find()).isTrue();
+        assertThat(fixed.group(1)).as("the POST-FIX shape must report no @Valid").isNull();
+        assertThat(fixed.group(2)).isNull();
+        assertThat(fixed.group(3)).as("while still resolving the bound type, or the population "
+            + "silently shrinks instead of the offender list").isEqualTo("ChangeTask");
     }
 
     /**

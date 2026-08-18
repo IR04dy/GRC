@@ -45,8 +45,16 @@ public class AuthorityDocumentCitation {
     @Column(nullable = false)
     private Integer depth = 0;
 
+    // ⚠⚠ F2-239 — the five fields below carry NO initialiser ON PURPOSE, and re-adding one is the
+    // defect. `updateCitation` guards each with `if (body.getX() != null)`; an entity-bound PUT
+    // deserialises an omitted key to the field's INITIALISER, not to null, so an initialiser makes
+    // every one of those guards true on every request and the stored value is overwritten. Probed
+    // live: the register's own edit form sends six keys and omits three of these, so editing a
+    // requirement paragraph moved it to sequence_order 0 (the top of the regulation's tree), marked
+    // it a placeholder, and recorded it EN_ONLY — in the same request that supplied its Arabic text.
+    // The defaults live in `createCitation`, which is the only writer of this table.
     @Column(name = "sequence_order", nullable = false)
-    private Integer sequenceOrder = 0;
+    private Integer sequenceOrder;
 
     @Column(name = "title_en", nullable = false, length = 500)
     private String titleEn;
@@ -73,16 +81,16 @@ public class AuthorityDocumentCitation {
     private String testingGuidanceAr;
 
     @Column(nullable = false, precision = 5, scale = 2)
-    private BigDecimal weight = BigDecimal.ONE;
+    private BigDecimal weight;
 
     @Column(nullable = false)
-    private Boolean mandatory = true;
+    private Boolean mandatory;
 
     @Column(name = "is_placeholder", nullable = false)
-    private Boolean isPlaceholder = true;
+    private Boolean isPlaceholder;
 
     @Column(name = "translation_status", nullable = false, length = 20)
-    private String translationStatus = "EN_ONLY";
+    private String translationStatus;
 
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;

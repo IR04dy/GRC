@@ -72,12 +72,18 @@ public class AuthorityDocument {
     @Column(name = "effective_date_h", length = 20)
     private String effectiveDateH;
 
+    // ⚠⚠ F2-239 — no initialiser ON PURPOSE on these two, and re-adding one is the defect: an
+    // entity-bound PUT deserialises an omitted key to the initialiser, so `update`'s
+    // `if (body.getIsPlaceholder() != null)` guard could never be false. The defaults live in
+    // `createDocument`. Latent here rather than live — this page's DOCUMENT form does send both,
+    // which is why the citation half below it was the reachable one — but two of five fixed leaves
+    // the rest looking covered (F2-215), and the register is the boundary, not the field.
     @Column(name = "is_placeholder", nullable = false)
-    private Boolean isPlaceholder = true;
+    private Boolean isPlaceholder;
 
     /** EN_ONLY | AR_AUTO | AR_HUMAN_REVIEWED | AR_OFFICIAL */
     @Column(name = "translation_status", nullable = false, length = 20)
-    private String translationStatus = "EN_ONLY";
+    private String translationStatus;
 
     /** DRAFT | ACTIVE | DEPRECATED | SUPERSEDED */
     @Column(nullable = false, length = 20)

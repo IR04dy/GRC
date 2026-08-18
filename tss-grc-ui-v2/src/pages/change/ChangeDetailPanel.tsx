@@ -53,7 +53,7 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
   const [voteDecision, setVoteDecision] = useState<'APPROVE' | 'REJECT' | 'DEFER' | 'ABSTAIN' | null>(null);
   const [taskOpen, setTaskOpen] = useState(false);
   const voteInitial = useMemo(() => ({ approverName: getUser()?.username ?? '', approverRole: '', comments: '' }), [voteDecision]);
-  const taskInitial = useMemo(() => ({ titleEn: '', ownerName: '', dueDate: '' }), []);
+  const taskInitial = useMemo(() => ({ titleEn: '', titleAr: '', ownerName: '', dueDate: '' }), []);
 
   async function reload() {
     if (!change) { setApprovals([]); setTasks([]); setComments([]); setConflicts([]); setReferral(null); return; }
@@ -106,10 +106,10 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
   function addTask() { setTaskOpen(true); }
   // CH-5 captures owner + due date so the SLA scheduler can act on the task;
   // CH-8 moves that capture out of chained window.prompt calls into a real modal.
-  async function submitTask(v: { titleEn: string; ownerName: string; dueDate: string }) {
+  async function submitTask(v: { titleEn: string; titleAr: string; ownerName: string; dueDate: string }) {
     const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(v.dueDate) ? `${v.dueDate}T17:00:00` : undefined;
     try {
-      await changeApi.addTask(change!.id, { titleEn: v.titleEn, status: 'PENDING',
+      await changeApi.addTask(change!.id, { titleEn: v.titleEn, titleAr: v.titleAr, status: 'PENDING',
         ownerName: v.ownerName || undefined, dueAt });
       setTaskOpen(false);
       void reload();
@@ -351,7 +351,13 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
           title={t('changeAddTask')}
           size="md"
           fields={[
-            { kind: 'text', key: 'titleEn', label: t('changeTaskTitle'), required: true, span: 12 },
+            // ⚠ F2-239 — `titleAr` is REQUIRED, and this form had no input for it: `ChangeTask.titleAr`
+            // is @NotBlank (F2-30, house rule 7), so POST /changes/{id}/tasks answered
+            // 400 "titleAr: Field must not be blank" to every submission this modal made. Probed live.
+            // House rule 7 says Arabic names are backend-mandatory and must be client-gated in forms —
+            // this is that gate, and its absence is why "Add task" had never once created a task.
+            { kind: 'text', key: 'titleEn', label: t('changeTaskTitle'), required: true, span: 6 },
+            { kind: 'text', key: 'titleAr', label: t('changeTaskTitleAr'), required: true, span: 6 },
             { kind: 'text', key: 'ownerName', label: t('changeTaskOwner'), span: 6 },
             { kind: 'date', key: 'dueDate', label: t('changeTaskDueDate'), span: 6 },
           ]}

@@ -1150,14 +1150,19 @@ public class ChangeManagementService {
     @Transactional(readOnly = true)
     public List<ChangeTask> tasks(Long changeId) {
         require(changeId);
-        return taskRepo.findByChangeRequestIdOrderBySortOrderAsc(changeId);
+        return taskRepo.findByChangeRequestIdOrderBySortOrderAscIdAsc(changeId);
     }
 
     @Transactional
     public ChangeTask addTask(Long changeId, ChangeTask body) {
         require(changeId);
         body.setChangeRequestId(changeId);
-        if (body.getStatus() == null) body.setStatus("PENDING");
+        // F2-239 — the ONLY defaults for these two NOT NULL columns, because the entity no longer
+        // initialises them (an initialiser makes `updateTask`'s null-guards unfirable). Dropping
+        // either line turns a silent reset into a 500 on create, and with ddl-auto=none nothing else
+        // in the tree would notice; NeverFiringNullGuardContractTest asserts both triples.
+        if (body.getStatus() == null)    body.setStatus("PENDING");
+        if (body.getSortOrder() == null) body.setSortOrder(0);
         ChangeTask saved = taskRepo.save(body);
         audit.log("TASK_ADD", "ChangeRequest", changeId,
             "Task added to change " + changeId + ": " + nullSafeMsg(saved.getTitleEn()));
@@ -1169,6 +1174,10 @@ public class ChangeManagementService {
         ChangeTask t = taskRepo.findById(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
         require(t.getChangeRequestId());
+        // F2-239 — see requireNotBlank: this route dropped `@Valid`, so the "mandatory title" half of
+        // F2-30 is enforced here, on the row, where an OMITTED field and a BLANK one differ.
+        requireNotBlank("titleEn", body.getTitleEn());
+        requireNotBlank("titleAr", body.getTitleAr());
         if (body.getTitleEn()    != null) t.setTitleEn(body.getTitleEn());
         if (body.getTitleAr()    != null) t.setTitleAr(body.getTitleAr());
         if (body.getOwnerName()  != null) t.setOwnerName(body.getOwnerName());
@@ -1647,6 +1656,19 @@ public class ChangeManagementService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
+    /**
+     * F2-239 — a field a partial update may OMIT but may not BLANK.
+     *
+     * <p>The distinction is the whole point: {@code null} means "the caller said nothing, leave the
+     * stored value alone", and {@code ""} means "make this row's mandatory field empty". Bean
+     * validation on the bound entity cannot tell them apart, which is why {@code @Valid} had to come
+     * off these two PUT routes and why this exists.
+     */
+    private static void requireNotBlank(String field, String value) {
+        if (value != null && value.isBlank())
+            throw new IllegalArgumentException(field + " must not be blank");
+    }
+
     private void apply(ChangeRequest target, ChangeRequest src) {
         // CH-2 (validation): reject invalid enums with a 400 up front, rather than
         // letting them reach the V300 DB CHECK constraints and surface as a 500.
@@ -1654,6 +1676,12 @@ public class ChangeManagementService {
             throw new IllegalArgumentException("Invalid changeType '" + src.getChangeType() + "' — allowed: " + CHANGE_TYPES);
         if (src.getRiskLevel() != null && !RISK_LEVELS.contains(src.getRiskLevel()))
             throw new IllegalArgumentException("Invalid riskLevel '" + src.getRiskLevel() + "' — allowed: " + RISK_LEVELS);
+        // F2-239 — the mandatory-title invariant now lives here rather than on the request, because
+        // the PUT route dropped `@Valid` (it was refusing every legitimately partial body). OMITTING
+        // the Arabic title leaves the row's own alone; sending it BLANK is refused, which is the
+        // property F2-30's `@NotBlank` was protecting. `requireNotBlank` also serves `updateTask`.
+        requireNotBlank("titleEn", src.getTitleEn());
+        requireNotBlank("titleAr", src.getTitleAr());
         if (src.getChangeCode()           != null) target.setChangeCode(src.getChangeCode());
         if (src.getTitleEn()              != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()              != null) target.setTitleAr(src.getTitleAr());

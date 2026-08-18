@@ -87,7 +87,7 @@ class CabPackExportTest {
         when(changeApprovalRepo.findByChangeRequestIdOrderByDecidedAtAsc(CHANGE_ID)).thenReturn(List.of(a));
         ChangeTask k = new ChangeTask();
         k.setTitleEn("Snapshot DB"); k.setStatus("DONE"); k.setOwnerName("ops");
-        when(changeTaskRepo.findByChangeRequestIdOrderBySortOrderAsc(CHANGE_ID)).thenReturn(List.of(k));
+        when(changeTaskRepo.findByChangeRequestIdOrderBySortOrderAscIdAsc(CHANGE_ID)).thenReturn(List.of(k));
         ChangeLink l = new ChangeLink();
         l.setEntityType("RISK"); l.setEntityId(9L); l.setLinkType("MITIGATES");
         when(changeLinkRepo.findByChangeRequestId(CHANGE_ID)).thenReturn(List.of(l));

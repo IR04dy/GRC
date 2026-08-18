@@ -116,7 +116,7 @@ public class ChangeWorkflowService {
     public List<WorkflowPort.RequestRef> requestsFor(Long changeId) {
         ChangeRequest c = requireChange(changeId);
         if (workflow.isEmpty()) return List.of();
-        List<Long> taskIds = tasks.findByChangeRequestIdOrderBySortOrderAsc(c.getId())
+        List<Long> taskIds = tasks.findByChangeRequestIdOrderBySortOrderAscIdAsc(c.getId())
             .stream().map(ChangeTask::getId).filter(Objects::nonNull).toList();
         return workflow.get().raisedForChange(c.getId(), taskIds);
     }

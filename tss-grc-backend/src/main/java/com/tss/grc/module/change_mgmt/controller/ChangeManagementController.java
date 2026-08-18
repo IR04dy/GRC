@@ -108,9 +108,24 @@ public class ChangeManagementController {
         return service.create(body);
     }
 
+    /**
+     * ⚠⚠ F2-239 — <b>NO {@code @Valid} HERE, and re-adding it breaks every partial caller.</b>
+     *
+     * <p>{@code service.update} is a partial merge: every field is written only when the body carried
+     * it. {@code @Valid} on the bound ENTITY contradicts that, because F2-30 put {@code @NotBlank} on
+     * {@code ChangeRequest.titleAr} — so a body that legitimately omits the Arabic title is refused
+     * with a 400 before the service is entered.
+     *
+     * <p>F2-105 diagnosed exactly this and fixed it in the frontend, by having the PIR card resend
+     * {@code {...change}}. That works for one caller. It is not a defence — the next caller does not
+     * have it (F2-237), and the next caller was {@code ChangeDetailPanel}, whose two change-task
+     * handlers had been answering 400 to every request since F2-30 landed. The invariant belongs on
+     * the row, not on the request: {@code update} refuses a BLANK Arabic title explicitly, and
+     * Hibernate re-validates the loaded row on pre-update.
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    public ChangeRequest update(@PathVariable Long id, @Valid @RequestBody ChangeRequest body) {
+    public ChangeRequest update(@PathVariable Long id, @RequestBody ChangeRequest body) {
         return service.update(id, body);
     }
 
@@ -289,9 +304,10 @@ public class ChangeManagementController {
     @ResponseStatus(HttpStatus.CREATED)
     public ChangeTask addTask(@PathVariable Long id, @Valid @RequestBody ChangeTask body) { return service.addTask(id, body); }
 
+    /** ⚠⚠ F2-239 — no {@code @Valid}, for the reason given on {@link #update} above. */
     @PutMapping("/tasks/{taskId}")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    public ChangeTask updateTask(@PathVariable Long taskId, @Valid @RequestBody ChangeTask body) { return service.updateTask(taskId, body); }
+    public ChangeTask updateTask(@PathVariable Long taskId, @RequestBody ChangeTask body) { return service.updateTask(taskId, body); }
 
     @DeleteMapping("/tasks/{taskId}")
     @PreAuthorize("hasPermission('CHANGE','DELETE')")

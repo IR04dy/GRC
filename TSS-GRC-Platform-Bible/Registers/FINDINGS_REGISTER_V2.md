@@ -2547,6 +2547,161 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-239 · The register is the boundary, and `@Valid` on a bound entity was refusing every partial body
+
+|  |  |
+|---|---|
+| **ID** | F2-239 |
+| **Title** | Editing a transcribed NCA ECC requirement moved it to the top of the regulation, marked it a placeholder and recorded it English-only — and on the change checklist the same family met `@Valid`, so neither "Add task" nor the status toggle had ever worked |
+| **Severity** | 🔴 P2 (live, dev = prod: 207 of 214 citations are not placeholders, 212 of 214 are ordered, 207 of 214 are past EN_ONLY — the edit form omits all three; both change-task write routes answered 400 to every body the UI sends) |
+| **Status** | 🟢 CLOSED 2026-08-18 |
+| **Programme** | Platform Bible F2 · server-owned state |
+| **Modules** | `platform/regulatory` (2 entities, 1 service), `change_mgmt` (entity, service, controller, repository), FE (3 files), 1 gate, 2 new test classes |
+
+### The ordering that finds the live sites is WHICH FIELD THE CALLER OMITS
+
+F2-238 filed a 28-entry work list, all `PUT`, and ranked it by **what the initialiser asserts** —
+naming `GhgEmissionRecord#coveragePercent` (resets to 100.00, an ISAE 3410 assurance input) and
+`AuthorityDocument#isPlaceholder` (resets to true) as the two sharpest.
+
+Re-derived (F2-221), the population is 14 routes across 12 services, **all binding the ENTITY**
+(resolved from the controllers, not guessed). 10 have a frontend write client. But neither body
+width nor initialiser severity decides reachability: **what decides it is whether the live caller's
+object literal contains that field's key.** Measured that way, of 28 entries **4 are live**:
+
+| entry | initialiser | the live caller |
+|---|---|---|
+| `AuthorityDocumentCitation#sequenceOrder` | `0` | omitted by `RegulatoryLibraryPage`'s citation form |
+| `AuthorityDocumentCitation#isPlaceholder` | `true` | omitted |
+| `AuthorityDocumentCitation#translationStatus` | `"EN_ONLY"` | omitted |
+| `ChangeTask#sortOrder` | `0` | omitted by `ChangeDetailPanel`'s `{ status: next }` |
+
+🔑 **F2-238's ranking picked one field that is not reachable and the wrong half of the other.**
+`coveragePercent` IS sent by its only caller. The live `isPlaceholder` is the **citation's** — a
+different entity, edited by a second form on the same page which has inputs for three fewer fields.
+**Harm-if-reached and reach are two orderings and they disagree; a work list has to carry both.**
+
+### The regulatory half, probed against rows the probe plants itself (F2-206)
+
+```
+planted:  seq=300  placeholder=False  translation=AR_OFFICIAL  mandatory=False  weight=2.50  req_ar=yes
+PUT /api/v1/regulatory/citations/{id}   the page's exact 6-key body   ->  HTTP 200
+after:    seq=0    placeholder=True   translation=EN_ONLY
+```
+
+`sequence_order` is what orders a regulation: the repository finder ends `OrderBySequenceOrderAsc`
+and `citationsToTree` sorts by it. **Document 9 holds 167 citations spanning 100..4360 with 159
+distinct values**, so editing any one requirement paragraph moved it above section 1-1-1.
+`is_placeholder` renders as a warning badge on the citation tree, so a transcribed NCA ECC
+sub-control started reading as a stub.
+
+🔑 **And `translation_status` → `EN_ONLY` is the sharpest, because the reset contradicts the request
+that produced it.** The citation form has Arabic inputs and sends them; 214 of 214 rows carry
+`title_ar` and 196 of 214 carry `requirement_text_ar`. So a human translating a requirement into
+Arabic and pressing Save recorded the citation as English-only. Arabic is the platform's primary
+language (house rule 7). F2-213's *a reset is worse than a null* one step further: this reset
+asserts the absence of the exact data the caller just supplied.
+
+🔑 **The correct artefact was 20 lines above the wrong one in the same file.** `createCitation`
+already defaults all five of these fields and *inherits* `isPlaceholder` from the parent document — a
+citation transcribed into a placeholder document is a placeholder. That reasoning predates this
+finding; `updateCitation` discarded it on every edit.
+
+### ⚠⚠ The change-task half was not a reset. Both its write routes REFUSED
+
+`ChangeTask.titleAr` is `@NotBlank` (F2-30, enforcing house rule 7) and both routes bound the entity
+with `@Valid`. Probed live with the exact bodies the UI sends:
+
+```
+POST /api/v1/changes/{id}/tasks   { titleEn, status, ownerName, dueAt }   ->  400  titleAr: Field must not be blank
+PUT  /api/v1/changes/tasks/{id}   { status: next }                        ->  400  titleAr: Field must not be blank
+PUT  /api/v1/changes/tasks/{id}   { status, titleAr }                     ->  200  sort_order 300 -> 0
+```
+
+So **neither the "Add task" button nor the status toggle on the change implementation checklist had
+ever worked**, and the third line is the reset sitting behind the 400. 🔑 **A reachability derivation
+that stops at the caller's body cannot see that the route refuses it** — F2-238's
+*the-throw-was-holding-the-write-shut*, from the other side and in a mechanism with no hand-written
+guard in it: bean validation runs before the service is entered and cannot tell an OMITTED mandatory
+field from a BLANK one.
+
+🔑 **F2-105 diagnosed this exact mechanism, wrote eleven lines explaining it, and fixed it in the
+FRONTEND** — the PIR card resends `{...change}`, with a comment noting the card "400'd on every save
+from the day F2-30 landed". That closes one caller. It is not a defence (F2-237), and **the write-up
+is what made the two siblings in the same controller look covered** (F2-215): a reader who finds the
+mechanism explained does not then ask which other routes share it.
+
+### The fix
+
+* **Remove the initialiser, own the default on the create path** — 9 initialisers across 3 entities.
+  Every column is NOT NULL, so `everyRemovedInitialiserHasAWriterOnTheCreatePath` asserts all 35
+  `(entity, field, writer)` triples in both directions: a writer that stops setting one turns a
+  silent reset into a **500 on create**, and `ddl-auto=none` means nothing else would notice. There
+  are **no other Java producers** of these three entities (0 `new X()` sites; the other five classes
+  touching their repositories only read), so the service creates are the whole population.
+* **Drop `@Valid` from the two partial-update PUT routes** and put the invariant on the ROW:
+  `requireNotBlank` refuses a BLANK mandatory title with a 400 naming the field, while an OMITTED one
+  leaves the stored value alone. Kept on the two CREATE routes, where a full entity genuinely
+  arrives — and the add-task form now has the Arabic input house rule 7 requires, which is why the
+  create's 400 is correct rather than the defect.
+* **`ClosedVocabulary` for the translation status, per column.** `updateCitation` validated nothing,
+  so a caller could store any string in a CHECK-constrained column and get the CHECK's 409 rather
+  than a 400; and because the column collates case-INSENSITIVELY (F2-179), `'ar_official'` was
+  ACCEPTED and stored verbatim while every reader compares case-sensitively — probed both, pre-fix.
+  `require`, not `coerce`, per F2-182's test: the CHECK already refuses everything outside the
+  vocabulary, so no working request can start failing. This also retires a **seventh hand-rolled
+  vocabulary** that `HandRolledVocabularyMirrorTest` never listed.
+* **`OrderBySortOrderAscIdAsc`** on the task finder, matching the sibling `ChangeConditionRepository`
+  which has always had the tie-break. Every UI-created task carries `sort_order = 0`, so ties are the
+  normal case and without a second key their order is whatever the database returns (F2-197).
+
+### The new gate leg, and its pre-fix control
+
+`noPartialUpdateRouteBindsAnEntityWithValid` is a **hard zero with an EMPTY exemption map**: the
+better fix is always available (bind a purpose-built request record, which puts the route outside the
+population by construction — F2-213's structural direction), so there is no correct code for it to
+fail on. Measured: **172 PUT/PATCH routes take a body, 94 bind an entity, 9 of 411 entities declare a
+bean-validated mandatory field, and exactly 2 routes were in the intersection.** Both fixed → 0.
+
+⚠ **The leg passed on its first run, which is also what a rotted regex looks like.** Restoring
+master's controller into the tree makes it fail naming both routes and nothing else, and a synthetic
+self-test drives both patterns against the literal pre-fix and post-fix shapes. The one that matters
+is the annotation ORDER: the house idiom is `@Valid @RequestBody T x`, and a pattern anchored on
+`@RequestBody` looking only forwards reported **0 of 2** — indistinguishable from a clean tree.
+
+### Verification
+
+`NeverFiringNullGuardContractTest` **7/7** (5 corpus legs + 2 self-tests) · new behaviour tests
+`CitationPartialUpdateTest` **7/7** and `ChangeTaskPartialUpdateTest` **5/5** · full suite
+**4,114 / 0 / 0** on a forced `target/test-classes` rebuild (F2-223) · live probe **21/21 post-fix**
+against a backend restarted on the fixed tree (F2-217), with the pre-fix control reproducing all
+three citation resets and both 400s · FE `tsc` clean, **72 files / 797 tests** · **browser**: the
+add-task modal renders both title fields required and bilingually labelled, a task was created
+end-to-end, and its status toggle moved PENDING → IN PROGRESS with no error — the two controls that
+had never worked · registers restored to 214 citations / 41 tasks all with a non-zero `sort_order`,
+**0 residual** `[REVIEW-TEST]` (hard-deleted with `CHARINDEX`).
+
+### Filed
+
+- **The residual 19-site work list**, all `PUT`. `GhgEmissionRecord#coveragePercent` and
+  `AuthorityDocument#isPlaceholder` are NOT among them any more for opposite reasons — the first is
+  sent by its caller and stays on the list as unreachable-today, the second is fixed. Ordered by
+  reach: the 4 sites whose route has no FE write client at all
+  (`BcmCommunicationContact` ×3, `RiskControlLink#linkType`, `SustainabilityEvidence
+  #confidentiality`, `VendorAssessment#riskRating`) are the least urgent; the ones whose caller
+  sends the field today are latent-by-caller and change the moment a second client appears. Read the
+  route and probe it; do not write 19 reasons (F2-188).
+- **`platform.authority_document_citations` has one CHECK constraint and it is on
+  `translation_status`.** `sequence_order`, `weight`, `mandatory` and `is_placeholder` have none —
+  cheap to add now that this slice closed the only open writer (F2-183's rule), and worth it because
+  `weight` is `decimal(5,2)` with no declared range.
+- **The structural root, unchanged from F2-213**: 83 entity-bound `PUT` handlers, and now a measured
+  **94** entity-bound PUT/PATCH routes. A purpose-built request record per endpoint makes this whole
+  family — resets, refusals and mass assignment alike — unrepresentable. Owner decision.
+- **`createCitation` defaults `sequenceOrder` to 0 and the FE create sends nothing**, so every
+  citation added through the UI lands at the top of the regulation. That is a product question (where
+  should a new requirement paragraph go?), not a defect of this family.
+
 ## F2-238 · A PATCH whose omitted fields are written is a contract violation, and the throw was holding the write shut
 
 |  |  |

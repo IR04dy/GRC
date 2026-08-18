@@ -17,8 +17,13 @@ public class ChangeTask {
     @Column(name = "change_request_id", nullable = false)
     private Long changeRequestId;
 
+    // ⚠⚠ F2-239 — no initialiser ON PURPOSE, here and on `status` below. `updateTask` guards both
+    // with `if (body.getX() != null)`, and an entity-bound PUT deserialises an omitted key to the
+    // INITIALISER rather than to null, so each guard was true on every request. The panel's only
+    // write is `{ status: next }`, so a status flip collapsed sort_order to 0 — and the server
+    // orders the implementation checklist by that column. `addTask` owns both defaults.
     @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder = 0;
+    private Integer sortOrder;
 
     @Column(name = "title_en", nullable = false, length = 500)
     private String titleEn;
@@ -33,8 +38,9 @@ public class ChangeTask {
     @Column(name = "owner_name", length = 255)
     private String ownerName;
 
+    /** PENDING | IN_PROGRESS | DONE | BLOCKED | SKIPPED — defaulted by {@code addTask}, see above. */
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "PENDING"; // PENDING | IN_PROGRESS | DONE | BLOCKED | SKIPPED
+    private String status;
 
     @Column(name = "due_at")
     private LocalDateTime dueAt;
