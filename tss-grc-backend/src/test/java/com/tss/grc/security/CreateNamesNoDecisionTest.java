@@ -1,5 +1,6 @@
 package com.tss.grc.security;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeActionItem;
 import com.tss.grc.module.admin.committee.repository.CommitteeActionItemRepository;
@@ -61,7 +62,16 @@ class CreateNamesNoDecisionTest {
         lenient().when(actionRepo.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
-    @AfterEach void tearDown() { TenantContext.clear(); }
+    @AfterEach void tearDown() { TenantContext.clear(); SecurityContextHolder.clearContext(); }
+    /** F2-236 — a principal to record, since the attribution now comes from the security context. */
+    private static void f236AuthAs(String username, Long userId) {
+        SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                new com.tss.grc.security.GrcUserDetails(
+                    userId, ORG_ID, username, "x", true, true, java.util.List.of()),
+                "x", java.util.List.of()));
+    }
+
 
     // ── data sharing agreement (PDPL third-party disclosure) ─────────────────
 
@@ -112,13 +122,24 @@ class CreateNamesNoDecisionTest {
 
         assertThat(dsa.submit(2L).getStatus()).isEqualTo("IN_REVIEW");
 
-        DataSharingAgreement live = dsa.activate(2L, "Real Signer", "Real Counterparty");
+        f236AuthAs("compliance", 3L);
+        DataSharingAgreement live = dsa.activate(2L, "Real Counterparty");
         assertThat(live.getStatus()).isEqualTo("ACTIVE");
         assertThat(live.getSignedAt())
             .as("activate() stamps the signature date from the clock — that is the whole reason a "
                 + "create may not name it")
             .isNotNull();
-        assertThat(live.getSignerName()).isEqualTo("Real Signer");
+        // F2-236 — this line used to read isEqualTo("Real Signer"), i.e. that the value the CALLER
+        // passed is the value STORED. That is precisely the defect, asserted as correct, ONE LINE
+        // BELOW the comment above stating the rule it breaks: if the clock is the server's, so is
+        // the attribution. Fifth instance in this register after F2-159, F2-175, F2-227, F2-234.
+        assertThat(live.getSignerName())
+            .as("OUR signatory is the authenticated principal")
+            .isEqualTo("compliance");
+        assertThat(live.getCounterpartySigner())
+            .as("the COUNTERPARTY's signatory stays caller data by design — that person is at "
+                + "another organisation and can never be a principal here")
+            .isEqualTo("Real Counterparty");
     }
 
     // ── committee action item (governance follow-up) ─────────────────────────
@@ -244,9 +265,15 @@ class CreateNamesNoDecisionTest {
 
         assertThat(actions.startProgress(3L).getStatus()).isEqualTo("IN_PROGRESS");
 
-        CommitteeActionItem done = actions.complete(3L, "Evidence filed", 5L);
+        f236AuthAs("compliance", 3L);
+        CommitteeActionItem done = actions.complete(3L, "Evidence filed");
         assertThat(done.getStatus()).isEqualTo("COMPLETED");
         assertThat(done.getCompletedAt()).isNotNull();
         assertThat(done.getCompletionNotesEn()).isEqualTo("Evidence filed");
+        // F2-236 — completedBy came from the request; a live probe stored user id 9999, which does
+        // not exist, as who completed a committee action item.
+        assertThat(done.getCompletedBy())
+            .as("who completed it is the principal, never a caller-named id")
+            .isEqualTo(3L);
     }
 }

@@ -120,8 +120,11 @@ export function markUnderReviewCompliance(id: number, reviewerName?: string) {
 export function returnCompliance(id: number, reason: string) {
   return api.post<NdiComplianceAssessment>(`${BASE}/${id}/return`, { reason });
 }
-export function approveCompliance(id: number, approverName?: string) {
-  return api.post<NdiComplianceAssessment>(`${BASE}/${id}/approve`, { approverName });
+// F2-236 — no approverName. NdiComplianceAssessmentService#approve takes NO actor parameter and
+// never has, so this was a field the server discarded — which is worse than none, because a
+// required prompt for it told the operator their answer mattered (F2-225's shape).
+export function approveCompliance(id: number) {
+  return api.post<NdiComplianceAssessment>(`${BASE}/${id}/approve`);
 }
 export function reopenCompliance(id: number) { return api.post<NdiComplianceAssessment>(`${BASE}/${id}/reopen`); }
 export function deleteCompliance(id: number) { return api.delete<void>(`${BASE}/${id}`); }

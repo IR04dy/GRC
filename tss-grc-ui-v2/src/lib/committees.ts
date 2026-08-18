@@ -833,9 +833,11 @@ export function startAction(id: number): Promise<ActionItemRecord> {
   return api.post(`${ACT_BASE}/${id}/start`);
 }
 
-export function completeAction(id: number, completionNotesEn?: string, completedBy?: number):
+// F2-236 — no completedBy: the server takes it from the authenticated principal. A live probe
+// stored user id 9999, which does not exist, as who completed a committee action item.
+export function completeAction(id: number, completionNotesEn?: string):
     Promise<ActionItemRecord> {
-  return api.post(`${ACT_BASE}/${id}/complete`, { completionNotesEn: completionNotesEn ?? '', completedBy: completedBy ?? null });
+  return api.post(`${ACT_BASE}/${id}/complete`, { completionNotesEn: completionNotesEn ?? '' });
 }
 
 export function cancelAction(id: number, reason: string): Promise<ActionItemRecord> {

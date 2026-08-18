@@ -64,8 +64,10 @@ public class FourthPartyExposureController {
 
     @PostMapping("/{id}/validate")
     @PreAuthorize("hasPermission('SCM','WRITE')")
-    public FourthPartyExposure validate(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.validate(id, body.getOrDefault("validatorName", "system"));
+    public FourthPartyExposure validate(@PathVariable Long id) {
+        // F2-236 — no body: the validator is the authenticated principal, not
+        // body.getOrDefault("validatorName", "system").
+        return service.validate(id);
     }
 
     @PostMapping("/{id}/mitigate")

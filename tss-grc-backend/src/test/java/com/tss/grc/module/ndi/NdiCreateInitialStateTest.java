@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.audit.service.NdiAuditPublisher;
 import com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle;
@@ -77,7 +78,16 @@ class NdiCreateInitialStateTest {
         lenient().when(cycles.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
-    @AfterEach void tearDown() { TenantContext.clear(); }
+    @AfterEach void tearDown() { TenantContext.clear(); SecurityContextHolder.clearContext(); }
+    /** F2-236 — a principal to record, since the attribution now comes from the security context. */
+    private static void f236AuthAs(String username, Long userId) {
+        SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                new com.tss.grc.security.GrcUserDetails(
+                    userId, ORG_ID, username, "x", true, true, java.util.List.of()),
+                "x", java.util.List.of()));
+    }
+
 
     private static NdiImprovementPlan plan() {
         NdiImprovementPlan p = new NdiImprovementPlan();
@@ -133,9 +143,14 @@ class NdiCreateInitialStateTest {
         draft.setStatus("DRAFT");
         when(plans.findByIdAndOrganisationId(4L, ORG_ID)).thenReturn(Optional.of(draft));
 
-        NdiImprovementPlan approved = planService.approve(4L, "so_officer");
+        f236AuthAs("so_officer", 8L);
+        NdiImprovementPlan approved = planService.approve(4L);
 
         assertThat(approved.getStatus()).isEqualTo("APPROVED");
+        // F2-236 — the assertion is unchanged in substance and its source has moved: the approver
+        // is now resolved from the security context rather than passed in. The intent this test
+        // was written with still holds — the route that IS allowed to approve must still record
+        // who did — and it is now recording somebody the caller could not have chosen.
         assertThat(approved.getApproverName())
             .as("the route that IS allowed to approve must still record it, or this slice closed "
                 + "the bypass by removing the feature")

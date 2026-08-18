@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.admin.committee.entity.CommitteeActionItem;
@@ -177,12 +178,15 @@ public class CommitteeActionItemService {
 
     /** Mark COMPLETED. */
     @Transactional
-    public CommitteeActionItem complete(Long id, String completionNotesEn, Long completedBy) {
+    public CommitteeActionItem complete(Long id, String completionNotesEn) {
         CommitteeActionItem a = get(id);
         String prev = a.getStatus();
         a.setStatus("COMPLETED");
         a.setCompletedAt(LocalDateTime.now());
-        if (completedBy != null) a.setCompletedBy(completedBy);
+        // F2-236 — completedBy is the principal, never the request. It arrived as
+        // `req.completedBy()`, and a live probe stored user id 9999 (which does not exist) as who
+        // completed a committee action item, beside this server clock.
+        a.setCompletedBy(CurrentActor.requireUserId("a committee action-item completion"));
         if (completionNotesEn != null) a.setCompletionNotesEn(completionNotesEn);
         CommitteeActionItem saved = repo.save(a);
         audit.log("ACTION_COMPLETE", "CommitteeActionItem", id,

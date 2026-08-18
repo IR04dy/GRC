@@ -96,7 +96,8 @@ export function listPlans(cycleId: number) {
 export function getPlan(id: number)            { return api.get<NdiImprovementPlan>(`${BASE}/${id}`); }
 export function createPlan(body: Partial<NdiImprovementPlan>) { return api.post<NdiImprovementPlan>(BASE, body); }
 export function updatePlan(id: number, body: Partial<NdiImprovementPlan>) { return api.put<NdiImprovementPlan>(`${BASE}/${id}`, body); }
-export function approvePlan(id: number, approverName?: string) { return api.post<NdiImprovementPlan>(`${BASE}/${id}/approve`, { approverName }); }
+// F2-236 — no approverName: the server takes it from the principal. The page passed 'admin'.
+export function approvePlan(id: number) { return api.post<NdiImprovementPlan>(`${BASE}/${id}/approve`); }
 export function transitionPlan(id: number, to: NdiPlanStatus)  { return api.post<NdiImprovementPlan>(`${BASE}/${id}/transition`, { to }); }
 export function deletePlan(id: number)         { return api.delete<void>(`${BASE}/${id}`); }
 export function recomputeAllPlans()            { return api.post<void>(`${BASE}/recompute-all`); }

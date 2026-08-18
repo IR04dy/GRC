@@ -54,8 +54,11 @@ export function startSrt(id: number) { return api.post<SupplierResilienceTest>(`
 export function completeSrt(id: number, body: Partial<{ outcome: SrtOutcome; rtoActualMinutes: number; observationsEn: string; actionItemsEn: string; evidenceRefs: string; }>) {
   return api.post<SupplierResilienceTest>(`${BASE}/${id}/complete`, body);
 }
-export function approveSrt(id: number, approverName: string) {
-  return api.post<SupplierResilienceTest>(`${BASE}/${id}/approve`, { approverName });
+// F2-236 — no approverName on purpose. The server takes the approving identity from the
+// authenticated principal; sending one would be a field the server ignores. The page used to pass
+// the literal 'admin', and the controller defaulted to 'admin' when it was absent.
+export function approveSrt(id: number) {
+  return api.post<SupplierResilienceTest>(`${BASE}/${id}/approve`);
 }
 export function cancelSrt(id: number, reason: string) {
   return api.post<SupplierResilienceTest>(`${BASE}/${id}/cancel`, { reason });

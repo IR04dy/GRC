@@ -55,6 +55,53 @@ public final class CurrentActor {
     }
 
     /**
+     * The username of the current principal, refusing rather than returning {@code null}.
+     *
+     * <p>F2-236 — for the attribution half of a transition this is the accessor to use, never
+     * {@link #username()} with a fallback. Where a service stamps {@code set<verb>At(now())} from
+     * its own clock it has already declared that <b>it</b> is the recorder of the act, so the
+     * matching {@code set<verb>By(...)} may not come from the request body: that splits one
+     * attribution across two owners, and the caller's half is unverified. Seven registers had
+     * exactly that shape, and four frontend call sites passed the literal {@code "admin"}.
+     *
+     * <p>Refusing is deliberately louder than recording an empty string or a placeholder. A
+     * governance record whose approver is {@code "admin"} or {@code ""} is worse than one that
+     * could not be written, because it reads as an attribution.
+     *
+     * @param act what is being recorded, for the message — e.g. {@code "an approval"}
+     * @return the authenticated principal's username, never null or blank
+     * @throws IllegalStateException when there is no authenticated principal to record
+     */
+    public static String requireUsername(String act) {
+        String name = username();
+        if (name == null || name.isBlank()) {
+            throw new IllegalStateException(
+                act + " with no identified actor is not " + act + ". No authenticated principal "
+                + "was available to record, and the caller may not name one.");
+        }
+        return name;
+    }
+
+    /**
+     * The user id of the current principal, refusing rather than returning {@code null}.
+     * The id-typed counterpart to {@link #requireUsername(String)} — see that javadoc for why
+     * the caller may not supply this.
+     *
+     * @param act what is being recorded, for the message
+     * @return the authenticated principal's user id, never null
+     * @throws IllegalStateException when there is no authenticated principal to record
+     */
+    public static Long requireUserId(String act) {
+        Long id = userId();
+        if (id == null) {
+            throw new IllegalStateException(
+                act + " with no identified actor is not " + act + ". No authenticated principal "
+                + "was available to record, and the caller may not name one.");
+        }
+        return id;
+    }
+
+    /**
      * Whether the current authenticated principal holds the platform-super-admin
      * authority ({@code ROLE_PLATFORM_ADMIN}). PLATFORM_ADMIN bypasses the
      * method-level {@code @PreAuthorize} guards in code and, by platform

@@ -101,7 +101,7 @@ export function FourthPartyPage() {
 
   async function onValidate(id: number) {
     setBusyId(id);
-    try { await validateFourthParty(id, 'admin'); toast.success(t('f4pValidated')); await reload(); }
+    try { await validateFourthParty(id); toast.success(t('f4pValidated')); await reload(); }
     catch { toast.danger(t('f4pActionFailed')); }
     finally { setBusyId(null); }
   }

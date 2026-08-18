@@ -80,8 +80,11 @@ export function listFourthParty(status?: FpStatus, page = 0, size = 200):
   return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
 
-export function validateFourthParty(id: number, validatorName: string): Promise<FourthPartyExposure> {
-  return api.post(`${BASE}/${id}/validate`, { validatorName });
+// F2-236 — no validatorName: the server takes the validator from the authenticated principal.
+// The controller defaulted to the literal 'system', which reads as an automated validation of a
+// SAMA fourth-party concentration record when a human performed it.
+export function validateFourthParty(id: number): Promise<FourthPartyExposure> {
+  return api.post(`${BASE}/${id}/validate`);
 }
 
 export function mitigateFourthParty(id: number, notesEn: string): Promise<FourthPartyExposure> {

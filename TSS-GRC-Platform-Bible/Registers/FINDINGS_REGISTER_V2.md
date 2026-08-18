@@ -2400,6 +2400,153 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-236 · Seven registers where the server stamped the clock and the caller named the actor
+
+|  |  |
+|---|---|
+| **ID** | F2-236 |
+| **Title** | The nine parameter-borne split attributions: four frontend call sites passed the literal `'admin'`, two controllers defaulted to it, and one register recorded a user id that does not exist |
+| **Severity** | 🔴 P2 (live on seven governance registers: SAMA fourth-party validation, ISO 22301 supplier resilience approval, PDPL data-sharing signature, CMA/GRI materiality approval, NCA/NDI maturity review and approval, committee action-item completion) |
+| **Status** | 🟢 CLOSED 2026-08-18 |
+| **Programme** | Platform Bible F2 · server-owned attribution |
+| **Modules** | `scm` (×2), `privacy/dsa`, `sust/materiality`, `ndi/plan`, `ndi/maturity`, `admin/committee`, `common/security`, FE (11 files) |
+
+### What was measured
+
+Executing F2-234's filed nine-entry work list. Every entry was read — the service **and** its
+controller, since the wire-ness of a scalar parameter lives at the call site. Adjudication:
+**8 confirmed and fixed · 1 BY DESIGN · 0 unread**.
+
+Measured **byte-identical in dev and prod**:
+
+| register | rows | clock set | actor set | what the actor values are |
+|---|---|---|---|---|
+| `scm.supplier_resilience_tests` | 11 | 4 | 4 | `CIO` ×2, `CISO`, `CEO` — offices |
+| `admin.committee_action_items` | 33 | 5 | 2 | user id `1` |
+| `privacy.data_sharing_agreements` | 8 | 8 | 8 / 8 | offices; counterparties are external parties |
+| `scm.fourth_party_exposures` | 13 | 5 | 5 | **5 invented person names** (F2-207's cast) |
+| `sust.material_topic` | 26 | 10 | 10 | `President of the Authority` ×7 |
+| `ndi.improvement_plan` | 2 | **0** | 1 | an attribution with **no clock at all** |
+| `ndi.maturity_assessment` | 16 | 8 / **0** | 8 / 8 | `Chair, Data Governance Committee`; `Chief Data Officer` |
+
+🔑 **No surface records a real attribution today**, which is what made the fix safe: the frontend
+passed the literal `'admin'` at **four** call sites, the literal `'counterparty'` as a signature, a
+`dialog.prompt` at **two**, and nothing at one. Every populated value is a seed.
+
+### The live half — probed 28/28 pre-fix and 28/28 post-fix
+
+As **`compliance`** (GRC_ADMINISTRATOR — holds all six guards these routes carry: `ADMIN:WRITE`,
+`PRIVACY:WRITE`, `SCM:WRITE`, `SUST:WRITE`, `NDI:WRITE`, `NDI:APPROVE`) and **not**
+PLATFORM_ADMIN, against rows the probe **plants itself** (F2-206).
+
+- `POST /api/scm/resilience/tests/{id}/approve` stored `approverName: "Nobody Who Did This"` beside
+  the server's own `approvedAt` — and **an omitted approver was stored as the literal `"admin"`**,
+  because the controller read `body.getOrDefault("approverName", "admin")`. 🔑 **`admin` is a real
+  PLATFORM_ADMIN username in this platform, not a placeholder**: the default did not leave the field
+  blank, it attributed the approval to the most privileged account that exists.
+- `POST /api/scm/fourth-party/{id}/validate` defaulted to the literal **`"system"`** — which reads as
+  an *automated* validation of a SAMA fourth-party concentration record when a human did it, or when
+  nobody did.
+- `POST /api/v1/committees/action-items/{id}/complete` stored **`completedBy: 9999`**, a user id that
+  does not exist, as who completed a committee action item.
+- `POST /api/sustainability/materiality/{id}/approve` **REQUIRED** `approvedBy` — a 400 when omitted —
+  and never verified it, while stamping `approvedAt` from its own clock. Fourth register in this
+  lineage to demand an attribution and then trust it (after F2-223, F2-224, F2-226).
+- `POST /api/privacy/data-sharing/{id}/activate`, `POST /api/ndi/plans/{id}/approve`,
+  `POST /api/ndi/maturity/{id}/mark-under-review` and `…/approve` all stored the forged actor.
+
+No privilege escalation anywhere: each route's guard is the same one the register's other writes
+carry. The attribution was the only thing at stake, and it was the caller's to choose.
+
+### The correct artefact was in the adjacent controller of the same package
+
+`SupplierResilienceController` — the file beside `SupplierResilienceTestController` — has always
+passed `usernameOf(auth), userIdOf(auth)` for `approveAlt` and `approvePlan`. 🔑 **N-th instance in
+this lineage of the right pattern sitting next to the wrong one**, and the first where the two are
+sibling controllers over sibling registers in one package.
+
+### One primitive, eight call sites
+
+`CurrentActor.requireUsername(act)` / `requireUserId(act)` — added to the class whose
+`organisationId()` already establishes the fail-fast idiom, rather than hand-rolling a ninth
+null-check. Refusing is deliberately louder than recording a blank: **a governance record whose
+approver is `""` or `"admin"` reads as an attribution**, so it is worse than one that could not be
+written.
+
+### The BY DESIGN survivor, verified rather than guessed
+
+`DataSharingAgreementService#activate::counterpartySigner` — the *other* organisation's signatory can
+never be a principal here. F2-234 filed this as *"plausibly BY_DESIGN … and that is a GUESS"*; it is
+now verified against the register: **all 8 live rows in both databases name an external party** — an
+NCA liaison officer, a MoCI director, a university dean, a vendor DPO. Its sibling `signerName` is
+OUR signatory and was closed, so the verdict is a **field-level boundary inside one method**, not a
+whole-method exemption.
+
+### 🔑 The half the OTHER gate found: closing the guarded route makes the update route a bypass
+
+`ServerStampedFieldContractTest` went red on this slice's own fix. Once `markUnderReview` stamped
+`reviewerName` from the principal, `NdiMaturityAssessmentService#update` writing the same field from
+the request became a contradiction that gate could report **for the first time** — and it is a real
+bypass: under the same `NDI:WRITE`, the ordinary edit route could overwrite the recorded reviewer with
+anything, making the fix pointless. **Two instruments in series, and the second only became able to
+see the site because the first was closed.**
+
+The verdict there is per field **and per window** (F2-222's shape): `reviewer_name` is an
+**assignment** before the review — measured, 8 of 16 live rows hold an office with `reviewed_at` NULL
+— and the **attribution** after it. So `update` keeps the assignment, refuses a *change* once
+`reviewedAt` is stamped, and still accepts an **echo** of the stored value so a form that round-trips
+the row keeps working (F2-231).
+
+### An eighth site the gate never reported, found by reading the frontend
+
+`NdiPage`'s compliance-assessment Approve opened a `required: true` prompt for `approverName` and sent
+it to `NdiComplianceAssessmentService#approve`, which **takes no actor parameter and never has** — so
+the server discarded it on arrival. F2-225's shape: a required field the server ignores tells the
+caller their value matters. The prompt and the client parameter are gone.
+
+### The fifth test asserting the defect as correct
+
+`CreateNamesNoDecisionTest` read `assertThat(live.getSignerName()).isEqualTo("Real Signer")` — that
+the value the **caller** passed is the value **stored** — **one line below its own comment stating the
+rule it breaks**: *"activate() stamps the signature date from the clock — that is the whole reason a
+create may not name it."* After F2-159, F2-175, F2-227 and F2-234. Repurposed the way F2-223 and
+F2-234 repurposed theirs: keep the half that protects the record, assert the attribution's new source.
+
+### Frontend
+
+11 files. Four `'admin'` literals and one `'counterparty'` deleted; three operator prompts for a name
+replaced by a confirmation that says the record will be in your name; the ESG materiality
+**approver-name form** retired — its placeholder read *"e.g. Khalid Al-Otaibi"*, the **8th recorded
+instance** of an invented officer in a placeholder teaching an operator to type somebody else's name.
+
+### Verification
+
+- Live probe **28/28 pre-fix** (forged values stored, plus both literal defaults) and **28/28
+  post-fix**, on a backend deliberately restarted so the probe could not hit stale classes (F2-217).
+- `SplitAttributionContractTest` **18/18**, `WORK_LIST` **9 → 0** with the ceiling lowered in the same
+  commit; `ServerStampedFieldContractTest` **20/20** with the new per-field verdict.
+- `ParameterBorneActorTest` — **9 new tests** for the four registers no gate can assert, because both
+  gates read a literal `"admin"` as a server stamp (F2-219: a mutant a gate legitimately cannot see is
+  an unasserted behaviour, not a loose instrument).
+- Mutation **8 killed / 0 survived / 0 anchor-miss**, including a negative control on the gate itself.
+- Full backend suite green; FE `tsc` clean; **72 vitest files / 797 tests**.
+- Cleanup: **38 planted rows** removed with CHARINDEX, 0 residual, every register back to its measured
+  size.
+
+### Filed
+
+- **`ndi.improvement_plan` has 1 row with an approver and no `approved_at`, and
+  `ndi.maturity_assessment` has 8 with a reviewer and no `reviewed_at`** — attributions with no clock,
+  so those rows never went through the routes that stamp both. Seed-origin, identical in both
+  databases.
+- **The office-versus-person meaning** in `supplier_resilience_tests.approver_name`,
+  `material_topic.approved_by`, `data_sharing_agreements.signer_name` and
+  `ndi.*.approver_name`: every populated value is an office title, and the platform now records a
+  username. If the product wants to record *which body* authorised something, that is a second field
+  and an owner decision — F2-222 filed the same shape for `policy.documents.approver_name`.
+- `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
+  *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
+
 ## F2-235 · The corpus an instrument cannot read scores exactly like a clean one
 
 |  |  |

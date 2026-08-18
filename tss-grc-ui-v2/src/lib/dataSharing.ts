@@ -47,8 +47,12 @@ export function listDsas(status?: DsaStatus, page = 0, size = 200):
   return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
 export function submitDsa(id: number) { return api.post<DataSharingAgreement>(`${BASE}/${id}/submit`); }
-export function activateDsa(id: number, signerName?: string, counterpartySigner?: string) {
-  return api.post<DataSharingAgreement>(`${BASE}/${id}/activate`, { signerName, counterpartySigner });
+// F2-236 — no signerName: OUR signatory is the authenticated principal, because activate stamps
+// signedAt from the server's clock and so records THIS act. counterpartySigner stays, and is the
+// one field here that legitimately comes from the caller: the other party's signatory is a person
+// at another organisation and can never be a principal in this platform.
+export function activateDsa(id: number, counterpartySigner?: string) {
+  return api.post<DataSharingAgreement>(`${BASE}/${id}/activate`, { counterpartySigner });
 }
 export function expireDsa(id: number) { return api.post<DataSharingAgreement>(`${BASE}/${id}/expire`); }
 export function terminateDsa(id: number, reasonEn: string) {

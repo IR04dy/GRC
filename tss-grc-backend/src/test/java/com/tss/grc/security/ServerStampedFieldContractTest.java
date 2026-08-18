@@ -136,6 +136,28 @@ class ServerStampedFieldContractTest {
      * longer hides a NEW contradiction on a different field of the same type.
      */
     private static final Map<String, String> BY_DESIGN = Map.ofEntries(
+        // F2-236 — this entry exists because F2-236's OWN FIX made the site visible to this gate:
+        // markUnderReview() now stamps reviewerName from the principal, which turned update()'s
+        // acceptance of the same field into a contradiction this gate could report for the first
+        // time. 🔑 Closing a split at the guarded route makes the ordinary update route a bypass of
+        // the same attribution, and only the OTHER gate can see that — two instruments in series.
+        //
+        // The verdict is BY DESIGN per field and per window, not per method. reviewer_name carries
+        // TWO meanings: before the review it is an ASSIGNMENT (measured, dev = prod: 8 of 16 live
+        // rows name an office — "Chief Data Officer" — with reviewed_at NULL, so no review has
+        // occurred), and from markUnderReview() onwards it is the ATTRIBUTION of who reviewed.
+        // update() therefore keeps the assignment and REFUSES a change once reviewedAt is set, with
+        // an echo of the stored value still accepted so a form that round-trips the row keeps
+        // working (F2-231). Refusing assignment outright would be a gate driving a fix that fails on
+        // correct code (F2-214); tolerating the change would have made the F2-236 fix pointless.
+        Map.entry("NdiMaturityAssessmentService::NdiMaturityAssessment#reviewerName",
+        "reviewer_name is an ASSIGNMENT before the review and the ATTRIBUTION after it. "
+        + "markUnderReview() stamps it from the authenticated principal beside reviewedAt; update() "
+        + "may still set it while reviewedAt IS NULL — which is what 8 of 16 live rows in both "
+        + "databases are, an office name with no review recorded — and throws on any CHANGE once "
+        + "reviewedAt is stamped, accepting an echo of the stored value. So the caller owns the "
+        + "field only in the window where it does not mean who reviewed."),
+
         Map.entry("NdiSettingService::NdiSetting#valueText",
         "resetToDefault() restores value_text FROM THE ROW's own default_value, which is a server "
         + "value only because the row already holds it. Supplying the value is the entire point of "

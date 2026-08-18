@@ -56,8 +56,11 @@ public class SupplierResilienceTestController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasPermission('SCM','WRITE')")
-    public SupplierResilienceTest approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.approve(id, body.getOrDefault("approverName", "admin"));
+    public SupplierResilienceTest approve(@PathVariable Long id) {
+        // F2-236 — no body: the approver is the authenticated principal. This used to be
+        // body.getOrDefault("approverName", "admin"), so an omitted approver was recorded as the
+        // literal "admin" — a real PLATFORM_ADMIN username, not a placeholder.
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/cancel")

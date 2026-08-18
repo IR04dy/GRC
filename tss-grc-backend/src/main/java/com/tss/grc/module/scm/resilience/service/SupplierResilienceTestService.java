@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.resilience.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestCreateRequest;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
@@ -106,12 +107,25 @@ public class SupplierResilienceTestService {
         return saved;
     }
 
+    /**
+     * F2-236 — the approver is the authenticated principal, never the request.
+     *
+     * <p>This method stamps {@code approvedAt} from the server's own clock, so it has already
+     * declared that it is the recorder of the approval; taking {@code approverName} from the body
+     * split one attribution across two owners. The controller's default was
+     * {@code body.getOrDefault("approverName", "admin")} — so an omitted approver was recorded as
+     * the literal {@code "admin"}, which is a <b>real PLATFORM_ADMIN username in this platform</b>,
+     * not a placeholder. Probed live: a forged name and the {@code "admin"} default were both
+     * stored. The sibling routes in {@code SupplierResilienceController} have always passed
+     * {@code usernameOf(auth)} — the correct artefact was in the adjacent controller of the same
+     * package.
+     */
     @Transactional
-    public SupplierResilienceTest approve(Long id, String approverName) {
+    public SupplierResilienceTest approve(Long id) {
         SupplierResilienceTest a = get(id);
         a.setStatus("APPROVED");
         a.setApprovedAt(LocalDateTime.now());
-        a.setApproverName(approverName);
+        a.setApproverName(CurrentActor.requireUsername("a resilience-test approval"));
         return repo.save(a);
     }
 

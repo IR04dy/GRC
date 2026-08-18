@@ -78,7 +78,7 @@ public class CommitteeActionItemController {
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
     public CommitteeActionItem complete(@PathVariable Long id,
                                          @RequestBody CompleteRequest req) {
-        return service.complete(id, req.completionNotesEn(), req.completedBy());
+        return service.complete(id, req.completionNotesEn());
     }
 
     @PostMapping("/{id}/cancel")
@@ -93,7 +93,8 @@ public class CommitteeActionItemController {
         return service.defer(id, req.newDueDate(), req.reason());
     }
 
-    public record CompleteRequest(String completionNotesEn, Long completedBy) {}
+    /** F2-236 — no {@code completedBy}: the server takes it from the authenticated principal. */
+    public record CompleteRequest(String completionNotesEn) {}
     public record CancelRequest(String reason) {}
     public record DeferRequest(LocalDate newDueDate, String reason) {}
 }

@@ -60,7 +60,6 @@ export function MaterialityTab() {
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<MaterialCategory | 'ALL'>('ALL');
   const [scoringTopic, setScoringTopic]     = useState<MaterialTopic | null>(null);
-  const [approvingId, setApprovingId]       = useState<number | null>(null);
   const [openNew, setOpenNew]               = useState(false);
   const [editTopic, setEditTopic]           = useState<MaterialTopic | null>(null);
 
@@ -96,14 +95,20 @@ export function MaterialityTab() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
-  async function submitApprove(values: Record<string, unknown>) {
-    if (approvingId == null) return;
-    const by = String(values.approvedBy ?? '').trim();
-    if (!by) { toast.danger(isAr ? 'الاسم مطلوب' : 'Name required'); return; }
+  /**
+   * F2-236 — the "Approver name" field is gone. It fed sust.material_topic.approved_by, which the
+   * server stamps beside its own approvedAt clock, so the approver is the authenticated principal
+   * and not whatever was typed. Its placeholder read "e.g. Khalid Al-Otaibi" — an invented officer
+   * in a placeholder is how a free-text attribution field teaches an operator to type somebody
+   * else's name (the 8th recorded instance of that shape in this codebase).
+   */
+  async function onApproveTopic(id: number) {
+    if (!window.confirm(isAr
+      ? 'اعتماد هذا الموضوع؟ سيُسجَّل الاعتماد باسمك.'
+      : 'Approve this topic? The approval will be recorded in your name.')) return;
     try {
-      await approveMaterialTopic(approvingId, by);
+      await approveMaterialTopic(id);
       toast.success(isAr ? 'تم الاعتماد' : 'Approved');
-      setApprovingId(null);
       await reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -122,11 +127,6 @@ export function MaterialityTab() {
       label: isAr ? 'الأهمية النسبية للأثر (من الداخل إلى الخارج) ٠–٥' : 'Impact materiality (inside-out) 0–5' },
     { kind: 'number', key: 'financialMateriality', required: true, min: 0, max: 5, span: 6,
       label: isAr ? 'الأهمية النسبية المالية (من الخارج إلى الداخل) ٠–٥' : 'Financial materiality (outside-in) 0–5' },
-  ];
-  const approveFields: FieldDef[] = [
-    { kind: 'text', key: 'approvedBy', required: true, span: 12,
-      label: isAr ? 'اسم المعتَمِد' : 'Approver name',
-      placeholder: isAr ? 'مثال: خالد العتيبي' : 'e.g. Khalid Al-Otaibi' },
   ];
 
   const createFields: FieldDef[] = [
@@ -353,7 +353,7 @@ export function MaterialityTab() {
                             </Button>
                           )}
                           {t.status === 'SCORED' && (
-                            <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingId(t.id!)}>
+                            <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onApproveTopic(t.id!)}>
                               {isAr ? 'اعتماد' : 'Approve'}
                             </Button>
                           )}
@@ -428,16 +428,6 @@ export function MaterialityTab() {
         submitLabel={isAr ? 'حفظ التقييم' : 'Save score'}
         onClose={() => setScoringTopic(null)}
         onSubmit={submitScore}
-      />
-      <FormModal
-        open={approvingId !== null}
-        title={isAr ? 'اعتماد الموضوع' : 'Approve topic'}
-        fields={approveFields}
-        initial={{ approvedBy: '' }}
-        size="md"
-        submitLabel={isAr ? 'اعتماد' : 'Approve'}
-        onClose={() => setApprovingId(null)}
-        onSubmit={submitApprove}
       />
       <FormModal
         open={openNew}
