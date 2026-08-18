@@ -107,6 +107,47 @@ import static org.assertj.core.api.Assertions.assertThat;
  * derivation that stops at the caller's body cannot see that the route refuses it</b> — F2-238's
  * lesson from the other side, in a mechanism no hand-written guard is involved in. See
  * {@link #noPartialUpdateRouteBindsAnEntityWithValid}.
+ *
+ * <h2>F2-240 — the residual 19, and why a whole-population sweep was the honest move</h2>
+ *
+ * <p>The list is now <b>0</b>, and {@link #WORK_LIST} is an invariant rather than a decreasing
+ * count. Re-derived per F2-221: 11 routes resolved from their controllers, <b>all binding the
+ * entity</b>, none carrying {@code @Valid}, 7 with a frontend write client, and every update method
+ * having exactly <b>one</b> Java caller — its own controller, so no second producer (F2-238's
+ * question). Then the reach ordering: <b>every one of the six live callers echoes back every
+ * initialised field it could omit</b>, so all 19 sites were latent-by-caller and reach could no
+ * longer rank them.
+ *
+ * <p>🔑 <b>That is a reason to sweep the population, not to close the file.</b> F2-237's own
+ * headline is that a defence in one client is not a defence, and these nineteen were defended by
+ * nothing except the shape of one page's payload. Six of them additionally had <em>no frontend write
+ * client at all</em>, so their only protection was that nobody has built the screen yet — which is
+ * F2-214's invitation-to-build shape. Removing the initialisers makes the hazard absent rather than
+ * latent (F2-213), and takes the gate from "this many known" to "none possible".
+ *
+ * <p>⚠ <b>Sort by what the initialiser ASSERTS and four are flattering</b>, measured identical in
+ * dev and prod: {@code VendorAssessment#riskRating} would take <b>13 of 19</b> vendor assessments
+ * from HIGH to MEDIUM; {@code GhgEmissionRecord#coveragePercent} would raise 8 of 18 rows sitting
+ * between 48% and 89% to <b>100.00</b>, an ISAE 3410 assurance input; {@code NdiFrameworkItem
+ * #mandatory} would make <b>13 of 20</b> mandatory NDMO requirements optional; and
+ * {@code ControlMapping#coverage} would report PARTIAL control coverage as FULL. A reset that
+ * MANUFACTURES an assurance does not lose a fact, it asserts one.
+ *
+ * <p>⚠⚠ <b>The fix needed a fifth writer kind, and the gate's own {@code Moved} leg would have
+ * failed on the correct fix without it.</b> Two of the nineteen defaults belong in a purpose-built
+ * request record's {@code toEntity()} rather than in a service, because those two creates bind the
+ * record (F2-233's fourth wire-closing mechanism, appearing on the writer side). See
+ * {@link #liveWriters} and {@link #theWriterScopeReallyIncludesNonServiceWriters}.
+ *
+ * <p>⚠ <b>Four detector errors while deriving this, in both directions</b> (F2-228: two errors in
+ * opposite directions produce an answer neither earns). The body-type regex demanded
+ * {@code @Valid @RequestBody} — a literal {@code @} before an optional group — and reported
+ * {@code body=None} on all 11 routes; the frontend path match was a literal while the house idiom is
+ * {@code const BASE = '/api/…'} plus a template, so it reported <b>0 frontend clients</b>, the
+ * flattering direction for this family. Then the omit check read only the call ARGUMENT, so an
+ * opaque {@code updateFrameworkItem(id, body)} read as sending nothing; and once locals were
+ * resolved it still missed {@code weight,} because an <b>ES6 shorthand property</b> does not match
+ * {@code field\s*:}.
  */
 class NeverFiringNullGuardContractTest {
 
@@ -124,28 +165,26 @@ class NeverFiringNullGuardContractTest {
      * initialiser onto the create path, and one, {@code CloudService#status}, that was never real:
      * it was a phantom produced by this class keying entities on their SIMPLE name, so the
      * {@code module/outsourcing} twin's initialiser was attributed to the {@code module/cyber}
-     * service (see {@link #initialisedFields}).
+     * service (see {@link #initialisedFields}). F2-239 took it 28 → 19.
+     *
+     * <p><b>F2-240 took it 19 → 0, and this is now an INVARIANT rather than a decreasing work
+     * list.</b> The previous four slices each ordered the population and took the reachable end
+     * first. F2-240 re-derived it the same way — all 11 routes resolved from their controllers, all
+     * binding the entity, 7 with a frontend write client, every update method having exactly ONE
+     * Java caller (its own controller, so no second producer) — and every remaining site measured
+     * <em>latent-by-caller</em>: each of the six live callers echoes back every initialised field it
+     * could omit. With nothing reachable, reach could no longer order the work, so the whole
+     * population was swept in one slice. That is not a shortcut: F2-237 established that a defence
+     * in one client is not a defence, so nineteen fields whose only protection is the payload one
+     * page happens to build are nineteen defects waiting for a second caller, and the fix makes the
+     * hazard <em>absent</em> rather than latent (F2-213's rule).
+     *
+     * <p>Keep it empty. There is no correct code for a hard zero here to fail on: an entity-bound
+     * partial update whose omitted key must mean "leave it alone" cannot also declare an
+     * initialiser, and where a default is genuinely wanted the create path is always available to
+     * own it — which is what {@link #everyRemovedInitialiserHasAWriterOnTheCreatePath} enforces.
      */
-    private static final Set<String> WORK_LIST = Set.of(
-        "BcmCommunicationContactService#update :: BcmCommunicationContact#availabilityStatus",
-        "BcmCommunicationContactService#update :: BcmCommunicationContact#escalationLevel",
-        "BcmCommunicationContactService#update :: BcmCommunicationContact#status",
-        "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#impact",
-        "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#likelihood",
-        "ClimateRiskOpportunityService#update :: ClimateRiskOpportunity#timeHorizon",
-        "ControlLibraryService#updateLink :: RiskControlLink#linkType",
-        "ControlLibraryService#updateMapping :: ControlMapping#coverage",
-        "CorrectiveActionService#update :: CorrectiveAction#actionType",
-        "CorrectiveActionService#update :: CorrectiveAction#priority",
-        "GhgEmissionRecordService#update :: GhgEmissionRecord#coveragePercent",
-        "NdiComplianceAssessmentService#update :: NdiComplianceAssessment#complianceStatus",
-        "NdiFrameworkItemService#update :: NdiFrameworkItem#mandatory",
-        "NdiFrameworkItemService#update :: NdiFrameworkItem#priority",
-        "NdiFrameworkItemService#update :: NdiFrameworkItem#status",
-        "NdiFrameworkItemService#update :: NdiFrameworkItem#weight",
-        "SgiCommitmentService#update :: SgiCommitment#valueSource",
-        "SustainabilityEvidenceService#update :: SustainabilityEvidence#confidentiality",
-        "TprmService#updateAssessment :: VendorAssessment#riskRating");
+    private static final Set<String> WORK_LIST = Set.of();
 
     // ── the derivation ───────────────────────────────────────────────────────
 
@@ -282,6 +321,50 @@ class NeverFiringNullGuardContractTest {
             NeverFiringNullGuardContractTest::read).collect(Collectors.toList()));
     }
 
+    /**
+     * Everything that can OWN a create-path default — F2-240.
+     *
+     * <p>{@link #liveServices} is the population of the measurement: a never-firing guard lives in a
+     * service, so that is the right scope for finding one. It is the WRONG scope for the fix, and
+     * F2-240 is where that showed: two of its nineteen defaults belong in a purpose-built request
+     * record's {@code toEntity()}, because those two creates bind the record rather than the entity
+     * (F2-233's fourth wire-closing mechanism, arriving on the writer side). Resolving the writer
+     * through {@code liveServices()} would have failed the assertion on a correct fix — so the
+     * writer scope is widened here, and {@link #theWriterScopeReallyIncludesNonServiceWriters}
+     * asserts the widening is load-bearing rather than decorative.
+     */
+    /**
+     * The brace-balanced body of {@code name} in {@code src}, or {@code null} if it has no such
+     * method — F2-240.
+     *
+     * <p>Exists because {@code source.contains("setX(")} over a whole writer file is satisfied by
+     * the partial-update method itself, or by an unrelated one: the mutation harness proved it by
+     * deleting {@code NdiFrameworkItemService#create}'s default and watching the gate stay green,
+     * because {@code importJson} and {@code update} both hold that setter.
+     */
+    static String methodBody(String src, String name) {
+        Matcher sig = Pattern.compile(
+            "(?:public|private|protected)\\s+(?:static\\s+)?[\\w<>,.\\[\\]\\s]+?\\s+"
+            + Pattern.quote(name) + "\\s*\\([^)]*\\)\\s*\\{").matcher(src);
+        if (!sig.find()) return null;
+        int open = src.indexOf('{', sig.end() - 1);
+        int depth = 0;
+        for (int i = open; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return src.substring(open, i);
+        }
+        return src.substring(open);
+    }
+
+    private static Map<String, String> liveWriters() {
+        Map<String, String> out = new LinkedHashMap<>(liveServices());
+        for (Path p : sources("Request.java")) {
+            out.put(p.getFileName().toString().replace(".java", ""), read(p));
+        }
+        return out;
+    }
+
     // ── the assertions ───────────────────────────────────────────────────────
 
     @Test
@@ -376,54 +459,84 @@ class NeverFiringNullGuardContractTest {
      */
     @Test
     void everyRemovedInitialiserHasAWriterOnTheCreatePath() {
-        record Moved(String entity, String field, String setter, String writer) { }
+        record Moved(String entity, String field, String setter, String writer, String method) { }
         List<Moved> moved = List.of(
-            new Moved("CloudService", "serviceModel",        "setServiceModel",        "CloudServiceService"),
-            new Moved("CloudService", "deploymentModel",     "setDeploymentModel",     "CloudServiceService"),
-            new Moved("CloudService", "kingdomDataResident", "setKingdomDataResident", "CloudServiceService"),
-            new Moved("CloudService", "criticality",         "setCriticality",         "CloudServiceService"),
-            new Moved("CloudService", "ssoEnabled",          "setSsoEnabled",          "CloudServiceService"),
-            new Moved("CloudService", "mfaEnforced",         "setMfaEnforced",         "CloudServiceService"),
-            new Moved("CloudService", "encryptionAtRest",    "setEncryptionAtRest",    "CloudServiceService"),
-            new Moved("CloudService", "encryptionInTransit", "setEncryptionInTransit", "CloudServiceService"),
-            new Moved("CloudService", "status",              "setStatus",              "CloudServiceService"),
-            new Moved("CrisisEvent", "severity",             "setSeverity",            "CrisisEventService"),
-            new Moved("CrisisEvent", "status",               "setStatus",              "CrisisEventService"),
-            new Moved("CrisisEvent", "personalDataAffected", "setPersonalDataAffected", "CrisisEventService"),
-            new Moved("CrisisEvent", "cyberRelated",         "setCyberRelated",        "CrisisEventService"),
-            new Moved("CrisisEvent", "supplierInvolved",     "setSupplierInvolved",    "CrisisEventService"),
+            new Moved("CloudService", "serviceModel", "setServiceModel", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "deploymentModel", "setDeploymentModel", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "kingdomDataResident", "setKingdomDataResident", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "criticality", "setCriticality", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "ssoEnabled", "setSsoEnabled", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "mfaEnforced", "setMfaEnforced", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "encryptionAtRest", "setEncryptionAtRest", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "encryptionInTransit", "setEncryptionInTransit", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CloudService", "status", "setStatus", "CloudServiceService", "applyCreateDefaults"),
+            new Moved("CrisisEvent", "severity", "setSeverity", "CrisisEventService", "create"),
+            new Moved("CrisisEvent", "status", "setStatus", "CrisisEventService", "create"),
+            new Moved("CrisisEvent", "personalDataAffected", "setPersonalDataAffected", "CrisisEventService", "create"),
+            new Moved("CrisisEvent", "cyberRelated", "setCyberRelated", "CrisisEventService", "create"),
+            new Moved("CrisisEvent", "supplierInvolved", "setSupplierInvolved", "CrisisEventService", "create"),
             // ⚠ the SIEM auto-escalation builds the entity itself and calls crisisEvents.save(),
             // so CrisisEventService.create's defaults never run for it (F2-238).
-            new Moved("CrisisEvent", "personalDataAffected", "setPersonalDataAffected", "BcmAuditCompletionService"),
-            new Moved("CrisisEvent", "supplierInvolved",     "setSupplierInvolved",    "BcmAuditCompletionService"),
-            new Moved("BcmBiaAssessment", "manualWorkaroundAvailable",  "setManualWorkaroundAvailable",  "BcmBiaAssessmentService"),
-            new Moved("BcmBiaAssessment", "opresCriticalOperationFlag", "setOpresCriticalOperationFlag", "BcmBiaAssessmentService"),
-            new Moved("BcmBiaAssessment", "nationalCriticalTier",       "setNationalCriticalTier",       "BcmBiaAssessmentService"),
-            new Moved("BcmBiaAssessment", "approvalStatus",             "setApprovalStatus",             "BcmBiaAssessmentService"),
-            new Moved("BcmComplianceMapping", "isPlaceholder",    "setIsPlaceholder",    "BcmComplianceMappingService"),
-            new Moved("BcmComplianceMapping", "complianceStatus", "setComplianceStatus", "BcmComplianceMappingService"),
-            new Moved("Department", "status",   "setStatus",   "DepartmentService"),
-            new Moved("Issue", "severity",      "setSeverity", "IssueService"),
-            new Moved("Issue", "priority",      "setPriority", "IssueService"),
-            new Moved("Issue", "status",        "setStatus",   "IssueService"),
+            new Moved("CrisisEvent", "personalDataAffected", "setPersonalDataAffected", "BcmAuditCompletionService", "ingestSiemEvent"),
+            new Moved("CrisisEvent", "supplierInvolved", "setSupplierInvolved", "BcmAuditCompletionService", "ingestSiemEvent"),
+            new Moved("BcmBiaAssessment", "manualWorkaroundAvailable", "setManualWorkaroundAvailable", "BcmBiaAssessmentService", "create"),
+            new Moved("BcmBiaAssessment", "opresCriticalOperationFlag", "setOpresCriticalOperationFlag", "BcmBiaAssessmentService", "create"),
+            new Moved("BcmBiaAssessment", "nationalCriticalTier", "setNationalCriticalTier", "BcmBiaAssessmentService", "create"),
+            new Moved("BcmBiaAssessment", "approvalStatus", "setApprovalStatus", "BcmBiaAssessmentService", "create"),
+            new Moved("BcmComplianceMapping", "isPlaceholder", "setIsPlaceholder", "BcmComplianceMappingService", "create"),
+            new Moved("BcmComplianceMapping", "complianceStatus", "setComplianceStatus", "BcmComplianceMappingService", "create"),
+            new Moved("Department", "status", "setStatus", "DepartmentService", "create"),
+            new Moved("Issue", "severity", "setSeverity", "IssueService", "create"),
+            new Moved("Issue", "priority", "setPriority", "IssueService", "create"),
+            new Moved("Issue", "status", "setStatus", "IssueService", "create"),
             // F2-239 — the regulatory library. `createCitation` already owned four of the five and
             // already INHERITED isPlaceholder from the parent document, which is why the create was
             // the right shape all along: it was `updateCitation` that discarded the reasoning.
-            new Moved("AuthorityDocument", "isPlaceholder",     "setIsPlaceholder",     "AuthorityDocumentService"),
-            new Moved("AuthorityDocument", "translationStatus", "setTranslationStatus", "AuthorityDocumentService"),
-            new Moved("AuthorityDocumentCitation", "sequenceOrder",     "setSequenceOrder",     "AuthorityDocumentService"),
-            new Moved("AuthorityDocumentCitation", "weight",            "setWeight",            "AuthorityDocumentService"),
-            new Moved("AuthorityDocumentCitation", "mandatory",         "setMandatory",         "AuthorityDocumentService"),
-            new Moved("AuthorityDocumentCitation", "isPlaceholder",     "setIsPlaceholder",     "AuthorityDocumentService"),
-            new Moved("AuthorityDocumentCitation", "translationStatus", "setTranslationStatus", "AuthorityDocumentService"),
+            new Moved("AuthorityDocument", "isPlaceholder", "setIsPlaceholder", "AuthorityDocumentService", "create"),
+            new Moved("AuthorityDocument", "translationStatus", "setTranslationStatus", "AuthorityDocumentService", "create"),
+            new Moved("AuthorityDocumentCitation", "sequenceOrder", "setSequenceOrder", "AuthorityDocumentService", "createCitation"),
+            new Moved("AuthorityDocumentCitation", "weight", "setWeight", "AuthorityDocumentService", "createCitation"),
+            new Moved("AuthorityDocumentCitation", "mandatory", "setMandatory", "AuthorityDocumentService", "createCitation"),
+            new Moved("AuthorityDocumentCitation", "isPlaceholder", "setIsPlaceholder", "AuthorityDocumentService", "createCitation"),
+            new Moved("AuthorityDocumentCitation", "translationStatus", "setTranslationStatus", "AuthorityDocumentService", "createCitation"),
             // F2-239 — the change implementation checklist. `addTask` owned status and not sortOrder.
-            new Moved("ChangeTask", "sortOrder", "setSortOrder", "ChangeManagementService"),
-            new Moved("ChangeTask", "status",    "setStatus",    "ChangeManagementService"));
+            new Moved("ChangeTask", "sortOrder", "setSortOrder", "ChangeManagementService", "addTask"),
+            new Moved("ChangeTask", "status", "setStatus", "ChangeManagementService", "addTask"),
 
-        Map<String, String> services = liveServices();
+            // F2-240 — the residual 19, swept in one slice because every one was latent-by-caller
+            // and so none of them could be ordered above the others by reach.
+            new Moved("BcmCommunicationContact", "availabilityStatus", "setAvailabilityStatus", "BcmCommunicationContactService", "create"),
+            new Moved("BcmCommunicationContact", "escalationLevel", "setEscalationLevel", "BcmCommunicationContactService", "create"),
+            new Moved("BcmCommunicationContact", "status", "setStatus", "BcmCommunicationContactService", "create"),
+            // the writer is a request record, not a service — see liveWriters()
+            new Moved("ClimateRiskOpportunity", "impact", "setImpact", "ClimateRiskCreateRequest", "toEntity"),
+            new Moved("ClimateRiskOpportunity", "likelihood", "setLikelihood", "ClimateRiskCreateRequest", "toEntity"),
+            new Moved("ClimateRiskOpportunity", "timeHorizon", "setTimeHorizon", "ClimateRiskCreateRequest", "toEntity"),
+            new Moved("RiskControlLink", "linkType", "setLinkType", "ControlLibraryService", "linkRiskToControl"),
+            new Moved("ControlMapping", "coverage", "setCoverage", "ControlLibraryService", "createMapping"),
+            new Moved("CorrectiveAction", "actionType", "setActionType", "CorrectiveActionService", "create"),
+            new Moved("CorrectiveAction", "priority", "setPriority", "CorrectiveActionService", "create"),
+            new Moved("GhgEmissionRecord", "coveragePercent", "setCoveragePercent", "GhgCreateRequest", "toEntity"),
+            new Moved("NdiComplianceAssessment", "complianceStatus", "setComplianceStatus", "NdiComplianceAssessmentService", "startForCycle"),
+            new Moved("NdiFrameworkItem", "mandatory", "setMandatory", "NdiFrameworkItemService", "create"),
+            new Moved("NdiFrameworkItem", "priority", "setPriority", "NdiFrameworkItemService", "create"),
+            new Moved("NdiFrameworkItem", "status", "setStatus", "NdiFrameworkItemService", "create"),
+            new Moved("NdiFrameworkItem", "weight", "setWeight", "NdiFrameworkItemService", "create"),
+            new Moved("SgiCommitment", "valueSource", "setValueSource", "SgiCommitmentService", "create"),
+            new Moved("SustainabilityEvidence", "confidentiality", "setConfidentiality", "SustainabilityEvidenceService", "create"),
+            new Moved("VendorAssessment", "riskRating", "setRiskRating", "TprmService", "createAssessment"),
+            // The 55th, and the gate found it by refusing F2-240's own fix: closing
+            // `updateAssessment`'s unconditional writes added `if (req.getStatus() != null)` over a
+            // field the entity initialised, i.e. a NEW never-firing guard. Roughly two in ten of a
+            // slice's own claims fall on first run (F2-188/F2-192/F2-204/F2-211); this one fell to
+            // the instrument the same slice was extending.
+            new Moved("VendorAssessment", "status", "setStatus", "TprmService", "createAssessment"));
+
+        Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
         List<String> stillInitialised = new java.util.ArrayList<>();
         List<String> unwritten = new java.util.ArrayList<>();
+        List<String> unresolved = new java.util.ArrayList<>();
 
         for (Moved m : moved) {
             String svc = services.get(m.writer());
@@ -432,8 +545,19 @@ class NeverFiringNullGuardContractTest {
             if (declared != null && declared.containsKey(m.field())) {
                 stillInitialised.add(m.entity() + "#" + m.field());
             }
-            if (!ServerStampedFieldContractTest.stripComments(svc).contains(m.setter() + "(")) {
-                unwritten.add(m.writer() + " :: " + m.setter());
+            // ⚠⚠ SCOPED TO THE NAMED METHOD, and that is a correction to this leg. F2-238 and
+            // F2-239 asked whether the writer FILE contains `setX(` anywhere, which is satisfied by
+            // the partial-update method itself or by any unrelated path — F2-194's
+            // substring-satisfied-by-something-else, and it had been asserting this since F2-238.
+            // The mutation harness proved it: deleting NdiFrameworkItemService#create's
+            // `setMandatory(false)` default left the gate GREEN, because `importJson` and `update`
+            // both contain that setter. Naming the method is self-verifying — a method that does not
+            // exist, or that does not hold the setter, fails below.
+            String body = methodBody(ServerStampedFieldContractTest.stripComments(svc), m.method());
+            if (body == null) {
+                unresolved.add(m.writer() + "#" + m.method() + " (no such method)");
+            } else if (!body.contains(m.setter() + "(")) {
+                unwritten.add(m.writer() + "#" + m.method() + " :: " + m.setter());
             }
         }
 
@@ -442,11 +566,97 @@ class NeverFiringNullGuardContractTest {
                 + "which silently restores the full-replace behaviour on a route whose HTTP verb "
                 + "promises the opposite")
             .isEmpty();
+        assertThat(unresolved)
+            .as("F2-240 — every moved default names the METHOD that owns it, and naming it is what "
+                + "makes this leg mean anything. A method that does not exist means the entry is "
+                + "stale, not that the default is fine")
+            .isEmpty();
         assertThat(unwritten)
             .as("the default MOVED to the create path — every one of these columns is NOT NULL, so a "
                 + "writer that stops setting it turns a silent reset into a 500 on create. That is "
                 + "the one way this fix can go wrong and nothing else in the tree would notice")
             .isEmpty();
+    }
+
+    /**
+     * F2-240 — {@link #methodBody} must really scope, or the leg above is the whole-file substring
+     * check it replaced.
+     *
+     * <p>The synthetic corpus below is the exact shape that defeated the old check: a class where
+     * the create path does NOT set the field and two other methods do. If {@code methodBody} stops
+     * narrowing, {@code create} appears to hold {@code setMandatory(} and the fix's one real hazard
+     * — a NOT NULL column with no create-path default — goes unnoticed again.
+     */
+    @Test
+    void theCreatePathCheckIsScopedToItsMethod() {
+        String corpus = """
+            public class Fake {
+                public Foo create(Foo req) {
+                    req.setId(null);
+                    return repo.save(req);
+                }
+                public Foo importJson(Foo req) {
+                    req.setMandatory(false);
+                    return repo.save(req);
+                }
+                public Foo update(Long id, Foo req) {
+                    if (req.getMandatory() != null) cur.setMandatory(req.getMandatory());
+                    return repo.save(cur);
+                }
+            }
+            """;
+
+        assertThat(corpus)
+            .as("the positive control: a whole-file substring check DOES find the setter here, which "
+                + "is exactly why it passed over a create path that never sets it")
+            .contains("setMandatory(");
+
+        assertThat(methodBody(corpus, "create"))
+            .as("scoped to create, the setter is absent — that is the finding the old check missed")
+            .isNotNull()
+            .doesNotContain("setMandatory(");
+        assertThat(methodBody(corpus, "importJson")).contains("setMandatory(");
+        assertThat(methodBody(corpus, "update")).contains("setMandatory(");
+        assertThat(methodBody(corpus, "noSuchMethod"))
+            .as("a name that does not resolve must be null so the leg can report it as stale rather "
+                + "than silently treating the default as present")
+            .isNull();
+    }
+
+    /**
+     * F2-240 — the widened writer scope must actually be carrying something.
+     *
+     * <p>{@link #liveWriters} adds request records to {@link #liveServices} so a default owned by a
+     * {@code toEntity()} resolves. A widening that turns out to match nothing is indistinguishable
+     * from a correct narrow scope, and the next reader deletes it — so assert that at least one
+     * entry in the moved set names a writer which is NOT a service, and that it resolves. Two do
+     * today ({@code ClimateRiskCreateRequest}, {@code GhgCreateRequest}); the assertion is "at least
+     * one" because the count is not the point, the mechanism is.
+     */
+    @Test
+    void theWriterScopeReallyIncludesNonServiceWriters() {
+        Map<String, String> services = liveServices();
+        Map<String, String> writers = liveWriters();
+
+        assertThat(writers.keySet())
+            .as("liveWriters must be a strict superset of liveServices, or the widening removed "
+                + "something instead of adding")
+            .containsAll(services.keySet());
+
+        List<String> nonService = List.of("ClimateRiskCreateRequest", "GhgCreateRequest");
+        for (String w : nonService) {
+            assertThat(services)
+                .as(w + " is deliberately NOT a *Service.java — that is the whole reason the writer "
+                    + "scope had to be widened, so if it starts resolving as a service this "
+                    + "assertion is measuring the wrong thing")
+                .doesNotContainKey(w);
+            assertThat(writers.get(w))
+                .as(w + " owns a create-path default this gate asserts, so it must resolve through "
+                    + "liveWriters(); if it cannot, everyRemovedInitialiserHasAWriterOnTheCreatePath "
+                    + "fails on a CORRECT fix, which is the one failure a gate must never have")
+                .isNotNull()
+                .contains("toEntity");
+        }
     }
 
     /**

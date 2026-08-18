@@ -22,6 +22,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TprmService {
 
+    /**
+     * The create-path default for a new assessment's rating, F2-240 — an assessment nobody has
+     * rated yet is taken as MEDIUM, which is what the entity's initialiser meant. Named so this
+     * and the test that pins it read one value rather than two copies.
+     */
+    static final String DEFAULT_RISK_RATING = "MEDIUM";
+
+    /** The create-path default for a new assessment's lifecycle state, F2-240. */
+    static final String DEFAULT_STATUS = "PLANNED";
+
     private final VendorRepository vendorRepo;
     private final VendorAssessmentRepository assessmentRepo;
 
@@ -110,6 +120,18 @@ public class TprmService {
         req.setAnsweredCount(0);
         req.setTotalQuestions(0);
         req.setComputedScorePct(null);
+        // F2-240 — this create path OWNS the rating default, because the entity no longer
+        // initialises it. That initialiser made `updateAssessment`'s `!= null` guard un-fireable,
+        // so a PUT that omitted the key downgraded the vendor's rating: 13 of 19 live rows in dev
+        // and prod are HIGH, and the reset takes every one of them to MEDIUM. `risk_rating` is
+        // NOT NULL, so this line is what keeps the create working.
+        if (req.getRiskRating() == null) req.setRiskRating(DEFAULT_RISK_RATING);
+        // `status` likewise — its initialiser had to go for the same reason (the gate refused the
+        // `if (req.getStatus() != null)` guard this slice added to updateAssessment), and
+        // `status` is NOT NULL. The column carries a database DEFAULT of 'PLANNED', which does NOT
+        // rescue this: the entity maps it insertable, so Hibernate names it in the INSERT and sends
+        // an explicit null rather than letting the default apply.
+        if (req.getStatus() == null) req.setStatus(DEFAULT_STATUS);
         return assessmentRepo.save(req);
     }
 
@@ -163,13 +185,24 @@ public class TprmService {
         // disagreed with no trace of which was which. Reject, naming the path that owns it —
         // never silently drop the value (F2-44).
         requireScoreIsNotQuestionnaireOwned(existing, req);
-        existing.setAssessmentDate(req.getAssessmentDate());
-        existing.setAssessor(req.getAssessor());
-        if (req.getRiskScore()  != null) existing.setRiskScore(req.getRiskScore());
-        if (req.getRiskRating() != null) existing.setRiskRating(req.getRiskRating());
-        existing.setStatus(req.getStatus());
-        existing.setFindings(req.getFindings());
-        existing.setNextReviewDate(req.getNextReviewDate());
+        // ⚠⚠ F2-240 — these five were UNCONDITIONAL, which made this route refuse every partial
+        // body AND destroy data on the bodies it accepted. Found by this slice's live probe, not by
+        // a gate: `PUT /api/v1/tprm/assessments/{id}` carrying only `findings` answered
+        // **400 "A required field was not supplied"**, because `assessment_date` and `status` are
+        // NOT NULL and arrived null. A body that did supply those two then nulled `assessor`,
+        // `findings` and `next_review_date` — populated on 18 of 19 live rows in dev and 19 of 19
+        // in prod. F2-213's full-replace family, not this slice's never-firing-guard family, and
+        // F2-213 fixed exactly this shape in `updateVendor` SIXTY LINES ABOVE and left it here
+        // (F2-215: two of N, and the mechanism a reader finds present makes the rest look covered).
+        // Nothing calls this route — no frontend client references it — so guarding it cannot break
+        // a working request; it converts a 400 into a partial update that behaves as its verb reads.
+        if (req.getAssessmentDate()  != null) existing.setAssessmentDate(req.getAssessmentDate());
+        if (req.getAssessor()        != null) existing.setAssessor(req.getAssessor());
+        if (req.getRiskScore()       != null) existing.setRiskScore(req.getRiskScore());
+        if (req.getRiskRating()      != null) existing.setRiskRating(req.getRiskRating());
+        if (req.getStatus()          != null) existing.setStatus(req.getStatus());
+        if (req.getFindings()        != null) existing.setFindings(req.getFindings());
+        if (req.getNextReviewDate()  != null) existing.setNextReviewDate(req.getNextReviewDate());
         return assessmentRepo.save(existing);
     }
 

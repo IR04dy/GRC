@@ -50,10 +50,25 @@ public class ClimateRiskOpportunity {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)") private String descriptionEn;
     @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)") private String descriptionAr;
 
-    @Column(name = "time_horizon", nullable = false, length = 10) private String timeHorizon = "MEDIUM";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by ClimateRiskCreateRequest#toEntity, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(name = "time_horizon", nullable = false, length = 10) private String timeHorizon;
 
-    @Column(nullable = false) private Short likelihood = 3;
-    @Column(nullable = false) private Short impact = 3;
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by ClimateRiskCreateRequest#toEntity, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false) private Short likelihood;
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by ClimateRiskCreateRequest#toEntity, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false) private Short impact;
     @Column(name = "risk_score", nullable = false) private Short riskScore = 9;
 
     @Column(name = "financial_impact_sar", precision = 18, scale = 2)

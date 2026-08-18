@@ -35,7 +35,12 @@ public class ControlMapping {
 
     /** FULL | PARTIAL | COMPENSATING */
     @Column(nullable = false, length = 20)
-    private String coverage = "FULL";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by ControlLibraryService#createMapping, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    private String coverage;
 
     @Column(name = "rationale_en", columnDefinition = "NVARCHAR(MAX)")
     private String rationaleEn;

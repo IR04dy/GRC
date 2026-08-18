@@ -40,10 +40,20 @@ public class VendorAssessment {
     private BigDecimal riskScore;
 
     @Column(name = "risk_rating", nullable = false, length = 20)
-    private String riskRating = "MEDIUM";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by TprmService#createAssessment, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    private String riskRating;
 
+    // F2-240 — no initialiser ON PURPOSE, same reason as riskRating above, and this one was found
+    // by the gate REFUTING this slice's own fix: adding `if (req.getStatus() != null)` to
+    // updateAssessment created a NEW never-firing null-guard, because the initialiser meant the
+    // guard could never be false. The default is owned by TprmService#createAssessment, asserted by
+    // NeverFiringNullGuardContractTest in both directions.
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "PLANNED";
+    private String status;
 
     @Column(name = "findings", columnDefinition = "NVARCHAR(MAX)")
     private String findings;

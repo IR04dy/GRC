@@ -2547,6 +2547,164 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-240 · The residual 19 were all latent-by-caller, so reach could no longer order them — and the gate refused this slice's own fix
+
+|  |  |
+|---|---|
+| **ID** | F2-240 |
+| **Title** | Every one of F2-239's residual never-firing null-guards was defended by nothing but the shape of one page's payload, so the whole population was swept and the work list became an invariant — and the gate's own create-path leg turned out to have been a whole-file substring check for two slices |
+| **Severity** | 🟠 P3 (latent-by-caller throughout: all 6 live callers echo back every initialised field, and 4 of the 11 routes have no frontend write client at all — but 4 of the 19 resets are flattering on live data, dev = prod) |
+| **Status** | 🟢 CLOSED 2026-08-18 |
+| **Programme** | Platform Bible F2 · server-owned state |
+| **Modules** | 11 entities across `bcm`, `sust` (×5), `platform/controls` (×2), `ndi` (×2), `tprm`; 4 create paths (2 services, 2 request records); 1 gate widened + 1 leg corrected; 2 new test classes |
+
+### The population was re-derived, and reach found nothing left to rank
+
+F2-239 filed 19 residual sites, all `PUT`, and said to order them by reach. Re-derived per F2-221:
+**11 routes resolved from their controllers, all binding the ENTITY, none carrying `@Valid`**, 7 with
+a frontend write client, and **every update method having exactly one Java caller — its own
+controller**, so there is no second producer (F2-238's question, asked and answered).
+
+Then the ordering itself came up empty: **all six live callers explicitly send every initialised
+field they could omit.** `NdiPage` builds one 25-key body for both create and edit;
+`EsgClimateTab`, `EsgCapaTab`, `EsgGhgInventoryTab` and `EsgSgiTab` each name every axis. So no site
+was live, and reach had nothing to sort.
+
+🔑 **That is an argument for sweeping the population, not for closing the file.** F2-237's own
+headline is that *a defence in one client is not a defence*; here the defence was the shape of one
+object literal, and for six of the nineteen there was no client at all — F2-214's
+invitation-to-build shape. Removing the initialisers makes the hazard **absent rather than latent**
+(F2-213), and takes the gate from *"19 known"* to *"none representable"*.
+
+### Sorted by what the initialiser ASSERTS, four are flattering — measured dev = prod
+
+| entry | reset to | rows it would change | what the reset asserts |
+|---|---|---|---|
+| `VendorAssessment#riskRating` | `MEDIUM` | **13 of 19** are HIGH | downgrades a third-party risk rating |
+| `GhgEmissionRecord#coveragePercent` | `100.00` | 8 of 18 sit at 48–89% | **manufactures** ISAE 3410 assurance coverage |
+| `NdiFrameworkItem#mandatory` | `false` | **13 of 20** are mandatory | makes a mandatory NDMO requirement optional |
+| `ControlMapping#coverage` | `FULL` | 1 of 5 is PARTIAL | reports partial control coverage as full |
+| `NdiComplianceAssessment#complianceStatus` | `UNDER_REVIEW` | 12 of 14 | re-opens a settled NCA/NDI assessment |
+| `CorrectiveAction#priority` | `MEDIUM` | 14 of 25 | |
+| `ClimateRiskOpportunity#impact` / `#likelihood` / `#timeHorizon` | `3` / `3` / `MEDIUM` | 12, 10, 7 of 17 | flattens a TCFD / IFRS S2 assessment |
+| `BcmCommunicationContact#escalationLevel` | `1` | 12 of 19 | resets a crisis call-tree tier to the first rung |
+| the other 6 | | 0 | latent on today's data |
+
+🔑 **A reset that manufactures an assurance does not lose a fact, it asserts one** — F2-238's rule,
+and two of the four sharpest are of that kind rather than the losing kind.
+
+### The fix needed a fifth writer kind, and the gate would have failed on the correct fix without it
+
+Two of the nineteen defaults belong in a purpose-built request record's `toEntity()`, not in a
+service: `POST /api/sustainability/climate-risks` and `POST /api/sustainability/ghg` bind
+`ClimateRiskCreateRequest` / `GhgCreateRequest` and hand the service an entity they built —
+F2-233's fourth wire-closing mechanism, arriving on the **writer** side. The gate's `Moved` leg
+resolved writers through `liveServices()` (files named `*Service.java`), so it would have reported
+both as *"no such writer"* on a correct fix. `liveWriters()` widens it, and
+`theWriterScopeReallyIncludesNonServiceWriters` asserts the widening is load-bearing rather than
+decorative — mutation M8 confirms narrowing it back goes red.
+
+### ⚠⚠ THE GATE'S CREATE-PATH LEG HAD BEEN A WHOLE-FILE SUBSTRING CHECK SINCE F2-238
+
+The mutation harness found M7 surviving: deleting `NdiFrameworkItemService#create`'s
+`if (req.getMandatory() == null) req.setMandatory(false);` left the build **green**, because
+`everyRemovedInitialiserHasAWriterOnTheCreatePath` asked whether the writer *file* contains
+`setMandatory(` anywhere — and `importJson` and `update` both do. **F2-194's
+substring-satisfied-by-something-else, in the leg that has been certifying this fix shape for two
+slices.** Every `Moved` entry now names the **method**, which is self-verifying (a method that does
+not exist, or does not hold the setter, fails), scoped by a brace-balanced `methodBody()` with its
+own synthetic positive control. 8/8 killed after.
+
+⚠ A name-shape classifier could **not** have derived those methods: `CloudServiceService` puts all
+nine of F2-238's defaults in a helper called `applyCreateDefaults`, which matches no
+`create|add|import` pattern. They were read, not guessed.
+
+### ⚠⚠ MY OWN GATE REFUTED MY OWN FIX ON ITS FIRST RUN
+
+Closing the separate defect below meant adding `if (req.getStatus() != null)` to
+`updateAssessment` — over a field `VendorAssessment` also initialised, i.e. **a brand-new
+never-firing guard**. The gate named it immediately. Roughly two in ten of a slice's own claims fall
+on first run (F2-188, F2-192, F2-204, F2-211); this one fell to the instrument the same slice was
+extending. `status` joined the sweep as the 55th `Moved` entry, its default owned by
+`createAssessment`.
+
+⚠ `tprm.vendor_assessments.status` carries a **database DEFAULT of `'PLANNED'`**, and that does not
+rescue it: the entity maps the column insertable, so Hibernate names it in the INSERT and sends an
+explicit null. F2-215's fourth filling mechanism looks like it applies here and does not.
+
+### A separate defect the probe walked into — F2-213's family, in the file F2-213 half-fixed
+
+`TprmService#updateAssessment` wrote `assessmentDate`, `assessor`, `status`, `findings` and
+`nextReviewDate` **unconditionally**. Because `assessment_date` and `status` are NOT NULL, the route
+answered **400 "A required field was not supplied"** to every partial body — and a body that did
+supply those two nulled the other three, populated on **18 of 19** live rows in dev and **19 of 19**
+in prod. F2-213 fixed exactly this shape in `updateVendor` **sixty lines above** and left this one
+(F2-215: two of N, and the mechanism a reader finds present makes the rest look covered). No
+frontend client calls the route, so guarding it cannot break a working request — it converts a 400
+into a partial update that behaves as its verb reads.
+
+🔑 **Found by the probe, not by a gate**, and recorded that way: `FullReplaceUpdateContractTest`
+passes over it because the method persists the loaded row rather than its own parameter.
+
+### An existing test's FIXTURE depended on the initialiser
+
+`CorrectiveActionServiceTest.aggregate_countsByType` went 1 → 0 on `CORRECTIVE`: its helper built
+`new CorrectiveAction()` and leaned on the entity's `actionType = "CORRECTIVE"` to make one of two
+rows corrective, while explicitly setting `PREVENTIVE` on the other. 🔑 **A fixture where one value
+comes from the entity and the other from the test cannot tell you which half is load-bearing**
+(F2-179) — and here the silent half was the defect. The fixture now says CORRECTIVE out loud.
+
+### Four detector errors while deriving this, in both directions
+
+F2-228's rule — two errors in opposite directions produce an answer neither earns:
+
+1. the body-type regex demanded `@Valid @RequestBody` (a literal `@` before an optional group) and
+   reported `body=None` on **all 11** routes;
+2. the frontend path match was a literal while the house idiom is `const BASE = '/api/…'` plus a
+   template, so it reported **0 frontend clients** — the flattering direction here;
+3. the omit check read only the call ARGUMENT, so the opaque `updateFrameworkItem(id, body)` read as
+   sending nothing and reported 4 false omissions;
+4. with locals resolved it still missed `weight,` — an **ES6 shorthand property** does not match
+   `field\s*:`.
+
+⚠ Two self-inflicted edit errors as well, both caught by reading the diff: `([ \t]*)` captured the
+spaces between a same-line `@Column(...)` and the field (this codebase column-aligns them), so a
+`//` comment landed mid-line and commented out the declaration; and `([^\r\n]*)$` **cannot match in
+a CRLF file** — with `(?m)`, `$` sits immediately before `\n`, after the `\r` the class forbids —
+so the corrected script reported **0 of 19** until the anchor became `(?=\r?\n|\Z)`. The CRLF trap
+for the fourth time in this lineage, in the script where I had just added CRLF handling for the
+output.
+
+### Verification
+
+* `NeverFiringNullGuardContractTest` **9/9**, `WORK_LIST` **19 → 0** and now an invariant
+* `everyRemovedInitialiserHasAWriterOnTheCreatePath` holds **55** (entity, field, setter, writer,
+  method) tuples in both directions
+* new: `CreatePathDefaultTest` (6), `VendorAssessmentPartialUpdateTest` (5); `CorrectiveActionServiceTest` fixture corrected
+* full suite **4,127 / 0 / 0**
+* mutation harness **8 killed / 0 survived / 0 anchor-miss**, after the M7 finding
+* **pre-fix control**: master's main sources against the emptied `WORK_LIST` reports **exactly the
+  19** — the derivation is live, not rotted
+* live probe **38/38** on a restarted backend (F2-217), every victim row planted by the probe
+  (F2-206), re-runnable, `CHARINDEX` cleanup, all four registers restored to 18/19/20/17 live rows
+  with 0 residual `[REVIEW-TEST]`
+* frontend `tsc` clean, **72 files / 797 tests**; browser: the GHG tab renders 48/54/70/72/89/100 %
+  coverage rather than a flat 100
+
+### Filed
+
+* **`tprm.vendor_assessments` has 3 CHECK constraints and `assessment_type` is unconstrained** —
+  now cheap, since this slice closed the register's open writers (F2-183's rule).
+* **The structural root is unchanged: 94 entity-bound `PUT`/`PATCH` routes.** A purpose-built
+  request record per endpoint makes resets, refusals and mass assignment alike unrepresentable — a
+  field the bound type does not declare can never arrive. Owner decision.
+* `ndi.framework_item.mandatory` has no CHECK, which is correct for a `bit`; noted so the next
+  vocabulary sweep does not read its absence as a gap.
+* F2-239's filed `sequence_order` / `weight` / `mandatory` / `is_placeholder` CHECKs on
+  `platform.authority_document_citations` remain open, and `weight` is still `decimal(5,2)` with no
+  declared range.
+
+
 ## F2-239 · The register is the boundary, and `@Valid` on a bound entity was refusing every partial body
 
 |  |  |

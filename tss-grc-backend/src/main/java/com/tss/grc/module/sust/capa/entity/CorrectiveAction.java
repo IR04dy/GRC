@@ -50,13 +50,23 @@ public class CorrectiveAction {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)") private String descriptionEn;
     @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)") private String descriptionAr;
 
-    @Column(nullable = false, length = 20) private String priority = "MEDIUM";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by CorrectiveActionService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(nullable = false, length = 20) private String priority;
     @Column(nullable = false, length = 20) private String status   = "OPEN";
 
     /** CT-3 (V297) — CAR/PAR classification: CORRECTIVE (reactive, gap-driven)
      *  or PREVENTIVE (raised before a nonconformity materialises). One register,
      *  one lifecycle; auto-opened CAPAs are always CORRECTIVE. */
-    @Column(name = "action_type", nullable = false, length = 20) private String actionType = "CORRECTIVE";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by CorrectiveActionService#create, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    @Column(name = "action_type", nullable = false, length = 20) private String actionType;
 
     @Column(name = "owner_name",  length = 255) private String ownerName;
     @Column(name = "owner_email", length = 255) private String ownerEmail;

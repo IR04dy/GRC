@@ -34,7 +34,12 @@ public class RiskControlLink {
 
     /** MITIGATES | DETECTS | TRANSFERS | AVOIDS | COMPENSATES */
     @Column(name = "link_type", nullable = false, length = 20)
-    private String linkType = "MITIGATES";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by ControlLibraryService#linkRiskToControl, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    private String linkType;
 
     /** EFFECTIVE | NEEDS_IMPROVEMENT | INEFFECTIVE | NOT_TESTED */
     @Column(length = 30)

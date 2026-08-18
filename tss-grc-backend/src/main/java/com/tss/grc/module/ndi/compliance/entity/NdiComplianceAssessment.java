@@ -52,7 +52,12 @@ public class NdiComplianceAssessment {
     @Column(length = 80)                   private String subdomain;
 
     @Column(name = "compliance_status", nullable = false, length = 30)
-    private String complianceStatus = "UNDER_REVIEW";
+    // F2-240 - no initialiser ON PURPOSE. This entity is bound by its own PUT, so an
+    // omitted key deserialises to the initialiser and the update's `!= null` guard can
+    // never be false - the line reads as a partial update and behaves as a full
+    // replace. The default is owned by NdiComplianceAssessmentService#startForCycle, asserted
+    // by NeverFiringNullGuardContractTest in both directions.
+    private String complianceStatus;
     @Column(name = "compliance_score", precision = 5, scale = 2) private BigDecimal complianceScore;
     @Column(nullable = false, precision = 5, scale = 2) private BigDecimal weight = BigDecimal.ONE;
 
