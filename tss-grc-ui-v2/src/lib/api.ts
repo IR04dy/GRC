@@ -3280,7 +3280,12 @@ export interface CyberCloudServiceDto {
   notes?: string;
 }
 export const CLOUD_SERVICE_MODELS = ['IAAS', 'PAAS', 'SAAS', 'FAAS', 'DBAAS'];
-export const CLOUD_DEPLOYMENT_MODELS = ['PUBLIC', 'PRIVATE', 'HYBRID', 'COMMUNITY'];
+// GOV_PRIVATE — the Saudi government private cloud. F2-238 measured it on 3 of the 15 live rows in
+// dev AND prod (the National Government Cloud, the SDAIA/NDMO national data platform, and the
+// sanctioned analytics platform) while both this list and the server's Set refused it. It renders
+// verbatim in the register, so the omission cost nothing on screen; what it did cost is that the
+// creation form could not record a government-cloud service as one.
+export const CLOUD_DEPLOYMENT_MODELS = ['PUBLIC', 'PRIVATE', 'HYBRID', 'COMMUNITY', 'GOV_PRIVATE'];
 export const CLOUD_DATA_CLASSES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED', 'TOP_SECRET'];
 export const CLOUD_CRITICALITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 export const CLOUD_STATUSES = ['ACTIVE', 'UNDER_REVIEW', 'DEPROVISIONED', 'ARCHIVED'];

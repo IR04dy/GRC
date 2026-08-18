@@ -44,11 +44,11 @@ public class CloudService extends BaseEntity {
 
     /** IAAS | PAAS | SAAS | FAAS | DBAAS */
     @Column(name = "service_model", nullable = false, length = 20)
-    private String serviceModel = "SAAS";
+    private String serviceModel;
 
     /** PUBLIC | PRIVATE | HYBRID | COMMUNITY */
     @Column(name = "deployment_model", nullable = false, length = 20)
-    private String deploymentModel = "PUBLIC";
+    private String deploymentModel;
 
     /** PUBLIC | INTERNAL | CONFIDENTIAL | RESTRICTED | TOP_SECRET (NCA / NDMO scale) */
     @Column(name = "data_classification", length = 30)
@@ -58,7 +58,7 @@ public class CloudService extends BaseEntity {
     private String residencyRegion;
 
     @Column(name = "kingdom_data_resident", nullable = false)
-    private Boolean kingdomDataResident = false;
+    private Boolean kingdomDataResident;
 
     /** NCA CSCC tier — "1" | "2" | "3". String to allow future fractional tiers. */
     @Column(name = "cscc_tier", length = 10)
@@ -74,16 +74,16 @@ public class CloudService extends BaseEntity {
 
     /** LOW | MEDIUM | HIGH | CRITICAL */
     @Column(name = "criticality", nullable = false, length = 20)
-    private String criticality = "MEDIUM";
+    private String criticality;
 
-    @Column(name = "sso_enabled",           nullable = false) private Boolean ssoEnabled           = false;
-    @Column(name = "mfa_enforced",          nullable = false) private Boolean mfaEnforced          = false;
-    @Column(name = "encryption_at_rest",    nullable = false) private Boolean encryptionAtRest    = false;
-    @Column(name = "encryption_in_transit", nullable = false) private Boolean encryptionInTransit = true;
+    @Column(name = "sso_enabled",           nullable = false) private Boolean ssoEnabled;
+    @Column(name = "mfa_enforced",          nullable = false) private Boolean mfaEnforced;
+    @Column(name = "encryption_at_rest",    nullable = false) private Boolean encryptionAtRest;
+    @Column(name = "encryption_in_transit", nullable = false) private Boolean encryptionInTransit;
 
     /** ACTIVE | UNDER_REVIEW | DEPROVISIONED | ARCHIVED */
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "ACTIVE";
+    private String status;
 
     @Column(name = "last_review_date") private LocalDate lastReviewDate;
     @Column(name = "next_review_date") private LocalDate nextReviewDate;

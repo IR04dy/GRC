@@ -56,5 +56,5 @@ public class Department extends BaseEntity {
 
     /** ACTIVE | INACTIVE | ARCHIVED */
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "ACTIVE";
+    private String status;
 }

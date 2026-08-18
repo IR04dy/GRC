@@ -152,6 +152,13 @@ public class BcmAuditCompletionService {
             ce.setStatus("DETECTED");
             ce.setDetectionTime(LocalDateTime.now());
             ce.setCyberRelated(true);
+            // F2-238 — this producer saves straight to the repository rather than through
+            // CrisisEventService.create, so it does not get that method's defaults. Both columns
+            // are NOT NULL and used to be filled by field initialisers on the entity; those had to
+            // go because they made update()'s null-guards decorative. Stated rather than inherited:
+            // a SIEM auto-escalation genuinely does not know either fact at detection time.
+            ce.setPersonalDataAffected(false);
+            ce.setSupplierInvolved(false);
             CrisisEvent persisted = crisisEvents.save(ce);
 
             row.setCrisisEventId(persisted.getId());

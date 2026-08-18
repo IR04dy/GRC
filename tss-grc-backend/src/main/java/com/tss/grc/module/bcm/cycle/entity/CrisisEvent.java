@@ -64,7 +64,7 @@ public class CrisisEvent {
      * Severity ≥ 4 triggers executive notification per spec §7.16.
      */
     @Column(nullable = false)
-    private Integer severity = 1;
+    private Integer severity;
 
     /** MANUAL | INCIDENT | EXERCISE | THREAT_INTEL | SUPPLIER | CYBER | EXTERNAL_ALERT */
     @Column(name = "trigger_source", length = 50)
@@ -93,16 +93,16 @@ public class CrisisEvent {
 
     /** DETECTED | ASSESSING | ACTIVATED | CONTAINED | RECOVERED | CLOSED | CANCELLED */
     @Column(nullable = false, length = 20)
-    private String status = "DETECTED";
+    private String status;
 
     /** JSON arrays of BCP/DRP IDs activated for this event. */
     @Column(name = "related_bcp_ids_json", columnDefinition = "NVARCHAR(MAX)") private String relatedBcpIdsJson;
     @Column(name = "related_drp_ids_json", columnDefinition = "NVARCHAR(MAX)") private String relatedDrpIdsJson;
 
     /** Trigger flags — F8 rules read these to fan out cross-module follow-ups. */
-    @Column(name = "personal_data_affected", nullable = false) private Boolean personalDataAffected = false;
-    @Column(name = "cyber_related",          nullable = false) private Boolean cyberRelated         = false;
-    @Column(name = "supplier_involved",      nullable = false) private Boolean supplierInvolved     = false;
+    @Column(name = "personal_data_affected", nullable = false) private Boolean personalDataAffected;
+    @Column(name = "cyber_related",          nullable = false) private Boolean cyberRelated;
+    @Column(name = "supplier_involved",      nullable = false) private Boolean supplierInvolved;
 
     /** Soft FK to the lesson learned that captured this event's findings. */
     @Column(name = "lessons_learned_id")

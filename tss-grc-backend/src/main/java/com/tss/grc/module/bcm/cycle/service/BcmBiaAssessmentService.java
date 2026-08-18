@@ -118,6 +118,13 @@ public class BcmBiaAssessmentService {
                 + " was rejected because approval requires mtpdHours and RTO ≤ MTPD, which this "
                 + "endpoint does not check. Create it, then POST /bia-assessments/{id}/transition.");
         body.setApprovalStatus("DRAFT");
+        // F2-238 — three field initialisers moved here. They made update()'s null-guards
+        // decorative, so any PATCH re-declared the BIA as having no manual workaround, not being
+        // an OPRES critical operation, and NORMAL national-criticality tier. All three are NOT
+        // NULL, so the create path has to own the default.
+        if (body.getManualWorkaroundAvailable() == null)  body.setManualWorkaroundAvailable(false);
+        if (body.getOpresCriticalOperationFlag() == null) body.setOpresCriticalOperationFlag(false);
+        if (body.getNationalCriticalTier() == null)       body.setNationalCriticalTier("NORMAL");
         if (body.getBiaCode() == null || body.getBiaCode().isBlank()) {
             body.setBiaCode(nextCode());
         }

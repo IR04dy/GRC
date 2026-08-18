@@ -72,7 +72,7 @@ public class BcmBiaAssessment {
 
     // ── Workaround ──
     @Column(name = "manual_workaround_available", nullable = false)
-    private Boolean manualWorkaroundAvailable = false;
+    private Boolean manualWorkaroundAvailable;
 
     @Column(name = "manual_workaround_description", columnDefinition = "NVARCHAR(MAX)")
     private String manualWorkaroundDescription;
@@ -112,19 +112,19 @@ public class BcmBiaAssessment {
 
     /** Flagged as a "critical operation" under SAMA OPRES (Article 4 mapping). */
     @Column(name = "opres_critical_operation_flag", nullable = false)
-    private Boolean opresCriticalOperationFlag = false;
+    private Boolean opresCriticalOperationFlag;
 
     // Tier-4 #27 (Sovereign / national-critical tier) ──────────────
     /** SOVEREIGN | NATIONAL | SECTORAL | NORMAL — Vision-2030 service classification. */
     @Column(name = "national_critical_tier", nullable = false, length = 20)
-    private String nationalCriticalTier = "NORMAL";
+    private String nationalCriticalTier;
 
     @Column(name = "evidence_id")  private Long evidenceId;
     @Column(name = "reviewer_id")  private Long reviewerId;
 
     /** DRAFT | UNDER_REVIEW | CHANGES_REQUIRED | APPROVED | ACTIVE | ARCHIVED */
     @Column(name = "approval_status", nullable = false, length = 30)
-    private String approvalStatus = "DRAFT";
+    private String approvalStatus;
 
     @Column(name = "approved_by", length = 255)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

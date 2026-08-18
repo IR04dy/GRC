@@ -1872,6 +1872,84 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A `PATCH` WHOSE OMITTED FIELDS ARE WRITTEN IS A CONTRACT VIOLATION, AND WHERE THE
+  NEVER-FIRING GUARD'S BODY IS A `throw` THE ROUTE REFUSES INSTEAD — THE THROW WAS HOLDING THE
+  WRITE SHUT** (F2-238, measured 2026-08-18). Executing F2-237's filed 46-site work list, the
+  population was ordered by **reachability** rather than field count: all 20 routes bind the ENTITY
+  (re-checked), 14 of 20 have a frontend write client, and **10 narrow-literal call sites across 9
+  services** send a body narrower than the entity. **Six of the twenty are `@PatchMapping`, and that
+  is the slice boundary — derived, not chosen**: a `PUT` has full-replace semantics as a defensible
+  reading, so omitting a field there is arguably a request for the default, while a PATCH's whole
+  contract is that omitted fields are left alone.
+  🔑 **ONE SHAPE, TWO CONSEQUENCES, decided only by whether the guard's body is a WRITE or a THROW.**
+  WRITE → silent reset: `CloudServiceService#update` rewrote 9 columns, and the register's **only**
+  write is `update(svc.id, { status })` because `CyberCloudServicesPage` has no edit form at all.
+  Probed live as `so_officer` against a planted row — `PATCH {"status":"UNDER_REVIEW"}` answered 200
+  and turned `IAAS / PRIVATE / ksa=true / CRITICAL / sso / mfa / atRest=true / inTransit=false` into
+  `SAAS / PUBLIC / ksa=false / MEDIUM / all-false / inTransit=true`: **8 of 8 fields**. Measured
+  identical in dev and prod — SSO, MFA and encryption-at-rest true on **14 of 15** live rows,
+  kingdom-data-residency on **10 of 15**, and 3 rows are `GOV_PRIVATE` (the National Government
+  Cloud, the SDAIA/NDMO national data platform, the sanctioned analytics platform), so a status
+  change reclassified the tenant's most sensitive services as **PUBLIC cloud** while clearing every
+  NCA CSCC flag. `BcmComplianceMapping#isPlaceholder` differs on **392 of 412**.
+  THROW → the route refuses: three registers carry
+  `if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus())) throw` over a
+  status the entity initialises, so the null test can never be false and the **comparison** fires for
+  every row not in the initial state — **5 of 5** crisis events, **4 of 7** BIA assessments, **6 of
+  13** issues could not be PATCHed at all.
+  ⚠⚠ **AND IN THOSE THREE THE THROW WAS HOLDING THE WRITE SHUT.** A row past the initial state got a
+  400 and was therefore *safe* from the resets; a row still in the initial state was reset. **Fixing
+  only the throw converts a broken route into a data-destroying one** (F2-203). That is why the fix
+  is *remove the initialiser* and not *rewrite the guard* — it closes both halves in one move. It is
+  also why the crisis/issue write half **cannot be demonstrated pre-fix at all**, which is the
+  finding rather than a gap in the probe.
+  🔑 **`encryptionInTransit` is the one flag whose initialiser is not `false`, so its reset
+  MANUFACTURES an assurance** instead of losing one — a service recorded as not encrypting in transit
+  becoming one that does. F2-213's *a reset is worse than a null* at its sharpest, and latent (0 of
+  15 rows hold false today). **When you find this family, sort the fields by what their initialiser
+  ASSERTS, not by how many there are.**
+  ⚠⚠ **FIXING THE RESET DETONATED THE NEXT DEFECT EXACTLY AS PREDICTED, AND THE RESET HAD BEEN
+  MASKING IT.** `update()` ends with `validate(existing)`; `DEPLOYMENT_MODELS` was
+  `{PUBLIC, PRIVATE, HYBRID, COMMUNITY}` while `cyber.cloud_services` carries **no CHECK constraint
+  of any kind** and stores `GOV_PRIVATE` on 3 live rows in both databases. Pre-fix the reset
+  overwrote the column with `"PUBLIC"` *before* `validate()` saw it, so **preserving the stored value
+  — the correct behaviour — is what makes `validate()` reachable for it**: omit the token and the fix
+  turns a silent reset into a 400 on the National Government Cloud. Declaring it server-side and in
+  `CLOUD_DEPLOYMENT_MODELS` is part of the same fix, not a tidy-up. F2-180 inverted — the only
+  narrowing was wrong about what the register holds.
+  ⚠ **The fix shape and its one hazard: no entity had a `@PrePersist`**, so those initialisers were
+  the only default mechanism for three Java producers that bypass the service create. `CcmService`
+  (F2-228's third-consecutive-CRITICAL-failure issue) and `KriBreachService` route through
+  `issueService.create`, so a create-path default covers them; **`BcmAuditCompletionService` saves
+  straight to the repository** and set only 3 of `CrisisEvent`'s 5. Every one of these columns is NOT
+  NULL, so **a writer that stops setting one turns a silent reset into a 500 on create** — and with
+  `ddl-auto=none` nothing else in the tree would notice.
+  `everyRemovedInitialiserHasAWriterOnTheCreatePath` asserts all 26 (entity, field, writer) triples
+  in both directions.
+  ⚠⚠ **A PHANTOM IN MY OWN GATE, ONE SLICE AFTER WRITING IT.** It reported `CloudService#status` as
+  still open after the cyber initialiser was removed, because `initialisedFields` keyed entities by
+  **simple name** and merged with `computeIfAbsent` — and there are two live `CloudService` classes,
+  the `module/outsourcing` twin declaring `status = "ONBOARDING"`. **F2-233's keying-ambiguity lesson
+  in an instrument written one slice before it.** It OVER-reports, so it fails loudly rather than
+  hiding a site, but 🔑 **a phantom entry in a hard-asserted list is worse than a missing one,
+  because it looks measured.** Re-keyed to the fully-qualified name, pairing resolved by longest
+  shared package prefix, both twins pinned by name in both directions. Work list **46 → 28**: 17
+  fixed, 1 never real. ⚠ My own anti-vacuity leg caught the re-keying (`inits.get("MaterialTopic")`
+  went null) — the leg doing its job.
+  ⚠ **Two probe corrections, both from running it:** `compliance` is **403** on
+  `/api/v1/cyber/cloud-services` (needs `CYBER:WRITE`, so `so_officer`), and `/api/v1/issues` is
+  reachable **only by `admin`** because `PLATFORM:WRITE` is held by one role with zero active users —
+  **F2-220's own open filing confirming itself**. Said out loud because *admin proves nothing about
+  authorization*: that leg tests data semantics, and the guard is the filing.
+  ⚙ **Filed:** the remaining **28-site work list**, all `PUT` routes — sharpest are
+  `GhgEmissionRecord#coveragePercent` (resets to **100.00**, an ISAE 3410 assurance input) and
+  `AuthorityDocument#isPlaceholder` / `AuthorityDocumentCitation#isPlaceholder` (reset to **true**,
+  marking a real regulatory instrument a placeholder). Read the route and probe it; do **not** write
+  28 reasons (F2-188). Also: `cyber.cloud_services` has **no CHECK on any of its four vocabulary
+  columns**, now cheap since this slice closed its only open writer and declared the missing token
+  (F2-183); and the structural root is unchanged from F2-213 — **83 entity-bound `PUT` handlers**,
+  where a purpose-built request record per endpoint would make the whole family unrepresentable
+  (a field the bound type does not declare can never arrive), which is an owner decision.
 - ⚠⚠ **A NULL-GUARD ON A FIELD WHOSE ENTITY DECLARES AN INITIALISER CAN NEVER FIRE, SO THE LINE
   READS AS A PARTIAL UPDATE AND BEHAVES AS A FULL REPLACE** (F2-237, measured 2026-08-18). Executing
   F2-220's filed *"the population of transition-by-parameter registers is unmeasured"*, the population
