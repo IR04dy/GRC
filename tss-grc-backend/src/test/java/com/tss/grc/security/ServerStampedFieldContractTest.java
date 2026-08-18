@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -186,6 +187,109 @@ class ServerStampedFieldContractTest {
         + "mirror was missing, which is what F2-231 found."));
 
     /**
+     * Fields this gate reports that are ALREADY closed, at a layer it cannot see.
+     *
+     * <p>⚠⚠ F2-233 — <b>a fourth wire-closing mechanism, and the strongest of the four.</b> This class
+     * subtracts {@code BaseEntity}'s nine ({@link #CLOSED_AT_THE_WIRE}, F2-218) and per-field
+     * {@code @JsonProperty(READ_ONLY)} ({@link #readOnlyOnTheWire}, F2-219). Neither knows about a
+     * create whose ENDPOINT binds a purpose-built request record and hands the service an entity it
+     * built itself: {@code SustainabilityAnnexController} binds {@code ReportingYearCreateRequest} and
+     * calls {@code service.createYear(req.toEntity())}, so the service's parameter is a
+     * {@code ReportingYear} and a service-layer scan can only conclude that the create accepts every
+     * column. A field the bound type does not declare can never arrive — which makes this stronger than
+     * an annotation, not weaker.
+     *
+     * <p>🔑 F2-215's headline for the fifth time on this class: <b>generalising an exclusion one
+     * mechanism at a time leaves the remainder looking covered, because the mechanisms that cover them
+     * are visibly present.</b> A reader who finds two subtractions here does not ask what the third is.
+     *
+     * <p>The other member is a RETIRED ROUTE, which is the same shape one level out: the code is
+     * reachable from no endpoint at all, so there is nothing for the create to accept.
+     *
+     * <p>Each entry is verified mechanically, never by its prose, by
+     * {@code everyClosedElsewhereEntryNamesSomethingThatReallyClosesIt} — reflection over the request
+     * record's components, or the absence of a write mapping on the controller. An exclusion nobody can
+     * audit is an assumption wearing a citation.
+     */
+    private static final Map<String, String> CLOSED_ELSEWHERE = Map.ofEntries(
+        Map.entry("SustainabilityReportService::ReportingYear#approvedAt",
+        "CLOSED AT THE REQUEST DTO. POST /api/v1/sust/annex/years binds ReportingYearCreateRequest — a "
+        + "validated record of seven components (year, periodStart, periodEnd, reportingEntityEn/Ar, "
+        + "preparedBy, notes) — and the controller calls service.createYear(req.toEntity()). The record "
+        + "declares no approvedAt, so the field cannot arrive however the service is written. Its own "
+        + "javadoc states the rule: \"Status + approval / publish stamps + computed readiness/gap counts "
+        + "are server-owned and NOT bindable (a year can never be born APPROVED/PUBLISHED)\". Adding a "
+        + "scrub in the service would be decoration over a field the wire cannot supply, and an inert "
+        + "construct is worse than none because it answers the question a reader was about to ask "
+        + "(F2-184/F2-219)."),
+
+        Map.entry("SustainabilityReportService::ReportingYear#publishedAt",
+        "The sibling of the field above, closed by the same absence on the same bound record, and "
+        + "recorded separately because a shared entry is how one of a pair later drifts while the other "
+        + "still reads as covered (F2-215's shape, which is what put this whole family on the register). "
+        + "Note what is NOT claimed here: ReportingYear#status is stamped by transitionYear() through a "
+        + "SCALAR PARAMETER, so it never enters the stamped set at all and this gate cannot see it "
+        + "either way — F2-220's filed transition-by-parameter blind spot, not a verdict."),
+
+        Map.entry("PolicyService::Policy#approvedAt",
+        "RETIRED ROUTE. RegChangePolicyController's write mappings for /policies were removed at CH-6 / "
+        + "PM-C1 — the comment where they were says policy authoring lives solely on the canonical "
+        + "register (POST/PUT/DELETE /api/policy/documents + /transition) and that only list/get/stats "
+        + "remain — so PolicyService#create is reachable from no endpoint. DarkServiceMethodTest holds "
+        + "all nine of its write-lifecycle methods with that reason, and the whole legacy service exits "
+        + "at CH-9. Adding a guard to a class scheduled for deletion is code on a corpse; a verdict is "
+        + "the honest artefact."),
+
+        Map.entry("PolicyService::Policy#legalReviewedAt",
+        "Same retired route, same CH-9 exit, recorded per field so a future re-routing of the legacy "
+        + "register cannot silently inherit four verdicts written for a class nobody could reach. If "
+        + "these endpoints ever come back, every one of these entries must be re-adjudicated — which is "
+        + "exactly what the reverse leg forces, because the scan will still find the fields."),
+
+        Map.entry("PolicyService::Policy#publishedAt",
+        "Same retired route (CH-6 / PM-C1, exits CH-9). Worth stating plainly that this is a "
+        + "reachability verdict and NOT a claim that the create is correct: it accepts four transition "
+        + "stamps and would be a live defect the moment a route pointed at it. Reachability is a fact "
+        + "about today, not a property of a control (F2-182)."),
+
+        Map.entry("PolicyService::Policy#retiredAt",
+        "Same retired route. The fourth of the four, listed rather than folded in, because the point of "
+        + "a per-field key is that a verdict covers exactly what it was written for (F2-231's lesson "
+        + "about a per-service key hiding every other field of the same type)."));
+
+    /**
+     * Fields the caller must NOT own, which cannot be closed without an owner decision.
+     *
+     * <p>⚠⚠ F2-233 — this bucket exists because filing them under {@link #BY_DESIGN} would <b>assert
+     * they are correct</b>, and they are not. F2-197's rule one level up: an invented figure invites a
+     * question, an invented all-clear closes one. A verdict vocabulary limited to "the caller legitimately
+     * owns this" cannot express "the caller must not own this and closing it rewrites live rows", so the
+     * defect would have been recorded as a design.
+     *
+     * <p>🔑 F2-224's lesson, which landed on this gate's own verdict vocabulary once already: <b>a verdict
+     * must NAME ITS EVIDENCE, not be one of the verdicts an earlier slice happened to reach.</b>
+     */
+    private static final Map<String, String> FILED_OWNER_DECISION = Map.ofEntries(
+        Map.entry("PrivacyService::DataBreach#status",
+        "FILED — OWNER DECISION. closeBreach()/containBreach() stamp this and createBreach() accepts it, "
+        + "so a PDPL Article 20 breach can be filed already CLOSED. It is NOT fixed here because the "
+        + "column has no CHECK, no declared state machine and seven stored values across dev and prod "
+        + "(F2-209 filed the vocabulary itself), so naming a creatable set is a decision about live rows "
+        + "in two real databases — F2-183/F2-196's owner boundary, not a side effect of closing a stamp. "
+        + "F2-231 closed the four SDAIA stamps on the same create and left this for the same reason."),
+
+        Map.entry("PrivacyService::DataSubjectRequest#status",
+        "FILED — OWNER DECISION. Same shape on the Article 23 register: fulfilDsr()/rejectDsr()/"
+        + "startDsr() stamp it, createDsr() accepts it. DsrRequestLifecycle declares only a TERMINAL "
+        + "set, so requireInitial has no initial state to enforce and would refuse the NEW/OPEN/PENDING "
+        + "creates the register already holds (F2-220's measured lesson, where the same reasoning made "
+        + "requireCreatable necessary for the authority-document library). Note that dueDate — the "
+        + "Article 4 statutory deadline, and the sharper half of F2-231's filing — is no longer reported "
+        + "by this gate at all: startDsr() only supplies it as a FALLBACK, so under F2-233's narrowing "
+        + "it is correctly not a stamp. The filing stands on F2-202's rule (only the server may issue a "
+        + "statutory deadline) and does not depend on this instrument."));
+
+    /**
      * Everything else, as a decrease-only figure rather than a set of hand-written verdicts.
      *
      * <p>⚠ Deliberately NOT a named map with a reason each. F2-188 measured five such reasons in a
@@ -218,8 +322,27 @@ class ServerStampedFieldContractTest {
      * that was here (F2-207). The remaining eleven are a WORK LIST with <b>no verdicts</b> (F2-188):
      * read the service, record CLOSED / INERT / BY DESIGN, lower this in the same commit. Do not write
      * reasons for them here first — that is the failure mode F2-188 measured at five claims, five false.
+     *
+     * <p>⚙ <b>F2-233: 11 → 4, and roughly half of that came from the INSTRUMENT rather than from
+     * fixes.</b> All eleven were read. Four detector narrowings removed fields no guarded route owns —
+     * a comma in {@link #readOnlyOnTheWire}'s type-token class, {@code instanceof} pattern variables,
+     * lambda parameters, and fallbacks/derivations over a field the same method also accepts — which
+     * alone retired {@code NdiGapService} and {@code ProcessorAssessmentService} and cut
+     * {@code DpiaService} from five reported fields to two. Two live creates were fixed and probed
+     * ({@code DpiaService}, {@code RegulatoryChangeService}); three services got verdicts in the two new
+     * buckets ({@code SustainabilityReportService}, {@code PolicyService},
+     * {@code PrivacyService}).
+     *
+     * <p>🔑 <b>Roughly a third of what an instrument like this reports is the instrument.</b> The
+     * corrected figure is not "we fixed seven services", and saying so would be the more flattering and
+     * less true story — F2-228's headline, where two detector errors in opposite directions produced a
+     * green neither earned.
+     *
+     * <p>The remaining FOUR are the BCM cluster, still a work list with no verdicts: their controllers
+     * all bind the ENTITY (checked, not assumed), so they are genuinely open, and every one needs its
+     * own live probe.
      */
-    private static final int BASELINE_CONTRADICTED_SERVICES = 11;
+    private static final int BASELINE_CONTRADICTED_SERVICES = 4;
 
 
     // ── source plumbing ──────────────────────────────────────────────────────
@@ -380,14 +503,144 @@ class ServerStampedFieldContractTest {
      */
     private static boolean aliasesCallerData(String value, String body, Set<String> requestLocals,
                                              Set<String> paramNames) {
-        if (!value.matches("\\w+")) return false;
-        Matcher m = Pattern.compile(
-            "\\b(?:[A-Za-z_][\\w<>,.\\[\\] ]*\\s+)?" + Pattern.quote(value) + "\\s*=([^;]*);")
-            .matcher(body);
-        while (m.find()) {
-            if (callerSupplied(m.group(1).trim(), requestLocals, paramNames)) return true;
+        return aliasesCallerData(value, body, requestLocals, paramNames, new LinkedHashSet<>());
+    }
+
+    /**
+     * ⚠⚠ F2-233 — the resolver was ONE HOP and the house idiom is TWO, so it could not see the
+     * commonest way caller data reaches a setter in this platform.
+     *
+     * <p>Every {@code /{id}/action} route whose payload is a {@code Map<String, Object> body} writes
+     * its fields like this:
+     * <pre>  Object lvl = body.get("impactLevel");
+     *  if (lvl instanceof String s) e.setImpactLevel(s);</pre>
+     * so the value at the setter is {@code s}, bound by an {@code instanceof} PATTERN — <b>which is
+     * not an assignment at all</b> — to a local which is itself an alias of the request. The old
+     * resolver looked for {@code s = …} and found nothing, so the caller's own value read as a server
+     * stamp. Measured 2026-08-18: <b>12 setter sites across 6 services</b>, including
+     * {@code Dpia#conclusion} and {@code #rejectionReason} (the substance of a PDPL Article 25
+     * assessment) and {@code RegulatoryChange#impactLevel}/{@code #impactSummary}.
+     *
+     * <p>🔑 <b>The direction is what makes it serious: a value the caller supplied, read as a value
+     * the server owns, reports a create that legitimately accepts the field as contradicting itself</b>
+     * — a gate failing on correct code (F2-214), inflating the very work list this gate publishes.
+     * F2-219 named four ways caller data reaches a setter and every one is visibly handled here, which
+     * is exactly why nobody asked what the fifth was (F2-215's headline, third time on this class).
+     *
+     * <p>Now resolves transitively over both bindings, with a {@code seen} set so an
+     * {@code a = b; b = a;} cycle terminates, and over <b>every identifier in the value</b> rather
+     * than only a value that IS one — because {@code e.setControlsUpdatedCount(num.intValue())} is a
+     * call ON caller data and the old "must be a bare identifier" rule could not see it either.
+     *
+     * <p>⚠ The widening is bounded on purpose. It resolves only the <b>immediate operand</b> of
+     * {@code instanceof} — an identifier or one simple call — where a first draft took 160 characters
+     * of preceding context and would have matched a {@code body} mentioned anywhere in the condition.
+     * Its error direction is the opposite of the bug it fixes (a real stamp read as caller data, which
+     * HIDES a defect), so it must not guess: a pure server value mentions no caller-bound local, and
+     * anything that does mention one is caller-influenced by construction.
+     */
+    private static boolean aliasesCallerData(String value, String body, Set<String> requestLocals,
+                                             Set<String> paramNames, Set<String> seen) {
+        Matcher id = Pattern.compile("\\b[a-z_]\\w*\\b").matcher(value);
+        while (id.find()) {
+            String local = id.group();
+            if (!seen.add(local)) continue;
+            if (bindsCallerData(local, body, requestLocals, paramNames, seen)) return true;
         }
         return false;
+    }
+
+    /**
+     * Is {@code local} bound — by assignment or by an {@code instanceof} pattern — to caller data?
+     *
+     * <p>⚠⚠ F2-233 — <b>the recursion must stop at a store read, and my own gate's reverse leg is the
+     * only thing that said so.</b> Following every identifier reached {@code c} in
+     * {@code SgiCommitment c = get(id);} and {@link #callerSupplied} answers TRUE for {@code get(id)}
+     * because {@code id} is a parameter — so a row LOADED FROM THE DATABASE read as caller data, and
+     * {@code refreshValue}'s {@code c.setCurrentValue(sv.value())} stopped counting as a stamp.
+     * {@code everyByDesignEntryStillDescribesSomethingTheScanFinds} failed, naming
+     * {@code SgiCommitment#currentValue}.
+     *
+     * <p>🔑 <b>The id is the caller's; the row it names is the server's.</b> And the error direction is
+     * the opposite of the bug this widening fixes — a real stamp read as caller data HIDES a
+     * contradiction rather than inventing one — which is exactly why the leg that caught it is the
+     * reverse one, the direction nobody writes first (F2-199). A shrinking population is not progress.
+     */
+    private static boolean bindsCallerData(String local, String body, Set<String> requestLocals,
+                                          Set<String> paramNames, Set<String> seen) {
+        Matcher a = Pattern.compile(
+            "\\b(?:[A-Za-z_][\\w<>,.\\[\\] ]*\\s+)?" + Pattern.quote(local) + "\\s*=([^;]*);")
+            .matcher(body);
+        while (a.find()) {
+            String rhs = a.group(1).trim();
+            if (loadsARow(rhs)) continue;
+            if (callerSupplied(rhs, requestLocals, paramNames)) return true;
+            if (aliasesCallerData(rhs, body, requestLocals, paramNames, seen)) return true;
+        }
+        Matcher pv = Pattern.compile(
+            "([\\w.]+(?:\\s*\\(\\s*[^()]*\\))?)\\s*\\binstanceof\\b\\s+[\\w<>\\[\\].]+\\s+"
+            + Pattern.quote(local) + "\\b").matcher(body);
+        while (pv.find()) {
+            String tested = pv.group(1);
+            if (loadsARow(tested)) continue;
+            if (callerSupplied(tested, requestLocals, paramNames)) return true;
+            if (aliasesCallerData(tested, body, requestLocals, paramNames, seen)) return true;
+        }
+        return bindsCallerDataAsALambdaParameter(local, body, requestLocals, paramNames, seen);
+    }
+
+    /**
+     * ⚠⚠ F2-233 — the THIRD binding form, after the assignment and the {@code instanceof} pattern: a
+     * LAMBDA PARAMETER over caller data.
+     *
+     * <p>{@code ProcessorAssessmentService#scoreAndComplete} does
+     * {@code controls.forEach((k, v) -> { case "c1WrittenInstructions" -> a.setC1WrittenInstructions(v); … })},
+     * so the value at each setter is {@code v} — bound by neither an assignment nor a pattern, and
+     * {@link #allParamNames} parses the METHOD's parameters and never a lambda's. All eight PDPL
+     * Article 28 control answers therefore read as server stamps, and the create that legitimately
+     * pre-fills them read as contradicting itself eight times over.
+     *
+     * <p>Measured 2026-08-18: <b>8 setter sites in exactly 1 service</b> — so this is narrow, and that
+     * is the argument for fixing the detector rather than writing eight near-identical BY_DESIGN
+     * reasons. 🔑 <b>A verdict says the code is right; a narrowing says the instrument was wrong, and
+     * eight fluent reasons for one detector bug is exactly the artefact F2-188 measured at five claims,
+     * five false.</b> The eight controls ARE the assessor's — {@code /score} derives the outcome and the
+     * risk score FROM them, and both of those carry {@code @JsonProperty(READ_ONLY)}.
+     *
+     * <p>Resolves the receiver the lambda iterates, so {@code someServerList.forEach(x -> …)} still
+     * reads as a stamp, and requires {@code local} to be one of the lambda's declared parameter names
+     * rather than merely to appear in the header.
+     */
+    private static boolean bindsCallerDataAsALambdaParameter(
+            String local, String body, Set<String> requestLocals, Set<String> paramNames,
+            Set<String> seen) {
+        Matcher lam = Pattern.compile("([\\w.]+)\\s*\\.\\s*\\w+\\s*\\(\\s*\\(?([\\w,\\s]+?)\\)?\\s*->")
+            .matcher(body);
+        while (lam.find()) {
+            boolean declaresIt = Arrays.stream(lam.group(2).split(","))
+                .map(String::trim).anyMatch(local::equals);
+            if (!declaresIt) continue;
+            String receiver = lam.group(1);
+            if (loadsARow(receiver)) continue;
+            if (callerSupplied(receiver, requestLocals, paramNames)) return true;
+            if (aliasesCallerData(receiver, body, requestLocals, paramNames, seen)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Does this right-hand side READ A ROW rather than carry the caller's value?
+     *
+     * <p>Anchored at the start on purpose, which is the whole discriminator: an unqualified
+     * {@code get(id)} / {@code mustGet(id)} or a {@code …Repo.findBy…(…)} is a store read, while
+     * {@code body.get("reason")} — the Map payload idiom this slice exists to resolve — is qualified
+     * by the request itself and must NOT read as a load. The two differ only in what precedes
+     * {@code get}, so testing anywhere in the string would silently undo the fix.
+     */
+    private static boolean loadsARow(String rhs) {
+        return rhs.matches(
+            "(?s)(?:[\\w.]*[Rr]epo\\w*\\s*\\.\\s*)?"
+            + "(?:get|mustGet|find\\w*|load\\w*|fetch\\w*)\\s*\\(.*");
     }
 
     /**
@@ -401,6 +654,30 @@ class ServerStampedFieldContractTest {
      * remainder looking covered, because the mechanism that covers them is visibly present</b>
      * (F2-215's headline, here on the gate rather than on a fix). Derived from the entity source,
      * never a second list of names.
+     *
+     * <p>⚠⚠ F2-233 — the capture was <b>wrong in both directions at once, from a single character in
+     * one character class.</b> It read {@code \b\w[\w<>,.\[\]]*\s+(\w+)\s*[;=]} — a "type token then
+     * field name" — and that class contains a COMMA, so in
+     * {@code @Column(name = "risk_score", precision = 4, scale = 1) private BigDecimal riskScore;}
+     * the token {@code 4,} parsed as the type and <b>{@code scale} as the field name.</b> Measured
+     * tree-wide: <b>4 phantom names</b> ({@code scale} ×3, {@code length} ×1) and <b>4 genuinely
+     * closed fields never subtracted</b> — {@code ProcessorAssessment#riskScore},
+     * {@code NdiAssessmentCycle#complianceScore}, {@code VendorAssessment#workflowStatus} and
+     * {@code VendorAssessment#computedScorePct}.
+     *
+     * <p>🔑 <b>One regex, two opposite errors.</b> Losing the real field OVER-reports — a field the
+     * wire already refuses is published as an open contradiction, which is noise on a work list and
+     * F2-214's failure. Inventing {@code scale} UNDER-reports — a phantom entry in the closed set
+     * would silently subtract a real field of that name, the quiet direction. The second half is
+     * latent only because none of those three entities declares a field called {@code scale} or
+     * {@code length}, which is precisely why it was invisible: <b>a phantom exclusion that matches
+     * nothing scores exactly like a correct one.</b>
+     *
+     * <p>Fixed by anchoring on the access modifier and forbidding the window to cross a {@code ;}, so
+     * it cannot leave the declaration it started in. {@code everyDerivedReadOnlyNameIsARealField}
+     * closes it permanently by REFLECTION — the self-check the derivation never had, and the only
+     * reason this was findable at all was reading its output against the entity rather than trusting
+     * the regex (my own reading of it said {@code riskScore}, twice).
      */
     static Map<String, Set<String>> readOnlyOnTheWire() {
         Map<String, Set<String>> out = new LinkedHashMap<>();
@@ -410,8 +687,9 @@ class ServerStampedFieldContractTest {
                 if (!src.contains("JsonProperty.Access.READ_ONLY")) continue;
                 String type = p.getFileName().toString().replace(".java", "");
                 Matcher m = Pattern.compile(
-                    "JsonProperty\\.Access\\.READ_ONLY\\s*\\)[\\s\\S]{0,400}?"
-                    + "\\b\\w[\\w<>,.\\[\\]]*\\s+(\\w+)\\s*[;=]").matcher(src);
+                    "JsonProperty\\.Access\\.READ_ONLY\\s*\\)[^;]{0,400}?"
+                    + "\\b(?:private|protected|public)\\s+[\\w<>,.\\[\\] ]*?(\\w+)\\s*[;=]")
+                    .matcher(src);
                 while (m.find()) {
                     out.computeIfAbsent(type, k -> new TreeSet<>()).add(m.group(1));
                 }
@@ -462,6 +740,94 @@ class ServerStampedFieldContractTest {
             }
         }
         return out;
+    }
+
+    /**
+     * The {@code Type#field}s this guarded route assigns a server value AND actually OWNS.
+     *
+     * <p>⚠⚠ F2-233 — {@link #stampsServerValue} answers "does a server-derived value reach this
+     * setter", which is the right question on the ACCEPTING side (it is how {@code acceptedAndStamped}
+     * decides what a create settled) and <b>not sufficient on the stamping side.</b> Two shapes assign
+     * a server value without claiming the field, and both were being read as ownership:
+     *
+     * <ul>
+     *   <li><b>A fallback for an absent caller value.</b>
+     *       {@code if (p.getEffectiveFrom() == null) p.setEffectiveFrom(LocalDate.now());} supplies a
+     *       value only when the caller did not, so the field is still the caller's.</li>
+     *   <li><b>A derivation over a field the same method also accepts.</b>
+     *       {@code NdiGapService#updateCapa} writes {@code progressPct} from the request AND forces
+     *       {@code 100} when the status is COMPLETED. Ownership is a fact about the METHOD, not about
+     *       one site, so a per-site scan reports the literal as ownership and never sees the copy.</li>
+     * </ul>
+     *
+     * <p>🔑 <b>F2-218's headline — {@code if (x == null) x = INITIAL} is a default, not a guard — read
+     * on the STAMPING side.</b> The accepting side has carried the mirror of this since F2-219
+     * ({@code settled.removeAll(defaults(...))}); the stamping side never did, and <b>that asymmetry
+     * is the finding</b>: one question, asked of the request on one side and of the loaded row on the
+     * other, answered on only one. The fields it hit are exactly the ones a professional is supposed
+     * to fill in — {@code Dpia#nextReviewDate} (the PDPL Article 25 review cadence),
+     * {@code Policy#effectiveFrom}, {@code NdiCorrectiveAction#completionDate} — so every one of them
+     * was a gate failing on correct code (F2-214).
+     *
+     * <p>Both halves share {@link #guardedByNullTestOnOwnField} with {@link #defaults}, so there is
+     * one predicate and not a second opinion nobody reads (F2-190). Pinned in both directions by
+     * {@code aFallbackForAnAbsentCallerValueIsNotAnOwnershipClaim}.
+     */
+    static Set<String> stampsAndOwns(String body, Map<String, String> types,
+                                     Set<String> requestLocals, Set<String> paramNames,
+                                     Map<String, Set<String>> helperStamps) {
+        Set<String> out = new TreeSet<>(
+            stampsServerValue(body, types, requestLocals, paramNames, helperStamps));
+        out.removeAll(callerWrittenAnywhere(body, types, requestLocals, paramNames));
+        Matcher m = SETTER.matcher(body);
+        while (m.find()) {
+            String type = types.get(m.group(1));
+            if (type == null) continue;
+            if (guardedByNullTestOnOwnField(body, m.start(), m.group(2), Set.of(m.group(1)))) {
+                out.remove(key(type, lower(m.group(2))));
+            }
+        }
+        return out;
+    }
+
+    /** Every {@code Type#field} this body writes from the caller at ANY site, however many others. */
+    private static Set<String> callerWrittenAnywhere(String body, Map<String, String> types,
+                                                     Set<String> requestLocals,
+                                                     Set<String> paramNames) {
+        Set<String> out = new TreeSet<>();
+        Matcher m = SETTER.matcher(body);
+        while (m.find()) {
+            String value = m.group(3).trim();
+            if (value.isEmpty() || value.equals("null") || refusesTheRequestValue(value)) continue;
+            String type = types.get(m.group(1));
+            if (type == null) continue;
+            if (callerSupplied(value, requestLocals, paramNames)
+                || aliasesCallerData(value, body, requestLocals, paramNames)) {
+                out.add(key(type, lower(m.group(2))));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Is the setter at {@code at} guarded by {@code if (<one of targets>.get<Field>() == null)}?
+     *
+     * <p>One predicate for the same question on both sides of the contract (F2-190): {@link #defaults}
+     * asks it of the <b>request</b> — "the caller sent nothing, so this literal settled nothing" — and
+     * {@link #stampsAndOwns} asks it of the <b>loaded row</b> — "the row held nothing, so this literal
+     * claimed nothing". Same shape, different target, and only one of the two had it (F2-233).
+     */
+    private static boolean guardedByNullTestOnOwnField(String body, int at, String field,
+                                                       Set<String> targets) {
+        for (String target : targets) {
+            Matcher g = Pattern.compile(
+                "if\\s*\\(\\s*" + Pattern.quote(target) + "\\s*\\.\\s*(?:get|is)"
+                + Pattern.quote(field) + "\\s*\\(\\s*\\)\\s*==\\s*null\\s*\\)").matcher(body);
+            while (g.find()) {
+                if (g.end() <= at && at - g.end() <= 200) return true;
+            }
+        }
+        return false;
     }
 
     /** Fields this method writes FROM the request object, on any target. */
@@ -965,8 +1331,8 @@ class ServerStampedFieldContractTest {
             if (!legacyMatch && guarded.isEmpty()) continue;
             Map<String, String> types = localTypes(m.params(), m.body());
             Set<String> params = allParamNames(m.params());
-            for (String f : stampsServerValue(m.body(), types, requestParams(m.params()), params,
-                                              visibleHelperStamps)) {
+            for (String f : stampsAndOwns(m.body(), types, requestParams(m.params()), params,
+                                          visibleHelperStamps)) {
                 String type = f.substring(0, f.indexOf('#'));
                 String field = f.substring(f.indexOf('#') + 1);
                 if (CLOSED_AT_THE_WIRE.contains(field)) continue;
@@ -1080,8 +1446,25 @@ class ServerStampedFieldContractTest {
      */
     private static Set<String> unexplained(Contradiction c) {
         Set<String> out = new TreeSet<>(c.fields());
-        out.removeIf(f -> BY_DESIGN.containsKey(c.service() + "::" + f));
+        out.removeIf(f -> adjudicated(c.service() + "::" + f));
         return out;
+    }
+
+    /**
+     * Has this exact {@code Service::Type#field} been read and given a verdict?
+     *
+     * <p>F2-233 — three buckets, because one could not say what needed saying. {@link #BY_DESIGN} means
+     * the caller legitimately owns the field; {@link #CLOSED_ELSEWHERE} means something outside this
+     * gate's reach already refuses it; {@link #FILED_OWNER_DECISION} means the caller must NOT own it
+     * and closing it is an owner's call about live rows. 🔑 Folding the third into the first would have
+     * recorded a live statutory defect as a design — F2-197's rule that an invented all-clear closes a
+     * question, and F2-224's that a verdict vocabulary must not be limited to the verdicts an earlier
+     * slice happened to reach.
+     */
+    private static boolean adjudicated(String site) {
+        return BY_DESIGN.containsKey(site)
+            || CLOSED_ELSEWHERE.containsKey(site)
+            || FILED_OWNER_DECISION.containsKey(site);
     }
 
     @Test
@@ -1134,7 +1517,12 @@ class ServerStampedFieldContractTest {
         // a measurement of something else looks measured).
         lines.add("# MEASURED unexplained services: " + services.size()
                   + "  (ceiling " + BASELINE_CONTRADICTED_SERVICES + ")   " + services);
-        lines.add("# BY_DESIGN field verdicts: " + new TreeSet<>(BY_DESIGN.keySet()));
+        lines.add("# BY_DESIGN field verdicts (the caller legitimately owns these): "
+                  + new TreeSet<>(BY_DESIGN.keySet()));
+        lines.add("# CLOSED_ELSEWHERE (already refused at a layer this gate cannot see): "
+                  + new TreeSet<>(CLOSED_ELSEWHERE.keySet()));
+        lines.add("# FILED_OWNER_DECISION (LIVE defects, deliberately left open — not health): "
+                  + new TreeSet<>(FILED_OWNER_DECISION.keySet()));
         lines.add("");
         grouped.forEach((svc, cs) -> {
             lines.add(svc);
@@ -1199,6 +1587,238 @@ class ServerStampedFieldContractTest {
             .as("a BY_DESIGN key is Service::Type#field, so the verdict is at the finding's own "
                 + "granularity and cannot silently cover a sibling")
             .matches("\\w+::\\w+#\\w+"));
+    }
+
+    /**
+     * F2-233 — the reverse leg for the two new buckets. Same argument as the BY_DESIGN one: a verdict
+     * written for something the scan no longer finds is either a fix whose entry outlived it or a
+     * detector that rotted, and both must be resolved rather than left standing.
+     *
+     * <p>🔑 This is the leg that matters most for {@link #CLOSED_ELSEWHERE}, because "closed at a layer
+     * I cannot see" is unfalsifiable from inside the gate: if the retired {@code /policies} write routes
+     * ever come back, the scan will still report those four fields and this forces them to be
+     * re-adjudicated rather than silently inheriting a verdict written when nothing could reach them.
+     */
+    @Test
+    void everyNewVerdictBucketStillDescribesSomethingTheScanFinds() {
+        Set<String> measured = new TreeSet<>();
+        for (Contradiction c : measure()) {
+            c.fields().forEach(f -> measured.add(c.service() + "::" + f));
+        }
+
+        assertThat(measured)
+            .as("a CLOSED_ELSEWHERE verdict names a field this gate DOES report and something outside "
+                + "its reach already refuses. If the scan stops finding it, the layer that closed it may "
+                + "have moved — re-read, do not delete the entry to make the build green")
+            .containsAll(CLOSED_ELSEWHERE.keySet());
+        assertThat(measured)
+            .as("a FILED_OWNER_DECISION verdict names a LIVE defect deliberately left open. It vanishing "
+                + "from the scan is the one case that must never pass unnoticed: it would mean the "
+                + "instrument stopped seeing a statutory hole nobody decided to close")
+            .containsAll(FILED_OWNER_DECISION.keySet());
+
+        for (Map<String, String> bucket : List.of(CLOSED_ELSEWHERE, FILED_OWNER_DECISION)) {
+            bucket.forEach((site, why) -> {
+                assertThat(site).matches("\\w+::\\w+#\\w+");
+                assertThat(why.length())
+                    .as("%s's reason must carry its evidence, not label the field", site)
+                    .isGreaterThan(120);
+            });
+        }
+        assertThat(FILED_OWNER_DECISION.values())
+            .as("""
+                A FILED entry must say out loud that the field is NOT correct and what an owner has to \
+                decide. Without that it reads as a by-design verdict, which is F2-197's defect one level \
+                up: an invented figure invites a question, an invented all-clear closes one.""")
+            .allSatisfy(why -> assertThat(why).contains("OWNER DECISION"));
+        assertThat(BY_DESIGN.keySet()).doesNotContainAnyElementsOf(CLOSED_ELSEWHERE.keySet());
+        assertThat(BY_DESIGN.keySet()).doesNotContainAnyElementsOf(FILED_OWNER_DECISION.keySet());
+        assertThat(CLOSED_ELSEWHERE.keySet()).doesNotContainAnyElementsOf(FILED_OWNER_DECISION.keySet());
+    }
+
+    /**
+     * F2-233 — {@link #CLOSED_ELSEWHERE}'s claims, resolved rather than read.
+     *
+     * <p>Two mechanisms, two checks. A field closed AT THE REQUEST DTO is verified by <b>reflection</b>:
+     * the bound record must exist, must not declare the field, and the controller must actually bind it
+     * and call the service. A field closed BY A RETIRED ROUTE is verified by the absence of a write
+     * mapping for that path plus the method's presence in {@code DarkServiceMethodTest}'s named map.
+     *
+     * <p>🔑 F2-215's rule about exclusions: <b>an exclusion nobody can audit is an assumption wearing a
+     * citation.</b> The prose in the map is for a human; this is what makes it true.
+     */
+    @Test
+    void everyClosedElsewhereEntryNamesSomethingThatReallyClosesIt() throws Exception {
+        Class<?> yearRequest =
+            Class.forName("com.tss.grc.module.sust.annex.dto.ReportingYearCreateRequest");
+        Set<String> declared = Arrays.stream(yearRequest.getRecordComponents())
+            .map(java.lang.reflect.RecordComponent::getName).collect(Collectors.toCollection(TreeSet::new));
+        assertThat(declared)
+            .as("the bound record's own components — a field absent from this list cannot arrive at "
+                + "createYear() however the service is written, which is the whole verdict")
+            .doesNotContain("status", "approvedAt", "publishedAt")
+            .contains("year", "reportingEntityEn");
+
+        String annexController = read(MAIN_JAVA.resolve(
+            "com/tss/grc/module/sust/annex/controller/SustainabilityAnnexController.java"));
+        assertThat(annexController)
+            .as("the verdict rests on THIS record being what the endpoint binds — a plausible DTO name "
+                + "is worth nothing until something resolves it (F2-202)")
+            .contains("@RequestBody ReportingYearCreateRequest")
+            .containsPattern("createYear\\s*\\(\\s*req\\.toEntity\\s*\\(\\s*\\)\\s*\\)");
+
+        String policyController = read(MAIN_JAVA.resolve(
+            "com/tss/grc/module/compliance/controller/RegChangePolicyController.java"));
+        for (String verb : List.of("PostMapping", "PutMapping", "DeleteMapping")) {
+            assertThat(policyController)
+                .as("a @%s for /policies would make PolicyService's create reachable again and every "
+                    + "PolicyService verdict here would need re-adjudicating (CH-6 / PM-C1 retired them)",
+                    verb)
+                .doesNotContainPattern("@" + verb + "\\(\"/policies");
+        }
+        String darkMethods = read(Path.of("src", "test", "java", "com", "tss", "grc", "security",
+            "DarkServiceMethodTest.java"));
+        assertThat(darkMethods)
+            .as("the other half of the reachability claim: the legacy write lifecycle is held as dark "
+                + "by name, so this verdict is not a second, unmaintained opinion (F2-190)")
+            .contains("com.tss.grc.module.compliance.service.PolicyService#create");
+    }
+
+    /**
+     * F2-233 — the derivation's own self-check, and the reason the comma bug was findable.
+     *
+     * <p>{@link #readOnlyOnTheWire} parses field names out of entity source. A capture that is not a
+     * field of that entity is a parse error in both directions at once: the REAL field it should have
+     * returned is never subtracted (a closed field published as an open contradiction), and the phantom
+     * name enters the closed set where it would silently subtract any real field that happens to share
+     * it. 🔑 <b>A phantom exclusion that matches nothing scores exactly like a correct one</b>, which is
+     * why nothing caught {@code scale} for two slices.
+     */
+    @Test
+    void everyDerivedReadOnlyNameIsARealField() {
+        Map<String, Set<String>> derived = readOnlyOnTheWire();
+        assertThat(derived).as("anti-vacuity: the derivation must still find the per-field annotations "
+            + "F2-219 added it for").hasSizeGreaterThan(10);
+
+        Map<String, Set<String>> phantom = new LinkedHashMap<>();
+        derived.forEach((type, fields) -> {
+            Set<String> real = entityFieldNames(type);
+            if (real.isEmpty()) return;              // type not resolvable from source — not this claim
+            Set<String> bogus = new TreeSet<>(fields);
+            bogus.removeAll(real);
+            if (!bogus.isEmpty()) phantom.put(type, bogus);
+        });
+
+        assertThat(phantom)
+            .as("""
+                Every name this derivation returns must be a field the entity declares. Before F2-233 \
+                the type-token character class contained a comma, so \
+                `@Column(precision = 4, scale = 1) private BigDecimal riskScore;` parsed as type "4," \
+                and field "scale" — losing ProcessorAssessment#riskScore, \
+                NdiAssessmentCycle#complianceScore, VendorAssessment#workflowStatus and \
+                VendorAssessment#computedScorePct from the closed set, and injecting `scale` and \
+                `length` into it.""")
+            .isEmpty();
+
+        assertThat(derived.getOrDefault("ProcessorAssessment", Set.of()))
+            .as("the demonstrating instance, held by name so a re-broken regex fails here first")
+            .contains("riskScore", "overallOutcome", "approverName");
+    }
+
+    /**
+     * Field names declared by an entity, read from its own source.
+     *
+     * <p>⚠ The UNION across every file with that simple name, not the first one found — because
+     * {@link #readOnlyOnTheWire} keys by filename and therefore merges duplicates under one key, and a
+     * comparison between a merged set and a single file's set invents a discrepancy. This fired on its
+     * first run: {@code VendorAssessment} is declared in BOTH {@code module/scm/entity} and
+     * {@code module/tprm/entity}, so {@code workflowStatus}, {@code answeredCount} and
+     * {@code computedScorePct} — all real {@code @JsonProperty(READ_ONLY)} fields of the tprm one —
+     * read as phantoms. F2-222 filed exactly this hazard (15 entity simple names declared twice, three
+     * shipped gates keyed on the simple name); 🔑 <b>a keying ambiguity is harmless until two things
+     * key on it differently.</b>
+     */
+    private static Set<String> entityFieldNames(String type) {
+        try (var s = Files.walk(MAIN_JAVA)) {
+            Set<String> out = new TreeSet<>();
+            for (Path p : s.filter(f -> f.getFileName().toString().equals(type + ".java")).toList()) {
+                Matcher m = Pattern.compile(
+                    "(?m)^\\s*(?:@\\w+(?:\\([^\\n]*\\))?\\s*)*(?:private|protected|public)\\s+"
+                    + "(?:static\\s+|final\\s+|transient\\s+)*[\\w<>,.\\[\\] ]*?(\\w+)\\s*[;=]")
+                    .matcher(read(p));
+                while (m.find()) out.add(m.group(1));
+            }
+            return out;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * F2-233 — the three binding forms and the fallback rule, pinned in both directions over literal
+     * source, because a detector that cannot match reads exactly like a clean tree.
+     */
+    @Test
+    void callerDataReachesASetterInMoreWaysThanAnAssignment() {
+        Map<String, String> types = Map.of("body", "Foo", "e", "Foo", "cur", "Foo");
+        Set<String> req = Set.of();                       // Map payloads are params, not request DTOs
+        Set<String> params = Set.of("id", "body", "controls");
+
+        String twoHopPattern = """
+            { Foo cur = get(id); Object lvl = body.get("impactLevel");
+              if (lvl instanceof String s) cur.setImpactLevel(s); }""";
+        assertThat(stampsAndOwns(twoHopPattern, types, req, params, Map.of()))
+            .as("the house Map-payload idiom: a pattern variable bound to a local that aliases the "
+                + "request. Two hops, no assignment to `s` at all — 12 sites across 6 services read as "
+                + "server stamps before F2-233")
+            .doesNotContain("Foo#impactLevel");
+
+        String throughACall = """
+            { Foo cur = get(id); Object n = body.get("count");
+              if (n instanceof Number num) cur.setCount(num.intValue()); }""";
+        assertThat(stampsAndOwns(throughACall, types, req, params, Map.of()))
+            .as("and the value need not BE the bound identifier — `num.intValue()` is a call ON caller "
+                + "data, which the old must-be-a-bare-identifier rule could not see either")
+            .doesNotContain("Foo#count");
+
+        String lambda = """
+            { Foo cur = get(id); controls.forEach((k, v) -> cur.setC1(v)); }""";
+        assertThat(stampsAndOwns(lambda, types, req, params, Map.of()))
+            .as("a lambda parameter over caller data: allParamNames parses the METHOD's parameters and "
+                + "never a lambda's, so all eight PDPL Art.28 control answers read as stamps")
+            .doesNotContain("Foo#c1");
+
+        String fallback = """
+            { Foo cur = get(id); cur.setStatus("APPROVED");
+              if (cur.getReviewDate() == null) cur.setReviewDate(LocalDate.now()); }""";
+        Set<String> owned = stampsAndOwns(fallback, types, req, params, Map.of());
+        assertThat(owned)
+            .as("a value supplied ONLY when the row held none is a fallback, not an ownership claim — "
+                + "F2-218's headline on the stamping side")
+            .doesNotContain("Foo#reviewDate");
+        assertThat(owned)
+            .as("...and the unconditional stamp beside it must survive, or the narrowing has eaten the "
+                + "findings it was supposed to sharpen")
+            .contains("Foo#status");
+
+        String alsoAccepted = """
+            { Foo cur = get(id); if (body.getPct() != null) cur.setPct(body.getPct());
+              if ("DONE".equals(cur.getState())) cur.setPct(100); }""";
+        assertThat(stampsAndOwns(alsoAccepted, types, Set.of("body"), params, Map.of()))
+            .as("ownership is a fact about the METHOD: a literal at one site is a derivation over a "
+                + "figure the same method takes from the caller at another")
+            .doesNotContain("Foo#pct");
+
+        String loadedRow = """
+            { Foo cur = get(id); Sourced sv = compute(cur); cur.setValue(sv.value()); }""";
+        assertThat(stampsAndOwns(loadedRow, types, req, params, Map.of()))
+            .as("""
+                THE NARROWING'S OWN LIMIT, and the reverse leg of this gate is what found it: the \
+                recursion must stop at a store read. `callerSupplied` answers true for `get(id)` \
+                because `id` is a parameter, so following every identifier made a row LOADED FROM THE \
+                DATABASE read as caller data and SgiCommitment#currentValue stopped being a stamp. The \
+                id is the caller's; the row it names is the server's.""")
+            .contains("Foo#value");
     }
 
     /**

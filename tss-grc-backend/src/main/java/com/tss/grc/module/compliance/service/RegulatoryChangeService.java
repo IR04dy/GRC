@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.tss.grc.common.validation.ServerOwnedState;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -20,6 +22,12 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class RegulatoryChangeService {
+
+    /**
+     * The state a regulatory change may be created in — shared with {@link #assessApplicability}'s own
+     * guard so the value the create forces and the machine's root cannot drift (F2-217).
+     */
+    private static final String INITIAL_STATUS = "NEW";
 
     private final RegulatoryChangeRepository repo;
 
@@ -35,6 +43,27 @@ public class RegulatoryChangeService {
             .orElseThrow(() -> new EntityNotFoundException("Regulatory change not found: " + id));
     }
 
+    /**
+     * ⚠⚠ F2-233 — this create named the state, so a regulatory obligation entering the platform could
+     * be filed already {@code CLOSED}, with a {@code closedAt} of the caller's choosing, having passed
+     * through none of NEW → APPLICABILITY_ASSESSED → IMPACT_ASSESSED → CONTROLS_UPDATED → CLOSED.
+     *
+     * <p>F2-220's shape: each of those transitions demands something ON THE WAY THROUGH — an
+     * {@code applicability} from a closed three-value vocabulary, an impact level and summary, a count
+     * of the controls updated — and a create that names the end state supplies none of it. The record is
+     * the platform's evidence that a SAMA/NCA/SDAIA change was assessed and acted on.
+     *
+     * <p>{@code status} and {@code closedAt} are not declarable by any client: {@code api.ts}'s
+     * {@code RegulatoryChangeRequest} carries {@code applicability?}, {@code impactLevel?} and
+     * {@code impactSummary?} and neither of these, so refusing them cannot break a request that works
+     * today (F2-182) — and the same reasoning is already written on {@link #update}, which F2-213
+     * stopped from resetting both. 🔑 <b>The update was fixed and the create two methods above it was
+     * not</b>, which is F2-215's headline for the fourth time in this lineage.
+     *
+     * <p>{@code impactLevel}/{@code impactSummary} stay accepted, deliberately: {@link #assessImpact}
+     * takes them from its own request body too, so they are the assessor's value in both places and only
+     * the STATUS is the machine's.
+     */
     @Transactional
     public RegulatoryChange create(RegulatoryChange req) {
         // Mass-assignment defense — see PolicyService.create() for the
@@ -42,6 +71,10 @@ public class RegulatoryChangeService {
         // cross-tenant merge() overwrites.
         req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "a regulatory change",
+            "POST /api/v1/compliance/regulatory-changes/{id}/assess-applicability"));
+        req.setClosedAt(null);
         return repo.save(req);
     }
 
@@ -83,7 +116,7 @@ public class RegulatoryChangeService {
     @Transactional
     public RegulatoryChange assessApplicability(Long id, Map<String, Object> body) {
         RegulatoryChange e = get(id);
-        require(e, "NEW");
+        require(e, INITIAL_STATUS);
         String appl = (String) body.getOrDefault("applicability", "APPLICABLE");
         if (!java.util.Set.of("APPLICABLE", "NOT_APPLICABLE", "PARTIAL").contains(appl)) {
             throw new IllegalArgumentException("applicability must be APPLICABLE | NOT_APPLICABLE | PARTIAL");

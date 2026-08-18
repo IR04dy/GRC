@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.tss.grc.common.validation.ServerOwnedState;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +37,12 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class DpiaService {
+
+    /**
+     * The state a DPIA may be created in — shared with {@link #submitForReview}'s own guard so the
+     * value the create forces and the value the machine's root demands cannot drift (F2-217).
+     */
+    private static final String INITIAL_STATUS = "DRAFT";
 
     private final DpiaRepository           dpiaRepo;
     private final DpiaQuestionRepository   questionRepo;
@@ -97,6 +105,33 @@ public class DpiaService {
         return out;
     }
 
+    /**
+     * ⚠⚠ F2-233 — a create that NAMES the state is a transition nobody guarded, and here the record is
+     * the PDPL Article 25 impact assessment that authorises high-risk processing to proceed.
+     *
+     * <p>{@code DpiaController} binds the {@code Dpia} ENTITY and this method did nothing but
+     * {@code setId(null)}, {@code setOrganisationId(…)} and {@code save(req)}, so a caller could file a
+     * DPIA already {@code APPROVED} — skipping DRAFT → IN_REVIEW → APPROVED entirely — or already
+     * {@code REJECTED} with a {@code rejectedAt} of its own choosing. {@code POST /api/v1/privacy/dpias}
+     * is guarded by {@code PRIVACY:WRITE}, <b>the same permission {@code /approve} carries</b>, so there
+     * is no privilege escalation to find: the state machine was the only control and the create sat
+     * beside it without one. The audit row said {@code DPIA_DRAFTED} whatever status was stored
+     * (F2-188/F2-191: a duplicated transition agrees on the row and differs on the trail).
+     *
+     * <p>🔑 {@code approvedAt} was <b>already</b> refused, because {@code Dpia} annotates that ONE field
+     * {@code @JsonProperty(READ_ONLY)} and not {@code status}, {@code rejectedAt},
+     * {@code rejectionReason} or {@code conclusion} — F2-215's two-of-N shape at one of five, and the
+     * one defended field is what makes the class read as protected. Its side effect was to make the two
+     * forgeries look different: a create naming REJECTED is internally consistent (both columns are
+     * writable) while one naming APPROVED leaves {@code approved_at} NULL, so <b>the single annotation
+     * left the dangerous forgery detectable and the other one seamless</b> — and nothing reads either.
+     *
+     * <p>Latent from the UI, live at the API: {@code apiClientMethodReachability} records
+     * {@code dpiaApi.create} as a HOLE ("a DPIA can be approved, rejected and expired but never
+     * created"), so no screen sends any of this and refusing it cannot break a working request
+     * (F2-182). That entry reads as an invitation to build the create screen, and building it is what
+     * would have fired this — F2-214's shape.
+     */
     @Transactional
     public Dpia create(Dpia req) {
         // Mass-assignment defense — controller accepts the entity via
@@ -106,6 +141,14 @@ public class DpiaService {
         // is also a regulatory disclosure risk.
         req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "a DPIA",
+            "POST /api/v1/privacy/dpias/{id}/submit-for-review"));
+        // The columns only the REJECTED state produces. approvedAt is deliberately NOT cleared here:
+        // it already carries @JsonProperty(READ_ONLY), and a scrub over a field the wire cannot supply
+        // is decoration that answers the question a reader was about to ask (F2-184/F2-219).
+        req.setRejectedAt(null);
+        req.setRejectionReason(null);
         Dpia saved = dpiaRepo.save(req);
         audit.log("CREATE", "Dpia", saved.getId(),
             "DPIA drafted: " + nullSafe(saved.getTitleEn()) + " (PDPL Article 25)");
@@ -158,7 +201,7 @@ public class DpiaService {
     @Transactional
     public Dpia submitForReview(Long id) {
         Dpia d = mustGet(id);
-        require(d, "DRAFT");
+        require(d, INITIAL_STATUS);
         d.setStatus("IN_REVIEW");
         Dpia saved = dpiaRepo.save(d);
         audit.log("TRANSITION", "Dpia", saved.getId(), "DPIA submitted for review (DRAFT → IN_REVIEW)");
