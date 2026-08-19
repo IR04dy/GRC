@@ -1872,6 +1872,76 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **AN UNVERIFIED FOREIGN KEY IS A CROSS-TENANT WRITE WAITING FOR THE ROW THAT
+  DEREFERENCES IT, AND THE PLATFORM-WIDE BACKSTOP GUARDS THE TENANT *COLUMN* RATHER THAN THE
+  TENANT *ROW*** (F2-242, measured 2026-08-19). `ScmService#startOnboarding` stored a
+  caller-supplied `vendorId` without verifying the vendor belonged to the caller's tenant, then
+  dereferenced it with `vendorRepo.findById(vendorId).ifPresent(v -> { …set…; save(v); })` — no
+  tenant predicate. Probed live as `ranalyst` (organisation 1, holding only `SCM:WRITE`) against a
+  `[REVIEW-TEST]` victim planted in organisation 2: the create answered **201** and moved the
+  foreign vendor `REJECTED → IN_PROGRESS`; `/approve` then took its `status` from **BLACKLISTED to
+  ACTIVE** — a supplier another tenant had struck off, reinstated by a stranger. **0 audit rows
+  name the mutated vendor**, the attacker cannot read it back (`GET /vendors` is tenant-scoped),
+  and organisation 2 has no user who could notice. In a SAMA-outsourcing register `status` gates
+  whether you may transact with a supplier, so the write is not cosmetic.
+  ⚠⚠ **`TenantWriteGuardInterceptor` CANNOT SEE IT AND THAT IS NOT A HOLE IN IT.** `decide`
+  returns `false` the moment `Objects.equals(oldOrg, newOrg)` — its own comment reads *"Tenant
+  unchanged — the normal case."* It catches a row being **moved** between tenants (F2-22b) and an
+  insert **landing** in the wrong one (F2-216); writing somebody else's row without touching its
+  `organisation_id` is outside its question **by construction**, while `application-prod.yml`
+  calls the bean the *"platform-wide … backstop … so a single missed per-service guard cannot
+  silently write across tenants"*. 🔑 **A guard's population is its question: before trusting a
+  backstop, say out loud which noun it protects.**
+  🔑🔑 **THE DISCRIMINATOR IS NOT THE UNSCOPED LOAD — IT IS WHETHER THE REFERENCE WAS VERIFIED
+  WHEN IT WAS STORED.** `RiskAcceptanceService#setRiskStatus` carried the **identical**
+  `risks.findById(riskId).ifPresent(…save…)` shape and was **correct**, because `request()` had
+  already resolved that `riskId` with `.filter(r -> Objects.equals(r.getOrganisationId(), orgId))`
+  before writing it to the column. So **fix it where the reference is STORED** and scope the load
+  as defence in depth. ⚠ Closed anyway: what made it harmless is a predicate in a *different
+  method* and nobody was maintaining that (F2-177); reachability is a fact about today, not a
+  property of a control (F2-182).
+  ⚠ **The FK does not help, and it is worth being precise about why.** `FK_scm_ob_vendor` and
+  `FK_scm_assess_vendor` both exist, so a **nonexistent** id is refused by the database — and a
+  foreign key knows nothing about tenancy, so a **cross-tenant** id is a perfectly valid
+  reference. *The constraint that looks like it protects the reference is the one that cannot.*
+  ⚠⚠ **The second instance: the on-request sibling filters and the sweep six methods away does
+  not.** `EvidenceItemService#expireStaleEvidence` (the nightly all-orgs sweep) reopened the
+  originating evidence request through an unpredicated `findById`, while `fulfilRequest` has
+  always carried `.filter(r -> r.getOrganisationId().equals(orgId))` — F2-215's two-of-N, in one
+  class. The correct anchor there is the **item's** tenant, not `TenantContext`, because the sweep
+  sets the tenant per row and has no request tenant of its own.
+  ⚠⚠ **THE DETECTOR BUG IS THE REUSABLE PART: the reconnaissance pass matched
+  `\.ifPresent\(([^;]{0,600}?)\)` and reported 0 SITES ON A TREE HOLDING 7, because a lambda BODY
+  is a statement list and a character class excluding `;` can never match the shape being
+  hunted.** 🔑 **A detector that cannot match reads exactly like a clean tree, and it
+  UNDER-reports.** Extract the argument with a **paren-balanced walk** (skipping string and char
+  literals so a `")"` in a message cannot end it) and carry a synthetic self-test over the literal
+  pre-fix *and* fixed forms. `UnverifiedForeignKeyWriteContractTest` does, over a **derived**
+  population (repository fields per owner type → entity → does it carry `organisation_id`), with
+  **one** read-and-reasoned exemption enforced both ways — `LoginAttemptService#onSuccess`, which
+  runs during authentication before any tenant exists, where `orgId()` would throw.
+  ⚠⚠ **MY OWN LEG 0 WAS WRONG TWICE AND THE SECOND FAILURE EXPOSED THE FIRST.** It asserted
+  `status: "planned"` → 400; that answered **201**, and I recorded it as F2-217's stale listener.
+  The post-fix run — on a backend restarted 40 seconds earlier — failed the identical leg, because
+  `ClosedVocabulary.require()` **normalises case before testing membership** (exactly what F2-241's
+  own casing test asserts), so `'planned'` is legal and 201 is correct. 🔑 **A wrong expectation
+  and a stale listener produce the identical red line, and the stale-listener reading is the more
+  interesting story — which is why it was the one I reached for.** Use a token legal in *no*
+  casing, and assert both halves so the leg cannot pass for the wrong reason.
+  ⚠ **The backtick landmine fired again**, this time on `py -c "…"` inside a Bash command: Bash
+  expands every backtick as command substitution before Python sees the string, prose about code
+  is mostly backticks, and the script **printed its own success line alongside the errors**. Write
+  the script to a file, and have it re-read what it wrote and assert the identifiers survived — a
+  mangled paragraph still reads like prose.
+  ⚙ **Filed:** the **7-site load-then-write-later residue** the gate prints and asserts
+  decrease-only, deliberately with **no verdicts** (F2-188) — `TprmService:172/211` is readiest,
+  being the twin register of the one this slice closed; `scm.vendors.status` /
+  `onboarding_status` written as Java literals against CHECK-constrained, case-insensitively
+  collated columns (legal today, cheap to close now that the register has no other open writer —
+  F2-183); `scm.slas` **still has no server surface of any kind** (14 live rows, dev = prod);
+  and the structural root — a caller-supplied foreign key is representable on every create in the
+  platform, so a `@TenantOwned`-style binding that resolves a reference through the tenant
+  automatically, rather than 200-odd services each remembering, is an **owner decision**.
 - ⚠⚠ **AN ENTITY'S FIELD INITIALISER IS A ONE-TOKEN VOCABULARY, AND BECAUSE NOBODY EVER
   *DECLARES* IT AS ONE, NO VOCABULARY INSTRUMENT IN THIS TREE HAD EVER COMPARED ONE AGAINST ITS
   COLUMN'S OWN CHECK** (F2-241, measured 2026-08-19). `module/scm/entity/VendorAssessment` declared
