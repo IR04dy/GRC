@@ -325,3 +325,8 @@
   color: var(--ink-3);
   cursor: help;
 }
+
+/* F2-249 — an analyst assigned by name only, with no resolvable platform user behind it.
+   Muted rather than red: an assignment to the Financial Crime Unit is legitimate, it simply
+   cannot be traced to a person, and a danger tone would read as a defect in the record. */
+.ethics-unlinked { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-3); }

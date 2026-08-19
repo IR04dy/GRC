@@ -2547,6 +2547,152 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-249 · A register that declares a person id beside a label wrote only the label
+
+| | |
+|---|---|
+| **ID** | F2-249 |
+| **Status** | ✅ CLOSED 2026-08-19 |
+| **Severity** | P2 |
+| **Area** | `module/iam` · `module/ethics` · `module/bcm/cycle` · `module/signature` · `module/admin/committee` — five registers whose parent reference is a PERSON, one shape |
+| **Found by** | executing F2-248's filed 38-member work list, reading the eight actor-attribution members whose parent is a person (F2-221, F2-248's classification) |
+
+Executing F2-248's 38-member work list, the eight actor-attribution members whose parent is a
+**person** were read in full. The same absence produced **two opposite symptoms**, and which one a
+register showed depended entirely on where its label came from. Measured identical in dev and prod:
+
+| register | id populated | label writer | symptom |
+|---|---|---|---|
+| `platform.signatures :: signer` | 4/4 | **derived from the id** | the exemplar — REFUTED |
+| `privacy.dpia_review :: reviewer` | 0/6 | `CurrentActor` | already closed — REFUTED |
+| `bcm.plan_review_attestations :: attested_by` | **0/5** | the acting principal | honest, unlinkable |
+| `bcm.bcp_plans :: last_attested_by` | **0/8** | derived from the attestation | honest, unlinkable |
+| `bcm.plan_acknowledgements :: distributed_by` | **0/8** | the acting principal | honest, unlinkable |
+| `ethics.aml_alerts :: analyst` | **0/10** | **caller free text** | a claim |
+| `ethics.cases :: investigator` | 6/30 (seed) | **caller free text** | a claim |
+| `evidence.evidence_items :: collector` | 77/78 | **no writer at all** | latent |
+
+🔑🔑 **THE REUSABLE RULE: F2-245 established that a description travelling beside an id can
+describe the wrong row. This is the case where the description travels ALONE — and the two ways that
+fails look nothing like each other. Where the label comes from the principal the record is honest and
+UNJOINABLE; where it comes from the caller the record is a CLAIM. Both are the absence of the same
+half, so a reader who fixes one symptom will not recognise the other.**
+
+**0 of the 3 stored analyst labels and 0 of the 14 investigator labels resolve to any real user**
+(matched against `iam.users.username` and `full_name_en`), and `bcm.plan_review_attestations` names
+`'Khalid Al-Mutairi'`, who resolves to nobody — F2-207's measured cast of 65 invented officers, in a
+**server** register.
+
+Probed live as `auditor` (a `INTERNAL_AUDITOR` holding `COMPLIANCE:WRITE`), pre-fix **10/10**:
+an AML alert moved `OPEN -> INVESTIGATING` naming an analyst who does not exist, and a misconduct
+case entered `INVESTIGATION` with an invented investigator. Both HTTP 200.
+
+⚠⚠ **THE SCREEN WAS THE COLLECTOR, AND F2-223 DELETED THE ONE BESIDE IT.**
+`EthicsPage` called `window.prompt(t('amlAssignPrompt'))` — it asked a human to **type** the analyst's
+name, and whatever they typed became the register's record of who was investigating an AML alert.
+F2-223 removed this page's `amlDecidedByPrompt` (the AML *decider*) and left this one; and
+`decidedByName` twenty lines below in the same service has resolved from `CurrentActor` ever since.
+🔑 **F2-215's two-of-N is why it looked covered: a reader who finds `CurrentActor` in a service
+does not then ask which of its other people-columns still comes from the body.** CH-8 ("replace
+window.prompt/confirm") is a completed task and this prompt survived it.
+
+⚠⚠ **FOUR HAND-WRITTEN COPIES OF ONE PREDICATE, AND NO TWO AGREED.** Before writing a
+fifth, the population was measured: `CoiService.requireOwnUser` (F2-244),
+`CommitteeMemberRegistryService.requireUserInTenant`, `SignatureService.resolveSignerName`, and the
+committee registry's own error text. **Two of them differed on whether a BLANK `full_name_en` falls
+back to the username** — so a user whose display name was the empty string rendered as an empty
+register cell in one place and as their username in the other. 🔑 **What made that duplication
+harmless was two copies happening to agree, and nobody was maintaining that** (F2-177).
+`module/iam/service/TenantUserDirectory` now owns both the predicate and the label spelling, and the
+three existing copies were **converted rather than exempted** (F2-190, F2-246's precedent).
+
+⚠ **`module/iam`, not `common/`, and that was checked rather than assumed.** `iam` owns
+`users`; `X -> iam` is an ordinary business edge (`UserRepository` is already read from ten modules
+outside `iam`, and `ModuleGraphRatchetTest`'s `KERNEL_ISH` is only `platform | integrations |
+dashboard`). Putting it in `common/` would have been **worse**: that package sits outside the
+ratchet's population entirely, so the dependency would be neither forbidden nor measured.
+
+⚠⚠ **A BARE LABEL STAYS LEGAL, AND THE SCHEMA DECIDES THAT — NOT TASTE.** A nullable id
+*beside* a nullable name column states that an unresolvable party is representable (F2-246's rule),
+and the live data proves the registers mean it: `'Financial Crime Unit'`, `'Head of FCC'`,
+`'Internal Audit'`, `'External Investigator'`, `'Forensic Accountant'`. Several are deliberately
+outside the platform — an external investigator has no login by definition — so **requiring a
+resolvable user would refuse exactly the ethics cases where independence matters most.** That is a
+fix failing on correct usage, the one failure a fix or a gate must never have (F2-214). Contrast
+F2-244, which refused: `coi_recusal_event` declares a NOT NULL id and **no name column at all**, so
+there the opposite holds. What is closed here is the **appearance** of a link — an id is resolved
+in-tenant, the label is DERIVED from what resolved, and a label contradicting a supplied id is
+refused while an **echo** is accepted so a round-trip form keeps working (F2-231/F2-234).
+
+⚠⚠ **MY OWN GATE HAD TWO REAL HOLES AND ONLY THE MUTATION HARNESS SAW THEM — both are
+failure modes this register already names.** (a) The id-half leg carried a blanket fallback —
+*"if the file calls `directory.requireLabel` anywhere, accept it"* — written because
+`EthicsCaseService` assigns the resolved id to a local first. Deleting `c.setInvestigatorId(userId)`
+**SURVIVED**, because the file still holds `c.setInvestigatorId(null)` in the no-assignee branch
+*and* still calls `requireLabel`, so the presence check and the fallback were both satisfied by
+something that was not the claim. F2-217's failure mode, inside the leg written to be load-bearing.
+(b) `setAnalystName(label != null ? label : derived)` **SURVIVED**: the contradiction check is
+case-INSENSITIVE, so the mutation's only observable effect is the **caller's casing** winning over
+the server's — a register whose spelling of a person's name depends on how a caller typed it, which
+is F2-179's collation family at one character's depth. 13/13 after both were closed.
+
+⚠ **The gate's load-bearing assertion is the POSITIVE one** (F2-247): on a path that never
+wrote the field, *"the service does not write X from the request"* is **vacuous** — there is no
+setter for a negative scan to find, so that leg would pass forever over the defect it was written
+for. `theIdHalfIsWrittenEverywhere` asserts the id half **is** written, from the resolver or the
+principal, and that it is not merely *cleared*.
+
+⚠⚠ **A HARD ZERO ON THE OBVIOUS RULE WAS MEASURED AND REJECTED.** *"Nobody may hand-spell
+a tenant-narrowed user load"* returns **25 sites across 9 files**, and most are correct —
+`UserService` resolving its own aggregate, `WorkflowRequestService`'s recipient reach. Measuring
+before writing the assertion is the only reason that did not ship as a gate failing on working code.
+
+⚠ **F2-244's gate then went red on correct code, and the response matters.**
+`CoiUserReferenceResolutionContractTest` asserted the tenant filter inside `CoiService`'s own
+`requireOwnUser` body; the predicate had moved into the shared primitive. The claim is unchanged and
+still true, so the leg now **follows the delegation** — and, because the predicate is split across
+the primitive's `resolve` (tenant) and `require` (refusal), each half is asserted where it actually
+lives. 🔑 **Deleting or relaxing the assertion always passes and proves nothing** (F2-206/F2-235).
+
+⚠ **Nineteen existing tests failed on `directory is null`**, and the fix was a **real**
+`TenantUserDirectory` over each test's mocked repository, never a mock of it: a mocked resolver
+returns empty and every refusal leg would go green asserting nothing (F2-237, F2-246's precedent).
+
+⚙ **No picker was built, deliberately.** `/api/v1/committees/registry/linkable-users` is
+guarded `ADMIN:WRITE` and the AML operator holds `COMPLIANCE:WRITE`, so a picker there would **403
+on open** — offering an affordance the caller cannot use is F2-246's own browser finding. The id
+path stays on the wire and the gap is filed. The register now shows the analyst in three states
+(F2-209): a resolved person; a label with an announced `role="status"` *unlinked* badge and a
+bilingual hint on `title` **and** `aria-label`; or an em-dash.
+
+⚠ **A probe leg of mine failed for a reason unrelated to its claim.** The investigator id-path
+leg re-used the case the label leg had just moved to `INVESTIGATION`, and the machine has no
+`INVESTIGATION -> INVESTIGATION` edge — so the 400 read exactly like the fix refusing a valid id.
+Fixed by planting a second and third case. F2-244's rule, and it cost one iteration.
+
+⚙ **Verification.** Pre-fix probe **10/10**, post-fix **20/20** against planted rows including a
+planted organisation-2 user (F2-206 — never a seeded governance row); pre-fix detector control
+**14/14 discriminating, 0 silent** against `git show master:`; mutation **13 killed / 0 survived /
+0 anchor-miss**; suite **4,259/0/0** (up 15); FE **805/805**; `npx tsc --noEmit` clean. Seeded
+registers unchanged. **No migration — V379 remains head, next free V380.**
+
+⚙ **Filed:**
+- **The 33 remaining census members** (38 minus the 5 closed here), no verdicts (F2-188). The
+  classification stands: the **person-reference** family is now largely closed, so what remains is
+  weighted toward **register references** — `cyber.vulnerabilities :: asset_id`,
+  `cyber.cyber_incidents :: affected_asset_id`, `socops.*_id`, `bcm.dr_plans`.
+- **`evidence.evidence_items :: collector_id + collector_name` has no writer of either half** —
+  77 of 78 rows populated by the seed, 0 dangling, so it is honest data behind no code at all
+  (F2-247's shape). It is latent and cannot regress; it also cannot be maintained.
+- **No user-listing endpoint is reachable by `COMPLIANCE:WRITE`**, so neither the AML nor the ethics
+  register can offer a picker. A `LinkableUser`-shaped projection behind a lighter guard would close
+  the id path on both screens at once — an owner decision about who may enumerate colleagues.
+- **The unresolvable live labels** — 3 AML analysts, 14 investigators, `'Khalid Al-Mutairi'` on the
+  BCM attestations — repair means deciding per row which real person an office label meant, in two
+  databases, with no mapping. **Owner decision** (F2-183/F2-196's rule).
+- **`ethics.cases.investigator_name` has no `*_ar`**, so an investigator is English-only on an
+  Arabic-primary UI (house rule 7); and `ethics.aml_alerts.analyst_name` likewise.
+
 ## F2-248 · Two agent nouns the risk ranking could not spell
 
 | | |

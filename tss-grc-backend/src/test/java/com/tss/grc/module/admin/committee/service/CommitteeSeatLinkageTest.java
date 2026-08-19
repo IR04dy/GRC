@@ -112,6 +112,11 @@ class CommitteeSeatLinkageTest {
     @BeforeEach
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
+        // F2-249 — a REAL TenantUserDirectory over the mocked repository, never a mock of it.
+        // F2-237: a mocked resolver returns empty, so every refusal this service performs
+        // would go green asserting nothing. The primitive is pure logic over the repository.
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "directory",
+                new com.tss.grc.module.iam.service.TenantUserDirectory(users));
         service.setClock(Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
         seat = term(TERM, "CCO", "Chair", (short) 1);

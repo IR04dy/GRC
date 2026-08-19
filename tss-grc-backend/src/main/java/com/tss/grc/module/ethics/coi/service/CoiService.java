@@ -20,6 +20,7 @@ import com.tss.grc.module.ethics.coi.repository.CoiDisclosedItemRepository;
 import com.tss.grc.module.ethics.coi.repository.CoiRecusalEventRepository;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -114,6 +115,8 @@ public class CoiService {
      * {@code platform | integrations | dashboard}. Checked against the ratchet, not assumed.
      */
     private final UserRepository users;
+    /** F2-249 — the one place a person reference is resolved against this tenant. */
+    private final TenantUserDirectory directory;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
 
@@ -296,17 +299,15 @@ public class CoiService {
      * neither a nullable id nor a name column, so recording an external director's recusal
      * truthfully needs a schema and form change. Filed as an owner decision rather than guessed
      * at here.
+     *
+     * <p>⚙ F2-249 — the predicate itself now lives in {@link TenantUserDirectory}. It was one of
+     * four hand-written copies, and two of them disagreed on whether a blank {@code full_name_en}
+     * falls back to the username; F2-190's rule is never to keep a second mechanism beside an
+     * existing one. Everything above this line is still the reason THIS register requires a
+     * resolvable user, which is a per-column decision the primitive deliberately does not make.
      */
     private User requireOwnUser(Long userId, String what) {
-        Long org = org();
-        return users.findById(userId)
-                .filter(u -> org.equals(u.getOrganisationId()))
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "User " + userId + " is not an active user in this organisation, so "
-                      + what + " cannot be recorded against them. Recording a governance "
-                      + "record against a user id that resolves to nobody leaves it attributable "
-                      + "to nobody."));
+        return directory.require(userId, what);
     }
 
     private static boolean hasAnyAuthority(String... authorities) {

@@ -310,34 +310,97 @@ class ParentIdentityCopyContractTest {
      * (F2-228) — and every one is asserted to still be a member the scan finds, so a reason cannot
      * outlive its subject (F2-199's reverse direction).
      */
-    private static final Map<String, String> CLOSED = new TreeMap<>(Map.of(
+    private static final Map<String, String> CLOSED = new TreeMap<>(Map.ofEntries(Map.entry(
             "risk.scenarios :: risk_id + risk_code, risk_title_en",
             "CLOSED by F2-245 — applyParentRisk is the only writer of all three columns: the id is "
           + "resolved in-tenant and both identity copies are DERIVED from the row it names, or all "
-          + "three are cleared together when there is no parent.",
+          + "three are cleared together when there is no parent."),
 
+            Map.entry(
             "scm.exit_plans :: vendor_id + vendor_name",
             "CLOSED by F2-246 — VendorReferenceResolver owns the pair; the create form picks the "
-          + "vendor from the register and sends the id, and the label is derived from what resolved.",
+          + "vendor from the register and sends the id, and the label is derived from what resolved."),
 
+            Map.entry(
             "scm.alternate_suppliers :: primary_vendor_id + primary_vendor_name",
             "CLOSED by F2-246 — same resolver. Note the schema settles which half is meant to "
           + "resolve: the SUBJECT vendor has an id column, and alternate_vendor_name has none "
-          + "anywhere, so a replacement supplier is deliberately free text.",
+          + "anywhere, so a replacement supplier is deliberately free text."),
 
+            Map.entry(
             "scm.supplier_resilience_tests :: vendor_id + vendor_name",
             "CLOSED by F2-246 — same resolver, and the register's coverage query joins on this id, "
-          + "which is why 8 of 11 unlinked rows could not answer 'which vendors have been tested'.",
+          + "which is why 8 of 11 unlinked rows could not answer 'which vendors have been tested'."),
 
+            Map.entry(
             "scm.fourth_party_exposures :: primary_vendor_id + primary_vendor_name",
             "CLOSED by F2-246 — same resolver, plus the one UPDATE that writes a vendor label now "
-          + "accepts an echo and refuses a change, so an update cannot re-open what the create shut.",
+          + "accepts an echo and refuses a change, so an update cannot re-open what the create shut."),
 
+            Map.entry(
             "tprm.third_party_cyber_assessments :: vendor_id + vendor_name",
             "CLOSED by F2-247 — a SECOND resolver, over tprm.vendors, because ADR-012/018 keep the "
           + "two modules' internals apart and this register's parent is a different table. "
           + "TprmService.getVendor now delegates to it, so the module has one tenant predicate "
-          + "rather than two copies nobody was comparing."
+          + "rather than two copies nobody was comparing."),
+
+            // ── F2-249: the same shape where the referenced parent is a PERSON ──────────
+            //
+            // Five registers declared a nullable user id beside a name column and wrote only the
+            // name. Two symptoms, and which one you get depends on where the label came from:
+            // caller free text (ethics) stored a CLAIM, the acting principal (bcm) stored an
+            // honest string nothing could join. Both are the absence of the resolvable half.
+            Map.entry(
+            "ethics.aml_alerts :: analyst_id + analyst_name",
+            "CLOSED by F2-249 — the assignment now goes through TenantUserDirectory: an "
+          + "analystUserId is resolved against the caller's own tenant and the label is DERIVED "
+          + "from what resolved, so no caller can produce a row whose two halves name different "
+          + "people. A bare label is still legal (live rows assign to 'Financial Crime Unit') and "
+          + "is recorded with a NULL id, which the register discloses as unlinked."),
+
+            Map.entry(
+            "ethics.cases :: investigator_id + investigator_name",
+            "CLOSED by F2-249 — same resolver, on the INVESTIGATION transition. The label stays "
+          + "legal here for a stronger reason than convenience: 'External Investigator' and "
+          + "'Forensic Accountant' are deliberately outside the platform, so requiring a "
+          + "resolvable user would refuse exactly the cases where independence matters most "
+          + "(F2-246's rule — a nullable id beside a name column is the schema saying so)."),
+
+            Map.entry(
+            "bcm.plan_review_attestations :: attested_by_id + attested_by_name",
+            "CLOSED by F2-249 — the label was always the acting principal, so nothing forgeable "
+          + "ever reached it, but the id had NO writer at all: NULL on 5 of 5 live rows in both "
+          + "databases, one of them naming an officer who resolves to nobody. Both halves now come "
+          + "from CurrentActor, and the 'system' placeholder default is gone (F2-236)."),
+
+            Map.entry(
+            "bcm.bcp_plans :: last_attested_by_id + last_attested_by_name",
+            "CLOSED by F2-249 — the parent plan's pair is DERIVED from the attestation row just "
+          + "written, both halves together, so the plan can never disagree with its own most "
+          + "recent attestation. The label half already worked that way; only the id was missing, "
+          + "which is what made the divergence invisible."),
+
+            Map.entry(
+            "bcm.plan_acknowledgements :: distributed_by_id + distributed_by_name",
+            "CLOSED by F2-249 — same shape, same fix: distributed_by_id was NULL on 8 of 8 live "
+          + "rows because nothing wrote it, so an ISO 22301 distribution record could not answer "
+          + "'who sent this version out' from the roster. Both halves from CurrentActor now."),
+
+            Map.entry(
+            "platform.signatures :: signer_id + signer_name",
+            "CLOSED by F2-249 (REFUTED as a defect, and it is the platform's EXEMPLAR of this "
+          + "shape) — signer_id has always come from @AuthenticationPrincipal and signer_name has "
+          + "always been DERIVED from the row that id names. Two things changed and neither alters "
+          + "behaviour: the label spelling moved into TenantUserDirectory rather than being a "
+          + "fourth hand-written copy, and the lookup is now tenant-scoped rather than relying on "
+          + "its call sites for that (F2-182)."),
+
+            Map.entry(
+            "privacy.dpia_review :: reviewer_id + reviewer_name",
+            "CLOSED by F2-249 (REFUTED — already correct) — DpiaService.addReview stamps both "
+          + "halves from CurrentActor. The 6 live rows carrying a reviewer_name with a NULL "
+          + "reviewer_id predate that fix and are seed-origin; the writer is closed, so the "
+          + "register cannot gain another unlinkable row. Verified by reading, not assumed.")
     ));
 
     @Test

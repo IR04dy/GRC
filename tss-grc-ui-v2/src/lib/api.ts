@@ -547,6 +547,12 @@ export interface AmlAlertDto {
   firstDetectedAt?: string;
   status: string;
   analystName?: string;
+  /**
+   * F2-249 — the resolvable half of the analyst reference. NULL means the assignment names a
+   * team or an external party rather than a platform user, and the register discloses that
+   * rather than presenting a label as if it were a person.
+   */
+  analystId?: number;
   slaDueAt?: string;
   disposition?: string;
   dispositionNotes?: string;
@@ -565,6 +571,18 @@ export interface AmlAnalyticsDto {
   openAlerts: number;
   strFiled: number;
 }
+/**
+ * F2-249 — who an AML alert is being assigned to. Mirrors the server's `AssignAnalystRequest`.
+ *
+ * The two are not interchangeable: an id names a platform user and the server derives the label
+ * from it; a name records an assignment to a team or an external party and leaves the id NULL, so
+ * the register can tell the two kinds apart instead of presenting both as a person.
+ */
+export interface AssignAnalystDto {
+  analystUserId?: number;
+  analystName?: string;
+}
+
 export const amlAlertApi = {
   list: (qs: { status?: string; type?: string; severity?: string; page?: number; size?: number } = {}) => {
     const p = new URLSearchParams();
@@ -579,7 +597,13 @@ export const amlAlertApi = {
   create:     (body: Partial<AmlAlertDto>) => api.post<AmlAlertDto>('/api/v1/ethics/aml-alerts', body),
   update:     (id: number, body: Partial<AmlAlertDto>) => api.put<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}`, body),
   remove:     (id: number) => api.delete<void>(`/api/v1/ethics/aml-alerts/${id}`),
-  assign:     (id: number, analystName: string) => api.post<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}/assign`, { analystName }),
+  /**
+   * F2-249 — exactly one of the two. `analystUserId` is a platform user, which the server
+   * resolves in-tenant and whose label it then DERIVES; `analystName` records an assignment to a
+   * team or an external party and leaves the id NULL. Sending a name that contradicts a supplied
+   * id is refused, so the row can never describe two different assignees.
+   */
+  assign:     (id: number, body: AssignAnalystDto) => api.post<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}/assign`, body),
   transition: (id: number, body: Record<string, unknown>) => api.post<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}/transition`, body),
   analytics:  () => api.get<AmlAnalyticsDto>('/api/v1/ethics/aml-alerts/analytics'),
 };

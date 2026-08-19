@@ -1,8 +1,7 @@
 package com.tss.grc.module.signature.service;
 
 import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.module.iam.entity.User;
-import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import com.tss.grc.module.signature.dto.SignatureResponse;
 import com.tss.grc.module.signature.entity.Signature;
 import com.tss.grc.module.signature.repository.SignatureRepository;
@@ -25,7 +24,7 @@ public class SignatureService {
         Set.of("APPROVE", "REVIEW", "ACKNOWLEDGE", "ATTEST", "REJECT");
 
     private final SignatureRepository repository;
-    private final UserRepository userRepository;
+    private final TenantUserDirectory directory;
 
     @Transactional(readOnly = true)
     public List<SignatureResponse> list(String entityType, Long entityId) {
@@ -56,11 +55,21 @@ public class SignatureService {
         return toResponse(repository.save(s));
     }
 
+    /**
+     * F2-249 — this register is the platform's <b>exemplar</b> of the (id + identity copy) shape:
+     * {@code signer_id} comes from the authenticated principal and {@code signer_name} has always
+     * been DERIVED from the row that id names, so the two halves cannot disagree. Four other
+     * registers declared the same pair and wrote only the label.
+     *
+     * <p>Two things changed here and neither alters behaviour for a well-formed call. The label
+     * spelling now comes from {@link TenantUserDirectory#labelFor} rather than being the fourth
+     * hand-written copy of it. And the lookup is <b>tenant-scoped</b>: the id has always come from
+     * the principal, so a cross-tenant resolution was never reachable — but that was a fact about
+     * the call sites rather than a property of this method (F2-182), and
+     * {@code CommitteeService.approveMinutes} passes its own {@code approverId} in as a scalar.
+     */
     private String resolveSignerName(Long userId) {
-        if (userId == null) return null;
-        User u = userRepository.findById(userId).orElse(null);
-        if (u == null) return null;
-        return u.getFullNameEn() != null && !u.getFullNameEn().isBlank() ? u.getFullNameEn() : u.getUsername();
+        return directory.resolve(userId).map(directory::labelFor).orElse(null);
     }
 
     /** First ROLE_ authority of the current principal, prefix stripped. */

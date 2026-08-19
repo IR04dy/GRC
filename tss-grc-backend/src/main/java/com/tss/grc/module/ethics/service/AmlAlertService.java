@@ -2,8 +2,10 @@ package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ethics.dto.AssignAnalystRequest;
 import com.tss.grc.module.ethics.entity.AmlAlert;
 import com.tss.grc.module.ethics.repository.AmlAlertRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ public class AmlAlertService {
     );
 
     private final AmlAlertRepository repo;
+    private final TenantUserDirectory directory;
 
     @Transactional(readOnly = true)
     public Page<AmlAlert> list(String status, String type, String severity, Pageable pageable) {
@@ -65,10 +68,53 @@ public class AmlAlertService {
         repo.save(a);
     }
 
+    /**
+     * F2-249 — assign the alert to an analyst, and make the two halves of that assignment agree.
+     *
+     * <p>{@code ethics.aml_alerts} declares {@code analyst_id} beside {@code analyst_name}. Before
+     * this, only the label was ever written — from {@code body.get("analystName")}, which the
+     * frontend collected through a {@code window.prompt} — so {@code analyst_id} was NULL on
+     * <b>10 of 10</b> live rows in dev and prod and <b>0 of 3</b> stored labels resolved to any
+     * real user. Probed live as {@code auditor}: an alert moved {@code OPEN -> INVESTIGATING}
+     * naming an analyst who does not exist, at HTTP 200.
+     *
+     * <p>🔑 {@code decidedByName} twenty lines below has taken the acting principal from
+     * {@link CurrentActor} since F2-223. <b>That is why this looked covered</b> — F2-215's
+     * two-of-N, inside one service, and on the same screen: F2-223 deleted this page's
+     * {@code amlDecidedByPrompt} and left the {@code amlAssignPrompt} beside it.
+     *
+     * <p>⚠ A free-text label is still accepted, because the schema says an unresolvable assignee
+     * is representable and live rows use it for a <em>team</em> ({@code 'Financial Crime Unit'}).
+     * Refusing it would be a fix that fails on correct usage (F2-214). What changed is that a
+     * caller can no longer produce a row that <b>looks</b> linked: an id is resolved in-tenant and
+     * the label is derived from what resolved, so the register can tell an assignment to a named
+     * person from an assignment to a function — and it discloses which.
+     */
     @Transactional
-    public AmlAlert assign(Long id, String analystName) {
+    public AmlAlert assign(Long id, AssignAnalystRequest req) {
         AmlAlert a = require(id);
-        a.setAnalystName(analystName);
+        boolean hasId = req != null && req.analystUserId() != null;
+        String label = req == null ? null : blank(req.analystName());
+        if (!hasId && label == null)
+            throw new IllegalArgumentException(
+                "An assignment needs an assignee: send analystUserId for a platform user, or "
+              + "analystName for a team or external party.");
+
+        if (hasId) {
+            String derived = directory.requireLabel(req.analystUserId(), "an AML analyst assignment");
+            // An echo of the derived label is fine; a label that says something else is not,
+            // because the row would then assert two different assignees (F2-231/F2-234).
+            if (label != null && !label.equalsIgnoreCase(derived))
+                throw new IllegalArgumentException(
+                    "analystName '" + label + "' does not name user " + req.analystUserId()
+                  + " ('" + derived + "'). Send the id alone and the register will name them, or "
+                  + "send the name alone to record an assignment to a team.");
+            a.setAnalystId(req.analystUserId());
+            a.setAnalystName(derived);
+        } else {
+            a.setAnalystId(null);
+            a.setAnalystName(label);
+        }
         if ("OPEN".equals(a.getStatus())) a.setStatus("INVESTIGATING");
         return repo.save(a);
     }
