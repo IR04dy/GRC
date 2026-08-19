@@ -61,6 +61,18 @@ public class EvidenceItem extends BaseEntity {
     @Column(name = "valid_to")
     private LocalDate validTo;
 
+    /**
+     * The one status that means "an independent reviewer accepted this as evidence".
+     *
+     * <p>F2-243 — named because two artefacts have to agree on it: this entity's own
+     * {@link #isUsableAsEvidence} predicate and {@code findApprovedExpiredAllOrgs}, the nightly
+     * auto-expiry query that flips APPROVED → EXPIRED once {@code validTo} has passed. A JPQL
+     * {@code @Query} takes a compile-time constant, so the two cannot be literally the same
+     * expression; {@code Rule2EvidenceResolutionContractTest} compares them by reflection instead,
+     * which is what stops them drifting.
+     */
+    public static final String APPROVED = "APPROVED";
+
     @Column(name = "status", nullable = false, length = 30)
     private String status = "DRAFT";
 
@@ -135,4 +147,25 @@ public class EvidenceItem extends BaseEntity {
 
     @Column(name = "chain_first_break_version")
     private Integer chainFirstBreakVersion;
+
+    /**
+     * F2-243 — may this item discharge another module's "attach evidence" requirement, as at
+     * {@code on}?
+     *
+     * <p>It lives here, on the entity that owns the column, so the vocabulary never crosses a
+     * module boundary: a caller that cannot name a status cannot invent its own idea of what
+     * counts as evidence (F2-196's rule). Two conditions, and both are the ones the module already
+     * uses itself — {@link #APPROVED}, and not past {@code validTo}. The date is checked as well as
+     * the status because the APPROVED → EXPIRED flip is done by a nightly scheduler, so between
+     * lapse and sweep an item reads APPROVED while its validity has gone.
+     *
+     * <p>⚠ This is deliberately an inclusion of exactly one state rather than an exclusion list.
+     * {@code evidence_items.status} has no CHECK constraint and holds five values today
+     * (APPROVED 27, EXPIRED 31, PENDING_REVIEW 15, DRAFT 4, REJECTED 1 — identical in dev and
+     * prod); an exclusion list would silently admit every token nobody remembered, which for a
+     * four-eyes gate is the unsafe direction (F2-196).
+     */
+    public boolean isUsableAsEvidence(LocalDate on) {
+        return APPROVED.equals(status) && (validTo == null || !validTo.isBefore(on));
+    }
 }

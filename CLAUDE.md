@@ -1872,6 +1872,95 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A FOUR-EYES GATE THAT CONSUMES A FOREIGN KEY MUST *RESOLVE* IT — A PRESENCE TEST ON
+  AN ID IS NOT A CHECK ON THE THING IT NAMES** (F2-243, measured 2026-08-19). CLAUDE.md lists
+  *"GHG verify needs evidence"* among the platform's server-enforced four-eyes gates.
+  `GhgEmissionRecordService.transition` asked `cur.getEvidenceItemId() == null`, so it was
+  discharged by any non-null number the foreign key would accept. Probed live as `so_officer`
+  (SUST WRITE) against records the probe planted: a GHG figure citing the register's one
+  **REJECTED** evidence item verified with **HTTP 200** and stored `verified = true`, and so did
+  one citing an **EXPIRED** item. Measured dev = prod, `evidence.evidence_items` holds EXPIRED 31 /
+  APPROVED 27 / PENDING_REVIEW 15 / DRAFT 4 / REJECTED 1 — **51 of 78 are not APPROVED** — so the
+  gate built to consume the evidence module's four-eyes review and its nightly staleness sweep was
+  discharged by their **rejected output**, on an ISAE 3410 assurance input. 🔑 **No second
+  tenant is needed, which is what makes this live rather than latent.**
+  ⚠ `FK_ghg_evidence_item` DOES exist, so the comment calling it *"a real evidence-item FK"* is
+  true (verified, not assumed — F2-227): a *nonexistent* id is refused by the database and every
+  other number is accepted. **The constraint that looks like it protects the reference protects only
+  its existence.**
+  🔑🔑 **THE REUSABLE RULE: THE TENANT IS VERIFIED WHERE THE REFERENCE IS *STORED*
+  (F2-242's discriminator) AND THE STATE WHERE IT IS *CONSUMED*** — because an item can be approved
+  on the day it is attached and expired by the time somebody verifies against it. That division is
+  why the fix is in two places, and it is the general answer for any gate whose input is an FK.
+  ⚠⚠ **The asymmetry sat inside one method, three lines apart.** `update` wrote two
+  caller-supplied foreign keys: `emissionFactorId` is resolved by `applyDerivation` with
+  `findByIdAndOrganisationId` **and a hard throw**; `evidenceItemId` was stored raw. 🔑 **The
+  reference feeding a NUMBER was verified and the one discharging a CONTROL was not** — F2-215's
+  two-of-N at its shortest range yet.
+  ⚠⚠ **TWO WRITERS OF ONE FK COLUMN, AND ONLY ONE OF THEM IS THE BRIDGE.**
+  `SustEvidenceLinkService.link()` (the declared S-C path) resolves the item in-tenant, records a
+  generic `EvidenceLink` **so `buildPackage()` can bundle the file and its SHA-256 for an assurer**,
+  and writes a LINK_EVIDENCE audit row. `update` did none of the three, so a record could be VERIFIED
+  citing an item **the ISAE 3410 evidence package would not contain** — F2-188/F2-189/F2-191's shape
+  in the evidence fabric: the duplicate agrees on the column and differs on the parts nothing
+  asserts. Closed structurally: the bridge is the single writer, and the entity-bound PUT accepts an
+  **echo** and refuses a **change** (F2-231/F2-234 — a round-trip PUT must keep working).
+  ⚠ **Put the predicate in the module that owns the vocabulary** (F2-196): `EvidenceItem.APPROVED`
+  + `EvidenceItemRepository.findUsableAsEvidence`, an **inclusion of exactly one state**, because
+  that column has no CHECK and an exclusion list silently admits every token nobody remembered — for
+  a four-eyes gate, the unsafe direction. No new module edge: `sust → evidence` already existed
+  through the bridge, and `ModuleGraphRatchetTest` is unmoved.
+  ⚠⚠ **MY OWN DIAGNOSTIC CITED A ROUTE THAT DOES NOT EXIST, AND THE GATE COULD NOT TELL.**
+  The refusal named `/api/sustainability/evidence/link`; the bridge is mapped at
+  `/api/sustainability/evidence-links`. **The live probe found it by receiving 400 from the very path
+  the error message had told it to use** — the gate asserted the path as a *literal*, and a
+  literal-matching check cannot resolve a route. 🔑 **A diagnostic whose only job is to send
+  the caller somewhere is worthless if the somewhere is invented** (the guessed-path error recorded
+  since F2-198, now inside a fix's own error text). Make it **one constant** read by the
+  `@RequestMapping` and by the citation, and assert the citation against the constant — never a
+  typed-out copy.
+  ⚠⚠ **F2-242's 7-site residue: ALL SEVEN REFUTED, because the detector looks for ONE
+  spelling of the predicate and this tree verifies a reference in at least FOUR ways** — a
+  tenant-scoped finder, a helper resolving the *parent*, an org-scoped native query (so the id is not
+  caller data at all), and a **recipient identity**, which is narrower than the tenant.
+  🔑 **A detector reporting zero defects over its own population is a statement about the
+  detector, not about the code**, so the count can never be the assertion (F2-234): demand a verdict
+  per site, and a reverse leg requiring every verdict to still name a site the scan finds.
+  ⚠ **And the PLURAL form was outside that gate by construction**: its pattern is singular, so a
+  caller-supplied id LIST was invisible. 9 receivers call `findAllById` on a tenant-bearing entity;
+  the exemplar for doing it right is already in the tree — `PolicyManagementService#setControlLinks`
+  filters every returned row on the tenant before using it. The one filed member is
+  `UserService#assignRolesByNameOrId`, whose `roleNames` branch resolves through
+  `findByOrganisationIdOrOrganisationIdIsNull(orgId)` and whose `roleIds` branch is a bare
+  `findAllById(roleIds)` — latent, since all 69 active roles are `organisation_id IS NULL` and both
+  write routes are PLATFORM_ADMIN-only. ⚠ `createIn`'s javadoc explains why role resolution is
+  tenant-correct and describes the `roleNames` branch **only**: F2-215's two-of-N, in the comment a
+  reader consults first.
+  ⚠ **My Python locator found 6 of those 9 — third consecutive slice where the throwaway
+  undercounts the shipped gate** (F2-213: 5 vs 9; F2-214: 3 vs 11). *Write the sweep as the gate,
+  over the same tree, in the same language.* ⚠ And a stripper that blanks comments with spaces
+  preserves byte offsets and **destroys line numbers** — every newline inside a block comment
+  vanishes, so every site after the first one is attributed to the wrong line, and a wrong line
+  number sends the reader to unrelated code, which reads exactly like a false finding.
+  ⚠⚠ **A HARNESS THAT DETECTS A KILL WITH `"Failures: 0, Errors: 0" not in out` IS WRONG THE
+  MOMENT IT RUNS TWO TEST CLASSES** — the *passing* class prints that line, so a real failure in the
+  other reads as SURVIVED, and one mutation was reported as a gate hole when the gate had killed it.
+  F2-194's substring-satisfied-by-something-else, in the instrument rather than the gate. Maven prints
+  exactly one BUILD verdict; use that.
+  ⚠ **An existing test asserted the defect as correct IN ITS NAME** —
+  `verify_acceptsWhenEvidenceItemIdPresent_evenIfRefBlank`, i.e. that *presence* of the id suffices.
+  The Nth instance (F2-159, F2-175, F2-227, F2-234, F2-236). Repurposed, not deleted.
+  ⚙ **Filed:** the **26-site store-side work list** (a create or update writing a caller-supplied
+  FK whose target carries `organisation_id`, no tenant predicate in the method) with deliberately no
+  verdicts — sharpest unread `CoiService#recordRecusal::userId`,
+  `AuditEngagementService#create::annualPlanId`, `DpiaService#update::processingActivityId`;
+  **`module/scm/resilience`**, where `ExitPlanService#create` and
+  `SupplierResilienceTestService#create` store a caller-supplied `vendorId` unverified **in the very
+  module F2-242 swept**, and `scm.exit_plans` / `scm.supplier_resilience_tests` have **no FOREIGN KEY
+  on `vendor_id` at all**, so an *absent* id is storable too; **4 GHG rows are VERIFIED/APPROVED with
+  no evidence of either kind**, carrying `verification_date = 2027-09-30` — a future date, dev = prod,
+  seed-origin, so repair is an owner decision; and the structural root, a `@TenantOwned`-style
+  binding, unchanged from F2-242.
 - ⚠⚠ **AN UNVERIFIED FOREIGN KEY IS A CROSS-TENANT WRITE WAITING FOR THE ROW THAT
   DEREFERENCES IT, AND THE PLATFORM-WIDE BACKSTOP GUARDS THE TENANT *COLUMN* RATHER THAN THE
   TENANT *ROW*** (F2-242, measured 2026-08-19). `ScmService#startOnboarding` stored a

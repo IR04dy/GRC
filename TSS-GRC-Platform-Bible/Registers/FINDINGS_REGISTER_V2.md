@@ -2547,6 +2547,213 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-243 · A four-eyes gate that consumes a foreign key must RESOLVE it — the platform's own "GHG verify needs evidence" control was discharged by any non-null number
+
+|  |  |
+|---|---|
+| **ID** | F2-243 |
+| **Title** | Rule 2 asked `cur.getEvidenceItemId() == null`, so a GHG emission record could be marked VERIFIED citing the register's one REJECTED evidence item, or any of the 31 EXPIRED ones — the gate built to consume the evidence module's four-eyes review and its nightly staleness sweep was discharged by their rejected output, on an ISAE 3410 assurance input |
+| **Severity** | 🟠 P2 (a documented four-eyes control bypassable by any `SUST:WRITE` holder through the register's own routes, needing no second tenant; latent in the data — 0 of 18 live rows cite an evidence item — and demonstrated live against records the probe planted) |
+| **Status** | 🟢 CLOSED 2026-08-19 |
+| **Programme** | Platform Bible F2 · control integrity / tenant isolation |
+| **Modules** | `sust/ghg` (Rule 2 + the store side), `evidence` (the vocabulary and the resolving predicate), `sust/evidence` (the bridge's route as a constant); 2 gates widened or added; 5 behaviour tests; F2-242's 7-site residue adjudicated to zero |
+
+### The filing that started it, and what re-deriving it found
+
+F2-242 filed a **7-site load-then-write-later residue**, printed and deliberately unverdicted.
+Read, **all seven are REFUTED** — the reference is verified at every one. They were invisible to
+that gate's residue leg because it looks for **one spelling** of the predicate,
+`<var>.getOrganisationId()` on the loaded variable, and this tree verifies a reference in at least
+four different ways:
+
+| site | mechanism the detector could not see |
+|---|---|
+| `OutsourcingService:372/429` | a tenant-scoped **finder** (`findByOrganisationIdAndId`) on both the create and the load |
+| `TprmService:172/211` | a helper resolving the **parent** (`getVendor`, which filters and throws) |
+| `RiskTreatmentService:66` | a helper resolving the **parent risk** (`ensureRiskInTenant`, 404 not 400 so ids cannot be enumerated) |
+| `AccessGovernanceService:94` | the id **is not caller data** — it comes from an org-scoped native query |
+| `NotificationService:271` | scoped by **recipient identity**, which is narrower than the tenant |
+
+🔑 **A detector reporting zero defects over its own population is a statement about the
+detector, not about the code.** So the count is no longer the assertion (F2-234): the residue leg now
+demands a **verdict per site**, and a reverse leg requires every verdict to still name a site the scan
+finds — without which a detector that stopped matching would report success on every site at once.
+
+### The defect the re-derivation found, one question further on
+
+F2-242's discriminator is *was the reference verified when it was **stored**?* Measuring that on the
+**store** side platform-wide — 37 caller-supplied FK stores whose target carries `organisation_id`,
+31 in a method with no tenant predicate — led to `GhgEmissionRecordService`, where CLAUDE.md's own
+list of server-enforced four-eyes gates includes *"GHG verify needs evidence"*:
+
+```java
+if ("VERIFIED".equals(to)
+        && cur.getEvidenceItemId() == null
+        && (cur.getEvidenceRef() == null || cur.getEvidenceRef().isBlank())) throw …
+```
+
+**A presence test on an id is not a check on the thing it names.** `FK_ghg_evidence_item` exists, so
+a *nonexistent* id is refused by the database — the comment calling it *"a real evidence-item FK
+(S-C)"* is **true**, verified rather than assumed (F2-227). Every **other** number the caller can send
+is one the gate accepts.
+
+Measured, identical in dev and prod: `evidence.evidence_items` holds **EXPIRED 31 · APPROVED 27 ·
+PENDING_REVIEW 15 · DRAFT 4 · REJECTED 1** — **51 of 78 are not APPROVED**. Probed live as
+`so_officer` (SUSTAINABILITY_OFFICER, holding SUST WRITE; `admin` proves nothing about
+authorization) against GHG records the probe planted itself (F2-206 — the register's 18 live rows
+were never touched):
+
+* citing the one **REJECTED** item → **HTTP 200**, stored `status = VERIFIED, verified = true`
+* citing an **EXPIRED** item → **HTTP 200**, same
+* citing an **organisation-2** item → stored on an organisation-1 record
+* **10/10 legs on master**, including the controls that the gate does refuse a null and that an
+  APPROVED in-date item verifies
+
+🔑 **No second tenant is needed**, which is what makes this live rather than latent: the
+evidence module's four-eyes review (`EvidenceReviewService`) and its nightly APPROVED→EXPIRED sweep
+both exist to decide whether an item *is* evidence, and the gate consuming their output never asked.
+
+### ⚠⚠ The asymmetry sat inside one method, three lines apart
+
+`update` wrote two caller-supplied foreign keys:
+
+| line | field | what happens to it |
+|---|---|---|
+| 115 | `emissionFactorId` | `applyDerivation` resolves it with `findByIdAndOrganisationId` **and throws** — *"not found in this tenant's factor library"* |
+| 121 | `evidenceItemId` | stored raw |
+
+🔑 **The reference feeding a NUMBER was verified and the one discharging a CONTROL was not.**
+F2-215's two-of-N at its shortest range yet.
+
+### ⚠⚠ Two writers of one FK column, and only one of them is the bridge
+
+`SustEvidenceLinkService.link()` is the declared S-C attachment path. It resolves the item **in the
+caller's tenant**, records a generic `EvidenceLink` **so `buildPackage()` can bundle the file and its
+SHA-256 for an assurer**, and writes a `LINK_EVIDENCE` audit row. `GhgEmissionRecordService.update`
+wrote the same column straight from the request body and did **none of the three** — so a record
+could be VERIFIED citing an item the **ISAE 3410 evidence package would not contain**. That is
+F2-188/F2-189/F2-191's shape, in the evidence fabric rather than a state machine: *the duplicate
+agrees with the original on the part that is easy to check (the column) and differs on the parts
+nothing asserts.*
+
+### 🔑 The reusable rule: two questions, two places
+
+* the **TENANT** is verified where the reference is **STORED** (F2-242's discriminator)
+* the **STATE** is verified where the reference is **CONSUMED** — because an item can be approved on
+  the day it is attached and expired by the time somebody verifies against it
+
+So the store side is closed **structurally**: the bridge is now the single writer, and the
+entity-bound PUT accepts an **echo** of the stored id (a round-trip edit must keep working) and
+refuses a **change**, naming the route that owns it (F2-231/F2-234's echo-versus-change rule). The
+state check lives in Rule 2, at consumption.
+
+The vocabulary stays in `module/evidence` (F2-196's rule: a caller that cannot name an evidence
+status cannot invent its own idea of what counts as evidence) — `EvidenceItem.APPROVED` plus
+`EvidenceItemRepository.findUsableAsEvidence`, an **inclusion of exactly one state** rather than an
+exclusion list, because that column has no CHECK constraint and an exclusion list silently admits
+every token nobody remembered. **No new module edge**: `sust → evidence` already exists through the
+bridge, checked rather than assumed — `ModuleGraphRatchetTest` is unmoved.
+
+### ⚠ What was already closed, and therefore left alone
+
+`POST /api/sustainability/ghg` binds `GhgCreateRequest`, which declares `evidenceRef` and **not**
+`evidenceItemId` — F2-233's fourth and strongest wire-closing mechanism, *a field the bound type
+does not declare can never arrive*. Adding a refusal there would be an **inert construct** (F2-184),
+so the closure is **asserted** instead, and the gate fires if the component is ever added. The legacy
+free-text `evidence_ref` branch is likewise untouched: it is what the five APPROVED rows in both
+databases were verified against (BV and KPMG assurance statements predating the bridge), and
+tightening it would refuse requests that work today for no gain the caller can act on (F2-182).
+
+### ⚠⚠ My own diagnostic cited a route that does not exist
+
+The refusal named `/api/sustainability/evidence/link`. The bridge is mapped at
+`/api/sustainability/evidence-links`. **The live probe found it by receiving 400 from the very path
+the error message had told it to use** — and the gate could not tell, because it asserted the path as
+a **literal**, and a literal-matching check cannot resolve a route. 🔑 **A diagnostic whose only
+job is to send the caller somewhere is worthless if the somewhere is invented**: the guessed-path
+error this programme has recorded since F2-198, arriving inside a fix's own error text. The path is
+now one constant read by the `@RequestMapping` and by the citation, and the unit test asserts against
+the constant rather than a typed-out copy.
+
+### ⚠⚠ The plural form sat outside every leg of F2-242's gate by construction
+
+`(\w+)\s+(\w+)\s*=\s*(\w+)\.findById\(` is **singular**, so a caller-supplied **id LIST** was
+invisible to it. **9 receivers** call `findAllById` on a tenant-bearing entity; 8 refuted (the ids
+come from rows already fetched tenant-scoped, or the row is filtered in the loop), **1 filed** —
+`UserService#assignRolesByNameOrId`, whose `roleNames` branch resolves through
+`findByOrganisationIdOrOrganisationIdIsNull(orgId)` and whose `roleIds` branch is a bare
+`findAllById(roleIds)`. Latent: all 69 active roles in dev (58 in prod) are `organisation_id IS NULL`
+global templates, and both write routes are `hasRole('PLATFORM_ADMIN')`, who is already trans-tenant
+by design. ⚠ `createIn`'s javadoc explains why role resolution is tenant-correct and describes the
+`roleNames` branch **only** — F2-215's two-of-N, in the comment a reader consults first.
+
+⚠ **My Python locator found 6 of those 9.** The Java gate found nine, and the three it missed
+(`CommitteeMemberRegistryService#users`, `EvidenceAdapter#items`,
+`AttackSurfaceFindingService#assetRepo`) are all correctly scoped — `EvidenceAdapter`'s under a
+comment citing **F2-106** for exactly this hazard. **Third consecutive slice where the throwaway
+locator undercounts the shipped gate** (F2-213: 5 vs 9; F2-214: 3 vs 11). *Write the sweep as the
+gate, over the same tree, in the same language.*
+
+### ⚠⚠ An existing test asserted the defect as correct, in its name
+
+`verify_acceptsWhenEvidenceItemIdPresent_evenIfRefBlank` — *"verify accepts when evidenceItemId is
+**present**"* — which is precisely the defect. The Nth instance in this programme (F2-159, F2-175,
+F2-227, F2-234, F2-236), and a test **name** that states the behaviour under review is the strongest
+possible reason not to look further (F2-216). **Repurposed, not deleted**: the half that protects the
+record (a real evidence item discharges Rule 2 with no free-text ref) is kept, and the half that was
+missing is asserted beside it.
+
+### Verification
+
+`Rule2EvidenceResolutionContractTest` **8/8** (including a synthetic self-test driving the detector
+over the literal pre-fix *and* fixed shapes, and a leg resolving the cited route against the
+controller's own mapping) · `UnverifiedForeignKeyWriteContractTest` **10/10** ·
+`GhgEmissionRecordServiceTest` **17 → 21** · module-graph, registry, authorization and
+mass-assignment ratchets **unmoved** · full suite **4,169/0/0** · **pre-fix control**: restoring
+master's sources makes the gate fail naming exactly the two legs, with the second case failing only
+by not compiling — the weaker result, and said so · **mutation harness 13 mutations, 12 killed, 1
+recorded EQUIVALENT** (changing the shared PATH constant moves the route *and* the citation together,
+so the caller is still sent somewhere real — a rename, not a defect; the mutation that tests the real
+claim, hard-coding a path *instead of* citing the constant, is killed by both the gate leg and the
+behaviour test) · live probe **10/10 pre-fix** and **11/11 post-fix** on a restarted backend ·
+registers restored to dev **18** / prod **17** live GHG rows with **0 residual `[REVIEW-TEST]`**.
+
+**No migration. No frontend file touched.** V379 remains the head; next free V380.
+
+⚠ A harness bug worth the words: the first draft detected a kill with
+`"Failures: 0, Errors: 0" not in out`. With two test classes the **passing** class prints that line,
+so a real failure in the other read as SURVIVED — M3 was reported as a gate hole when the gate had
+killed it. F2-194's substring-satisfied-by-something-else, in the harness rather than the gate.
+
+### FILED
+
+* **The store-side work list — 26 unread sites** across 20 services where a create or update writes a
+  caller-supplied foreign key whose target carries `organisation_id`, with no tenant predicate in the
+  method. Deliberately **no verdicts** (F2-188). Sharpest by harm, unread:
+  `CoiService#recordRecusal::userId`, `AuditEngagementService#create::annualPlanId`,
+  `DpiaService#update::processingActivityId`, `TreatmentPlanService#create::riskId`,
+  `RiskScenarioService#create::riskId`, `NdiGapService#updateGap::riskId`,
+  `PolicyManagementService#updateException::riskId`.
+* **`module/scm/resilience` — the module F2-242 swept, one package over.**
+  `ExitPlanService#create` and `SupplierResilienceTestService#create` store a caller-supplied
+  `vendorId` (plus three `linked*Id`s) with no verification, and **`scm.exit_plans` /
+  `scm.supplier_resilience_tests` have NO FOREIGN KEY on `vendor_id` at all**, so an *absent* id is
+  storable too. 13 + 11 live rows, 0 bad today, dev = prod. `vendor_name` is separately
+  caller-supplied and NOT NULL, so the register can contradict itself.
+* **4 GHG rows are VERIFIED/APPROVED with no evidence of either kind** (ids 11, 12, 14 VERIFIED and
+  15 APPROVED), all carrying `verification_date = 2027-09-30` — **a future date** — identical in dev
+  and prod. Rule 2 would refuse all four; they are seed-origin, and repair rewrites live rows in two
+  databases, so it is an **owner decision** (F2-183/F2-196).
+* `UserService#assignRolesByNameOrId`'s `roleIds` branch (above), and `iam.roles` holding one
+  org-scoped row in **both** databases — `REVIEW_TEST_ROLE` (id 56, inactive, soft-deleted), probe
+  residue from an earlier slice.
+* The **structural root**, unchanged from F2-242: a caller-supplied foreign key is representable on
+  every create in the platform, so a `@TenantOwned`-style binding that resolves a reference through
+  the tenant automatically — rather than 200-odd services each remembering — is an **owner
+  decision**.
+
+---
+
 ## F2-242 · An unverified foreign key is a cross-tenant write waiting for the row that dereferences it, and the platform-wide backstop guards the tenant COLUMN rather than the tenant ROW
 
 |  |  |

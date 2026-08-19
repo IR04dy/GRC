@@ -97,6 +97,133 @@ class UnverifiedForeignKeyWriteContractTest {
         + "break login lockout bookkeeping, which is the opposite of a security fix."
     );
 
+    /**
+     * F2-243 — the seven load-then-write-later sites F2-242 measured, printed and filed WITHOUT
+     * verdicts, now <b>read</b>. All seven are refuted: the reference is verified at every one.
+     *
+     * <p>🔑 <b>They were invisible to the residue detector because it looks for ONE spelling of the
+     * predicate — {@code <var>.getOrganisationId()} on the loaded variable — and this tree verifies
+     * a reference in at least four different ways.</b> That is why a detector reporting zero
+     * defects over its own population is a statement about the detector, not about the code, and
+     * why the number below can never be the assertion (F2-234).
+     *
+     * <p>Keyed {@code file#receiver} — the two {@code TprmService} sites and the two
+     * {@code OutsourcingService} sites share a repository and a verdict, so seven sites are five
+     * keys. Enforced in BOTH directions: a fixed site must lose its entry in the same commit, and a
+     * verdict for something the scan no longer finds fails just as loudly (F2-199's direction).
+     */
+    private static final Map<String, String> LOAD_THEN_WRITE_VERDICTS = Map.of(
+        "module/outsourcing/service/OutsourcingService.java#arrangementRepo",
+        "REFUTED — VERIFIED AT STORE, by a tenant-scoped finder. `createReview` and "
+        + "`createExitPlan` both call `loadArrangement(req.arrangementId())`, which is "
+        + "`findByOrganisationIdAndId(org(), id)` and throws, before the id reaches the column; and "
+        + "`transitionReview`/`transitionExitPlan` read that id off a row they loaded with "
+        + "`findByOrganisationIdAndId` themselves. So the id being dereferenced is twice-verified "
+        + "tenant data. This is F2-242's own negative control shape (RiskAcceptanceService).",
+
+        "module/tprm/service/TprmService.java#assessmentRepo",
+        "REFUTED — VERIFIED AT STORE, via the PARENT. `createAssessment` calls "
+        + "`getVendor(req.getVendorId())` (a tenant filter that throws) and stamps the assessment's "
+        + "organisation from the vendor it resolved, and `updateAssessment` writes no vendorId, so "
+        + "assessment.organisationId can never diverge from its vendor's. `updateAssessment` and "
+        + "`deleteAssessment` then guard with `getVendor(existing.getVendorId())` under a "
+        + "SEC-TPRM-001 comment. ⚠ That comment's stated REASON is stale — it says "
+        + "\"VendorAssessment has no organisation_id\" and the entity has declared one since "
+        + "PERF-PG-002 added it as a denormalised tenant anchor. The guard is sound; the "
+        + "justification for its shape is not, which is why the comment is corrected in the same "
+        + "commit rather than left to mislead the next reader (F2-184).",
+
+        "module/risk/service/RiskTreatmentService.java#treatments",
+        "REFUTED — VERIFIED AT STORE, via the PARENT. `create(riskId, req)` calls "
+        + "`ensureRiskInTenant(riskId)` before building the row, and `get`/`update`/`transition`/"
+        + "`delete` each call `ensureRiskInTenant(t.getRiskId())` — a tenant comparison that "
+        + "deliberately throws 404 rather than 400 so ids cannot be enumerated across tenants "
+        + "(SEC-RISK-001). The predicate is on the PARENT risk, not on the treatment, so a scan "
+        + "asking for `t.getOrganisationId()` cannot see it.",
+
+        "module/iam/governance/service/AccessGovernanceService.java#roles",
+        "REFUTED — THE ID IS NOT CALLER DATA. `createRole`'s revive branch loads `retiredId`, which "
+        + "came from `roles.findRetiredRoleId(org, r.roleName())` — a native query whose WHERE "
+        + "clause is `organisation_id = :org AND UPPER(role_name) = UPPER(:name) AND is_deleted = "
+        + "1`. The caller supplies a NAME, never an id, and the tenant is in the query. The native "
+        + "query exists because Role carries @Where(is_deleted = 0), so JPA cannot see the retired "
+        + "row it has to revive.",
+
+        "module/platform/service/NotificationService.java#notificationRepository",
+        "REFUTED — SCOPED BY RECIPIENT, WHICH IS NARROWER THAN THE TENANT. `markAsRead(id, userId)` "
+        + "filters `notif.getRecipientId().equals(userId)`, and its one caller passes "
+        + "`user.getUserId()` from `@AuthenticationPrincipal` — so it is the authenticated reader's "
+        + "own notification or nothing. A recipient belongs to exactly one organisation, so this "
+        + "implies the tenant check rather than omitting it."
+    );
+
+    /**
+     * F2-243 — the PLURAL form, {@code repo.findAllById(<a caller-supplied id list>)}, which the
+     * singular detector cannot express by construction.
+     *
+     * <p>Six sites; five refuted because the ids come from rows the service already fetched
+     * tenant-scoped, and the exemplar for the shape is already in the tree:
+     * {@code PolicyManagementService#setControlLinks} does {@code findAllById(controlIds)} and then
+     * {@code if (orgId.equals(c.getOrganisationId()))} on every row before using it.
+     */
+    private static final Map<String, String> PLURAL_LOAD_VERDICTS = Map.of(
+        "module/iam/service/UserService.java#roleRepository",
+        "FILED, LATENT — `assignRolesByNameOrId` has TWO branches that are not equivalent: the "
+        + "roleNames branch resolves through `findByOrganisationIdOrOrganisationIdIsNull(orgId)`, "
+        + "the roleIds branch is a bare `findAllById(roleIds)` with no tenant predicate. Latent "
+        + "today because all 69 active roles in dev (58 in prod) are `organisation_id IS NULL` "
+        + "global templates, so both branches return the same set; it goes live the moment any "
+        + "tenant creates a bespoke role, which `AccessGovernanceService#createRole` stamps with "
+        + "`organisation_id = org()`. Both write routes are `hasRole('PLATFORM_ADMIN')`, who is "
+        + "already trans-tenant by design, so it buys an attacker nothing today. ⚠ `createIn`'s "
+        + "javadoc explains why role resolution is tenant-correct and describes the roleNames "
+        + "branch ONLY — F2-215's two-of-N, in the comment a reader consults first.",
+
+        "module/ccm/service/CcmService.java#defRepo",
+        "REFUTED — the ids come from SERVER ROWS. `listLatestRuns` collects `defIds` from runs "
+        + "fetched by `runRepo.findRecent(orgId, …)`, so every id was already inside the tenant.",
+
+        "module/evidence/service/EvidenceItemService.java#userRepository",
+        "REFUTED — a DISPLAY-NAME lookup in a read-only batch mapper (`toResponses`), whose "
+        + "`ownerIds` come from the items themselves; no write, and no id from the caller.",
+
+        "module/policy/service/PolicyManagementService.java#controls",
+        "REFUTED — `resolveControlsForPolicy` takes its ids from "
+        + "`controlLinks.findByOrganisationIdAndPolicyDocumentId(org(), policyId)`. And the WRITE "
+        + "path beside it, `setControlLinks`, is the exemplar for this whole shape: it filters "
+        + "every row `if (orgId.equals(c.getOrganisationId()))` before adding it.",
+
+        "module/risk/service/RiskService.java#riskCategoryRepository",
+        "REFUTED — a display-name map for a read-only list projection. `catIds` are collected from "
+        + "risks the tenant-scoped page query already returned, so every id is inside the tenant "
+        + "before the batch load runs; the map is consumed only to label a row, and no write "
+        + "follows it.",
+
+        "module/risk/service/RiskService.java#userRepository",
+        "REFUTED — the owner-name half of the same read-only projection, two lines below the "
+        + "category half. `ownerIds` are collected from risks the tenant-scoped page query already "
+        + "returned, the map is consumed only to render a display name, and no write follows. The "
+        + "caller supplies a page request, never an id.",
+
+        "module/admin/committee/service/CommitteeMemberRegistryService.java#users",
+        "REFUTED — SCOPED IN THE LOOP. `linkage` batches the roster's linked user ids and admits "
+        + "each row only `if (org.equals(u.getOrganisationId()))`, so an unlinked-or-foreign seat "
+        + "falls out of the map and reads as unlinked rather than surfacing a foreign name.",
+
+        "module/change_adapters/EvidenceAdapter.java#items",
+        "REFUTED — SCOPED IN THE STREAM, deliberately and with provenance. It filters "
+        + "`org.equals(e.getOrganisationId())` on the ITEM as well as on the link row, under a "
+        + "comment citing F2-106: a legacy link can point outside the tenant, so such a row must "
+        + "vanish from the read rather than surface a foreign title. The codebase already knew this "
+        + "shape at one site — which is the argument for measuring the whole population rather than "
+        + "trusting that the knowledge spread.",
+
+        "module/cyber/asm/service/AttackSurfaceFindingService.java#assetRepo",
+        "REFUTED — SCOPED IN THE STREAM. `mapWithAssets` filters "
+        + "`orgId.equals(a.getOrganisationId())` before building the map, so a finding whose asset "
+        + "is not the tenant's renders with no asset rather than another tenant's hostname."
+    );
+
     // ── the detector ────────────────────────────────────────────────────────────
 
     /** A single-expression load-and-write with no tenant predicate. */
@@ -460,20 +587,101 @@ class UnverifiedForeignKeyWriteContractTest {
             }
         }
         residue.sort(String::compareTo);
-        System.out.println("[F2-242] load-then-write-later, no tenant predicate resolved "
-                           + "(FILED, unread -- a dataflow question):");
+        System.out.println("[F2-243] load-then-write-later, no `<var>.getOrganisationId()` in the "
+                           + "chain (ALL SEVEN ADJUDICATED -- see LOAD_THEN_WRITE_VERDICTS):");
         residue.forEach(r -> System.out.println("    " + r));
 
-        // Decrease-only, and deliberately NOT zero: these are unread. The number exists so the
-        // next slice knows the size of what it inherited, and so a detector that stops matching
-        // fails here rather than reporting success.
-        assertThat(residue).as(
-            "F2-242 measured 7 sites of this shape and read none of them; the two it DID read "
-            + "(RiskAcceptanceService, EvidenceItemService) were reached through the decidable "
-            + "single-expression shape. Read the route and probe it before writing a reason.")
-            .hasSizeLessThanOrEqualTo(7);
+        // F2-243: every site now carries a verdict, so the FORWARD assertion is that nothing is
+        // unadjudicated -- never that the count is small. F2-234's rule: a work list reaching zero
+        // is exactly what a rotted detector produces, so the number cannot be the assertion.
+        List<String> unadjudicated = residue.stream()
+            .filter(r -> LOAD_THEN_WRITE_VERDICTS.keySet().stream().noneMatch(k -> r.startsWith(
+                k.substring(0, k.indexOf('#')))
+                && r.contains(k.substring(k.indexOf('#') + 1) + ".findById")))
+            .toList();
+        assertThat(unadjudicated).as("""
+            A load-then-write-later site with no verdict. This is a DATAFLOW question a regex \
+            cannot settle (F2-182), so read the route -- and read what stores the reference, not \
+            just what dereferences it. F2-243 read all seven of F2-242's and refuted all seven: \
+            the reference is verified at every one, by four different mechanisms this detector's \
+            single spelling cannot see (a tenant-scoped finder, a helper resolving the parent, an \
+            org-scoped native query, and a recipient identity narrower than the tenant). Add a \
+            verdict naming WHICH mechanism, or fix the site.""")
+            .isEmpty();
+
         assertThat(residue).as("anti-vacuity: a resolver that stops matching reports an empty "
             + "residue, which is indistinguishable from a swept tree")
             .isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("every load-then-write verdict still names a site the scan finds, and says how")
+    void everyLoadThenWriteVerdictIsStillReachedAndSubstantial() {
+        // The direction nobody writes first (F2-199). A verdict for something no longer in the
+        // population reads exactly like a verdict for something that is -- and after F2-243 the
+        // forward leg is satisfied by an EMPTY residue, so without this leg a detector that stopped
+        // matching would report success on every site at once.
+        List<String> found = new ArrayList<>();
+        Pattern assign = Pattern.compile("(\\w+)\\s+(\\w+)\\s*=\\s*(\\w+)\\.findById\\s*\\(");
+        for (Path p : javaFiles()) {
+            String rel = MAIN.relativize(p).toString().replace('\\', '/');
+            Matcher m = assign.matcher(read(p));
+            while (m.find()) found.add(rel + "#" + m.group(3));
+        }
+        assertThat(found).as(
+            "each adjudicated site must still be a `<Type> v = <repo>.findById(` the scan reaches")
+            .containsAll(LOAD_THEN_WRITE_VERDICTS.keySet());
+
+        LOAD_THEN_WRITE_VERDICTS.forEach((site, reason) -> {
+            assertThat(reason).as("verdict for %s is a bare label", site).hasSizeGreaterThan(180);
+            assertThat(reason).as("""
+                the verdict for %s must open with REFUTED / FILED / VERIFIED and name the \
+                mechanism. F2-188 measured what happens when a slice writes fluent reasons for \
+                code it has not read: five claims, five false -- and fluency reads as \
+                verification.""", site)
+                .containsAnyOf("REFUTED", "FILED", "VERIFIED");
+        });
+    }
+
+    @Test
+    @DisplayName("the PLURAL findAllById form is adjudicated too — a singular detector cannot see it")
+    void thePluralLoadFormIsAdjudicated() {
+        // F2-243: `(\w+)\s+(\w+)\s*=\s*(\w+)\.findById\(` is singular by construction, so a
+        // caller-supplied ID LIST sat outside every leg of this gate at once. Same shape as
+        // F2-198's recurring finding: the invariant is real, its POPULATION is narrower than it
+        // looks -- here narrowed by the arity of the finder.
+        Corpus c = corpus();
+        Pattern plural = Pattern.compile("(\\w+)\\.findAllById\\s*\\(");
+        Set<String> found = new LinkedHashSet<>();
+        for (Path p : javaFiles()) {
+            String src = read(p);
+            Map<String, String> fields = new LinkedHashMap<>();
+            Matcher f = REPO_FIELD.matcher(src);
+            while (f.find()) fields.put(f.group(2), f.group(1));
+            Matcher m = plural.matcher(src);
+            while (m.find()) {
+                String repo = fields.get(m.group(1));
+                if (repo == null) continue;
+                String entity = c.repoEntity().get(repo);
+                if (entity == null || !Boolean.TRUE.equals(c.entityHasTenant().get(entity))) continue;
+                found.add(MAIN.relativize(p).toString().replace('\\', '/') + "#" + m.group(1));
+            }
+        }
+        System.out.println("[F2-243] findAllById on a tenant-bearing entity: " + found.size()
+                           + " receiver(s)");
+        found.forEach(s -> System.out.println("    " + s));
+
+        assertThat(found).as("""
+            A `findAllById(<caller-supplied ids>)` on a tenant-bearing entity with no verdict. The \
+            exemplar for this shape is already in the tree: PolicyManagementService#setControlLinks \
+            filters every returned row `if (orgId.equals(c.getOrganisationId()))` before using it. \
+            Either do that, or record why the ids cannot be the caller's.""")
+            .containsExactlyInAnyOrderElementsOf(PLURAL_LOAD_VERDICTS.keySet());
+
+        PLURAL_LOAD_VERDICTS.forEach((site, reason) -> {
+            assertThat(reason).as("verdict for %s is a bare label", site).hasSizeGreaterThan(150);
+            assertThat(reason).as("verdict for %s must open with REFUTED or FILED", site)
+                .containsAnyOf("REFUTED", "FILED");
+        });
     }
 }
