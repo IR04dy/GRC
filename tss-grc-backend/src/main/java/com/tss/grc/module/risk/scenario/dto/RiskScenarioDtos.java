@@ -17,10 +17,23 @@ public final class RiskScenarioDtos {
     private RiskScenarioDtos() {}
 
     // ─── Create request ──────────────────────────────────────────────
+    /**
+     * ⚠⚠ F2-245 — {@code riskCode} and {@code riskTitleEn} are GONE from this record,
+     * and their absence is the fix.
+     *
+     * <p>A soft FK that also carries the parent's identity is making <b>two</b> claims:
+     * the id says <i>which row</i>, and the code and title say <i>what it is called</i>.
+     * Only the parent can answer the second. This record used to accept all three, so
+     * a caller could name risk 4 and label it anything — and measured in dev and prod,
+     * <b>11 of 11</b> live scenarios did exactly that: every stored label was coherent
+     * and none of them was the title of the risk the id names.
+     *
+     * <p>The server now derives both from the risk it resolves, so a disagreement is
+     * unrepresentable rather than merely absent (F2-213). A field the bound type does
+     * not declare can never arrive — the strongest closure there is (F2-233).
+     */
     public record CreateRequest(
             Long riskId,
-            String riskCode,
-            String riskTitleEn,
 
             @NotBlank @Size(max = 255) String titleEn,
             @Size(max = 255) String titleAr,

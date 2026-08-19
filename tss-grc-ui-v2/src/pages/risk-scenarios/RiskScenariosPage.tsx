@@ -14,6 +14,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { riskApi } from '../../lib/api';
 import {
   listScenarios, createScenario, approveScenario, rejectScenario, archiveScenario,
   parseMonteCarloResult, fmtSar,
@@ -34,7 +35,22 @@ type TabId = 'all' | 'draft' | 'approved' | 'rejected' | 'archived' | 'stats';
 interface CreateValues {
   titleEn?: string;        titleAr?: string;
   scenarioType?: string;
-  riskCode?: string;       riskTitleEn?: string;
+  /**
+   * ⚠⚠ F2-245 — this replaced two free-text inputs, `riskCode` and `riskTitleEn`.
+   *
+   * The form collected the parent risk's code and title as text and never collected
+   * `riskId` at all, so it gathered the LABEL and never the LINK. The consequence is
+   * structural: `GET /by-risk/{riskId}` — the route that answers "what quantitative
+   * analysis exists for this risk?" — joins on `risk_id`, so a scenario created through
+   * the platform's own form could never be found from its risk. And the code input was
+   * placeholdered `'RSK-2026-042'`, a code space that exists nowhere in `risk.risks`,
+   * whose only reference is a UUID.
+   *
+   * A select over the tenant's own register cannot name a risk that does not exist,
+   * which is why the picker is the fix and not merely nicer (F2-244: the create form
+   * asking a human to type a raw id is what produces invented ids).
+   */
+  riskId?: string;
   horizonMonths?: number;
   descriptionEn?: string;  descriptionAr?: string;
   inputJson?: string;
@@ -55,8 +71,31 @@ export function RiskScenariosPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // F2-245 — the picker's options are the tenant's OWN risks, from the server.
+  // A select built from the register cannot name a risk the tenant does not own,
+  // so the refusal the server now makes should never be reached from this screen.
+  const [riskOptions, setRiskOptions] = useState<Array<{ value: string; label: string }>>([]);
 
   useEffect(() => { void reload(); }, []);
+
+  useEffect(() => {
+    if (!createOpen || riskOptions.length > 0) return;
+    void (async () => {
+      try {
+        const page = await riskApi.list(undefined, 0, 200);
+        setRiskOptions((page.content ?? []).map(r => ({
+          value: String(r.id),
+          // The register's own reference is a UUID, so it is not a useful label on its
+          // own — the title is what an operator recognises.
+          label: (lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn) ?? String(r.id),
+        })));
+      } catch {
+        // Leave the list empty: `emptyHint` says the register could not be read,
+        // rather than the field silently offering nothing (F2-197).
+        setRiskOptions([]);
+      }
+    })();
+  }, [createOpen, riskOptions.length, lang]);
 
   async function reload() {
     setLoading(true);
@@ -141,8 +180,10 @@ export function RiskScenariosPage() {
         { value: 'WHAT_IF',     label: t('scnTypeWhatIf') },
       ], span: 6 },
     { kind: 'number', key: 'horizonMonths', label: t('scnHorizonMonths'), min: 1, max: 60, span: 6 },
-    { kind: 'text', key: 'riskCode',    label: t('scnRiskCode'),    placeholder: 'RSK-2026-042', span: 6 },
-    { kind: 'text', key: 'riskTitleEn', label: t('scnRiskTitleEn'), span: 6 },
+    { kind: 'select-searchable', key: 'riskId', label: t('scnParentRisk'), span: 12,
+      options: riskOptions,
+      placeholder: t('scnParentRiskPlaceholder'),
+      emptyHint: t('scnParentRiskEmpty') },
     { kind: 'textarea', key: 'descriptionEn', label: t('scnDescriptionEn'), rows: 2, span: 12 },
     { kind: 'textarea', key: 'descriptionAr', label: t('scnDescriptionAr'), rows: 2, span: 12 },
     { kind: 'textarea', key: 'inputJson', label: t('scnInputJson') + ' *', rows: 3, span: 12 },
@@ -156,8 +197,9 @@ export function RiskScenariosPage() {
         titleEn:       (values.titleEn ?? '').trim(),
         titleAr:       (values.titleAr ?? '').trim() || undefined,
         scenarioType:  (values.scenarioType ?? 'MONTE_CARLO') as ScenarioType,
-        riskCode:      (values.riskCode ?? '').trim() || undefined,
-        riskTitleEn:   (values.riskTitleEn ?? '').trim() || undefined,
+        // F2-245: the link, not the label. The server derives riskCode and
+        // riskTitleEn from the risk it resolves, and refuses an id outside the tenant.
+        riskId:        values.riskId ? Number(values.riskId) : undefined,
         horizonMonths: values.horizonMonths != null ? Number(values.horizonMonths) : undefined,
         descriptionEn: (values.descriptionEn ?? '').trim() || undefined,
         descriptionAr: (values.descriptionAr ?? '').trim() || undefined,
@@ -254,9 +296,20 @@ export function RiskScenariosPage() {
                             </td>
                             <td className="mono">{r.scenarioCode}</td>
                             <td>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}</td>
+                            {/*
+                              F2-245 — show the derived TITLE, with the reference as the
+                              tooltip. Before the fix this cell rendered `riskCode`, which
+                              was free text an operator had typed; now the server derives
+                              it from the risk, and `risk.risks`' only reference is a UUID,
+                              so printing the code would have made the fix render WORSE.
+                              ⚠ There is no `risk_title_ar` column, so this label is
+                              English-only on an Arabic-primary UI (house rule 7) — filed,
+                              because adding it is a migration. The `title` states that
+                              rather than letting the gap read as an absent risk.
+                            */}
                             <td>
-                              {r.riskCode
-                                ? <span className="mono">{r.riskCode}</span>
+                              {r.riskTitleEn || r.riskCode
+                                ? <span title={r.riskCode ?? undefined}>{r.riskTitleEn ?? r.riskCode}</span>
                                 : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                             </td>
                             <td>{t(SCENARIO_TYPE_LABEL_KEY[r.scenarioType])}</td>
