@@ -48,8 +48,12 @@ export function listTpc(status?: TpcStatus, page = 0, size = 200):
   return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
 export function submitTpc(id: number)   { return api.post<ThirdPartyCyberAssessment>(`${BASE}/${id}/submit`); }
-export function approveTpc(id: number, approverName: string) {
-  return api.post<ThirdPartyCyberAssessment>(`${BASE}/${id}/approve`, { approverName });
+// F2-247 — no approverName on purpose. `ThirdPartyCyberAssessmentController#approve` reads the
+// approving identity from `principal.getUsername()` and has always discarded this body field, so
+// the page was passing the literal 'admin' into a value the server never used. A required-looking
+// parameter the server ignores tells the caller their value matters (F2-184/F2-225).
+export function approveTpc(id: number) {
+  return api.post<ThirdPartyCyberAssessment>(`${BASE}/${id}/approve`);
 }
 export function retireTpc(id: number)   { return api.post<ThirdPartyCyberAssessment>(`${BASE}/${id}/retire`); }
 

@@ -34,6 +34,7 @@ public class TprmService {
 
     private final VendorRepository vendorRepo;
     private final VendorAssessmentRepository assessmentRepo;
+    private final TprmVendorReferenceResolver vendorRefs;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
@@ -46,10 +47,18 @@ public class TprmService {
     }
 
     @Transactional(readOnly = true)
+    /**
+     * F2-247 — one predicate, not two copies.
+     *
+     * <p>This method was the module's only in-tenant vendor load, and {@code createAssessment}
+     * calls it with the comment <i>"verify org ownership"</i>. {@code tprm/cyber}'s assessment
+     * register did not use it and had no {@code VendorRepository} at all, so it stored a
+     * caller-supplied {@code vendor_id} and {@code vendor_name} unchecked. The predicate now lives
+     * in {@link TprmVendorReferenceResolver} and is read from both places, because what made the
+     * duplicate harmless was two lists agreeing and nobody maintaining that (F2-177).
+     */
     public Vendor getVendor(Long id) {
-        return vendorRepo.findById(id)
-            .filter(v -> v.getOrganisationId().equals(TenantContext.getCurrentTenant()))
-            .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + id));
+        return vendorRefs.requireOwn(id, TenantContext.getCurrentTenant());
     }
 
     @Transactional

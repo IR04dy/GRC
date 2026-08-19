@@ -14,6 +14,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
+import { loadTprmVendorOptions, type VendorOption } from '../../lib/vendorOptions';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -28,6 +29,7 @@ export function ThirdPartyCyberPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('all');
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
   const [rows, setRows] = useState<ThirdPartyCyberAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -36,6 +38,16 @@ export function ThirdPartyCyberPage() {
   const [docsTarget, setDocsTarget] = useState<ThirdPartyCyberAssessment | null>(null);
 
   useEffect(() => { void reload(); }, []);
+
+  /*
+   * F2-247 - load the vendor register when the create modal opens, not on mount: the picker is
+   * only needed there, and 28 rows is a small enough register that a fresh read per open is
+   * cheaper to reason about than a cache that can go stale against the register it mirrors.
+   */
+  useEffect(() => {
+    if (!createOpen) return;
+    void loadTprmVendorOptions(lang).then(setVendorOptions).catch(() => setVendorOptions([]));
+  }, [createOpen, lang]);
   async function reload() {
     setLoading(true);
     try { const p = await listTpc(undefined, 0, 200); setRows(p.content); }
@@ -84,12 +96,22 @@ export function ThirdPartyCyberPage() {
   }
 
   async function onSubmit(id: number)  { try { setBusyId(id); await submitTpc(id); toast.success(t('tpcSubmitted')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
-  async function onApprove(id: number) { try { setBusyId(id); await approveTpc(id, 'admin'); toast.success(t('tpcApproved')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
+  async function onApprove(id: number) { try { setBusyId(id); await approveTpc(id); toast.success(t('tpcApproved')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
   async function onRetire(id: number)  { if(!window.confirm(t('tpcRetireConfirm'))) return; try { setBusyId(id); await retireTpc(id); toast.success(t('tpcRetired')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
 
   const CREATE_FIELDS: FieldDef[] = [
     { kind: 'text', key: 'assessmentCode', label: t('tpcColCode'), span: 4, placeholder: 'TPC-2026-009' },
-    { kind: 'text', key: 'vendorName',     label: t('tpcColVendor') + ' *', required: true, span: 4 },
+    /*
+     * F2-247 — this was `{ kind: 'text', key: 'vendorName', required: true }`, a free-text box with
+     * no picker, and `onCreate` sent no `vendorId` at all. So every assessment this screen created
+     * was unjoinable to the vendor register: 8 of the 16 live rows in dev and prod carry an
+     * annotated-prose label (`'New vendor — Sentry IO'`) and no link, which is exactly what a
+     * label-collecting form produces. The picker is over `tprm.vendors` — this register's own
+     * parent, resolved from `TprmService.getVendor` rather than guessed from the schema name.
+     */
+    { kind: 'select-searchable', key: 'vendorId', label: t('tpcColVendor') + ' *',
+      required: true, span: 4, options: vendorOptions,
+      placeholder: t('vendorPickerPlaceholder'), emptyHint: t('vendorPickerEmpty') },
     { kind: 'text', key: 'vendorCountry',  label: t('tpcColCountry'), maxLength: 3, span: 4, placeholder: 'SAU' },
     { kind: 'select', key: 'inherentCyberRisk', label: t('tpcColInherent') + ' *', required: true, span: 12,
       options: [ {value:'LOW',label:'Low'},{value:'MEDIUM',label:'Medium'},{value:'HIGH',label:'High'},{value:'CRITICAL',label:'Critical'} ] },
@@ -106,7 +128,10 @@ export function ThirdPartyCyberPage() {
     try {
       await api.post('/api/tprm/cyber-assessments', {
         assessmentCode: String(values.assessmentCode ?? '').trim() || undefined,
-        vendorName: String(values.vendorName ?? '').trim(),
+        // The label is DERIVED server-side from the vendor this id names, so sending one
+        // would be a field the server overwrites — and a caller-supplied label beside a
+        // resolved id is precisely how the two halves came to describe different rows (F2-245).
+        vendorId: values.vendorId ? Number(values.vendorId) : undefined,
         vendorCountry: String(values.vendorCountry ?? '').trim() || undefined,
         inherentCyberRisk: values.inherentCyberRisk,
         scopeDescriptionEn: String(values.scopeDescriptionEn ?? '').trim(),
