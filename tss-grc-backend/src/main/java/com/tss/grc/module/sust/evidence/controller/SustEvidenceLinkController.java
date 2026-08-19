@@ -26,11 +26,25 @@ import java.util.Map;
  * lives in {@code /api/v1/evidence/*}; this surface only links + bundles.
  */
 @RestController
-@RequestMapping("/api/sustainability/evidence-links")
+@RequestMapping(SustEvidenceLinkController.PATH)
 @RequiredArgsConstructor
 @RequireModule("ESG")
 @Tag(name = "Sustainability — Evidence Links (module/evidence bridge)")
 public class SustEvidenceLinkController {
+
+    /**
+     * F2-243 — named because another module's error message cites it.
+     *
+     * <p>{@code GhgEmissionRecordService} refuses a direct write to {@code evidence_item_id} and
+     * points the caller here. My first draft of that message spelled the path
+     * {@code /api/sustainability/evidence/link} — which does not exist — and the gate asserting the
+     * message could not tell, because a literal-matching assertion cannot resolve a route. 🔑 <b>A
+     * diagnostic whose only job is to send the caller somewhere is worthless if the somewhere is
+     * invented</b> (the guessed-path error this programme has recorded since F2-198, now inside a
+     * fix's own error text). One constant, read by the mapping and by the citation, so they cannot
+     * disagree.
+     */
+    public static final String PATH = "/api/sustainability/evidence-links";
 
     private final SustEvidenceLinkService service;
 

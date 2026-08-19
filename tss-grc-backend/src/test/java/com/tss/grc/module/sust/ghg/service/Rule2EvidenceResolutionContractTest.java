@@ -2,9 +2,11 @@ package com.tss.grc.module.sust.ghg.service;
 
 import com.tss.grc.module.evidence.entity.EvidenceItem;
 import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
+import com.tss.grc.module.sust.evidence.controller.SustEvidenceLinkController;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -140,7 +142,7 @@ class Rule2EvidenceResolutionContractTest {
         assertThat(src).as("the refusal must name the endpoint that owns the linkage, so the caller "
             + "is sent somewhere (F2-180) rather than merely refused")
             .contains("requireEvidenceLinkageIsUnchanged")
-            .contains("/api/sustainability/evidence/link");
+            .contains("SustEvidenceLinkController.PATH");
 
         assertThat(src).as("""
             An ECHO of the stored value must be accepted: this route binds the whole entity, so a \
@@ -151,6 +153,23 @@ class Rule2EvidenceResolutionContractTest {
 
         assertThat(src).as("the bridge remains the writer, so the create path is untouched by this")
             .doesNotContain("evidenceItems.save(");
+    }
+
+    @Test
+    @DisplayName("the path the refusal cites RESOLVES to a real mapped route")
+    void theCitedPathResolvesToARealRoute() {
+        // ⚠ My first draft of that message spelled the bridge `/api/sustainability/evidence/link`.
+        // It does not exist — the route is `/api/sustainability/evidence-links` — and the assertion
+        // above could not tell, because a literal-matching check cannot resolve a route. The live
+        // probe found it, by receiving 400 from a path it had been told to use. 🔑 A diagnostic
+        // whose only job is to send the caller somewhere is worthless if the somewhere is invented;
+        // this is the guessed-path error this programme has recorded since F2-198, arriving inside a
+        // fix's own error text. So the citation is now a CONSTANT and this leg resolves it.
+        assertThat(SustEvidenceLinkController.class.getAnnotation(RequestMapping.class).value())
+            .as("the constant the refusal cites must be the controller's own mapping")
+            .containsExactly(SustEvidenceLinkController.PATH);
+        assertThat(SustEvidenceLinkController.PATH)
+            .as("and it must look like the route it is").startsWith("/api/");
     }
 
     @Test

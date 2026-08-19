@@ -5,6 +5,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.entity.EvidenceItem;
 import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.evidence.controller.SustEvidenceLinkController;
 import com.tss.grc.module.sust.ghg.entity.EmissionFactor;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.EmissionFactorRepository;
@@ -347,7 +348,10 @@ class GhgEmissionRecordServiceTest {
         change.setEvidenceItemId(78L);
         assertThatThrownBy(() -> service.update(14L, change))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("/api/sustainability/evidence/link");
+            // Asserted against the CONSTANT, not a typed-out path: my first draft of the message
+            // spelled an endpoint that does not exist, and a hand-written literal here would have
+            // agreed with it (F2-198's guessed path, inside a fix's own diagnostic).
+            .hasMessageContaining(SustEvidenceLinkController.PATH);
         assertThat(r.getEvidenceItemId()).as("the stored linkage must be untouched").isEqualTo(77L);
     }
 

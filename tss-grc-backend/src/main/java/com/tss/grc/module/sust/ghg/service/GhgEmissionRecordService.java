@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.entity.EvidenceItem;
 import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
+import com.tss.grc.module.sust.evidence.controller.SustEvidenceLinkController;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.ghg.entity.EmissionFactor;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -175,7 +176,7 @@ public class GhgEmissionRecordService {
         if (requested == null || requested.equals(cur.getEvidenceItemId())) return;
         throw new IllegalArgumentException(
             "evidenceItemId is set by the evidence bridge, not by this endpoint: POST "
-            + "/api/sustainability/evidence/link {entityType:'GhgEmissionRecord', entityId:"
+            + SustEvidenceLinkController.PATH + " {entityType:'GhgEmissionRecord', entityId:"
             + cur.getId() + ", evidenceItemId:" + requested + "}. It resolves the item in your "
             + "organisation and records the EvidenceLink the assurance package is built from — "
             + "writing the column directly would leave the record citing evidence that package "
