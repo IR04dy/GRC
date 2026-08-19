@@ -28,7 +28,11 @@ public final class FourthPartyExposureDtos {
      *  all audit / validation / soft-delete state. */
     public record CreateRequest(
             Long primaryVendorId,
-            @NotBlank @Size(max = 255) String primaryVendorName,
+            // F2-246 - NOT @NotBlank: the subject vendor is identified by `primaryVendorId`
+            // (resolved in-tenant, label derived) OR by this label when the supplier is
+            // not in the vendor register. The service enforces that one of the two is
+            // present, so the diagnostic names the actual rule instead of one field.
+            @Size(max = 255) String primaryVendorName,
             @NotBlank @Size(max = 255) String fourthPartyName,
             @Size(max = 3) String fourthPartyCountry,
             @NotBlank @Size(max = 30) String dependencyType,

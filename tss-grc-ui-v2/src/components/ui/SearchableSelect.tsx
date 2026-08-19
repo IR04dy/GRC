@@ -226,7 +226,28 @@ export function SearchableSelect({
               value={query}
               onChange={e => setQuery(e.currentTarget.value)}
               onKeyDown={onKeyDown}
-              placeholder={isAr ? 'ابحث أو أنشئ جديداً…' : 'Search or create new…'}
+              /*
+               * F2-246 — the placeholder may only promise what THIS instance offers.
+               *
+               * It read "Search or create new…" / "ابحث أو أنشئ جديداً…" unconditionally,
+               * while the create row 130 lines above is correctly gated on `!!onCreate`. So
+               * the affordance was conditional and only the promise was not: measured, 17 of
+               * the 19 `select-searchable` fields in the app wire no `onCreate`, so almost
+               * every picker in the platform invited the operator to create a record it
+               * cannot create. F2-184's shape — a construct that answers the question a
+               * reader was about to ask — at the level of the text a user actually reads.
+               *
+               * ⚠ Found in the BROWSER after every gate in this slice was green, which is now
+               * the eighth consecutive slice where that is where a text-level claim surfaced:
+               * no code-scoped gate can see a string that is only wrong in relation to a
+               * sibling prop. Checked in BOTH languages (house rule 7) — the Arabic half
+               * carried the same promise.
+               */
+              placeholder={
+                onCreate
+                  ? (isAr ? 'ابحث أو أنشئ جديداً…' : 'Search or create new…')
+                  : (isAr ? 'ابحث…' : 'Search…')
+              }
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
                 font: '500 13px var(--font-sans)', color: 'var(--ink-1)',

@@ -2,6 +2,7 @@ package com.tss.grc.module.scm.resilience.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.scm.service.VendorReferenceResolver;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.AltCreateRequest;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.AltUpdateRequest;
 import com.tss.grc.module.scm.resilience.entity.AlternateSupplier;
@@ -32,6 +33,9 @@ public class AlternateSupplierService {
     private static final Set<String> CONTRACTUAL = Set.of("NONE", "MOU_SIGNED", "FRAMEWORK_ACTIVE");
 
     private final AlternateSupplierRepository repo;
+
+    /** F2-246 - the single writer of this register's (vendor id, vendor name) pair. */
+    private final VendorReferenceResolver vendorRefs;
 
     @Transactional(readOnly = true)
     public Page<AlternateSupplier> list(Pageable pageable) {
@@ -74,8 +78,18 @@ public class AlternateSupplierService {
         AlternateSupplier a = new AlternateSupplier();
         a.setOrganisationId(TenantContext.getCurrentTenant());
         a.setExternalId("ALT_" + UUID.randomUUID().toString().substring(0, 12));
-        a.setPrimaryVendorId(req.primaryVendorId());
-        a.setPrimaryVendorName(req.primaryVendorName());
+        // F2-246 - the PRIMARY vendor is the one being replaced and it has an id column,
+        // so it must resolve; alternateVendorName has no id column at all and stays free
+        // text by design (a substitute supplier need not be registered yet).
+        // The tenant is read directly rather than from the half-built row: a resolve
+        // placed above the organisation stamp would pass null, the filter could never
+        // match, and EVERY linked create would answer 404. Found by the live probe -
+        // and the probe legs that expect a refusal cannot see it, because a refusal
+        // caused by a null tenant looks exactly like a correct one.
+        var vendor = vendorRefs.resolve(req.primaryVendorId(), req.primaryVendorName(),
+                TenantContext.getCurrentTenant());
+        a.setPrimaryVendorId(vendor.id());
+        a.setPrimaryVendorName(vendor.name());
         a.setAlternateVendorName(req.alternateVendorName());
         a.setAlternateVendorCountry(req.alternateVendorCountry());
         a.setAlternateVendorRole(req.alternateVendorRole());

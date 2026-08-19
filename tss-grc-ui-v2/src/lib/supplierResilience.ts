@@ -13,6 +13,9 @@ export type PlanTestOutcome = 'NOT_TESTED' | 'PASSED' | 'GAP_IDENTIFIED' | 'FAIL
 
 export interface AlternateSupplier {
   id: number; externalId?: string;
+  // F2-246 — DERIVED, never the caller's claim: when `primaryVendorId` resolves, the
+  // server writes the vendor register's own name here. NOT NULL in the column, so it
+  // is always sent; the create request is where it may be omitted.
   primaryVendorId?: number; primaryVendorName: string;
   alternateVendorName: string;
   alternateVendorCountry?: string; alternateVendorRole: AltRole;
@@ -28,7 +31,12 @@ export interface AlternateSupplier {
 }
 
 export interface AltCreateRequest {
-  primaryVendorId?: number; primaryVendorName: string;
+  // F2-246 — supply `primaryVendorId` to link this record to the vendor register (the
+  // server resolves it in-tenant and derives the label), or `primaryVendorName` when
+  // the supplier is not registered. One of the two must identify the vendor; the form
+  // always sends the id. `alternateVendorName` stays required because the schema has
+  // no `alternate_vendor_id` column at all — a substitute need not be registered.
+  primaryVendorId?: number; primaryVendorName?: string;
   alternateVendorName: string;
   alternateVendorCountry?: string; alternateVendorRole: AltRole;
   serviceScopeEn: string; serviceScopeAr?: string;
@@ -47,6 +55,8 @@ export interface ExitPlanStep {
 export interface ExitPlan {
   id: number; externalId?: string;
   planCode: string;
+  // F2-246 — DERIVED from `vendorId` when the row is linked, the caller's own text when
+  // it is not. NOT NULL in the column, so a response always carries one.
   vendorId?: number; vendorName: string; contractCode?: string;
   titleEn: string; titleAr?: string;
   triggerConditions?: string; severityThreshold?: PlanSeverity;
@@ -65,7 +75,9 @@ export interface ExitPlan {
 }
 
 export interface PlanCreateRequest {
-  vendorId?: number; vendorName: string; contractCode?: string;
+  // F2-246 — `vendorId` links to the register and the server derives the label;
+  // `vendorName` identifies an unregistered supplier. One of the two is required.
+  vendorId?: number; vendorName?: string; contractCode?: string;
   titleEn: string; titleAr?: string;
   triggerConditions?: string; severityThreshold?: PlanSeverity;
   targetDisengagementDays?: number;

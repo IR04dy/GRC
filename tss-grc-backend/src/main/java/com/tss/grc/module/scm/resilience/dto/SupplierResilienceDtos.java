@@ -27,7 +27,11 @@ public final class SupplierResilienceDtos {
 
     public record TestCreateRequest(
             Long vendorId,
-            @NotBlank @Size(max = 255) String vendorName,
+            // F2-246 - NOT @NotBlank: the subject vendor is identified by `vendorId`
+            // (resolved in-tenant, label derived) OR by this label when the supplier is
+            // not in the vendor register. The service enforces that one of the two is
+            // present, so the diagnostic names the actual rule instead of one field.
+            @Size(max = 255) String vendorName,
             @Size(max = 40) String testCode,
             @NotBlank @Size(max = 255) String titleEn,
             @Size(max = 255) String titleAr,
@@ -108,7 +112,11 @@ public final class SupplierResilienceDtos {
     // ═══ AlternateSupplier ════════════════════════════════════════════
     public record AltCreateRequest(
             Long primaryVendorId,
-            @NotBlank @Size(max = 255) String primaryVendorName,
+            // F2-246 - NOT @NotBlank: the subject vendor is identified by `primaryVendorId`
+            // (resolved in-tenant, label derived) OR by this label when the supplier is
+            // not in the vendor register. The service enforces that one of the two is
+            // present, so the diagnostic names the actual rule instead of one field.
+            @Size(max = 255) String primaryVendorName,
             @NotBlank @Size(max = 255) String alternateVendorName,
             @Size(max = 3) String alternateVendorCountry,
             @NotBlank @Size(max = 20) String alternateVendorRole,
@@ -184,7 +192,11 @@ public final class SupplierResilienceDtos {
     // ═══ ExitPlan ═════════════════════════════════════════════════════
     public record PlanCreateRequest(
             Long vendorId,
-            @NotBlank @Size(max = 255) String vendorName,
+            // F2-246 - NOT @NotBlank: the subject vendor is identified by `vendorId`
+            // (resolved in-tenant, label derived) OR by this label when the supplier is
+            // not in the vendor register. The service enforces that one of the two is
+            // present, so the diagnostic names the actual rule instead of one field.
+            @Size(max = 255) String vendorName,
             @Size(max = 64) String contractCode,
             @NotBlank @Size(max = 255) String titleEn,
             @Size(max = 255) String titleAr,

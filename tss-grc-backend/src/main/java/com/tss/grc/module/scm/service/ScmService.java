@@ -28,6 +28,12 @@ import java.util.Map;
 public class ScmService {
 
     private final VendorRepository vendorRepo;
+    /**
+     * F2-246 — the shared answer to "is this my vendor?". This service was already
+     * asking it correctly; delegating means there is one implementation rather than two
+     * that happen to agree today with nobody maintaining that (F2-177).
+     */
+    private final VendorReferenceResolver vendorRefs;
     private final VendorOnboardingRepository onboardingRepo;
     private final VendorAssessmentRepository assessmentRepo;
     private final DependencyRepository dependencyRepo;
@@ -89,9 +95,7 @@ public class ScmService {
      * <em>foreign</em> id is the defect.
      */
     private Vendor requireOwnVendor(Long vendorId) {
-        return vendorRepo.findById(vendorId)
-                .filter(v -> v.getOrganisationId().equals(orgId()))
-                .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + vendorId));
+        return vendorRefs.requireOwn(vendorId, orgId());
     }
 
     /**
@@ -127,8 +131,7 @@ public class ScmService {
 
     @Transactional(readOnly = true)
     public VendorDtos.Response getVendor(Long id) {
-        Vendor v = vendorRepo.findById(id).filter(x -> x.getOrganisationId().equals(orgId()))
-                .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + id));
+        Vendor v = requireOwnVendor(id);
         return toVendorResponse(v);
     }
 
@@ -140,16 +143,14 @@ public class ScmService {
     }
 
     public VendorDtos.Response updateVendor(Long id, VendorDtos.Request req) {
-        Vendor v = vendorRepo.findById(id).filter(x -> x.getOrganisationId().equals(orgId()))
-                .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + id));
+        Vendor v = requireOwnVendor(id);
         applyVendor(v, req);
         v.setUpdatedAt(LocalDateTime.now());
         return toVendorResponse(vendorRepo.save(v));
     }
 
     public void deleteVendor(Long id) {
-        Vendor v = vendorRepo.findById(id).filter(x -> x.getOrganisationId().equals(orgId()))
-                .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + id));
+        Vendor v = requireOwnVendor(id);
         v.setIsDeleted(true);
         v.setUpdatedAt(LocalDateTime.now());
         vendorRepo.save(v);

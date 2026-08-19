@@ -62,7 +62,23 @@ class ScmServiceTest {
     @Mock private SlaRepository slaRepo;
     @InjectMocks private ScmService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
+    /**
+     * F2-246 — a REAL {@link VendorReferenceResolver} over the mocked repository, replacing
+     * the mock Mockito injects.
+     *
+     * <p>{@code ScmService#requireOwnVendor} now delegates its tenant check to that resolver,
+     * and this class's cross-tenant legs (F2-242) exist to prove the check refuses. A mocked
+     * collaborator returns null, so every one of those legs would go green while asserting
+     * nothing — the shape F2-237 recorded, where a mocked repository happily returns rows for
+     * a predicate that is wrong. The resolver is a pure function of the repository, so using
+     * the real one costs nothing and keeps the legs about what they claim.
+     */
+    @BeforeEach void setUp() throws Exception {
+        TenantContext.setCurrentTenant(ORG_ID);
+        var f = ScmService.class.getDeclaredField("vendorRefs");
+        f.setAccessible(true);
+        f.set(service, new VendorReferenceResolver(vendorRepo));
+    }
     @AfterEach  void tearDown() { TenantContext.clear(); }
 
     private static Vendor vendor(Long orgId) {

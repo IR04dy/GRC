@@ -13,6 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
+import { loadVendorOptions, type VendorOption } from '../../lib/vendorOptions';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -41,6 +42,20 @@ export function FourthPartyPage() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [docsTarget, setDocsTarget] = useState<FourthPartyExposure | null>(null);
+  // F2-246 — the vendor picker's options, loaded from the tenant's own register the
+  // first time a create modal opens. A picker built from the register cannot name a
+  // vendor this tenant does not own, so the refusal the server now makes should never
+  // be reached from this screen.
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
+
+  useEffect(() => {
+    if (!createOpen || vendorOptions.length > 0) return;
+    void (async () => {
+      try { setVendorOptions(await loadVendorOptions(lang)); }
+      catch { setVendorOptions([]); }
+    })();
+  }, [createOpen, vendorOptions.length, lang]);
+
 
   useEffect(() => { void reload(); }, []);
 
@@ -122,7 +137,15 @@ export function FourthPartyPage() {
   }
 
   const CREATE_FIELDS: FieldDef[] = [
-    { kind: 'text',   key: 'primaryVendorName',     label: t('f4pColPrimary') + ' *', required: true, span: 6 },
+    // F2-246 — the vendor PICKER, not a free-text name. The old field was a required
+    // text box and the payload carried no id, so every row this form created was
+    // unjoinable: 32 of 53 live rows across the four SCM vendor registers carry a
+    // label and no link (dev = prod). The server derives the label from the vendor
+    // this id resolves to, so nothing here sends a vendor name any more.
+    { kind: 'select-searchable', key: 'primaryVendorId',
+      label: t('f4pColPrimary') + ' *', required: true, span: 6,
+      options: vendorOptions, placeholder: t('vendorPickerPlaceholder'),
+      emptyHint: t('vendorPickerEmpty') },
     { kind: 'text',   key: 'fourthPartyName',       label: t('f4pColFourth')  + ' *', required: true, span: 6 },
     { kind: 'text',   key: 'fourthPartyCountry',    label: t('f4pColCountry'),        span: 3, maxLength: 3, placeholder: 'USA' },
     { kind: 'select', key: 'dependencyType',        label: t('f4pColType') + ' *', required: true, span: 4,
@@ -137,7 +160,7 @@ export function FourthPartyPage() {
   async function onCreate(values: Record<string, unknown>) {
     try {
       await api.post('/api/scm/fourth-party', {
-        primaryVendorName:     String(values.primaryVendorName ?? '').trim(),
+        primaryVendorId:       values.primaryVendorId ? Number(values.primaryVendorId) : undefined,
         fourthPartyName:       String(values.fourthPartyName ?? '').trim(),
         fourthPartyCountry:    String(values.fourthPartyCountry ?? '').trim() || undefined,
         dependencyType:        values.dependencyType,

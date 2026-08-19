@@ -200,7 +200,10 @@ const KNOWN_DARK: readonly string[] = [
   'lib/api.ts#crisisCommsApi.updateTemplate',                 // HOLE
   'lib/bcmManagementReviews.ts#bcmManagementReviewApi.get',   // HOLE
   // ── TPRM / vendor ───────────────────────────────────────────────────────────────────────────────
-  'lib/api.ts#scmApi.allVendors',                                 // HOLE
+  // F2-246 removed `scmApi.allVendors`, which had been recorded here as a HOLE: the four SCM
+  // vendor registers offered a required free-text vendor-name box and no picker, so the client
+  // that lists the tenant's vendors had nothing calling it. `lib/vendorOptions.ts` now does.
+  // The endpoint already existed — the fifth blocker in this programme that was already solved.
   'lib/api.ts#tprmApi.stats',
   'lib/cpty.ts#cptyApi.listLimits',                               // HOLE
   'lib/cpty.ts#cptyApi.update',                                   // HOLE

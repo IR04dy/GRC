@@ -5,6 +5,7 @@ import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequ
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
 import com.tss.grc.module.scm.fourthparty.repository.FourthPartyExposureRepository;
+import com.tss.grc.module.scm.service.VendorReferenceResolver;
 import com.tss.grc.module.tprm.automation.TprmAutomationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,13 +56,17 @@ class FourthPartyConcentrationTest {
 
     @Mock private FourthPartyExposureRepository repo;
     @Mock private TprmAutomationService automation;
+    @Mock private com.tss.grc.module.scm.repository.VendorRepository vendorRepo;
 
     private FourthPartyExposureService service;
 
     @BeforeEach
     void setUp() throws Exception {
         TenantContext.setCurrentTenant(ORG);
-        service = new FourthPartyExposureService(repo);
+        // F2-246 — the register now resolves its primary-vendor reference through the shared
+        // resolver instead of storing the caller's id and label. A real resolver over a mocked
+        // VendorRepository keeps these concentration legs about concentration.
+        service = new FourthPartyExposureService(repo, new VendorReferenceResolver(vendorRepo));
         // `automation` is @Autowired(required = false) field injection, not a constructor arg.
         var f = FourthPartyExposureService.class.getDeclaredField("automation");
         f.setAccessible(true);

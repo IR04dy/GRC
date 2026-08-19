@@ -5335,6 +5335,8 @@ export const en = {
   srpKpiPlansActivated:        'Exit plans activated',
   srpKpiTestOverdue:           'Plans with overdue test',
 
+  vendorPickerPlaceholder: 'Search the vendor register…',
+  vendorPickerEmpty: 'No vendors in this register yet — add the vendor first, then link this record to it.',
   srpAltPrimaryVendor:         'Primary vendor',
   srpAltAltVendor:             'Alternate vendor',
   srpAltCountry:               'Country (ISO-3)',

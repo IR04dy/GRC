@@ -4,6 +4,7 @@ import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.OrderedVocabulary;
+import com.tss.grc.module.scm.service.VendorReferenceResolver;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
@@ -74,6 +75,9 @@ public class FourthPartyExposureService {
     static final String RETIRED = "RETIRED";
 
     private final FourthPartyExposureRepository repo;
+
+    /** F2-246 - the single writer of this register's (vendor id, vendor name) pair. */
+    private final VendorReferenceResolver vendorRefs;
     @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
@@ -100,8 +104,18 @@ public class FourthPartyExposureService {
         // validation columns) are NOT taken from the client (SEC-FIN-004) —
         // they keep their entity defaults / are stamped here.
         FourthPartyExposure e = new FourthPartyExposure();
-        e.setPrimaryVendorId(req.primaryVendorId());
-        e.setPrimaryVendorName(req.primaryVendorName());
+        // F2-246 - the PRIMARY vendor is ours and has an id column, so it must resolve;
+        // fourthPartyName is the downstream party, which by design has no id column
+        // because a fourth party is not one of our vendors.
+        // The tenant is read directly rather than from the half-built row: a resolve
+        // placed above the organisation stamp would pass null, the filter could never
+        // match, and EVERY linked create would answer 404. Found by the live probe -
+        // and the probe legs that expect a refusal cannot see it, because a refusal
+        // caused by a null tenant looks exactly like a correct one.
+        var vendor = vendorRefs.resolve(req.primaryVendorId(), req.primaryVendorName(),
+                TenantContext.getCurrentTenant());
+        e.setPrimaryVendorId(vendor.id());
+        e.setPrimaryVendorName(vendor.name());
         e.setFourthPartyName(req.fourthPartyName());
         e.setFourthPartyCountry(req.fourthPartyCountry());
         e.setDependencyType(DEPENDENCY_TYPE.require(req.dependencyType()));
@@ -132,7 +146,15 @@ public class FourthPartyExposureService {
     @Transactional
     public FourthPartyExposure update(Long id, UpdateRequest req) {
         FourthPartyExposure existing = get(id);
-        if (req.primaryVendorName() != null) existing.setPrimaryVendorName(req.primaryVendorName());
+        // F2-246 - a LINKED row's label belongs to the vendor register: an echo is
+        // accepted so a form that round-trips the whole row keeps working, a CHANGE is
+        // refused. Without this, the create could be closed and an update could still
+        // make a resolved reference describe the wrong vendor.
+        if (req.primaryVendorName() != null) {
+            existing.setPrimaryVendorName(vendorRefs.relabel(
+                    existing.getPrimaryVendorId(), existing.getPrimaryVendorName(),
+                    req.primaryVendorName()));
+        }
         if (req.fourthPartyName() != null) existing.setFourthPartyName(req.fourthPartyName());
         existing.setFourthPartyCountry(req.fourthPartyCountry());
         if (req.dependencyType() != null)
