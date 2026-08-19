@@ -1872,6 +1872,78 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A SOFT FK THAT ALSO CARRIES THE PARENT'S IDENTITY IS MAKING TWO CLAIMS, AND ONLY THE
+  PARENT CAN ANSWER THE SECOND** (F2-245, measured 2026-08-19). `risk.scenarios` stores `risk_id`
+  (which row) beside `risk_code` and `risk_title_en` (what it is called), and
+  `RiskScenarioService.create` took all three from the request. Measured in dev and prod:
+  **11 of 11 live scenarios store a `risk_title_en` that is not the `title_en` of the risk their
+  `risk_id` names** — scenario 1, *"Aramco contract delay — Monte Carlo (base case)"*, stores
+  *"Aramco contract renewal delay"* against `risk_id = 4`, which is **"Non-Compliance with NCA ECC
+  Controls"** — and every `risk_code` is `RSK-2026-NNN` while **`risk.risks` has no code column at
+  all**, its only reference being a UUID `external_id` (F2-203's disjoint-code-space shape).
+  🔑🔑 **THE REUSABLE RULE: F2-243 established that a *presence* test on an id is not a check on
+  the thing it names and F2-244 that an *authority* check on the caller is not a check on the
+  referent; this is the next one along — a reference can be stored, dereferenceable and still
+  DESCRIBE THE WRONG ROW, because the description travelled beside the id instead of being read
+  from it.**
+  🔑 **The half on screen is not necessarily the half with a vote.** The stored copy is what the
+  register renders; the id is what `GET /by-risk/{riskId}` joins on. Two surfaces, two halves,
+  nothing comparing them — and every invented label was a coherent sentence, which is what a
+  fabrication needs to survive (F2-205's *consistency among copies is not evidence*, with the
+  copy that has no vote being the one an operator reads).
+  ⚠⚠ **THE FORM COLLECTED THE LABEL AND NEVER THE LINK.** `RiskScenariosPage` had two free-text
+  inputs (`riskCode` placeholdered **`'RSK-2026-042'`**, teaching the operator to invent a
+  reference — F2-236's placeholder rule on a register id rather than a person) and `onCreate`
+  **never sent `riskId`**. `forRisk` joins on that column, so **a scenario created through the
+  platform's own screen could never be found from its risk**; the `by-risk` client is dark, so the
+  link was neither written nor read from the client. 🔑 **Ask what a create form SENDS, not what
+  it shows.**
+  ⚠ **1 of the 8 body-bound `risk_id` writers validated it, and the reassuring sentence is what
+  narrowed the claim.** `NdiCrossLinkService`'s javadoc calls itself *"the single place where those
+  soft links are validated against their real targets"* — true **of NDI**, while seven peers write
+  the same column into the same table. F2-215's two-of-N. It could not be reused (ADR-012/018
+  forbid importing a peer's internals — the `CyberInputValidation` situation), and
+  `risk/scenario → risk` is **intra-module**, checked against `ModuleGraphRatchetTest`.
+  ⚠ **Re-deriving F2-244's filing refuted its own top pick and two more.**
+  `AuditEngagementService#create::annualPlanId` is **`String(64)`, not a numeric FK**, nothing
+  dereferences it, and there are **two classes with that simple name** (`audit_eng` and
+  `compliance`) — one of F2-222's filed 15 duplicate-name hazards, and the filing keyed on the
+  simple name. `NdiGapService#updateGap` validates on **both** paths.
+  `RiskControlFindingPivotService` dereferences `link.getRiskId()` at three sites with a bare
+  `findById` and **all three are correct** — each is followed by
+  `.filter(r -> orgId.equals(r.getOrganisationId()))`. A grep locates; reading adjudicates.
+  ⚠⚠ **MY OWN GATE FAILED ON THE CORRECT FIX ON ITS FIRST RUN, AND THE GATE WAS WRONG.** It
+  asserted *"exactly one call site"* per setter; `applyParentRisk` legitimately writes each in
+  **both** branches (no parent ⇒ all three cleared; resolved ⇒ all three derived). F2-206's rule
+  applied to an assertion: **a red leg is a finding only if the code is actually wrong.** The claim
+  that was wanted is *"the only writer is the resolver"* — about WHERE the writes live, which is
+  also the claim that prevents drift. ⚠ And **a fixture that cannot reach a branch proves nothing
+  about it**: `Risk` declares `private UUID externalId = UUID.randomUUID()` (F2-241's
+  field-initialiser family), so the "risk with no reference" helper silently held a random UUID and
+  the null-branch test failed for a reason unrelated to the code.
+  ⚠ **A probe leg that asserts more than its claim fails for reasons unrelated to the claim** — one
+  leg compared the whole `ProblemDetail` envelope instead of its `detail` and went red on a correct
+  server. ⚠ And the Python locator said **52** pairs where the Java gate says **49**: *write the
+  sweep as the gate, over the same tree, in the same language* (F2-213), fourth consecutive slice.
+  ⚙ **`ParentIdentityCopyContractTest` is deliberately two instruments**: an invariant over this
+  register (hard zero, **no exemptions** — a derived copy is always available, so there is no
+  correct code for it to fail on) and an **exactly-asserted census** by reflection over all 425
+  shipped entities — **49 (id + identity-copy) pairs**, 2 with a verdict (`platform.audit_log`,
+  `ndi.audit_event` are **BY DESIGN**: an audit row must keep the code the entity carried *when the
+  event happened*), the other 47 a **work list with no verdicts** (F2-188). ⚠ Roughly half that raw
+  population is `*_by_id + *_by_name`, i.e. F2-236's **actor-attribution** family — a different
+  question whose answer is the authenticated principal, not a derived copy. Classify before reading.
+  ⚙ **Filed:** the 47-site work list (F2-243's filing already noticed `scm.exit_plans`, one of its
+  four `scm` members); the **11 live divergent scenarios + 1 dangling `risk_id = 25`**, where repair
+  means choosing per row whether the id or the label was the intent (owner decision);
+  **`risk_lc.treatment_plans` holds a live CROSS-TENANT row in both databases** (plan 1 is org 2
+  naming org 1's risk 1, sharing `external_id` with plan 2, so seed-origin) and `risk_lc`
+  dereferences the risk **nowhere**, making it F2-239's least-urgent kind while still proving
+  F2-242's *"waiting for the row that dereferences it"* is not hypothetical; **no
+  `risk.scenarios.risk_title_ar`**, so the register's risk label is English-only on an
+  Arabic-primary UI (house rule 7); **`risk_id` carries no FOREIGN KEY on 19 of the 21 tables that
+  declare a soft link to `risk.risks`**; and the structural `@TenantOwned` root, which for this
+  shape would also derive any identity copy from what it resolved.
 - ⚠⚠ **AN AUTHORITY CHECK ON THE CALLER IS NOT A CHECK ON THE REFERENT, AND ONE METHOD
   VERIFIED ONE OF ITS TWO FOREIGN KEYS WITH A COMMENT SAYING SO** (F2-244, measured 2026-08-19).
   `CoiService#recordRecusal` stored `req.userId()` verbatim **three lines below**
