@@ -64,6 +64,38 @@ export interface ScenarioCreateRequest {
   methodologyNotesEn?: string; methodologyNotesAr?: string;
 }
 
+/**
+ * What the register's risk column can honestly say about the parent risk.
+ *
+ * F2-245. The label is the server-derived `riskTitleEn`; this tooltip carries the two
+ * things the label cannot:
+ *
+ *   * the reference (`riskCode`), which is `risk.risks.external_id` — a UUID, so it is
+ *     useful on hover and useless as a column;
+ *   * the fact that **`risk.scenarios` has no `risk_title_ar` column**, so on an
+ *     Arabic-primary UI this one name is unavoidably English (house rule 7). The risk
+ *     register itself *does* store `title_ar` — the picker in the create form shows it —
+ *     so the gap is the snapshot column, not the data. Filed: adding it is a migration
+ *     plus a decision about whether the snapshot should be bilingual.
+ *
+ * ⚠ This exists because the first draft rendered `title={r.riskCode}` under a comment
+ * claiming the tooltip stated the Arabic caveat. It did not. Found in the browser after
+ * every gate was green — F2-184's shape, where a comment describing a behaviour that does
+ * not exist is worse than no comment because it answers the question a reader was about
+ * to ask.
+ */
+export function parentRiskTooltip(
+  r: Pick<RiskScenario, 'riskCode' | 'riskTitleEn'>,
+  lang: 'en' | 'ar',
+): string | undefined {
+  const parts: string[] = [];
+  if (r.riskCode) parts.push(r.riskCode);
+  if (lang === 'ar' && r.riskTitleEn) {
+    parts.push('يُخزَّن اسم المخاطرة في هذا السجل بالإنجليزية فقط.');
+  }
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
 const BASE = '/api/risk/scenarios';
 
 export function listScenarios(status?: ScenarioStatus, page = 0, size = 50):

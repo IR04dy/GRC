@@ -249,6 +249,23 @@ class ParentIdentityCopyContractTest {
                 .as("the picker's options must come from the tenant's own register, so a risk "
                   + "the tenant does not own cannot be named at all")
                 .contains("riskApi.list");
+
+        // ⚠ The register's risk column must route its tooltip through the predicate that
+        // discloses the house-rule-7 gap, not through a bare `riskCode`. The first draft
+        // rendered `title={r.riskCode}` under a comment claiming otherwise — F2-184's shape,
+        // found in the browser after every gate here was green.
+        //
+        // Asserted as a CALL SHAPE (`name\s*\(`), never the bare token: F2-194 recorded a
+        // substring check satisfied by an import and F2-205 one satisfied by a name still in
+        // an import list.
+        assertThat(Pattern.compile("parentRiskTooltip\\s*\\(").matcher(page).find())
+                .as("the risk column's tooltip must come from parentRiskTooltip, which carries "
+                  + "the reference AND says that risk.scenarios has no risk_title_ar column")
+                .isTrue();
+        assertThat(Pattern.compile("title=\\{\\s*r\\.riskCode").matcher(page).find())
+                .as("the tooltip may not be a bare riskCode — that is the shape whose comment "
+                  + "claimed to disclose the Arabic gap and did not")
+                .isFalse();
     }
 
     // ── leg 4: the census — the shape platform-wide, no verdicts ──────────────────────────────

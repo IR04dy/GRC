@@ -18,7 +18,7 @@ import { riskApi } from '../../lib/api';
 import {
   listScenarios, createScenario, approveScenario, rejectScenario, archiveScenario,
   parseMonteCarloResult, fmtSar,
-  SCENARIO_STATUS_TONE, SCENARIO_TYPE_LABEL_KEY,
+  SCENARIO_STATUS_TONE, SCENARIO_TYPE_LABEL_KEY, parentRiskTooltip,
   type RiskScenario, type ScenarioType,
 } from '../../lib/riskScenarios';
 
@@ -297,19 +297,24 @@ export function RiskScenariosPage() {
                             <td className="mono">{r.scenarioCode}</td>
                             <td>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}</td>
                             {/*
-                              F2-245 — show the derived TITLE, with the reference as the
-                              tooltip. Before the fix this cell rendered `riskCode`, which
-                              was free text an operator had typed; now the server derives
-                              it from the risk, and `risk.risks`' only reference is a UUID,
-                              so printing the code would have made the fix render WORSE.
-                              ⚠ There is no `risk_title_ar` column, so this label is
-                              English-only on an Arabic-primary UI (house rule 7) — filed,
-                              because adding it is a migration. The `title` states that
-                              rather than letting the gap read as an absent risk.
+                              F2-245 — show the derived TITLE, with the reference and the
+                              language caveat in the tooltip. Before the fix this cell
+                              rendered `riskCode`, which was free text an operator had
+                              typed; now the server derives it from the risk, and
+                              `risk.risks`' only reference is a UUID, so printing the code
+                              would have made the fix render WORSE.
+
+                              ⚠ The FIRST draft of this comment claimed "the `title` states
+                              that" about the Arabic gap while the `title` carried only the
+                              UUID — found in the browser after every gate was green, and
+                              it is F2-184's shape (a comment describing a behaviour that
+                              does not exist is worse than no comment, because it answers
+                              the question a reader was about to ask). `parentRiskTooltip`
+                              now actually says it.
                             */}
                             <td>
                               {r.riskTitleEn || r.riskCode
-                                ? <span title={r.riskCode ?? undefined}>{r.riskTitleEn ?? r.riskCode}</span>
+                                ? <span title={parentRiskTooltip(r, lang)}>{r.riskTitleEn ?? r.riskCode}</span>
                                 : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                             </td>
                             <td>{t(SCENARIO_TYPE_LABEL_KEY[r.scenarioType])}</td>
