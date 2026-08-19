@@ -2,6 +2,8 @@ package com.tss.grc.module.sust.ghg.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.evidence.entity.EvidenceItem;
+import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.ghg.entity.EmissionFactor;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -25,6 +27,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -45,6 +49,8 @@ class GhgEmissionRecordServiceTest {
     @Mock private OrganisationSettingsService settingsService;
     @Mock private AuditLogService audit;
     @Mock private EmissionFactorRepository factorRepo;
+    /** F2-243 — Rule 2 resolves the evidence item it cites, so the gate needs the real collaborator. */
+    @Mock private EvidenceItemRepository evidenceItems;
     @InjectMocks private GhgEmissionRecordService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -231,20 +237,118 @@ class GhgEmissionRecordServiceTest {
         assertThat(after.getVerified()).isFalse();
     }
 
-    // ── S-J — evidence-item FK satisfies the verify gate (Rule 2) ─────
+    // ── S-J / F2-243 — an evidence-item FK satisfies the verify gate (Rule 2) ─────
+    //
+    // ⚠ This pair replaces a single test named
+    // `verify_acceptsWhenEvidenceItemIdPresent_evenIfRefBlank`, which asserted that the PRESENCE of
+    // an id is enough — i.e. it asserted the defect as correct, in its own name. That is the Nth
+    // instance in this programme of a test locking one in (F2-159, F2-175, F2-227, F2-234, F2-236),
+    // and a name that states the behaviour under review is the strongest possible reason not to look
+    // further (F2-216). Repurposed rather than deleted: the half that protects the record — a real
+    // evidence item discharges Rule 2 with no free-text ref — is kept, and the half that was missing
+    // is now asserted beside it.
 
     @Test
-    void verify_acceptsWhenEvidenceItemIdPresent_evenIfRefBlank() {
+    void verify_acceptsAUsableEvidenceItem_withNoFreeTextRef() {
         GhgEmissionRecord r = new GhgEmissionRecord();
         r.setId(10L); r.setOrganisationId(ORG_ID); r.setStatus("SUBMITTED");
         r.setEvidenceRef(null); r.setEvidenceItemId(77L);        // real FK, no free-text ref
         r.setVerified(false);
         when(repo.findByIdAndOrganisationId(10L, ORG_ID)).thenReturn(Optional.of(r));
         when(repo.save(any(GhgEmissionRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(evidenceItems.findUsableAsEvidence(eq(77L), eq(ORG_ID), any()))
+            .thenReturn(Optional.of(new EvidenceItem()));
 
         GhgEmissionRecord after = service.transition(10L, "VERIFIED");
         assertThat(after.getStatus()).isEqualTo("VERIFIED");
         assertThat(after.getVerified()).isTrue();
+    }
+
+    @Test
+    void verify_refusesAnItemTheEvidenceModuleWillNotVouchFor_namingItsState() {
+        // Probed live before the fix: a record citing the register's one REJECTED item verified with
+        // HTTP 200 and stored verified = true, and so did one citing an EXPIRED item. 51 of the 78
+        // live items are not APPROVED, in dev and prod alike.
+        GhgEmissionRecord r = new GhgEmissionRecord();
+        r.setId(11L); r.setOrganisationId(ORG_ID); r.setStatus("SUBMITTED");
+        r.setEvidenceRef(null); r.setEvidenceItemId(30L);
+        r.setVerified(false);
+        when(repo.findByIdAndOrganisationId(11L, ORG_ID)).thenReturn(Optional.of(r));
+        when(evidenceItems.findUsableAsEvidence(eq(30L), eq(ORG_ID), any()))
+            .thenReturn(Optional.empty());
+        EvidenceItem rejected = new EvidenceItem();
+        rejected.setStatus("REJECTED");
+        when(evidenceItems.findByIdAndOrganisationId(30L, ORG_ID)).thenReturn(Optional.of(rejected));
+
+        assertThatThrownBy(() -> service.transition(11L, "VERIFIED"))
+            .isInstanceOf(IllegalArgumentException.class)
+            // The state has to be in the message: "not usable" on its own sends nobody anywhere,
+            // and the caller needs to know whether to chase a review or a re-collection (F2-180).
+            .hasMessageContaining("30")
+            .hasMessageContaining("REJECTED");
+        assertThat(r.getStatus()).as("the record must not move").isEqualTo("SUBMITTED");
+        assertThat(r.getVerified()).isFalse();
+    }
+
+    @Test
+    void verify_stillRefusesWhenThereIsNoEvidenceAtAll() {
+        // The gate's original job, unchanged — and it must be refused BEFORE anything is resolved,
+        // so a record with no evidence never reaches the evidence module at all.
+        GhgEmissionRecord r = new GhgEmissionRecord();
+        r.setId(12L); r.setOrganisationId(ORG_ID); r.setStatus("SUBMITTED");
+        r.setEvidenceRef("  "); r.setEvidenceItemId(null);
+        when(repo.findByIdAndOrganisationId(12L, ORG_ID)).thenReturn(Optional.of(r));
+
+        assertThatThrownBy(() -> service.transition(12L, "VERIFIED"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("requires evidence");
+        verifyNoInteractions(evidenceItems);
+    }
+
+    @Test
+    void verify_theLegacyFreeTextRefStillDischargesRule2_withoutResolvingAnything() {
+        // Deliberately untouched: it is what the five APPROVED rows in both databases were verified
+        // against (BV and KPMG assurance statements predating the S-C bridge). Tightening it would
+        // refuse requests that work today for no gain the caller can act on (F2-182).
+        GhgEmissionRecord r = new GhgEmissionRecord();
+        r.setId(13L); r.setOrganisationId(ORG_ID); r.setStatus("SUBMITTED");
+        r.setEvidenceRef("KPMG-Verif-2025-S2-Riyadh.pdf"); r.setEvidenceItemId(null);
+        when(repo.findByIdAndOrganisationId(13L, ORG_ID)).thenReturn(Optional.of(r));
+        when(repo.save(any(GhgEmissionRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.transition(13L, "VERIFIED").getStatus()).isEqualTo("VERIFIED");
+        verifyNoInteractions(evidenceItems);
+    }
+
+    @Test
+    void update_acceptsAnEchoOfTheStoredEvidenceItemButRefusesAChange() {
+        // The register's PUT binds the whole entity, so a round-trip edit resends the id it just
+        // read: an echo must pass (F2-231/F2-234). A change must not — evidence_item_id belongs to
+        // the S-C bridge, which is the only writer that also records the EvidenceLink the assurance
+        // package is built from.
+        GhgEmissionRecord r = new GhgEmissionRecord();
+        r.setId(14L); r.setOrganisationId(ORG_ID); r.setStatus("DRAFT");
+        // update() ends in validate(), so the row has to be a legal one — an incomplete fixture
+        // throws for an unrelated reason and the assertion below would pass on the wrong exception
+        // (F2-219: a test that fails on the unmutated tree makes every mutation read as killed).
+        r.setScope((short) 1); r.setCategory("Mobile combustion");
+        r.setSourceNameEn("Fleet diesel"); r.setReportingYear((short) 2025);
+        r.setEmissionValueTco2e(new BigDecimal("12.50"));
+        r.setEvidenceItemId(77L);
+        when(repo.findByIdAndOrganisationId(14L, ORG_ID)).thenReturn(Optional.of(r));
+        when(repo.save(any(GhgEmissionRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        GhgEmissionRecord echo = new GhgEmissionRecord();
+        echo.setEvidenceItemId(77L);
+        echo.setNotes("edited");
+        assertThat(service.update(14L, echo).getNotes()).isEqualTo("edited");
+
+        GhgEmissionRecord change = new GhgEmissionRecord();
+        change.setEvidenceItemId(78L);
+        assertThatThrownBy(() -> service.update(14L, change))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("/api/sustainability/evidence/link");
+        assertThat(r.getEvidenceItemId()).as("the stored linkage must be untouched").isEqualTo(77L);
     }
 
     // ── S-J — library factor + unit registry → COMPUTED value ─────────

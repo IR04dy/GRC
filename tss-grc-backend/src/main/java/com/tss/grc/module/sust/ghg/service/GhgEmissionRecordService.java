@@ -2,6 +2,8 @@ package com.tss.grc.module.sust.ghg.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.evidence.entity.EvidenceItem;
+import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.ghg.entity.EmissionFactor;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -46,6 +49,15 @@ public class GhgEmissionRecordService {
     private final AuditLogService audit;
     /** S-J — versioned emission-factor library, for records that reference a library factor. */
     private final EmissionFactorRepository factorRepo;
+    /**
+     * F2-243 — Rule 2 has to resolve the evidence item it cites, not merely count it.
+     *
+     * <p>No new module edge: {@code sust → evidence} already exists, because
+     * {@code sust/evidence/SustEvidenceLinkService} — the S-C bridge that owns this same FK — has
+     * held {@code EvidenceItemRepository} since the bridge was built. {@code ModuleGraphRatchetTest}
+     * is unmoved by this, which was checked rather than assumed.
+     */
+    private final EvidenceItemRepository evidenceItems;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -118,7 +130,7 @@ public class GhgEmissionRecordService {
         if (req.getMethodology() != null)        cur.setMethodology(req.getMethodology());
         if (req.getNotes() != null)              cur.setNotes(req.getNotes());
         if (req.getEvidenceRef() != null)        cur.setEvidenceRef(req.getEvidenceRef());
-        if (req.getEvidenceItemId() != null)     cur.setEvidenceItemId(req.getEvidenceItemId());
+        requireEvidenceLinkageIsUnchanged(cur, req);
         if (req.getOwnerName() != null)          cur.setOwnerName(req.getOwnerName());
         if (req.getOwnerEmail() != null)         cur.setOwnerEmail(req.getOwnerEmail());
         applyDerivation(cur);
@@ -134,6 +146,41 @@ public class GhgEmissionRecordService {
         audit.log("UPDATE", "GhgEmissionRecord", saved.getId(),
             "Updated GHG record" + (wasVerified ? " — verification reset, re-verification required" : ""));
         return saved;
+    }
+
+    /**
+     * F2-243 — {@code evidence_item_id} has TWO writers, and only one of them is the bridge.
+     *
+     * <p>{@code SustEvidenceLinkService.link()} is the declared S-C attachment path: it resolves
+     * the item inside the caller's tenant, records a generic {@code EvidenceLink} <em>so
+     * buildPackage() can bundle the file and its SHA-256 for an assurer</em>, and writes a
+     * LINK_EVIDENCE audit row. This method wrote the same column straight from the request body and
+     * did none of the three — so a record could be VERIFIED citing an item the ISAE 3410 evidence
+     * package would not contain. That is the shape F2-188/F2-189/F2-191 each found in a state
+     * machine: the duplicate agrees with the original on the part that is easy to check (the
+     * column) and differs on the parts nothing asserts.
+     *
+     * <p>So the linkage is now read-only here and the bridge is the single writer. An <b>echo</b> of
+     * the stored value is accepted, because the register's PUT binds the whole entity and a
+     * round-trip edit (GET, change one field, send it all back) must keep working; a <b>change</b>
+     * is refused, naming the endpoint that owns it (F2-231/F2-234's echo-versus-change rule).
+     *
+     * <p>Safe to refuse rather than silently drop (F2-44): {@code GhgCreateRequest} does not declare
+     * the field at all, so the create was already closed by its bound type; no frontend client sends
+     * it (the ESG screens attach GHG evidence through {@code sustEvidenceLinks.ts}); and it is null
+     * on all 18 live rows in dev and prod. Nothing that works today starts failing.
+     */
+    private void requireEvidenceLinkageIsUnchanged(GhgEmissionRecord cur, GhgEmissionRecord req) {
+        Long requested = req.getEvidenceItemId();
+        if (requested == null || requested.equals(cur.getEvidenceItemId())) return;
+        throw new IllegalArgumentException(
+            "evidenceItemId is set by the evidence bridge, not by this endpoint: POST "
+            + "/api/sustainability/evidence/link {entityType:'GhgEmissionRecord', entityId:"
+            + cur.getId() + ", evidenceItemId:" + requested + "}. It resolves the item in your "
+            + "organisation and records the EvidenceLink the assurance package is built from — "
+            + "writing the column directly would leave the record citing evidence that package "
+            + "does not contain. Currently linked: "
+            + (cur.getEvidenceItemId() == null ? "none" : cur.getEvidenceItemId()) + ".");
     }
 
     /**
@@ -171,12 +218,7 @@ public class GhgEmissionRecordService {
         if (!ok) throw new IllegalTransitionException(from, to, Set.of("SUBMITTED","VERIFIED","APPROVED","ARCHIVED"));
         // Rule 2 — verifying requires evidence: a real evidence-item FK (S-C)
         // OR the legacy free-text evidence_ref.
-        if ("VERIFIED".equals(to)
-                && cur.getEvidenceItemId() == null
-                && (cur.getEvidenceRef() == null || cur.getEvidenceRef().isBlank())) {
-            throw new IllegalArgumentException(
-                "GHG verification requires evidence (Rule 2): attach an evidence item (evidenceItemId) or set evidence_ref.");
-        }
+        if ("VERIFIED".equals(to)) requireRule2Evidence(cur);
         cur.setStatus(to);
         LocalDateTime now = LocalDateTime.now();
         switch (to) {
@@ -188,6 +230,53 @@ public class GhgEmissionRecordService {
         GhgEmissionRecord saved = repo.save(cur);
         audit.log("TRANSITION", "GhgEmissionRecord", saved.getId(), "GHG record -> " + to);
         return saved;
+    }
+
+    /**
+     * Rule 2 — a GHG figure may not be marked VERIFIED without evidence.
+     *
+     * <p>F2-243 — this used to ask {@code cur.getEvidenceItemId() == null}. A presence test on an
+     * id is not a check on the thing it names, so the gate CLAUDE.md lists among the platform's
+     * server-enforced four-eyes controls was discharged by any non-null number the foreign key
+     * would accept. Probed live as {@code so_officer}: a record citing the one REJECTED evidence
+     * item in the register verified with HTTP 200 and stored {@code verified = true}, and so did one
+     * citing an EXPIRED item. 51 of the 78 live items are not APPROVED (31 EXPIRED, 15
+     * PENDING_REVIEW, 4 DRAFT, 1 REJECTED — identical in dev and prod), so the gate built to consume
+     * the evidence module's four-eyes review and its nightly staleness sweep was being discharged by
+     * their rejected output. An ISAE 3410 assurance input.
+     *
+     * <p>The resolution is {@code module/evidence}'s, not this module's — a caller that cannot name
+     * an evidence status cannot invent its own idea of what counts as evidence (F2-196). The state is
+     * checked HERE, at consumption, rather than when the item was attached, because an item can be
+     * approved on the day it is linked and expired by the time somebody verifies against it.
+     *
+     * <p>⚠ The legacy free-text {@code evidence_ref} branch is deliberately untouched. It is what
+     * the five APPROVED rows in both databases were verified against (BV and KPMG assurance
+     * statements, recorded before the S-C bridge existed), and tightening it would refuse requests
+     * that work today for no gain the caller can act on (F2-182).
+     */
+    private void requireRule2Evidence(GhgEmissionRecord cur) {
+        String ref = cur.getEvidenceRef();
+        if (ref != null && !ref.isBlank()) return;              // legacy free-text branch
+        Long itemId = cur.getEvidenceItemId();
+        if (itemId == null) {
+            throw new IllegalArgumentException(
+                "GHG verification requires evidence (Rule 2): attach an evidence item (evidenceItemId) or set evidence_ref.");
+        }
+        evidenceItems.findUsableAsEvidence(itemId, org(), LocalDate.now()).orElseThrow(() -> {
+            // Name the state, so the caller knows whether to chase a review or a re-collection --
+            // "not usable" on its own sends nobody anywhere (F2-180: a diagnostic that names the
+            // column is worth more than one that is merely correct).
+            String state = evidenceItems.findByIdAndOrganisationId(itemId, org())
+                .map(e -> "status=" + e.getStatus()
+                          + (e.getValidTo() == null ? "" : ", validTo=" + e.getValidTo()))
+                .orElse("not found in this organisation");
+            return new IllegalArgumentException(
+                "GHG verification requires evidence (Rule 2): evidence item " + itemId
+                + " cannot support a verification (" + state + "). It must be "
+                + EvidenceItem.APPROVED + " and still in date — have it reviewed at POST "
+                + "/api/v1/evidence/reviews, or attach a current item instead.");
+        });
     }
 
     @Transactional
