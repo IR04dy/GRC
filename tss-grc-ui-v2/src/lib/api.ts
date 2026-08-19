@@ -333,8 +333,32 @@ export interface CaseActionDto {
   actionType: string;
   title: string;
   description?: string;
+  /** Server-owned: the column is `insertable = false`, so the database supplies it. */
   actionAt?: string;
+  /** Who did it — server-owned since F2-248, taken from the authenticated principal. */
   actorName?: string;
+  /**
+   * The actor's user id.
+   *
+   * F2-248 — declared here for the same reason as `ChangeCommentDto.authorId`: the wire carried it
+   * and this type did not, so the timeline could not distinguish an attributed action from a
+   * free-text office label. `EthicsPage` sent no actor at all, so every action recorded through the
+   * platform's own screen stored `actor_name = NULL` and `actor_id = NULL` — the action log of a
+   * misconduct investigation saying what happened and when, and not who did it.
+   */
+  actorId?: number;
+  isConfidential?: boolean;
+}
+/**
+ * F2-248 — what a caller may send when recording an ethics case action.
+ *
+ * No actor: `addAction` used to bind the entity and never touch `actorName`/`actorId`, so both were
+ * stored exactly as they arrived. The server now takes both from the principal.
+ */
+export interface CaseActionCreateDto {
+  actionType: string;
+  title: string;
+  description?: string;
   isConfidential?: boolean;
 }
 export interface CaseLinkDto {
@@ -373,7 +397,7 @@ export const ethicsCaseApi = {
   transition: (id: number, body: Record<string, unknown>) => api.post<EthicsCaseDto>(`/api/v1/ethics/cases/${id}/transition`, body),
 
   actions:    (id: number) => api.get<CaseActionDto[]>(`/api/v1/ethics/cases/${id}/actions`),
-  addAction:  (id: number, body: Partial<CaseActionDto>) => api.post<CaseActionDto>(`/api/v1/ethics/cases/${id}/actions`, body),
+  addAction:  (id: number, body: CaseActionCreateDto) => api.post<CaseActionDto>(`/api/v1/ethics/cases/${id}/actions`, body),
 
   links:      (id: number) => api.get<CaseLinkDto[]>(`/api/v1/ethics/cases/${id}/links`),
   addLink:    (id: number, body: Partial<CaseLinkDto>) => api.post<CaseLinkDto>(`/api/v1/ethics/cases/${id}/links`, body),
@@ -674,8 +698,36 @@ export interface ChangeLinkDto {
 }
 export interface ChangeCommentDto {
   id?: number; changeRequestId?: number;
-  authorName: string; body: string;
+  /**
+   * Who wrote it — server-owned since F2-248, taken from the authenticated principal.
+   *
+   * `NOT NULL` in the column, so the wire always carries it.
+   */
+  authorName: string;
+  /**
+   * The author's user id.
+   *
+   * F2-248 — the wire has always carried this (the endpoint returns the entity) and this type
+   * never declared it, which is F2-198's `crossBorderTransfer` shape: the register could not tell
+   * an attributed row from a free-text label, so it showed both identically. Measured: NULL on
+   * **45 of 45** dev rows and **46 of 46** prod rows, because nothing had ever written the column.
+   * Rows created from F2-248 onwards carry it; the pre-existing ones never will, and the panel
+   * discloses that difference rather than letting an unattributable row read as a tidy one.
+   */
+  authorId?: number;
+  body: string;
   createdAt?: string;
+}
+/**
+ * F2-248 — what a caller may send when adding a comment: the text, and nothing else.
+ *
+ * The author used to be a request field (`getUser()?.username ?? 'You'`), and the prod register
+ * holds a row whose author is the literal string `'You'`. The server now takes both halves of the
+ * attribution from the principal and the bound type has no field for either, so the forgery is not
+ * expressible rather than merely rejected.
+ */
+export interface ChangeCommentCreateDto {
+  body: string;
 }
 /**
  * S8b/CE-12 — one ITIL/ISO KPI, with the population it was computed over.
@@ -1157,7 +1209,7 @@ export const changeApi = {
                                                      { evidenceId, notes }),
 
   comments:    (id: number) => api.get<ChangeCommentDto[]>(`/api/v1/changes/${id}/comments`),
-  comment:     (id: number, body: Partial<ChangeCommentDto>) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),
+  comment:     (id: number, body: ChangeCommentCreateDto) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),
 
   analytics:   () => api.get<ChangeAnalyticsDto>('/api/v1/changes/analytics'),
 

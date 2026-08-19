@@ -130,8 +130,15 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
   async function postComment() {
     if (!commentBody.trim()) return;
     try {
-      // CH-8: attribute the comment to the signed-in user, not a hardcoded 'You'.
-      await changeApi.comment(change!.id, { authorName: getUser()?.username ?? 'You', body: commentBody });
+      // F2-248 — the author is not sent at all. The server takes it from the authenticated
+      // principal, and `ChangeCommentCreateDto` has no field for it.
+      //
+      // ⚠ This line used to read `{ authorName: getUser()?.username ?? 'You', ... }` under a
+      // comment claiming "CH-8: attribute the comment to the signed-in user, not a hardcoded
+      // 'You'" — and the `?? 'You'` fallback it kept is in the PROD register, on a real row. A
+      // comment that says the placeholder was removed, above the line that still supplies it,
+      // is worse than no comment (F2-184).
+      await changeApi.comment(change!.id, { body: commentBody });
       setCommentBody(''); void reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -317,6 +324,21 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
                   <div key={c.id} className="changes-comment-item">
                     <div className="changes-comment-meta">
                       <strong className="changes-comment-author">{c.authorName}</strong>
+                      {/*
+                        F2-248 — three states, and the middle two must not look alike (F2-209).
+                        A row with an `authorId` was attributed by the server from the authenticated
+                        principal. A row without one predates that and carries whatever the caller
+                        typed — 45 of 45 dev rows and 46 of 46 prod rows, one of them literally
+                        'You'. Blanking the name would let the unattributable rows read as the
+                        tidiest (F2-197), so the name stays and the row says what it is.
+                      */}
+                      {c.authorId == null && (
+                        <span role="status" className="changes-comment-unverified"
+                              title={t('changeCommentUnverifiedHint')}
+                              aria-label={t('changeCommentUnverifiedHint')}>
+                          {t('changeCommentUnverified')}
+                        </span>
+                      )}
                       {c.createdAt && <span className="mono changes-comment-time">{new Date(c.createdAt).toLocaleString()}</span>}
                     </div>
                     <div className="changes-comment-body">{c.body}</div>

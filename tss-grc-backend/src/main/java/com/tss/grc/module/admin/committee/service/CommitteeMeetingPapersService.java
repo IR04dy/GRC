@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -64,6 +65,23 @@ public class CommitteeMeetingPapersService {
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
+        // F2-248 — WHO circulated is the acting principal, and it was recording nobody.
+        // `circulated_by` is a user id, was bound straight from the request, and is NULL on all 21
+        // live rows in dev and prod: the column existed and nothing ever wrote it, so the record of
+        // a CMA/SAMA committee paper circulation named neither a real circulator nor a verifiable
+        // one. Found by READING the row the F2-248 vocabulary widening surfaced, not by the gate —
+        // `circulated` is not one of AUTHORITY_SHAPE's 29 verbs either.
+        //
+        // ⚠ `authorName` beside it is deliberately NOT touched. That is the paper's PREPARER, a
+        // third party: there is no `author_id` column, `author_role` holds an office, and all 21
+        // rows in both databases name a body ('COM-BOARD Secretariat') resolving to no iam.users
+        // row. F2-236's counterpartySigner precedent, and the schema's own separation of
+        // `circulated_by` from `author_name` is what settles it.
+        //
+        // ⚠ `circulatedAt` stays a FALLBACK, not a stamp: back-dating a circulation that happened
+        // last week is legitimate, and F2-233(d) established that a fallback is not an ownership
+        // claim. So this is not the split-attribution shape — it is a column with no writer.
+        in.setCirculatedBy(CurrentActor.requireUserId("a paper circulation"));
         if (in.getCirculatedAt() == null) in.setCirculatedAt(LocalDateTime.now());
         if (in.getConfidentiality() == null) in.setConfidentiality("INTERNAL");
         if (in.getLatePaper() == null) in.setLatePaper((short) 0);

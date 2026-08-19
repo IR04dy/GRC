@@ -348,7 +348,13 @@ class MassAssignmentRatchetTest {
             "counterpartySigner", "escalatedAt", "integrityVerifiedAt", "lastAttestedAt",
             "lastReviewedAt", "lastReviewedBy", "loiSignedAt", "pirReviewedAt", "pirReviewedBy",
             "publishedAt", "ratificationEscalatedAt", "ratifiedAt", "rejectedAt", "reviewedAt",
-            "reviewer", "reviewerId", "reviewerName", "reviewerUserId", "signerName");
+            "reviewer", "reviewerId", "reviewerName", "reviewerUserId", "signerName",
+            // F2-248 — the two agent nouns F2-217's own shape did not spell. Both are the sole
+            // record of who performed an act, and both sat in the LOW tier because of it.
+            // The camelCase-suffixed forms are here too: a rule anchored only at the start of the
+            // name would miss `lastAuthorId`, and missing one silently shrinks the work list.
+            "author", "authorId", "authorName", "actor", "actorId", "actorName",
+            "lastAuthorId", "caseActorId", "reviewActorName");
 
         assertThat(measuredOnRealEntities).allSatisfy(n ->
             assertThat(isAuthorityField(n))
@@ -363,7 +369,16 @@ class MassAssignmentRatchetTest {
 
         List<String> notAuthority = List.of(
             "createdAt", "updatedAt", "lastUpdated", "deletedAt", "titleEn", "status",
-            "organisationId", "targetDate", "hours", "externalId", "engagementCode", "severity");
+            "organisationId", "targetDate", "hours", "externalId", "engagementCode", "severity",
+            // F2-248 — the near-misses that keep `author`/`actor` from being a blanket widening.
+            // `authority`/`actionType` share a prefix; `authorRole`/`actorRole` name a role rather
+            // than an identity, so the tail group excludes them. The last three are the reason
+            // SHORT_AGENT_SHAPE exists at all: `actor` is a SUBSTRING of `factor`, `contractor` and
+            // `benefactor`, and the first draft — which reused AGENT_SHAPE's `(?:.*[a-z0-9])?`
+            // prefix — paired `factorName` on its very first run. If any of these starts pairing,
+            // the camelCase anchor has been dropped and the profile is about to re-tier on nothing.
+            "authority", "authorityName", "authorRole", "actorRole", "actionType",
+            "factorName", "contractorName", "benefactorId");
         assertThat(notAuthority).allSatisfy(n ->
             assertThat(isAuthorityField(n))
                 .as("'%s' is not an authority field. A shape this wide would re-tier the platform "
@@ -406,6 +421,134 @@ class MassAssignmentRatchetTest {
             .isEmpty();
     }
 
+    /**
+     * F2-248 — a purpose-built request type may not declare who performed the act either.
+     *
+     * <h2>Why this leg exists beside the entity-bound ranking</h2>
+     *
+     * <p>Everything above measures endpoints that bind an {@code @Entity}. The fix for such an
+     * endpoint is to bind a narrow record instead (F2-213's structural direction, and what F2-248
+     * did for the change-comment and ethics-action creates) — which moves it <b>out of that
+     * population entirely</b>. So without this leg, the strongest available fix is also the one that
+     * makes the endpoint invisible: re-add {@code authorName} to {@code ChangeCommentRequest} and
+     * nothing above would notice. 🔑 <b>A gate whose population is "endpoints that bind an entity"
+     * cannot see a DTO that reintroduces the defect, and the recommended fix is what moves an
+     * endpoint across that boundary.</b>
+     *
+     * <h2>Why the vocabulary is not copied</h2>
+     *
+     * <p>This leg calls {@link #isAuthorityField(String)} directly. Writing a second agent-noun list
+     * in a new gate class would commit the exact defect F2-248 is fixing — two vocabularies, nobody
+     * maintaining the agreement (F2-177) — and the whole finding is that F2-217's shape was still a
+     * list. One declaration, two readers.
+     *
+     * <h2>⚠⚠ Why this is a CENSUS and not a hard zero — my own first draft got it wrong</h2>
+     *
+     * <p>I wrote it as a hard zero with an empty exemption map. It reported <b>28</b> types, and
+     * reading the list showed the assertion was <b>wrong rather than the code</b>: a large share are
+     * <b>round-trip</b> DTOs — {@code BoardPackDto}, {@code CapaTaskDto}, {@code DsrCaseDto},
+     * {@code NcaEccFilingDto} — used for the response as well as the request. Such a type <b>must</b>
+     * declare {@code decidedBy}/{@code verifiedBy} in order to RETURN it, and whether the write path
+     * honours the inbound value is a question about the SERVICE, which
+     * {@code ServerStampedFieldContractTest} already asks. 🔑 <b>The question "does a bound type
+     * declare an actor field?" conflates inbound-only types with round-trip ones, so a zero over it
+     * would fail on correct code — the one thing a gate must never do (F2-214).</b>
+     *
+     * <p>So this is F2-204's rule applied to my own leg: when a figure cannot honestly be zero, ask
+     * whether the QUESTION was wrong. It is a <b>decrease-only census with no verdicts</b> (F2-188 —
+     * twenty-eight fluent reasons for unread code is the artefact that measured five-of-five false),
+     * and the enforceable half is per-type, in the behaviour tests beside each fix:
+     * {@code ChangeCommentProvenanceTest#theRequestTypeCannotCarryAnAuthorAtAll} and
+     * {@code EthicsCaseServiceTest} assert by reflection that the two types F2-248 built declare no
+     * actor at all — which is the shape a future reader would otherwise undo without any gate
+     * noticing.
+     */
+    @Test
+    void noRequestDtoDeclaresWhoPerformedTheAct() {
+        Map<String, String> found = new TreeMap<>();
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        for (var bd : scanner.findCandidateComponents("com.tss.grc")) {
+            Class<?> c;
+            try {
+                c = Class.forName(bd.getBeanClassName());
+            } catch (Throwable t) {
+                continue;
+            }
+            for (Method m : c.getDeclaredMethods()) {
+                if (!isWriteMapping(m)) {
+                    continue;
+                }
+                for (Parameter param : m.getParameters()) {
+                    Class<?> type = param.getType();
+                    // Entity-bound writes are the ranking's job, above. A Map body carries no
+                    // declared field to inspect, and F2-236 closed that shape by reading the call
+                    // sites instead — a scalar or Map parameter is measured there, not here.
+                    if (!hasRequestBody(param) || type.isAnnotationPresent(Entity.class)
+                        || Map.class.isAssignableFrom(type) || type.getName().startsWith("java.")) {
+                        continue;
+                    }
+                    List<String> actorFields = declaredNamesOf(type).stream()
+                        .filter(MassAssignmentRatchetTest::isAuthorityField)
+                        .sorted().toList();
+                    if (!actorFields.isEmpty()) {
+                        found.put(type.getSimpleName(), String.join(",", actorFields));
+                    }
+                }
+            }
+        }
+
+        System.out.println("[F2-248] bound request types declaring an authority/actor field = "
+            + found.size() + "  (a WORK LIST — read the service, then lower the figure)");
+        found.forEach((k, v) -> System.out.println("    NEEDS-READING  " + k + " -> " + v));
+
+        assertThat(found.size())
+            .as("A bound request type declaring who approved / reviewed / authored / performed the "
+              + "act is a LOCATOR, not yet a verdict: some of these are round-trip DTOs that must "
+              + "declare the field in order to RETURN it, and whether the write path honours the "
+              + "inbound value is ServerStampedFieldContractTest's question. Read the service, then "
+              + "either take the actor from the principal and delete the field — a field the bound "
+              + "type does not declare can never arrive (F2-233) — or record why the named party is "
+              + "genuinely a third party. Lower this figure in the same commit; it may never be "
+              + "raised (house rule 3).")
+            .isLessThanOrEqualTo(BASELINE_ACTOR_BEARING_REQUEST_TYPES);
+
+        // Anti-vacuity, and the floor sits above the largest WRONG answer rather than above zero
+        // (F2-215). The wrong answers here are: the scan resolves no controllers (0), or the
+        // vocabulary stops matching (which would ALSO look like progress against the ceiling above).
+        assertThat(found.size())
+            .as("a scan that stops resolving reports few types, and few reads exactly like clean")
+            .isGreaterThan(15);
+    }
+
+    /**
+     * F2-248 — bound request types that let the caller name the actor.
+     *
+     * <p>Decrease-only. Measured 28 on 2026-08-19, immediately after this slice took the two it
+     * created out of the population by construction. Deliberately NOT accompanied by 28 reasons
+     * (F2-188).
+     */
+    private static final int BASELINE_ACTOR_BEARING_REQUEST_TYPES = 28;
+
+    /**
+     * Field/record-component names a bound type declares.
+     *
+     * <p>⚠ A record's {@code @Size}/{@code @NotBlank} live on the backing field, not the component
+     * (F2-185b), but NAMES are the same either way — so this walks fields, which covers records and
+     * classes alike without the {@code RECORD_COMPONENT} trap.
+     */
+    private static List<String> declaredNamesOf(Class<?> type) {
+        List<String> names = new ArrayList<>();
+        for (Class<?> k = type; k != null && k != Object.class; k = k.getSuperclass()) {
+            for (Field f : k.getDeclaredFields()) {
+                if (!f.isSynthetic()) {
+                    names.add(f.getName());
+                }
+            }
+        }
+        return names;
+    }
+
     @Test
     void aBodyBindingBothATenantAndAStateFieldIsNeverRankedTenant() {
         List<String> masked = rankEntityBoundWrites().stream()
@@ -437,6 +580,28 @@ class MassAssignmentRatchetTest {
      * </ul>
      */
     private static final Map<String, String> ADJUDICATED = Map.ofEntries(
+        // ── F2-248: the one row the author/actor/circulated widening surfaced ─────────────
+        //
+        // Three fields, three different answers, which is why a per-endpoint verdict has to say
+        // which is which (F2-231's per-field lesson):
+        //   · circulatedBy — CLOSED. A user id, bound from the request, never written by the
+        //     service, NULL on all 21 live rows in dev and prod. Now stamped from the principal.
+        //   · authorName   — BY DESIGN, verified rather than reasoned: there is no author_id
+        //     column, `author_role` holds an office, and all 21 rows in both databases name a BODY
+        //     ('COM-BOARD Secretariat') resolving to no iam.users row. A committee paper's author is
+        //     its PREPARER — the CFO, a department, an external advisor — and the schema's own
+        //     separation of circulated_by from author_name is what settles it. F2-236 verified the
+        //     same shape for counterpartySigner.
+        //   · circulatedAt — TOLERATED as a fallback, stated rather than glossed: back-dating a
+        //     circulation that happened last week is legitimate, and F2-233(d) established that a
+        //     fallback is not an ownership claim. So this endpoint is NOT the split-attribution
+        //     shape; it was a column with no writer at all.
+        Map.entry("CommitteeMeetingPapersController#circulate(CommitteeMeetingPaper)",
+            "CLOSED F2-248 (circulatedBy) — was bound from the body and NULL on 21/21 live rows in "
+          + "both databases; now stamped from the principal. authorName is BY DESIGN (the paper's "
+          + "preparer: no author_id column, author_role holds an office, 21/21 name a body). "
+          + "circulatedAt is deliberately a fallback so a past circulation can be recorded"),
+
         // ── CLOSED: real bypasses, fixed service-side (so still ranked here) ──────────────
         Map.entry("EthicsCaseController#create(EthicsCase)",
             "CLOSED F2-22b(v) — apply() no longer copies status/outcome; create rejects non-initial"),
@@ -595,19 +760,69 @@ class MassAssignmentRatchetTest {
         + "|[Cc]ertified|[Aa]ttested|[Aa]uthorised|[Aa]uthorized|[Cc]losed|[Pp]ublished"
         + "|[Ee]ndorsed|[Aa]cknowledged|[Rr]atified|[Ww]itnessed|[Ee]scalated|[Aa]ccepted"
         + "|[Vv]alidated|[Ss]anctioned|[Cc]ountersigned|[Dd]ispositioned|[Aa]djudicated"
-        + "|[Cc]onfirmed|[Cc]leared|[Ww]aived|[Ee]xempted|[Dd]elegated|[Rr]ecorded)(?:By|At)$");
+        + "|[Cc]onfirmed|[Cc]leared|[Ww]aived|[Ee]xempted|[Dd]elegated|[Rr]ecorded"
+        // F2-248 — a THIRD unspelled name, and this one is an act VERB rather than an agent noun.
+        // It was found by READING the single row the author/actor widening surfaced, not by the
+        // gate: `admin.committee_meeting_papers.circulated_by` is a user id, was bound straight from
+        // the request, never written by the service, and NULL on all 21 live rows in dev and prod.
+        // 🔑 Two vocabularies, two blind spots, one slice — so assume a fourth spelling exists.
+        + "|[Cc]irculated)(?:By|At)$");
 
     /** An authority ACTOR: the agent noun rather than the act. {@code reviewer}, {@code signerName}. */
+    /**
+     * ⚠⚠ <b>F2-248 — F2-217 replaced a literal field-name list with a SHAPE, and the shape's stems
+     * are themselves a literal list.</b>
+     *
+     * <p>F2-217's own headline is that <i>"a risk ranking built from a literal field-name list finds
+     * exactly the spellings its author had already seen"</i>, and its remedy was this pattern. But an
+     * alternation of twelve agent nouns is still a vocabulary — it just looks like a rule. The two it
+     * did not spell are {@code author} and {@code actor}, both ordinary English agent nouns ending in
+     * {@code -or}, and both the sole record of who performed an act in a governance register:
+     *
+     * <ul>
+     *   <li>{@code change_mgmt.change_comments.author_id/author_name} — who wrote a comment on a
+     *       change request, i.e. part of the CAB deliberation trail. {@code author_id} was NULL on
+     *       <b>45 of 45</b> dev rows and <b>46 of 46</b> prod rows, so nothing had ever written it,
+     *       and a {@code RISK_ANALYST} could store a comment as the CISO (probed, HTTP 201).</li>
+     *   <li>{@code ethics.case_actions.actor_id/actor_name} — who conducted an interview, made a
+     *       finding or closed a whistleblowing case.</li>
+     * </ul>
+     *
+     * <p>🔑 <b>Both endpoints ranked LOW.</b> Of 214 entity-bound writes only five were in that tier,
+     * and these were two of them — so the ranking filed the two forgeable attributions it could not
+     * spell into its smallest and least-attended bucket. F2-198's shape (the invariant is real, its
+     * population is narrower than it looks) at the level of a pattern rather than a list.
+     *
+     * <p>⚠⚠ <b>A SHORT agent-noun stem cannot share the prefix rule of a long one, and my first
+     * draft put both new stems into {@link #AGENT_SHAPE} where they did not belong.</b> That
+     * pattern's prefix is {@code (?:.*[a-z0-9])?}, which happily matches a single lower-case letter
+     * — so {@code actor} matched inside {@code f·actor·Name}, and the negative half of
+     * {@link #theAuthorityVocabularyRecognisesTheNamesTheLiteralListMissed()} caught it on the first
+     * run. {@code contractorName} and {@code benefactorId} are the same trap. The twelve original
+     * stems are long and distinctive enough never to have hit it, which is exactly why the rule was
+     * safe to write that way and is not safe to extend.
+     *
+     * <p>So the two short stems get their own pattern demanding a <b>camelCase word boundary</b>:
+     * the stem starts the name, or begins with a capital. {@code authorId}/{@code actorName} pair;
+     * {@code lastAuthorId}/{@code caseActorId} pair; {@code factorName}/{@code contractorName} do
+     * not. Both directions are asserted, because a widening that is too wide silently RE-TIERS the
+     * platform and one that is too narrow silently shrinks the work list.
+     */
     private static final Pattern AGENT_SHAPE = Pattern.compile(
         "^(?:.*[a-z0-9])?(?:[Rr]eviewer|[Aa]pprover|[Ss]ignatory|[Ss]igner|[Vv]erifier|[Cc]ertifier"
         + "|[Aa]ttester|[Ww]itness|[Ee]ndorser|[Aa]uthoriser|[Aa]uthorizer|[Aa]djudicator)"
         + "(?:Id|Name|UserId)?$");
 
+    /** F2-248 — {@code author} and {@code actor}, anchored to a camelCase boundary. See above. */
+    private static final Pattern SHORT_AGENT_SHAPE = Pattern.compile(
+        "^(?:[Aa]uthor|[Aa]ctor|.*[a-z0-9](?:Author|Actor))(?:Id|Name|UserId)?$");
+
     /** True when a field name names an authority act or the actor who performed it. */
     static boolean isAuthorityField(String n) {
         return AUTHORITY_EXTRA.contains(n)
             || AUTHORITY_SHAPE.matcher(n).find()
-            || AGENT_SHAPE.matcher(n).matches();
+            || AGENT_SHAPE.matcher(n).matches()
+            || SHORT_AGENT_SHAPE.matcher(n).matches();
     }
     private static final List<String> OUTCOME = List.of(
         "voteFor", "voteAgainst", "voteAbstain", "votesFor", "votesAgainst", "votesAbstain",

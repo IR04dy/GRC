@@ -623,6 +623,10 @@ export const en = {
   changeTaskDeleteConfirm:   'Delete this task?',
   changeComments:            'Comments',
   changeNoComments:          'No comments yet.',
+  // F2-248 — a comment written before the server owned the attribution. The name shown is
+  // whatever the caller typed (45 of 45 dev rows, 46 of 46 prod rows, one of them 'You').
+  changeCommentUnverified:   'unattributed',
+  changeCommentUnverifiedHint: 'This comment predates server-side attribution: the name shown was supplied by the client and is not linked to a platform user.',
   changeCommentPlaceholder:  'Write a comment…',
   changeCommentPost:         'Post',
   changeWorkflowList:        'All changes',
@@ -699,6 +703,10 @@ export const en = {
   ethicsWorkflowSelectSub:    'Pick a case from the list to triage, investigate, log actions and route to outcome.',
   ethicsActionTimeline:       'Action Timeline',
   ethicsAddAction:            'Add action',
+  // F2-248 — the three states of an action's actor, disclosed rather than blanked.
+  ethicsActionUnverified:     ' · unattributed',
+  ethicsActionUnverifiedHint: 'Recorded before server-side attribution: the name shown was supplied by the client and is not linked to a platform user.',
+  ethicsActionNoActorHint:    'No actor was recorded for this action. Actions added before F2-248 stored no actor at all, because the form sent none.',
   ethicsNoActions:            'No actions logged yet.',
   ethicsActionTypePrompt:     'Action type (INTERVIEW, EVIDENCE_COLLECTED, DOCUMENT_REVIEWED, FORENSIC_REQUEST, LEGAL_CONSULT, HR_REFERRAL, EXTERNAL_REFERRAL, NOTE)',
   ethicsActionTitlePrompt:    'Action title',

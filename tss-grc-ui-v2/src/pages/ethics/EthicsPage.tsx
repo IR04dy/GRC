@@ -506,7 +506,28 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
                     {a.actionAt && <span className="mono ethics-action-timeline-time">{new Date(a.actionAt).toLocaleString()}</span>}
                   </div>
                   {a.description && <div className="ethics-action-timeline-desc">{a.description}</div>}
-                  {a.actorName && <div className="ethics-action-timeline-actor">— {a.actorName}</div>}
+                  {/*
+                    F2-248 — the actor is now the authenticated principal. Three states, disclosed:
+                    an id means the server attributed it; a name with no id is a pre-F2-248 label
+                    (all 15 rows in dev and prod name an office resolving to no user); neither means
+                    the action was recorded through a screen that sent no actor at all, which is
+                    what every UI-created row looked like. An em-dash with a bilingual hint, not a
+                    blank, because absence reading as tidiness is its own defect (F2-197).
+                  */}
+                  {a.actorName
+                    ? <div className="ethics-action-timeline-actor">
+                        — {a.actorName}
+                        {a.actorId == null && (
+                          <span role="status" className="ethics-action-timeline-unverified"
+                                title={t('ethicsActionUnverifiedHint')}
+                                aria-label={t('ethicsActionUnverifiedHint')}>
+                            {t('ethicsActionUnverified')}
+                          </span>
+                        )}
+                      </div>
+                    : <div className="ethics-action-timeline-actor"
+                           title={t('ethicsActionNoActorHint')}
+                           aria-label={t('ethicsActionNoActorHint')}>—</div>}
                 </div>
               ))
           }
