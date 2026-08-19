@@ -601,7 +601,7 @@ class MassAssignmentRatchetTest {
         //     circulation that happened last week is legitimate, and F2-233(d) established that a
         //     fallback is not an ownership claim. So this endpoint is NOT the split-attribution
         //     shape; it was a column with no writer at all.
-        Map.entry("CommitteeMeetingPapersControllerXX#circulate(CommitteeMeetingPaper)",
+        Map.entry("CommitteeMeetingPapersController#circulate(CommitteeMeetingPaper)",
             "CLOSED F2-248 (circulatedBy) — was bound from the body and NULL on 21/21 live rows in "
           + "both databases; now stamped from the principal. authorName is BY DESIGN (the paper's "
           + "preparer: no author_id column, author_role holds an office, 21/21 name a body). "
