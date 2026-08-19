@@ -1,5 +1,7 @@
 package com.tss.grc.module.ethics.controller;
 
+import jakarta.validation.Valid;
+import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
 import com.tss.grc.module.ethics.entity.CaseLink;
 import com.tss.grc.module.ethics.entity.EthicsCase;
@@ -88,10 +90,18 @@ public class EthicsCaseController {
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public List<CaseAction> actions(@PathVariable Long id) { return service.actions(id); }
 
+    /**
+     * F2-248 — binds {@link CaseActionRequest}, not the entity, so the actor cannot arrive.
+     *
+     * <p>Like its twin on the change-comment thread, this endpoint sat in
+     * {@code MassAssignmentRatchetTest}'s <b>LOW</b> tier — five endpoints of 214 — because the
+     * ranking's agent-noun vocabulary does not spell {@code actor}. The service now takes both
+     * halves of the attribution from the authenticated principal.
+     */
     @PostMapping("/{id}/actions")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public CaseAction addAction(@PathVariable Long id, @RequestBody CaseAction body) {
+    public CaseAction addAction(@PathVariable Long id, @Valid @RequestBody CaseActionRequest body) {
         return service.addAction(id, body);
     }
 

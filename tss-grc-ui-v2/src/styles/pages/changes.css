@@ -614,3 +614,17 @@
    and hiding it is how two dead rows stayed invisible for a month. */
 .cab-orphan { background: var(--danger-bg-subtle, transparent); }
 .cab-orphan td { opacity: 0.85; }
+
+/* F2-248 — an unattributed comment says so, quietly. Muted rather than alarming: the row is not
+   wrong, it simply predates the server owning the attribution, and 45 of 45 dev rows are like
+   this. A red badge over the whole existing register would train the reader to ignore it. */
+.changes-comment-unverified {
+  margin-inline-start: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  cursor: help;
+}

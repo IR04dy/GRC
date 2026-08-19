@@ -1,6 +1,8 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
 import com.tss.grc.module.ethics.entity.CaseLink;
 import com.tss.grc.module.ethics.entity.EthicsCase;
@@ -145,12 +147,42 @@ public class EthicsCaseService {
         return saved;
     }
 
+    /**
+     * Record an action on an ethics case — an interview, a finding, an HR referral, closure.
+     *
+     * <p>F2-248 — <b>the actor is the acting principal.</b> This used to bind {@link CaseAction}
+     * and never touch {@code actorName} or {@code actorId}, so both were stored exactly as they
+     * arrived. {@code action_at} is {@code insertable = false}, so the database has always owned
+     * <i>when</i> while the caller owned <i>who</i>: F2-223's split attribution, with the
+     * server-clock half arriving through the one filling mechanism a setter-matching scan cannot
+     * see (F2-226).
+     *
+     * <p>🔑 The symptom here is the <b>inverse</b> of its twin in {@code change_mgmt}:
+     * {@code EthicsPage} sends no actor at all, so every action added through the platform's own
+     * screen recorded {@code actor_name = NULL} and {@code actor_id = NULL} — the action log of a
+     * misconduct investigation saying what happened and when, and not who did it. A register that
+     * does not own WHO either stores a claim or stores nothing, and neither is an attribution.
+     *
+     * <p>Both halves are required, not merely read: an authenticated principal on this route always
+     * carries an id, so refusing cannot break a working request, and a half-recorded attribution is
+     * the state that reads as complete while resolving to nobody (F2-236).
+     */
     @Transactional
-    public CaseAction addAction(Long caseId, CaseAction body) {
+    public CaseAction addAction(Long caseId, CaseActionRequest req) {
         require(caseId);
+        if (req.actionType() == null || req.actionType().isBlank())
+            throw new IllegalArgumentException("actionType is required");
+        if (req.title() == null || req.title().isBlank())
+            throw new IllegalArgumentException("title is required");
+
+        CaseAction body = new CaseAction();
         body.setCaseId(caseId);
-        if (body.getActionType() == null) throw new IllegalArgumentException("actionType is required");
-        if (body.getTitle() == null || body.getTitle().isBlank()) throw new IllegalArgumentException("title is required");
+        body.setActionType(req.actionType().trim());
+        body.setTitle(req.title().trim());
+        body.setDescription(req.description());
+        if (req.isConfidential() != null) body.setIsConfidential(req.isConfidential());
+        body.setActorName(CurrentActor.requireUsername("a case action"));
+        body.setActorId(CurrentActor.requireUserId("a case action"));
         return actionRepo.save(body);
     }
 

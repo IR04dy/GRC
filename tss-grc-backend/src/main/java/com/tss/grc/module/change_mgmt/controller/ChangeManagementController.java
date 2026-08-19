@@ -8,6 +8,7 @@ import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+import com.tss.grc.module.change_mgmt.dto.ChangeCommentRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeModelRequest;
 import com.tss.grc.module.change_mgmt.dto.EngineRequestDtos;
@@ -370,10 +371,21 @@ public class ChangeManagementController {
     @PreAuthorize("hasPermission('CHANGE','READ')")
     public List<ChangeComment> comments(@PathVariable Long id) { return service.comments(id); }
 
+    /**
+     * F2-248 — binds {@link ChangeCommentRequest}, not the entity, so the author cannot arrive.
+     *
+     * <p>{@code MassAssignmentRatchetTest} ranked this endpoint <b>LOW</b>: of 214 entity-bound
+     * writes only five were in that tier, and this was one of them, because the ranking's
+     * agent-noun vocabulary does not spell {@code author}. It bound {@code authorName} and
+     * {@code authorId} — the whole record of who wrote a CAB comment.
+     */
     @PostMapping("/{id}/comments")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ChangeComment addComment(@PathVariable Long id, @RequestBody ChangeComment body) { return service.addComment(id, body); }
+    public ChangeComment addComment(@PathVariable Long id,
+                                    @Valid @RequestBody ChangeCommentRequest body) {
+        return service.addComment(id, body);
+    }
 
     // ── Analytics ───────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+import com.tss.grc.module.change_mgmt.dto.ChangeCommentRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
@@ -1272,16 +1273,56 @@ public class ChangeManagementService {
         return commentRepo.findByChangeRequestIdOrderByCreatedAtAsc(changeId);
     }
 
+    /**
+     * Add a comment to a change request.
+     *
+     * <p>F2-248 — <b>the author is the acting principal, and the caller cannot name one.</b> This
+     * used to bind {@link ChangeComment} and write whatever {@code authorName}/{@code authorId}
+     * arrived, with {@code if (getAuthorName() == null) setAuthorName("Unknown")} in front of it —
+     * a default, not a guard (F2-218), so it discarded nothing. Probed live as {@code ranalyst}: a
+     * comment stored as the CISO, HTTP 201.
+     *
+     * <p>🔑 <b>{@code recordApproval}, in this file, already had this right</b> — it resolves
+     * {@code approverId} from the principal and uses it as the CM-C2 segregation input under a
+     * comment reading <i>"which the caller cannot choose"</i>, and {@code create} captures
+     * {@code requestedById} through {@link ChangeSoD} for the same reason (CE-15/F2-112). The
+     * comment thread beside them was the one people-bearing column in this module nobody swept
+     * (F2-215's two-of-N), and {@code ChangeSoD}'s own javadoc states the rule it needed:
+     * <i>"the id is the part a gate can stand on, and only the server can know it."</i>
+     *
+     * <p>{@link ChangeSoD#actor()} is deliberately the primitive used here rather than
+     * {@code CurrentActor}: it is this module's declared single reader of the principal, and a
+     * second mechanism beside it is how two copies start disagreeing (F2-190).
+     *
+     * <p>Refusing is louder than recording a blank. A comment whose author is {@code ""} or
+     * {@code "Unknown"} still reads as an attribution, which is worse than one that could not be
+     * written (F2-236).
+     */
     @Transactional
-    public ChangeComment addComment(Long changeId, ChangeComment body) {
+    public ChangeComment addComment(Long changeId, ChangeCommentRequest req) {
         require(changeId);
-        body.setChangeRequestId(changeId);
-        if (body.getBody() == null || body.getBody().isBlank())
+        if (req.body() == null || req.body().isBlank())
             throw new IllegalArgumentException("body is required");
-        if (body.getAuthorName() == null) body.setAuthorName("Unknown");
+
+        ChangeSoD.Actor author = ChangeSoD.actor();
+        if (author.name() == null || author.name().isBlank())
+            throw new IllegalStateException(
+                "A comment with no identified author is not a comment. No authenticated principal "
+              + "was available to record, and the caller may not name one.");
+
+        ChangeComment body = new ChangeComment();
+        body.setChangeRequestId(changeId);
+        body.setBody(req.body().trim());
+        body.setAuthorId(author.id());
+        body.setAuthorName(author.name());
         ChangeComment saved = commentRepo.save(body);
+        // The trail reads off the SAVED ROW, never the request. Pre-fix this line quoted the
+        // caller's claim, so the audit row contradicted itself: `user_username` held the real actor
+        // while the message said "by You" (F2-223 — quoting the claim is what makes a forged
+        // attribution invisible to whoever audits it).
         audit.log("COMMENT_ADD", "ChangeRequest", changeId,
-            "Comment added to change " + changeId + " by " + nullSafeMsg(saved.getAuthorName()));
+            "Comment added to change " + changeId + " by " + nullSafeMsg(saved.getAuthorName())
+                + " (user#" + saved.getAuthorId() + ")");
         return saved;
     }
 

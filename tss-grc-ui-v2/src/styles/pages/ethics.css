@@ -318,3 +318,10 @@
   padding: var(--sp-7);
   color: var(--ink-3);
 }
+
+/* F2-248 — see changes.css: same disclosure, same reasoning, on the ethics case timeline. */
+.ethics-action-timeline-unverified {
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: help;
+}

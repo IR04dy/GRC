@@ -1,6 +1,7 @@
 package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
 import com.tss.grc.module.ethics.entity.CaseLink;
 import com.tss.grc.module.ethics.entity.EthicsCase;
@@ -296,15 +297,13 @@ class EthicsCaseServiceTest {
     void addAction_requires_actionType_and_title() {
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("TRIAGE")));
 
-        CaseAction missingType = new CaseAction();
-        missingType.setTitle("ok");
-        assertThatThrownBy(() -> service.addAction(ID, missingType))
+        assertThatThrownBy(() -> service.addAction(ID,
+                new CaseActionRequest(null, "ok", null, null)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("actionType");
 
-        CaseAction missingTitle = new CaseAction();
-        missingTitle.setActionType("INTERVIEW");
-        assertThatThrownBy(() -> service.addAction(ID, missingTitle))
+        assertThatThrownBy(() -> service.addAction(ID,
+                new CaseActionRequest("INTERVIEW", null, null, null)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("title");
 
@@ -315,13 +314,102 @@ class EthicsCaseServiceTest {
     void addAction_persists_with_caseId_when_valid() {
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("TRIAGE")));
         when(actionRepo.save(any(CaseAction.class))).thenAnswer(inv -> inv.getArgument(0));
+        f248AuthAs("compliance", 3L);
 
-        CaseAction a = new CaseAction();
-        a.setActionType("INTERVIEW");
-        a.setTitle("Interview reporter");
-        CaseAction saved = service.addAction(ID, a);
+        CaseAction saved = service.addAction(ID,
+            new CaseActionRequest("INTERVIEW", "Interview reporter", null, null));
 
         assertThat(saved.getCaseId()).isEqualTo(ID);
+    }
+
+    // ─── F2-248: the actor is the principal, and the caller cannot name one ─────────────
+
+    /**
+     * F2-248 — both halves of the attribution come from the authenticated principal.
+     *
+     * <p>The old signature took the {@link CaseAction} entity and never touched
+     * {@code actorName}/{@code actorId}, so both were stored exactly as they arrived. The proof that
+     * the fix is structural rather than a guard is that the request record has <b>no field</b> for
+     * either — a caller cannot express the forgery, so this test cannot even be written the old way.
+     */
+    @Test
+    void addAction_takesBothHalvesOfTheAttributionFromThePrincipal() {
+        when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("INVESTIGATION")));
+        when(actionRepo.save(any(CaseAction.class))).thenAnswer(inv -> inv.getArgument(0));
+        f248AuthAs("compliance", 3L);
+
+        CaseAction saved = service.addAction(ID,
+            new CaseActionRequest("FINDING", "Substantiated — payment irregularity", "detail", null));
+
+        assertThat(saved.getActorName()).isEqualTo("compliance");
+        assertThat(saved.getActorId()).isEqualTo(3L);
+    }
+
+    /**
+     * F2-248 — refusing is louder than recording a blank (F2-236).
+     *
+     * <p>An action on a misconduct case whose actor is {@code ""} or {@code null} still reads as a
+     * record of who did it, which is worse than one that could not be written. Measured: every
+     * action added through {@code EthicsPage} stored {@code actor_name = NULL}, because the page
+     * sends no actor and nothing supplied one.
+     */
+    @Test
+    void addAction_refusesWhenThereIsNoPrincipalToRecord() {
+        when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("INVESTIGATION")));
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> service.addAction(ID,
+                new CaseActionRequest("INTERVIEW", "Interview reporter", null, null)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("a case action");
+
+        verify(actionRepo, never()).save(any());
+    }
+
+    /** The entity's own default survives: an ethics action is confidential unless stated. */
+    @Test
+    void addAction_keepsTheConfidentialDefaultAndHonoursAnExplicitFalse() {
+        when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("TRIAGE")));
+        when(actionRepo.save(any(CaseAction.class))).thenAnswer(inv -> inv.getArgument(0));
+        f248AuthAs("compliance", 3L);
+
+        assertThat(service.addAction(ID, new CaseActionRequest("NOTE", "t", null, null))
+                .getIsConfidential()).isTrue();
+        assertThat(service.addAction(ID, new CaseActionRequest("NOTE", "t", null, false))
+                .getIsConfidential()).isFalse();
+    }
+
+    /**
+     * F2-248 — the structural closure, asserted rather than assumed.
+     *
+     * <p>The strongest guarantee here is a compile-time one: {@link CaseActionRequest} has no field
+     * for the actor, so a caller cannot express the forgery (F2-233). No runtime assertion above
+     * could notice it coming back — a caller-supplied actor that happens to equal the principal
+     * looks correct — and {@code MassAssignmentRatchetTest}'s entity-bound ranking cannot see this
+     * type at all, because binding a record is precisely what moved the endpoint out of that
+     * population. So the invariant lives here, next to the behaviour it protects.
+     */
+    @Test
+    void theCaseActionRequestCannotCarryAnActorAtAll() {
+        assertThat(java.util.Arrays.stream(CaseActionRequest.class.getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName).toList())
+            .as("CaseActionRequest may declare only what a caller decides. An actor field here is "
+              + "how an action on a whistleblowing case could be attributed to anybody.")
+            .containsExactly("actionType", "title", "description", "isConfidential");
+    }
+
+    /**
+     * The F2-223 idiom: {@code CurrentActor} resolves only a {@link com.tss.grc.security.GrcUserDetails}
+     * principal, so a bare username token would leave the id null and the assertion would be about
+     * nothing.
+     */
+    private static void f248AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 
     @Test
