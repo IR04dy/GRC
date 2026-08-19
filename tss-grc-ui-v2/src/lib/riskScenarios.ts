@@ -38,8 +38,22 @@ export interface RiskScenario {
   createdAt: string; updatedAt: string;
 }
 
+/**
+ * ⚠⚠ F2-245 — `riskCode` and `riskTitleEn` are GONE from the create request, and
+ * their absence is the fix.
+ *
+ * The form used to collect the parent risk's code and title as free text and never
+ * collected `riskId` at all — so it gathered the LABEL and never the LINK. Measured
+ * in dev and prod, 11 of 11 live scenarios stored a coherent label that was not the
+ * title of the risk the id named, and `riskCode` held an `RSK-2026-NNN` code space
+ * that exists nowhere in `risk.risks` (whose only reference is a UUID `external_id`).
+ *
+ * The server now derives both from the risk it resolves, and refuses an id that does
+ * not resolve inside the tenant. They stay on `RiskScenario` because the server sends
+ * them back — read-only, derived, never declared here.
+ */
 export interface ScenarioCreateRequest {
-  riskId?: number; riskCode?: string; riskTitleEn?: string;
+  riskId?: number;
   titleEn: string; titleAr?: string;
   descriptionEn?: string; descriptionAr?: string;
   scenarioType: ScenarioType;
