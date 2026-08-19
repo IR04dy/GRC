@@ -2,12 +2,19 @@ package com.tss.grc.module.ethics.coi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.coi.dto.CoiDtos.SubmitDeclarationRequest;
+import com.tss.grc.module.iam.entity.User;
+import com.tss.grc.module.iam.repository.UserRepository;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,18 +35,50 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * not rejected</b>: a rejection would disclose whether another id exists, and a self-declaration has no
  * reason to carry one.
  *
- * <p>The private resolver is invoked directly. It is the whole unit under test, it touches none of the
- * service's six collaborators, and going through {@code submitDeclaration} would mean stubbing a
- * campaign, four repositories and an audit sink to observe one field.
+ * <p>The private resolver is invoked directly. It is the whole unit under test, and going through
+ * {@code submitDeclaration} would mean stubbing a campaign, four repositories and an audit sink to
+ * observe one field.
+ *
+ * <p><b>F2-244 — this class's own premise was the next defect, and it was written down.</b> The
+ * sentence above used to read <em>"it touches none of the service's six collaborators"</em>, offered
+ * as evidence that the unit was cleanly isolated. It was true, and the reason it was true is that
+ * {@code declarantFor} decided <em>who may name another person</em> and then returned that person's
+ * id <b>without ever asking whether they exist</b>. 🔑 <b>A resolver that touches nothing cannot
+ * resolve anything</b> — so the isolation the javadoc presented as a virtue was the shape of the
+ * hole. Measured: 8 of the 8 non-null declaration user ids in dev and prod name no user at all.
+ *
+ * <p>These tests were right and are kept: every one of them is about <em>authority</em>, which is a
+ * different question from <em>referent</em>, and both are needed. What is added is the leg nobody had
+ * — that a named declarant must resolve inside the caller's tenant.
  */
+@ExtendWith(MockitoExtension.class)
 class CoiDeclarantBindingTest {
 
     private static final long CALLER = 7L;
     private static final long SOMEONE_ELSE = 99L;
+    private static final long ORG = 1L;
+
+    @Mock private UserRepository users;
+
+    @BeforeEach
+    void setTenant() {
+        TenantContext.setCurrentTenant(ORG);
+    }
+
+    /** A live user of the caller's own tenant, for the paths that must keep working. */
+    private static User userIn(long id, long org) {
+        User u = new User();
+        u.setId(id);
+        u.setOrganisationId(org);
+        u.setIsActive(true);
+        u.setFullNameEn("Named Declarant");
+        return u;
+    }
 
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
+        TenantContext.clear();
     }
 
     private static void authenticate(long userId, String... authorities) {
@@ -56,8 +95,10 @@ class CoiDeclarantBindingTest {
                 false, false, "I attest.", List.of());
     }
 
-    private static Long resolve(SubmitDeclarationRequest req) throws Exception {
-        CoiService service = new CoiService(null, null, null, null, null, null);
+    private Long resolve(SubmitDeclarationRequest req) throws Exception {
+        // F2-244 — `users` is the fifth argument now. It is the collaborator this class's javadoc
+        // once boasted the resolver did not need.
+        CoiService service = new CoiService(null, null, null, null, users, null, null);
         Method m = CoiService.class.getDeclaredMethod("declarantFor", SubmitDeclarationRequest.class);
         m.setAccessible(true);
         return (Long) m.invoke(service, req);
@@ -92,6 +133,11 @@ class CoiDeclarantBindingTest {
     @Test
     @DisplayName("a COI management authority may still file on another employee's behalf")
     void anAdministratorMayNameAnotherDeclarant() throws Exception {
+        // F2-244 — the named declarant now has to be a real, active user of this tenant, so the
+        // path that must keep working needs one.
+        org.mockito.Mockito.when(users.findById(SOMEONE_ELSE))
+                .thenReturn(java.util.Optional.of(userIn(SOMEONE_ELSE, ORG)));
+
         for (String authority : new String[] { "ROLE_PLATFORM_ADMIN", "ETHICS_WRITE" }) {
             SecurityContextHolder.clearContext();
             authenticate(CALLER, authority);
@@ -134,6 +180,63 @@ class CoiDeclarantBindingTest {
         assertThat(resolve(requestNaming(null)))
                 .as("naming no declarant is a self-declaration, not an unattributed one")
                 .isEqualTo(CALLER);
+    }
+
+    /**
+     * F2-244 — the leg this class never had. Every test above asks <em>who may name another
+     * person</em>; none asked whether the person named is real.
+     */
+    @Test
+    @DisplayName("a named declarant who resolves to nobody is refused, not stored")
+    void aNamedDeclarantMustResolveInsideTheTenant() throws Exception {
+        authenticate(CALLER, "ETHICS_WRITE");
+        org.mockito.Mockito.when(users.findById(SOMEONE_ELSE)).thenReturn(java.util.Optional.empty());
+
+        assertThat(catchThrowableOf(() -> resolve(requestNaming(SOMEONE_ELSE))))
+                .as("""
+                    A declaration filed against a user id that resolves to nobody is attributable
+                    to nobody, and this register cannot fall back on a name — coi_declaration has
+                    full_name_en, but the recusal table sharing this resolver has no name column at
+                    all. Storing it is what left 8 of 8 non-null declaration user ids in dev and
+                    prod naming ids 1001-1007 against MAX(iam.users.id) = 8.""")
+                .isNotNull()
+                .hasMessageContaining("not an active user in this organisation");
+    }
+
+    /**
+     * F2-244 — and the tenant is the point, not merely existence. A user of another organisation is
+     * refused with the SAME message, deliberately: distinguishing "no such user" from "another
+     * tenant's user" would let a caller enumerate foreign user ids by reading the error text (the
+     * rule {@code CommitteeMemberRegistryService#requireUserInTenant} records).
+     */
+    @Test
+    @DisplayName("a declarant belonging to another tenant is refused, with the same message")
+    void aForeignDeclarantIsRefusedIndistinguishably() throws Exception {
+        authenticate(CALLER, "ETHICS_WRITE");
+        org.mockito.Mockito.when(users.findById(SOMEONE_ELSE))
+                .thenReturn(java.util.Optional.of(userIn(SOMEONE_ELSE, ORG + 1)));
+
+        assertThat(catchThrowableOf(() -> resolve(requestNaming(SOMEONE_ELSE))))
+                .isNotNull()
+                .hasMessageContaining("not an active user in this organisation");
+    }
+
+    /**
+     * F2-244 — an inactive user is refused too. A leaver's conflict declaration filed after they
+     * left would be a record nobody can be asked about, and {@code linkableUsers} already treats
+     * {@code isActive} as part of "is this a person we can name".
+     */
+    @Test
+    @DisplayName("an inactive user cannot be named as a declarant")
+    void anInactiveDeclarantIsRefused() throws Exception {
+        authenticate(CALLER, "ETHICS_WRITE");
+        User leaver = userIn(SOMEONE_ELSE, ORG);
+        leaver.setIsActive(false);
+        org.mockito.Mockito.when(users.findById(SOMEONE_ELSE)).thenReturn(java.util.Optional.of(leaver));
+
+        assertThat(catchThrowableOf(() -> resolve(requestNaming(SOMEONE_ELSE))))
+                .isNotNull()
+                .hasMessageContaining("not an active user in this organisation");
     }
 
     @Test

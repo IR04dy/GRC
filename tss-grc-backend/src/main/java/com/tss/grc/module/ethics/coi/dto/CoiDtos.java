@@ -4,6 +4,7 @@ import com.tss.grc.module.ethics.coi.entity.CoiDeclaration;
 import com.tss.grc.module.ethics.coi.entity.CoiDeclarationCampaign;
 import com.tss.grc.module.ethics.coi.entity.CoiDisclosedItem;
 import com.tss.grc.module.ethics.coi.entity.CoiRecusalEvent;
+import com.tss.grc.module.iam.entity.User;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -191,11 +192,35 @@ public final class CoiDtos {
         }
     }
 
+    /**
+     * F2-244 — {@code userNameEn} / {@code userNameAr} / {@code userResolved} are new, and the
+     * first two were <b>already declared by the frontend</b>.
+     *
+     * <p>{@code lib/coi.ts}'s {@code RecusalResponse} has carried {@code userNameEn?} and
+     * {@code userNameAr?} all along and this record declared neither, so
+     * {@code CoiRegisterPage}'s detail panel renders the person's name behind
+     * {@code selected.userNameEn && …} — a field the wire has never carried. F2-211's shape: the
+     * client nominates, the entity adjudicates, and {@code CoiRecusalEvent} has <b>no name column
+     * at all</b>. The consequence was that the SAMA Article 30 recusal register never named the
+     * person who recused — not in the detail panel, and not in the table, which has no person
+     * column either.
+     *
+     * <p>🔑 <b>{@code userResolved} exists because two different facts were previously
+     * indistinguishable</b>: a user whose {@code full_name_en} happens to be blank, and a
+     * {@code user_id} that resolves to nobody. 11 of the 28 live COI rows in dev and prod are the
+     * second kind, so rendering a blank name would let the register's worst rows read as its
+     * tidiest (F2-197: an invented figure invites a question, an invented all-clear closes one).
+     * The server owns this fact — a client cannot compute it — and the three states are F2-209's:
+     * a value, a resolvable user with no name recorded, and no such user.
+     */
     public record RecusalEventResponse(
             Long id,
             Long organisationId,
             Long declarationId,
             Long userId,
+            Boolean userResolved,
+            String userNameEn,
+            String userNameAr,
             String meetingReference,
             String committeeCode,
             LocalDateTime recusalDate,
@@ -205,10 +230,19 @@ public final class CoiDtos {
             Boolean recordedInMinutes,
             LocalDateTime createdAt
     ) {
-        public static RecusalEventResponse from(CoiRecusalEvent r) {
+        /**
+         * @param subject the user {@code r.getUserId()} resolves to <em>inside the row's own
+         *                tenant</em>, or {@code null} when it resolves to nobody. Never resolve it
+         *                here — a DTO has no repository and no tenant, and guessing either is how
+         *                a cross-tenant read is built by accident.
+         */
+        public static RecusalEventResponse from(CoiRecusalEvent r, User subject) {
             return new RecusalEventResponse(
                     r.getId(), r.getOrganisationId(), r.getDeclarationId(),
                     r.getUserId(),
+                    subject != null,
+                    subject == null ? null : subject.getFullNameEn(),
+                    subject == null ? null : subject.getFullNameAr(),
                     r.getMeetingReference(), r.getCommitteeCode(),
                     r.getRecusalDate(),
                     r.getRecusalReasonEn(), r.getRecusalReasonAr(),

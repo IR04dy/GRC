@@ -160,6 +160,20 @@ export interface RecusalResponse {
   organisationId: number;
   declarationId?: number;
   userId: number;
+  /**
+   * F2-244 — whether `userId` resolves to an active user of this tenant, decided by the server.
+   *
+   * `userNameEn` / `userNameAr` were declared here long before the server sent them: the backend
+   * `RecusalEventResponse` declared neither and `CoiRecusalEvent` has no name column, so the
+   * detail panel's `selected.userNameEn && …` guard could never fire (F2-211 — the client
+   * nominates, the entity adjudicates). Both are now served, resolved in-tenant.
+   *
+   * This flag is separate on purpose: a resolvable user whose full name is blank and a `userId`
+   * that resolves to nobody are different facts, and 11 of the 28 live COI rows in dev and prod
+   * are the second kind. Rendering a blank for both would let the register's worst rows read as
+   * its tidiest (F2-197).
+   */
+  userResolved?: boolean;
   userNameEn?: string;
   userNameAr?: string;
   meetingReference: string;
@@ -169,6 +183,44 @@ export interface RecusalResponse {
   recusalReasonAr: string;
   agendaItems?: string;
   createdAt?: string;
+}
+
+/**
+ * F2-244 — the one predicate every recusal surface reads to name its subject.
+ *
+ * Three states, kept distinct because the two unhappy ones want opposite readings (F2-209):
+ *
+ *   1. `userResolved === false` — the stored `user_id` resolves to no active user of this tenant.
+ *      Disclosed with the id, never blanked. 11 of the 28 live COI rows in dev and prod are this
+ *      kind (ids 1001–1007 against `MAX(iam.users.id) = 8`), so blanking would make the register's
+ *      broken rows its cleanest-looking ones — F2-197's rule that an absence must not read as
+ *      health.
+ *   2. resolved, but the user row records no name in either language — say so; somebody can fix it
+ *      on the user record.
+ *   3. resolved with a name — show it, preferring the reader's language and falling back to the
+ *      other rather than claiming nothing is recorded (house rule 7).
+ *
+ * It is one function rather than a copy per surface for the reason F2-209 records: the console and
+ * the register table below it disagreed for a whole slice because each computed its own answer.
+ */
+export function recusalSubjectLabel(r: RecusalResponse, lang: 'en' | 'ar'): string {
+  if (r.userResolved === false) {
+    return lang === 'ar'
+      ? `مُعرّف ${r.userId} — لا يوجد مستخدم مطابق في المنشأة`
+      : `ID ${r.userId} — no matching platform user`;
+  }
+  const preferred = lang === 'ar' ? r.userNameAr : r.userNameEn;
+  const fallback  = lang === 'ar' ? r.userNameEn : r.userNameAr;
+  const name = (preferred && preferred.trim()) || (fallback && fallback.trim());
+  if (name) return name;
+  return lang === 'ar'
+    ? `مستخدم ${r.userId} — الاسم غير مُسجَّل`
+    : `User ${r.userId} — name not recorded`;
+}
+
+/** True when the row names somebody the platform cannot resolve — drives the warning tone. */
+export function recusalSubjectIsUnresolved(r: RecusalResponse): boolean {
+  return r.userResolved === false;
 }
 
 // ─── REST client ──────────────────────────────────────────────────
