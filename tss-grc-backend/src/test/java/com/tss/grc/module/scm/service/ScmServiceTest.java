@@ -344,12 +344,14 @@ class ScmServiceTest {
     }
 
     private VendorAssessment createdFrom(AssessmentDtos.Request req) {
-        // Deliberately only the two collaborators createAssessment actually reaches. ⚠ It does NOT
-        // resolve the vendor at all — unlike TprmService#createAssessment, which calls getVendor() to
-        // "verify org ownership" — so stubbing vendorRepo.findById here would be an UnnecessaryStubbing
-        // that hid a real asymmetry. Filed, not fixed in this slice: an SCM assessment can name a
-        // vendor id the caller's tenant does not own. The row is still stamped with the caller's org,
-        // so it is a dangling reference rather than a leak (vendorIndex() cannot resolve the name).
+        // ⚠ F2-242 CORRECTED THIS COMMENT. It read: "It does NOT resolve the vendor at all … so
+        // stubbing vendorRepo.findById here would be an UnnecessaryStubbing that hid a real
+        // asymmetry. Filed, not fixed in this slice." That filing is now closed — createAssessment
+        // resolves the vendor inside the tenant (requireOwnVendor), so the stub below is REQUIRED,
+        // and its absence is what an unverified reference looks like from a test's point of view.
+        // Note the direction: an UnnecessaryStubbing failure is how F2-241 discovered the asymmetry
+        // in the first place, and a MISSING stub is how it would have been reintroduced.
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(ORG_ID)));
         when(assessmentRepo.save(any(VendorAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vendorRepo.findByOrganisationId(ORG_ID)).thenReturn(List.of(vendor(ORG_ID)));
         ArgumentCaptor<VendorAssessment> saved = ArgumentCaptor.forClass(VendorAssessment.class);
@@ -412,6 +414,7 @@ class ScmServiceTest {
     void applyAssessment_refuses_a_token_the_column_does_not_have() {
         AssessmentDtos.Request r = bareAssessment();
         r.setStatus("DRAFT");            // the literal pre-fix initialiser: legal nowhere
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(ORG_ID)));
 
         assertThatThrownBy(() -> service.createAssessment(r))
             .as("require, not coerce: nothing upstream coerces this field and the CHECK already "
@@ -421,6 +424,116 @@ class ScmServiceTest {
             .hasMessageContaining("status")
             .hasMessageContaining("IN_PROGRESS");
         verify(assessmentRepo, never()).save(any(VendorAssessment.class));
+    }
+
+    // ─── F2-242: an unverified foreign key is a cross-tenant write ───────────────────────────────
+
+    /**
+     * The behavioural half of {@code UnverifiedForeignKeyWriteContractTest}, which can only assert
+     * the <em>shape</em>. These assert the <em>consequence</em>: probed live, a caller holding only
+     * {@code SCM:WRITE} in organisation 1 moved an organisation-2 vendor from BLACKLISTED to ACTIVE
+     * through {@code POST /scm/onboarding} + {@code /approve}.
+     *
+     * <p>⚠ Note what the mocks CAN and cannot show. A mocked repository has no tenant filter of its
+     * own, so {@code findById} returning a foreign vendor is exactly the situation the real database
+     * produces — which is why this family IS unit-testable where F2-241's CHECK family was not.
+     */
+    @Test
+    void startOnboarding_refuses_a_vendor_of_another_tenant() {
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG)));
+        OnboardingDtos.Request r = new OnboardingDtos.Request();
+        r.setVendorId(VENDOR_ID);
+
+        assertThatThrownBy(() -> service.startOnboarding(r))
+            .as("the create is where the reference is STORED, so it is where the tenant question "
+              + "has to be answered — everything downstream dereferences whatever it wrote")
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Vendor not found");
+
+        verify(onboardingRepo, never()).save(any(VendorOnboarding.class));
+        verify(vendorRepo, never()).save(any(Vendor.class));
+    }
+
+    @Test
+    void startOnboarding_writes_the_vendor_it_resolved_and_nothing_else() {
+        Vendor v = vendor(ORG_ID);
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(v));
+        when(onboardingRepo.save(any(VendorOnboarding.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vendorRepo.findByOrganisationId(ORG_ID)).thenReturn(List.of(v));
+        OnboardingDtos.Request r = new OnboardingDtos.Request();
+        r.setVendorId(VENDOR_ID);
+
+        service.startOnboarding(r);
+
+        assertThat(v.getOnboardingStatus()).isEqualTo("IN_PROGRESS");
+        // Exactly ONE load. The pre-fix code resolved the vendor a second time, unpredicated, to do
+        // the write — so the object it verified and the object it wrote were not the same object.
+        verify(vendorRepo, times(1)).findById(VENDOR_ID);
+        verify(vendorRepo, times(1)).save(v);
+    }
+
+    @Test
+    void approveOnboarding_will_not_touch_a_vendor_outside_the_onboarding_rows_tenant() {
+        VendorOnboarding o = new VendorOnboarding();
+        o.setId(ID);
+        o.setOrganisationId(ORG_ID);
+        o.setVendorId(VENDOR_ID);
+        when(onboardingRepo.findById(ID)).thenReturn(Optional.of(o));
+        when(onboardingRepo.save(any(VendorOnboarding.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vendorRepo.findByOrganisationId(ORG_ID)).thenReturn(List.of(vendor(ORG_ID)));
+        // A stored reference that points outside the tenant — the row a data fix or a restore
+        // leaves behind. Reachability is a fact about today, not a property of a control (F2-182).
+        Vendor foreign = vendor(OTHER_ORG);
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(foreign));
+
+        service.approveOnboarding(ID);
+
+        assertThat(foreign.getStatus())
+            .as("pre-fix this flipped a supplier another tenant had BLACKLISTED to ACTIVE")
+            .isEqualTo(vendor(OTHER_ORG).getStatus());
+        verify(vendorRepo, never()).save(any(Vendor.class));
+    }
+
+    @Test
+    void createIncident_refuses_a_vendor_of_another_tenant() {
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG)));
+        IncidentDtos.Request r = new IncidentDtos.Request();
+        r.setVendorId(VENDOR_ID);
+        r.setIncidentType("OTHER");
+
+        assertThatThrownBy(() -> service.createIncident(r))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Vendor not found");
+        verify(incidentRepo, never()).save(any(SupplierIncident.class));
+    }
+
+    @Test
+    void createAssessment_refuses_a_vendor_of_another_tenant() {
+        // The F2-241 filing, closed: TprmService#createAssessment resolves the vendor with the
+        // comment "verify org ownership" and this twin never did.
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.createAssessment(bareAssessment()))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Vendor not found");
+        verify(assessmentRepo, never()).save(any(VendorAssessment.class));
+    }
+
+    @Test
+    void createDependency_refuses_a_foreign_vendor_on_EITHER_reference() {
+        // Two references on one row, and only checking the obvious one leaves the other open —
+        // F2-215's two-of-N shape at its smallest.
+        DependencyDtos.Request r = new DependencyDtos.Request();
+        r.setVendorId(VENDOR_ID);
+        r.setAlternativeVendorId(12L);
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(ORG_ID)));
+        when(vendorRepo.findById(12L)).thenReturn(Optional.of(vendor(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.createDependency(r))
+            .as("alternativeVendorId is the second reference and it is the one a reader skips")
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("12");
+        verify(dependencyRepo, never()).save(any(Dependency.class));
     }
 
     @Test

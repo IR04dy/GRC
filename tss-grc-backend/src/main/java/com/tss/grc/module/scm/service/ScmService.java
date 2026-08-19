@@ -46,6 +46,72 @@ public class ScmService {
         return TenantContext.requireOrganisationId();
     }
 
+    /**
+     * F2-242 — resolve a caller-supplied vendor id <b>inside the caller's tenant</b>, or refuse.
+     *
+     * <p><b>An unverified foreign key is a cross-tenant write waiting for the row that
+     * dereferences it.</b> Six sites in this class stored {@code req.getVendorId()} verbatim, and
+     * four others then did {@code vendorRepo.findById(vendorId).ifPresent(v -> { …set…; save(v); })}
+     * with no tenant predicate — so an organisation-1 caller holding nothing but {@code SCM:WRITE}
+     * could name organisation 2's vendor and write to it. Probed live as {@code ranalyst} against a
+     * planted victim: {@code POST /api/v1/scm/onboarding} answered <b>201</b> and moved the foreign
+     * vendor's {@code onboarding_status} REJECTED → IN_PROGRESS; {@code /approve} then took its
+     * {@code status} from <b>BLACKLISTED to ACTIVE</b> — a supplier another tenant had struck off,
+     * reinstated by a stranger, with no audit row naming the vendor and nothing visible on either
+     * side of the boundary.
+     *
+     * <p>⚠⚠ <b>{@code TenantWriteGuardInterceptor} cannot see this, and it is not a hole in that
+     * guard.</b> {@code decide} returns {@code false} when {@code Objects.equals(oldOrg, newOrg)} —
+     * <em>"Tenant unchanged — the normal case."</em> It guards the tenant <b>column</b>: it catches a
+     * row being <em>moved</em> between tenants (F2-22b) and an insert landing in the wrong one
+     * (F2-216). Writing somebody else's row without touching its {@code organisation_id} is outside
+     * its question by construction, so the per-service predicate is the only control there is.
+     *
+     * <p>🔑 <b>The discriminator, and the reason the sibling sites are safe:</b>
+     * {@code RiskAcceptanceService#setRiskStatus} has the identical unscoped
+     * {@code risks.findById(riskId).ifPresent(…save…)} shape and is <b>correct</b>, because
+     * {@code request()} resolved that {@code riskId} with
+     * {@code .filter(r -> Objects.equals(r.getOrganisationId(), orgId))} before ever storing it.
+     * <b>An unscoped load by a stored id is safe exactly when the id was verified as it was
+     * written</b> — which makes the create the primary fix and the scoped loads defence in depth
+     * for a reference that arrives some other way (a data fix, a restore): reachability is a fact
+     * about today, not a property of a control (F2-182).
+     *
+     * <p>⚠ The correct idiom was already in this file three times — {@code getVendor},
+     * {@code updateVendor} and {@code deleteVendor} all filter on the tenant — and
+     * {@code TprmService#createAssessment} carries it with the comment
+     * <em>"verify org ownership"</em>. It was used for the vendor itself and never once for a
+     * <em>reference</em> to one.
+     *
+     * <p>This cannot break a working request. A vendor of the caller's own tenant resolves exactly
+     * as before; a <em>nonexistent</em> id was already refused by {@code FK_scm_ob_vendor} /
+     * {@code FK_scm_assess_vendor} (as a 500, so this only improves the diagnostic); and a
+     * <em>foreign</em> id is the defect.
+     */
+    private Vendor requireOwnVendor(Long vendorId) {
+        return vendorRepo.findById(vendorId)
+                .filter(v -> v.getOrganisationId().equals(orgId()))
+                .orElseThrow(() -> new EntityNotFoundException("Vendor not found: " + vendorId));
+    }
+
+    /**
+     * F2-242 — the write half: stamp a vendor's onboarding fields, refusing to touch a row that
+     * does not belong to {@code orgId}. The tenant is passed in rather than read from
+     * {@link #orgId()} so the anchor is always the <em>owning row's</em> tenant, which is what a
+     * caller-independent path (a sweep) would need.
+     */
+    private void stampVendorOnboarding(Long vendorId, Long orgId, String onboardingStatus,
+                                       String vendorStatus) {
+        if (vendorId == null) return;
+        vendorRepo.findById(vendorId)
+                .filter(v -> v.getOrganisationId().equals(orgId))
+                .ifPresent(v -> {
+                    v.setOnboardingStatus(onboardingStatus);
+                    if (vendorStatus != null) v.setStatus(vendorStatus);
+                    vendorRepo.save(v);
+                });
+    }
+
     // ───────────── Vendors ─────────────
     @Transactional(readOnly = true)
     public Page<VendorDtos.Response> listVendors(Pageable pageable) {
@@ -122,9 +188,14 @@ public class ScmService {
     }
 
     public OnboardingDtos.Response startOnboarding(OnboardingDtos.Request req) {
+        // F2-242 — resolve the vendor in the caller's tenant BEFORE storing the reference.
+        // This is the site that made the whole chain reachable: `vendor_id` is NOT NULL here,
+        // so an onboarding always names a vendor, and until this line the name could be
+        // anybody's. See requireOwnVendor().
+        Vendor vendor = requireOwnVendor(req.getVendorId());
         VendorOnboarding o = new VendorOnboarding();
         o.setOrganisationId(orgId());
-        o.setVendorId(req.getVendorId());
+        o.setVendorId(vendor.getId());
         o.setCurrentStage("REGISTRATION");
         o.setStatus("IN_PROGRESS");
         o.setAssignedToId(req.getAssignedToId());
@@ -132,8 +203,10 @@ public class ScmService {
         o.setNotes(req.getNotes());
         o.setCompletedStages("");
         o = onboardingRepo.save(o);
-        // Update parent vendor onboarding_status
-        vendorRepo.findById(req.getVendorId()).ifPresent(v -> { v.setOnboardingStatus("IN_PROGRESS"); vendorRepo.save(v); });
+        // Update parent vendor onboarding_status — on the vendor this method already resolved
+        // inside the tenant, so there is no second, unpredicated load to get wrong.
+        vendor.setOnboardingStatus("IN_PROGRESS");
+        vendorRepo.save(vendor);
         if (bcast != null) bcast.entity(o.getOrganisationId(), "vendor_onboarding", o.getId(), o);
         return toOnboardingResponse(o, vendorIndex());
     }
@@ -150,7 +223,7 @@ public class ScmService {
         o.setCompletedStages(done);
         if (idx == stages.length - 1) {
             o.setStatus("COMPLETED");
-            vendorRepo.findById(o.getVendorId()).ifPresent(v -> { v.setOnboardingStatus("COMPLETED"); v.setStatus("ACTIVE"); vendorRepo.save(v); });
+            stampVendorOnboarding(o.getVendorId(), o.getOrganisationId(), "COMPLETED", "ACTIVE");
         } else {
             o.setCurrentStage(stages[idx + 1]);
         }
@@ -166,7 +239,7 @@ public class ScmService {
         o.setStatus("COMPLETED");
         o.setCurrentStage("APPROVAL");
         o.setUpdatedAt(LocalDateTime.now());
-        vendorRepo.findById(o.getVendorId()).ifPresent(v -> { v.setOnboardingStatus("COMPLETED"); v.setStatus("ACTIVE"); vendorRepo.save(v); });
+        stampVendorOnboarding(o.getVendorId(), o.getOrganisationId(), "COMPLETED", "ACTIVE");
         return toOnboardingResponse(onboardingRepo.save(o), vendorIndex());
     }
 
@@ -176,7 +249,7 @@ public class ScmService {
         o.setStatus("REJECTED");
         o.setRejectionReason(reason);
         o.setUpdatedAt(LocalDateTime.now());
-        vendorRepo.findById(o.getVendorId()).ifPresent(v -> { v.setOnboardingStatus("REJECTED"); vendorRepo.save(v); });
+        stampVendorOnboarding(o.getVendorId(), o.getOrganisationId(), "REJECTED", null);
         return toOnboardingResponse(onboardingRepo.save(o), vendorIndex());
     }
 
@@ -253,7 +326,10 @@ public class ScmService {
             "riskRating", "CK_scm_assess_rating", "LOW", "MEDIUM", "HIGH", "CRITICAL");
 
     private void applyAssessment(VendorAssessment a, AssessmentDtos.Request req) {
-        if (req.getVendorId() != null) a.setVendorId(req.getVendorId());
+        // F2-242 — TprmService#createAssessment resolves the vendor with the comment "verify org
+        // ownership"; this twin never did, so a SAMA outsourcing assessment could be filed against
+        // a supplier the tenant does not own.
+        if (req.getVendorId() != null) a.setVendorId(requireOwnVendor(req.getVendorId()).getId());
         if (req.getAssessmentType() != null) {
             a.setAssessmentType(ASSESSMENT_TYPE.require(req.getAssessmentType()));
         }
@@ -312,11 +388,14 @@ public class ScmService {
         if (req.getServiceNameEn() != null) d.setServiceNameEn(req.getServiceNameEn());
         if (req.getServiceNameAr() != null) d.setServiceNameAr(req.getServiceNameAr());
         if (req.getAssetName() != null) d.setAssetName(req.getAssetName());
-        if (req.getVendorId() != null) d.setVendorId(req.getVendorId());
+        // F2-242 — both vendor references, resolved inside the tenant before being stored.
+        if (req.getVendorId() != null) d.setVendorId(requireOwnVendor(req.getVendorId()).getId());
         if (req.getDependencyType() != null) d.setDependencyType(req.getDependencyType());
         if (req.getDependencyLevel() != null) d.setDependencyLevel(req.getDependencyLevel());
         if (req.getHasAlternative() != null) d.setHasAlternative(req.getHasAlternative());
-        if (req.getAlternativeVendorId() != null) d.setAlternativeVendorId(req.getAlternativeVendorId());
+        if (req.getAlternativeVendorId() != null) {
+            d.setAlternativeVendorId(requireOwnVendor(req.getAlternativeVendorId()).getId());
+        }
         if (req.getStatus() != null) d.setStatus(req.getStatus());
         if (req.getImpactAnalysis() != null) d.setImpactAnalysis(req.getImpactAnalysis());
     }
@@ -345,7 +424,9 @@ public class ScmService {
     public IncidentDtos.Response createIncident(IncidentDtos.Request req) {
         SupplierIncident i = new SupplierIncident();
         i.setOrganisationId(orgId());
-        i.setVendorId(req.getVendorId());
+        // F2-242 — `vendor_id` is NOT NULL on scm.supplier_incidents, so an incident always names
+        // a supplier; until this line it could name anybody's.
+        i.setVendorId(requireOwnVendor(req.getVendorId()).getId());
         i.setIncidentType(req.getIncidentType());
         i.setImpact(req.getImpact() != null ? req.getImpact() : "MEDIUM");
         i.setDescription(req.getDescription());
@@ -430,7 +511,8 @@ public class ScmService {
     }
 
     private void applyContract(Contract c, ContractDtos.Request req) {
-        if (req.getVendorId() != null) c.setVendorId(req.getVendorId());
+        // F2-242 — a contract naming another tenant's supplier is a dangling outsourcing record.
+        if (req.getVendorId() != null) c.setVendorId(requireOwnVendor(req.getVendorId()).getId());
         if (req.getContractNumber() != null) c.setContractNumber(req.getContractNumber());
         if (req.getTitleEn() != null) c.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null) c.setTitleAr(req.getTitleAr());

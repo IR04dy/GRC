@@ -2547,6 +2547,206 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-242 · An unverified foreign key is a cross-tenant write waiting for the row that dereferences it, and the platform-wide backstop guards the tenant COLUMN rather than the tenant ROW
+
+|  |  |
+|---|---|
+| **ID** | F2-242 |
+| **Title** | `ScmService#startOnboarding` stored a caller-supplied `vendorId` without verifying the vendor belonged to the caller's tenant, then dereferenced it with an unpredicated `findById(...).ifPresent(...save...)` — so an organisation-1 caller holding only `SCM:WRITE` moved an organisation-2 supplier from BLACKLISTED to ACTIVE, with the platform-wide cross-tenant write backstop watching and saying nothing |
+| **Severity** | 🔴 P1 (a cross-tenant WRITE on a third-party register, reachable by any `SCM:WRITE` holder through a documented route; latent in the data — 0 foreign references in dev or prod — and demonstrated live against a planted victim) |
+| **Status** | 🟢 CLOSED 2026-08-19 |
+| **Programme** | Platform Bible F2 · tenant isolation |
+| **Modules** | `scm` (6 reference-storing sites, 3 transitions), `evidence` (the nightly sweep + its create), `risk` (a safe site closed anyway); 1 new gate; 6 behaviour tests; 1 F2-241 comment corrected |
+
+### The filing that started it, and what re-deriving it found
+
+F2-241 filed: *"`ScmService#createAssessment` never resolves the vendor, where
+`TprmService#createAssessment` calls `getVendor()` to 'verify org ownership' — so an SCM assessment
+can name a vendor id the caller's tenant does not own. A dangling reference, not a leak: the row is
+still stamped with the caller's org."*
+
+Both halves of that are true and it was **the mildest instance of the shape**. Re-derived per F2-221,
+`module/scm` stores a caller-supplied vendor reference at **six** sites and verifies it at none — and
+at four *other* sites it then **writes to the referenced vendor** through
+`vendorRepo.findById(vendorId).ifPresent(v -> { …set…; save(v); })` with no tenant predicate. The
+assessment was the one member of the family with nothing downstream to dereference it.
+
+### 🔑 The discriminator is not the unscoped load — it is whether the reference was verified when it was STORED
+
+`RiskAcceptanceService#setRiskStatus` carried the **identical** shape:
+
+```java
+risks.findById(riskId).ifPresent(r -> {
+    if (!"CLOSED".equals(r.getStatus())) { r.setStatus(status); risks.save(r); }
+});
+```
+
+and was **correct**, because `request()` had already resolved that `riskId` with
+`.filter(r -> Objects.equals(r.getOrganisationId(), orgId))` before ever writing it to the column. So
+an unscoped load by a stored id is safe **exactly when the id was verified as it was written** — which
+makes the create the primary fix and a scoped load defence in depth. That is why this finding is about
+foreign keys and not about `findById`.
+
+⚠ It was closed anyway. **What made it harmless is a predicate in a different method, and nobody was
+maintaining that relationship** (F2-177's rule). A row arriving by another route — a data fix, a
+restore, a future second producer — walks straight through, and reachability is a fact about today,
+not a property of a control (F2-182).
+
+### ⚠⚠ `TenantWriteGuardInterceptor` cannot see this, and that is not a hole in it
+
+`decide` returns `false` the moment `Objects.equals(oldOrg, newOrg)` — its own comment reads
+*"Tenant unchanged — the normal case."* The guard is correct for the question it asks: it catches a row
+being **moved** between tenants (F2-22b) and an insert **landing** in the wrong one (F2-216). **It
+guards the tenant COLUMN.** Writing another tenant's row without touching its `organisation_id` is
+outside its question *by construction*.
+
+`application-prod.yml` describes the bean as the *"platform-wide Hibernate-level cross-tenant write
+backstop … so a single missed per-service guard cannot silently write across tenants"* — true of the
+two shapes it sees, false of this one. 🔑 **So the per-service predicate is the only control there is,
+and until this slice nothing was counting the places it is missing.** F2-216 found the null-value hole
+in `decideInsert`; this is the same class of question asked of `decide`, and the answer is that the
+missing coverage is structural rather than a bug.
+
+### The live demonstration — 12 of 13 legs, F2-206's planted victim
+
+Probed as **`ranalyst`** (organisation 1; holds `SCM:READ/WRITE/EXPORT` and nothing else — `admin`
+proves nothing about authorization). The victim is a `[REVIEW-TEST]` vendor planted in
+**organisation 2** (*Aramco Trading Company*, which has **no users at all**, so the victim tenant has
+nobody who could notice), `status = BLACKLISTED`, `onboarding_status = REJECTED` — because that is the
+value whose loss matters.
+
+| leg | call | result |
+|---|---|---|
+| 1 | `POST /api/v1/scm/onboarding {vendorId: <org-2 vendor>}` | **201** · victim `onboarding_status` REJECTED → **IN_PROGRESS** · row stored `(org 1, vendor 81)` |
+| 2 | `POST /onboarding/{id}/approve` | **200** · victim `status` BLACKLISTED → **ACTIVE**, `onboarding_status` → COMPLETED |
+| 3 | `POST /onboarding/{id}/reject` | **200** · third writer reaches it too |
+| 4 | `POST /api/v1/scm/assessments {vendorId: <same>}` | **201** · a SAMA outsourcing assessment filed against a supplier the tenant does not own |
+| 5 | visibility | the attacker **cannot read the vendor back** (`GET /vendors` is tenant-scoped, 31 rows, victim absent); their own onboarding row renders with **no vendor name**; **0 audit rows** name the mutated vendor |
+
+🔑 **A supplier another tenant had struck off, reinstated by a stranger, invisible from both sides of
+the boundary.** In a SAMA-outsourcing register `status` is what gates whether the organisation may
+transact with a supplier, so the write is not cosmetic.
+
+⚠ **The FK does not help, and it is worth being precise about why.** `FK_scm_ob_vendor` and
+`FK_scm_assess_vendor` both exist — so a **nonexistent** vendor id is refused by the database. A
+foreign key knows nothing about tenancy, so a **cross-tenant** id is a perfectly valid reference. *The
+constraint that looks like it protects the reference is the one that cannot.*
+
+### ⚠⚠ My own leg 0 was wrong TWICE, and the second failure is what exposed the first
+
+The probe carried a sanity leg — *"F2-241's `require` is active on the running listener"* — asserting
+that `status: "planned"` answers **400**. It answered **201**, and I recorded that as F2-217's stale
+listener: *"the listener was serving pre-F2-241 bytecode while answering `/actuator/health` 200."*
+
+**That inference was unfounded.** The post-fix run, against a backend restarted 40 seconds earlier on
+the fixed tree, failed the identical leg. `ClosedVocabulary.require()` **normalises case before testing
+membership** — which is precisely what F2-241's own
+`applyAssessment_normalises_the_casing_the_collation_would_have_let_through` asserts — so `'planned'`
+becomes `'PLANNED'`, which is legal, and **201 is the correct answer**. The assertion was wrong, not
+the server.
+
+🔑 **A wrong expectation and a stale listener produce the identical red line, and the stale-listener
+reading is the more interesting story — which is exactly why it was the one I reached for.** F2-217 is
+a real hazard and it was not this. The discriminator that actually tests the running tree is a token
+legal in **no** casing: `"DRAFT"`, the literal pre-F2-241 initialiser. Corrected leg 0 now asserts both
+halves — `DRAFT` → 400, `planned` → 201 — so it cannot pass for the wrong reason in either direction.
+
+⚙ It changes nothing about legs 1–5: `ScmService`'s onboarding path is untouched by F2-241, and the
+post-fix probe was run on a restarted backend regardless. What it changes is the claim: **there is no
+evidence the pre-fix listener was stale.**
+
+### The second confirmed instance: the on-request sibling filters and the sweep six methods away does not
+
+`EvidenceItemService#expireStaleEvidence` is the nightly all-orgs sweep. It reopened the originating
+evidence request through `requestRepository.findById(item.getRequestId())` with **no** predicate, while
+`fulfilRequest` — the on-request path, in the same class — has **always** carried
+`.filter(r -> r.getOrganisationId().equals(orgId))`. **F2-215's two-of-N shape**: a reader who finds the
+predicate on one reader of a foreign key has no reason to check the other.
+
+⚠ The correct anchor there is **the item's own tenant**, not `TenantContext` — the sweep sets the tenant
+per row and has no request tenant of its own. And the root is the same as SCM's: `applyRequest` stored
+`req.requestId()` unverified, so the create now refuses a request belonging to another tenant.
+
+### Adjudication of the derived population
+
+The decidable shape is the single-expression `findById(x).ifPresent(v -> { …set…; save(v); })` on an
+entity carrying `organisation_id`. **7 sites; 6 fixed, 1 by design, 0 open.**
+
+| site | verdict |
+|---|---|
+| `ScmService` ×4 (onboarding start/advance/approve/reject) | **CONFIRMED, live** — probed cross-tenant write |
+| `EvidenceItemService#expireStaleEvidence` | **CONFIRMED** — sibling filters, sweep did not |
+| `RiskAcceptanceService#setRiskStatus` | **SAFE — verified at store; closed anyway** (F2-177) |
+| `LoginAttemptService#onSuccess`/`onFailure` | **BY DESIGN** — authentication, before any tenant exists; the id is the principal the authenticator just resolved, `TenantContext` is unset, and `orgId()` would throw. Scoping it would break login lockout bookkeeping |
+
+### ⚠⚠ The detector bug that produced the gate, because it is the reusable part
+
+The reconnaissance pass matched `\.ifPresent\(([^;]{0,600}?)\)` and reported **0 sites on a tree holding
+7**. **A lambda body is a statement list**, so a character class excluding `;` can never match the very
+shape being hunted. 🔑 **A detector that cannot match reads exactly like a clean tree, and it
+UNDER-reports** — the quiet direction, and the ~12th instance of this shape on the register.
+
+`UnverifiedForeignKeyWriteContractTest` extracts the argument with a **paren-balanced walk** (string
+and char literals skipped so a `")"` in a message cannot end it), and carries a **synthetic self-test**
+driving the detector across the literal pre-fix source *and* the literal fixed form, plus two shapes it
+must never flag (a read; an entity with no tenant column) so the invariant cannot be satisfied by
+over-matching.
+
+Its population is **derived**, never listed: repository fields are read from each class's own
+declarations and resolved **per owner type** (F2-187 — a name-only fallback is how that slice lost
+`PolicyService#create`), each repository is resolved to its entity, and an entity is in scope only if it
+carries `organisation_id`. Floors sit above the largest *wrong* answers (F2-215): ≥380 entities, ≥340
+tenanted, ≥380 repositories resolved, ≥1500 files walked — because "the walk found nothing" and "no
+repository resolved" both make the invariant vacuously green.
+
+⚠ **The one exemption is a named map with a reason, enforced in both directions**, not an empty set —
+a hard zero here would fail on correct code, the one thing a gate must never do (F2-214). And the
+reverse leg is the direction nobody writes first (F2-199): an exemption for something no longer in the
+population reads exactly like an exemption for something that is.
+
+### The residue is measured, printed and FILED unread
+
+The broader *load-then-write-later* shape (an assignment, a setter below, a save at the end) is a
+**dataflow** question a regex cannot answer (F2-182), so the gate prints it and asserts only
+decrease-only + non-empty. **7 sites, none read:**
+
+```
+module/iam/governance/service/AccessGovernanceService.java:94   roles.findById -> Role (as revived)
+module/outsourcing/service/OutsourcingService.java:372/429      arrangementRepo.findById -> OutsourcingArrangement
+module/platform/service/NotificationService.java:271            notificationRepository.findById -> Notification
+module/risk/service/RiskTreatmentService.java:66                treatments.findById -> RiskTreatment
+module/tprm/service/TprmService.java:172/211                    assessmentRepo.findById -> VendorAssessment
+```
+
+Deliberately **no verdicts** (F2-188 — five fluent claims, five false). Read the route and probe it.
+
+⚙ **The Java gate reproduced the Python recon's residue exactly** — same 7 sites, same files — which is
+the first exact locator/gate agreement in this lineage since F2-220 (F2-213 measured 5 vs 9, F2-214 3 vs
+11, both because the locator's resolver was narrower than the gate's).
+
+### Verification
+
+* `UnverifiedForeignKeyWriteContractTest` **8/8**; `ScmServiceTest` **20 → 26**; `RiskAcceptanceServiceTest` 8/8; `EvidenceItemServiceTest` 20/20.
+* **Pre-fix control**: master's three main sources restored under the new gate → **2 of 8 legs fail, naming exactly the six closed sites**. The other six are synthetic/floor legs that correctly pass on both trees.
+* Full unit suite green; live probe **12/13 pre-fix** (leg 0 = my own wrong assertion, corrected below) and **16/16 post-fix** on a **restarted** backend.
+* Both databases restored: `scm.vendors` **31**, `scm.vendor_onboarding` **17**, `scm.vendor_assessments` **15**, **0 residual `[REVIEW-TEST]`**, **0 rows naming a foreign or absent vendor** — dev = prod throughout.
+* **No migration.** The FKs already existed and no live row violates the new rule; this is a service-layer refusal, not a schema change.
+
+### 🔑 Reusable
+
+1. **An unverified foreign key is a cross-tenant write waiting for the row that dereferences it.** Fix it where the reference is *stored*; scope the load as defence in depth.
+2. **A guard's population is its question.** `TenantWriteGuardInterceptor` guards the tenant *column*; nothing guarded the tenant *row*. Before trusting a backstop, say out loud which noun it protects.
+3. **A foreign-key constraint refuses a nonexistent reference and is blind to a cross-tenant one** — so the constraint that looks protective is the one that cannot help.
+4. **A character class excluding `;` cannot match a lambda body.** Extract arguments with a balanced walk, and carry a self-test over the literal defect.
+5. **A safe instance of a dangerous shape is safe because of something in another method.** Close it anyway.
+
+### ⚙ Filed
+
+- **The 7-site load-then-write-later residue above**, unread and unverdicted. `TprmService:172/211` is the readiest — it is the twin register of the one this slice closed.
+- **`scm.vendors.status` and `onboarding_status` are written by `stampVendorOnboarding` as Java literals against CHECK-constrained, case-insensitively-collated columns** (`CK_scm_vendor_status`, `CK_scm_vendor_ob_status`). The literals are all legal today; the register has no other open writer for them, so closing them with `ClosedVocabulary` is cheap (F2-183) and was left out of scope only to keep this slice's diff to the tenant question.
+- **`scm.slas` still has no server surface of any kind** (14 live rows, dev = prod) — F2-204's `NO_SERVER_SURFACE` population, whose derived registry is scoped to the four `*_lc` modules and so has never seen it. Carried from F2-241.
+- **The structural root is unchanged**: a caller-supplied foreign key is representable on every create in the platform. A `@TenantOwned`-style binding that resolves a reference through the tenant automatically — rather than 200-odd services each remembering — is an owner decision, and it is the same shape as F2-213's *"a purpose-built request record per endpoint would make this class unrepresentable."*
+
 ## F2-241 · An entity's field initialiser is a one-token vocabulary, and no instrument had ever compared one against its column's own CHECK
 
 |  |  |
