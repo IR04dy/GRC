@@ -2547,6 +2547,201 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-247 · A second register, a second resolver, and a bean name that would not boot
+
+| | |
+|---|---|
+| **ID** | F2-247 |
+| **Status** | ✅ CLOSED 2026-08-19 |
+| **Severity** | P2 |
+| **Area** | `module/tprm/cyber` · SAMA/NCA third-party cyber assessment · one create form |
+| **Found by** | executing F2-246's filed 45-member work list, after re-deriving it (F2-221) |
+
+### What was measured
+
+Re-deriving the census by **reach** in both databases split the population into two disjoint
+sub-shapes, which is the useful result before any code is read:
+
+* **fully linked** registers can only exhibit F2-245's *divergence* — `cyber.cyber_controls`
+  75/75, `admin.committee_meetings` 34/34, `iam.sod_violations` 9/9,
+  `bcm.mtpd_inheritance_finding` 8/8 (twice), `ethics.aml_alerts :: rule_id` 10/10.
+* **unlinked** registers can only exhibit F2-246's *unlinkability* — `socops.sbom_component`
+  20/20, `bcm.dr_plans` 16/16 (twice), `socops.appsec_finding` 10/10,
+  `bcm.strategy_roi_analysis` 3/3, `tprm.third_party_cyber_assessments` 8 of 16.
+
+Three of the fully-linked registers turned out to be **already correct by construction**, and they
+are the exemplar this family's fix copies: `CommitteeService` writes
+`m.setCommitteeCode(parent.getCode())`, `SodService` writes `v.setRuleCode(rule.getRuleCode())`,
+and `MtpdInheritanceService` writes `f.setVendorName(vend.getVendorName())` — every label derived
+from a resolved parent.
+
+⚠⚠ **MY OWN FIRST PAIRING MANUFACTURED A 75-ROW PHANTOM, AND F2-210 HAD JUST WRITTEN THE RULE.**
+`cyber.cyber_controls` stores `framework_id` beside `framework_name`, and paired against
+`compliance.frameworks` by NAME it reported **all 75 rows diverging**, with ids and labels
+apparently naming different frameworks (`id=5` labelled `NCA CSCC` resolving to *ISO/IEC 27001
+ISMS*). `CyberController` owns a `/frameworks` route and `CyberFrameworkService` resolves
+`cyber.cyber_frameworks` with `findByOrganisationId` — so **that** is the parent, and against it
+**75 of 75 AGREE**, 0 dangling, 0 cross-tenant. 🔑 *A scan locates; **the pairing is the
+measurement**, and a guessed pairing manufactures phantom findings* (F2-210), landing on the slice
+one after it was recorded. There are also **two** framework registers (`compliance.frameworks` 24
+rows, `evidence.frameworks` 16), neither carrying an `organisation_id`, which is why the wrong one
+resolved so plausibly.
+
+Two candidates were **excluded on measurement rather than fixed**: `socops.sbom_component` and
+`socops.appsec_finding` both carry an `application_id` populated on **no live row**, and **`socops`
+declares no application register at all** — so the id has no target and this is the *unwireable*
+case (F2-204's shape), not a fixable one. `bcm.dr_plans` is blocked on owner decisions on both
+halves: no critical-system register exists, and `linked_bcp_id`'s parent is the already-filed
+two-plan-register ambiguity (`bcm_plans` vs `bcp_plans`, F2-196). Neither of its two id columns has
+**any** writer at all — `DrPlanService` writes only the labels.
+
+### The live defect
+
+`tprm.third_party_cyber_assessments` — 16 live rows, byte-identical dev and prod:
+
+| | rows |
+|---|---|
+| **unlinked** (`TPC-2026-001..008`), label only | **8** |
+| linked and agreeing (`TPC-GOV-001..008`) | 8 |
+| diverging | 0 |
+| dangling | 0 |
+
+The unlinked labels are annotated prose — `'New vendor — Sentry IO'`, `'Legacy vendor — Backup Tape
+Logistics LLC'` — which is *why* they can never join. `ThirdPartyCyberAssessmentService.create`
+binds the **entity** and touched neither half, so both came straight from the caller's body with no
+resolution and no tenant check, and the wire contract said so: `vendorId?: number` (optional)
+beside `vendorName: string` (required). `ThirdPartyCyberPage`'s form was a `required: true`
+free-text vendor box with **no picker**, and `onCreate` sent **no id at all** — so the rows the
+platform's own screen produces are exactly the unlinked ones, and the 8 that are linked came from
+the seed.
+
+Probed live as `compliance` (holds `TPRM:WRITE`, not `TPRM:APPROVE`, resolved from
+`iam.role_permissions` — `admin` proves nothing about authorization) against a **planted** org-2
+victim cloned from a real org-1 vendor (F2-206, F2-246):
+
+| leg | pre-fix | post-fix |
+|---|---|---|
+| label-only create | 201 | **201** — deliberately kept |
+| another tenant's vendor id | **201**, stored | **404** |
+| `vendorId: 999999` | **201** | **404** |
+| real id + **lying label** | **201**, lie stored | **201**, label derived `'Cisco Systems'` |
+
+The last row is the load-bearing leg. **The two legs that expect a refusal cannot tell a correct
+refusal from one caused by a null tenant** — F2-246's fix was wrong in one of its four registers for
+exactly that reason, and only the derived-label assertion could see it. Note also that leg 4 answers
+201 pre-fix: the column carries **no FOREIGN KEY**, so the database refused nothing either.
+
+### The module already knew
+
+`TprmService.createAssessment` resolves its vendor with `getVendor(req.getVendorId())` under the
+comment *"verify org ownership"*. That is the correct artefact, one service over in the same module
+— and `tprm/cyber` imported **nothing** from `tprm/*`, so it had no `VendorRepository` at all and
+could not have resolved a vendor if it had wanted to. F2-215's two-of-N. `getVendor` now delegates
+to the shared resolver, because what made the duplicate harmless was two copies agreeing and nobody
+maintaining that (F2-177).
+
+### ⚠⚠ The bean name that would not boot
+
+Naming the new class `VendorReferenceResolver`, mirroring F2-246's, **stopped the application
+starting**: two `@Component` classes with the same simple name claim the same default bean name and
+Spring throws `ConflictingBeanDefinitionException` while parsing the configuration class.
+
+🔑 **All 4,229 unit tests passed over it.** Nothing in the suite boots a Spring context, and
+`mvn -o clean package` is deliberately hermetic — no database, no secrets — so the build never
+starts the app either. The only instrument that could see this was launching it, and the launch
+printed **`BUILD SUCCESS`** over the failure (the recorded landmine that `BUILD SUCCESS` is not a
+start signal under `spring-boot:run`, because DevTools' `RestartLauncher` swallows it). The visible
+symptom was a health probe that never answered.
+
+F2-222 filed the duplicate-simple-name hazard for **entities** and measured it as latent — 15 of
+433 names in two packages, *"and nobody is maintaining that"*. For a Spring bean it is **fatal**, so
+it gets an invariant: `UniqueBeanNameContractTest` (**744** component-scanned beans measured, hard
+zero, no exemption map — an explicit `@Component("name")` is always available, so there is no
+correct code for it to fail on). The `Tprm` prefix is also the honest name, for the same reason
+`loadTprmVendorOptions` carries one: there are two vendor registers for one concept and reaching
+for the wrong resolver is the easy mistake.
+
+### What was deliberately NOT done
+
+* **`vendor_country` is not derived.** It looks like a third identity copy and is not: the
+  assessment stores `'SA'` where `tprm.vendors` stores `'Saudi Arabia'` — two notations for one
+  concept (F2-203's shape) — and the form caps the field at `maxLength: 3` with the placeholder
+  `'SAU'`. Deriving it would write a country *name* into a three-character field. Filed.
+* **The unlinked case is preserved and disclosed**, not refused: nothing rejects a label-only
+  create today and 8 live rows were made that way, so `require` would break working requests
+  (F2-182), and an assessment of a supplier that is not in the register is a real thing to want.
+* **No migration.** V379 remains head.
+
+### The census gap this slice closed
+
+`ParentIdentityCopyContractTest` held its closures as a **single `String`**, so F2-246 closed four
+registers and **all four still printed `NEEDS-READING`**. 🔑 *A member left on a work list after a
+sweep is indistinguishable from one nobody has looked at* — house rule 3's warning about un-lowered
+ceilings, arriving inside the artefact that carries the work list. Now a `CLOSED` map of six
+entries, each naming its slice and mechanism and each asserted to still be a member the scan finds
+(F2-199's reverse direction). Work list **45 → 40**.
+
+### Instrument errors of mine, all caught by running things
+
+* The guessed pairing above (75 phantom rows), and a guessed column — `compliance.frameworks` has
+  no `organisation_id`, and the answer was printed by my own script one line above the query that
+  failed on it.
+* **A vacuous invariant.** My first gate leg asserted *"the service does not write the vendor
+  reference from the request"*, and the pre-fix control showed it **SILENT ON MASTER**: an
+  entity-bound create has **no setter for a scan to find**, because Jackson had already bound both
+  values onto the entity. The leg would have passed forever over the defect it was written for.
+  🔑 **On an entity-bound endpoint the load-bearing assertion has to be the positive** — both halves
+  *overwritten from the resolver* — which is the only shape that can see a create doing nothing at
+  all.
+* **A gate failing on correct code**, the one failure a gate must never have (F2-214): a file-wide
+  ban on `approverName` fired on the RESPONSE type, which legitimately declares it because
+  `approver_name` is a real column. **F2-225 recorded this exact mistake** and I repeated it;
+  re-scoped to the function body.
+* An anti-vacuity floor **guessed at 800** against a measured **744**, so the leg failed on a correct
+  tree — F2-195's rule that a baseline lifted from something other than the measurement is worse
+  than none, because it looks measured.
+* ⚠⚠ **A docs script destroyed the 1.79 MB findings register**, and the mechanism generalises:
+  `io.open(p, "w")` **truncates on open**, so an exception during `.write()` leaves the file at zero
+  bytes. Every subsequent grep then answered *"not found"*, which reads as the anchor having moved
+  rather than as the file having been destroyed. Restored with `git checkout --` because it was
+  tracked and uncommitted. **Build the content, write a temp file, assert the round-trip, then
+  replace.** The encode failure itself was lone surrogates — `\ud83d\udd11` written as two escapes
+  is two unpaired surrogates, not a character.
+* A sibling of that: a patch script whose write handle was **never closed**, so its own verifying
+  `assert` re-read an unflushed file, found nothing, and passed vacuously.
+* Small ones: a probe fixture giving a `uniqueidentifier` column a plausible string; `mvn` needing
+  `mvn.cmd` on Windows, so the mutation harness raised `FileNotFoundError` instead of reporting a
+  result; and a non-ASCII character in a bash `grep` pattern, which does not survive the shell.
+
+### Verification
+
+Backend **4,232/0/0** · frontend **805/805** · `npx tsc --noEmit` clean · pre-fix control **14
+discriminating, 0 silent-on-master, 0 broken** · mutation **13/13 killed, 0 survived, 0
+anchor-miss** · live probe **7/7 post-fix against 6/7 pre-fix**, run twice with cleanup verified and
+the seeded register unchanged at 16 rows.
+
+### Filed
+
+* The **40-member work list** that remains, still with no verdicts (F2-188). The two `socops`
+  members are **unwireable** (no application register exists) and `bcm.dr_plans` needs an owner
+  decision on both halves — recorded so the next slice does not re-measure them.
+* **`cyber.cyber_controls` is latent, not clean**: the create and update both take `framework_id`
+  and `framework_name` from the request with no resolution and no tenant check on the framework, so
+  divergence and a cross-tenant reference are representable. 0 rows exhibit either today.
+* **`ethics.aml_alerts :: rule_id + rule_name`** — `AmlAlertService` writes the label from the
+  source rather than from a resolved rule.
+* **`tprm.third_party_cyber_assessments.vendor_country`**, the two-notation column above: which
+  notation governs is an owner decision, and the form's 3-character cap disagrees with the parent's
+  stored value.
+* **The 8 unlinked live rows** in both databases — repair means deciding per row which registered
+  vendor an annotated label meant (owner decision), and the missing FOREIGN KEY is blocked on it.
+* **Two vendor registers for one concept** (`scm.vendors` 31 rows, `tprm.vendors` 28) and therefore
+  two resolvers, because ADR-012/018 keep the modules' internals apart. **That the shape recurs once
+  per module because the primitive cannot be shared is the structural finding**, and it is the same
+  argument as the `CyberInputValidation` situation. Owner decision.
+* **`tprm.vendors` exists for organisation 1 only**, so the picker is empty for any other tenant —
+  the same gap F2-246 filed for `scm.vendors`.
+
 ## F2-246 · A form that collects a LABEL instead of a LINK produces a row nothing can join
 
 | | |

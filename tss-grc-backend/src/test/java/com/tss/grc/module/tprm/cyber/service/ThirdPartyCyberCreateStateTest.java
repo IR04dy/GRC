@@ -3,6 +3,8 @@ package com.tss.grc.module.tprm.cyber.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.tprm.cyber.entity.ThirdPartyCyberAssessment;
 import com.tss.grc.module.tprm.cyber.repository.ThirdPartyCyberAssessmentRepository;
+import com.tss.grc.module.tprm.repository.VendorRepository;
+import com.tss.grc.module.tprm.service.TprmVendorReferenceResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +35,12 @@ class ThirdPartyCyberCreateStateTest {
     @BeforeEach
     void setUp() {
         repo = mock(ThirdPartyCyberAssessmentRepository.class);
-        service = new ThirdPartyCyberAssessmentService(repo);
+        // F2-247 — a REAL TprmVendorReferenceResolver over a mocked VendorRepository, never a mocked
+        // resolver. A mock returns null and the create's vendor-reference legs would then go green
+        // asserting nothing (F2-237). These fixtures supply a label and no id, so the unlinked
+        // path is taken and the repository is never consulted.
+        service = new ThirdPartyCyberAssessmentService(
+                repo, new TprmVendorReferenceResolver(mock(VendorRepository.class)));
         when(repo.save(any(ThirdPartyCyberAssessment.class)))
             .thenAnswer(inv -> inv.getArgument(0));
         TenantContext.setCurrentTenant(1L);

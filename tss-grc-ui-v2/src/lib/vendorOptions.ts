@@ -1,4 +1,4 @@
-import { scmApi } from './api';
+import { scmApi, tprmApi } from './api';
 
 /**
  * The tenant's own vendor register, as picker options.
@@ -42,6 +42,32 @@ export async function loadVendorOptions(lang: 'en' | 'ar'): Promise<VendorOption
     .map((v) => ({
       value: String(v.id),
       label: lang === 'ar' && v.nameAr ? v.nameAr : v.nameEn,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, lang === 'ar' ? 'ar' : 'en'));
+}
+
+/**
+ * The TPRM vendor register, as picker options (F2-247).
+ *
+ * ⚠ **This is a DIFFERENT register from `loadVendorOptions` above, and the two live side by side
+ * on purpose.** `scm.vendors` and `tprm.vendors` are two tables for one concept — F2-196's shape,
+ * an owner decision nobody has taken — and a reader who finds one loader must be able to see that
+ * the other exists rather than reaching for whichever they found first. F2-205 put the two
+ * vulnerability clients adjacent for the same reason.
+ *
+ * `tprm.third_party_cyber_assessments.vendor_id` names a row of THIS register: resolved from
+ * `TprmService.getVendor`, not guessed from the schema name, because a schema name does not predict
+ * a parent (F2-202).
+ *
+ * Measured 2026-08-19: 28 live rows for organisation 1 in both dev and prod, so `size` comfortably
+ * covers the register — the same check that made F2-246's picker safe to ship.
+ */
+export async function loadTprmVendorOptions(lang: 'en' | 'ar'): Promise<VendorOption[]> {
+  const page = await tprmApi.vendors(0, 200);
+  return (page.content ?? [])
+    .map((v) => ({
+      value: String(v.id),
+      label: lang === 'ar' && v.vendorNameAr ? v.vendorNameAr : v.vendorName,
     }))
     .sort((a, b) => a.label.localeCompare(b.label, lang === 'ar' ? 'ar' : 'en'));
 }

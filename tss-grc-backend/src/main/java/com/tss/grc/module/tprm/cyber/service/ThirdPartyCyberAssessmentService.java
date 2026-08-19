@@ -5,6 +5,7 @@ import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.tprm.cyber.entity.ThirdPartyCyberAssessment;
 import com.tss.grc.module.tprm.cyber.repository.ThirdPartyCyberAssessmentRepository;
+import com.tss.grc.module.tprm.service.TprmVendorReferenceResolver;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -75,6 +76,7 @@ public class ThirdPartyCyberAssessmentService {
     }
 
     private final ThirdPartyCyberAssessmentRepository repo;
+    private final TprmVendorReferenceResolver vendorRefs;
 
     @Transactional(readOnly = true)
     public Page<ThirdPartyCyberAssessment> list(Pageable p) {
@@ -93,7 +95,13 @@ public class ThirdPartyCyberAssessmentService {
     @Transactional
     public ThirdPartyCyberAssessment create(ThirdPartyCyberAssessment req) {
         req.setInherentCyberRisk(INHERENT.require(req.getInherentCyberRisk()));
-        req.setOrganisationId(TenantContext.getCurrentTenant());
+        Long orgId = TenantContext.getCurrentTenant();
+        req.setOrganisationId(orgId);
+        // F2-247 — the (vendor id, vendor label) pair has ONE writer, and the label is derived from
+        // the row the id names. Read the tenant from the request above, never from `req` after the
+        // fact: F2-246's fix was wrong in one of its four registers because the resolver ran before
+        // the org was stamped, and a 404 from a null tenant reads exactly like a correct refusal.
+        applyVendorReference(req, req.getVendorId(), req.getVendorName(), orgId);
         req.setId(null);
         // F2-220's shape, tenth instance: `if (status == null) status = "DRAFT"` is a DEFAULT, not a
         // guard, so a caller could create an assessment already APPROVED — skipping submit() and
@@ -103,6 +111,23 @@ public class ThirdPartyCyberAssessmentService {
                 req.getStatus(), DRAFT, "third-party cyber assessment"));
         recompute(req);
         return repo.save(req);
+    }
+
+    /**
+     * The only writer of {@code vendorId} + {@code vendorName} on this register (F2-247).
+     *
+     * <p>Both columns used to arrive straight from the caller's body, because this endpoint binds
+     * the ENTITY and the service touched neither. Measured in dev and prod: 8 of 16 live rows carry
+     * an annotated-prose label and no link, which is what the register's own create form produces.
+     *
+     * <p>Extracted so there is exactly one call site to read and one to gate — a scan cannot tell a
+     * relocated write from a removed one, and the population shrinks either way (F2-231).
+     */
+    private void applyVendorReference(ThirdPartyCyberAssessment target,
+                                      Long vendorId, String suppliedName, Long orgId) {
+        var vendor = vendorRefs.resolve(vendorId, suppliedName, orgId);
+        target.setVendorId(vendor.id());
+        target.setVendorName(vendor.name());
     }
 
     @Transactional

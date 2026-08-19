@@ -296,8 +296,49 @@ class ParentIdentityCopyContractTest {
           + "value is a snapshot of a resolved row rather than a caller's claim about one."
     ));
 
-    /** The register this slice closed — asserted present so a rename cannot silently drop it. */
-    private static final String CLOSED_THIS_SLICE = "risk.scenarios :: risk_id + risk_code, risk_title_en";
+    /**
+     * Registers whose (parent id + identity copy) pair has been ADJUDICATED and closed.
+     *
+     * <p>⚠ This was a single {@code String} until F2-247, and that is why F2-246's four {@code scm}
+     * registers still printed {@code NEEDS-READING} after it had closed all four. <b>A member left
+     * on a work list after a sweep is indistinguishable from one nobody has looked at</b> — house
+     * rule 3's warning about un-lowered ceilings, arriving inside the artefact that carries the work
+     * list. The next reader re-measures what has already been measured, which is the cost F2-221
+     * exists to avoid.
+     *
+     * <p>Each entry names the slice that closed it and how, because a bare label is not a verdict
+     * (F2-228) — and every one is asserted to still be a member the scan finds, so a reason cannot
+     * outlive its subject (F2-199's reverse direction).
+     */
+    private static final Map<String, String> CLOSED = new TreeMap<>(Map.of(
+            "risk.scenarios :: risk_id + risk_code, risk_title_en",
+            "CLOSED by F2-245 — applyParentRisk is the only writer of all three columns: the id is "
+          + "resolved in-tenant and both identity copies are DERIVED from the row it names, or all "
+          + "three are cleared together when there is no parent.",
+
+            "scm.exit_plans :: vendor_id + vendor_name",
+            "CLOSED by F2-246 — VendorReferenceResolver owns the pair; the create form picks the "
+          + "vendor from the register and sends the id, and the label is derived from what resolved.",
+
+            "scm.alternate_suppliers :: primary_vendor_id + primary_vendor_name",
+            "CLOSED by F2-246 — same resolver. Note the schema settles which half is meant to "
+          + "resolve: the SUBJECT vendor has an id column, and alternate_vendor_name has none "
+          + "anywhere, so a replacement supplier is deliberately free text.",
+
+            "scm.supplier_resilience_tests :: vendor_id + vendor_name",
+            "CLOSED by F2-246 — same resolver, and the register's coverage query joins on this id, "
+          + "which is why 8 of 11 unlinked rows could not answer 'which vendors have been tested'.",
+
+            "scm.fourth_party_exposures :: primary_vendor_id + primary_vendor_name",
+            "CLOSED by F2-246 — same resolver, plus the one UPDATE that writes a vendor label now "
+          + "accepts an echo and refuses a change, so an update cannot re-open what the create shut.",
+
+            "tprm.third_party_cyber_assessments :: vendor_id + vendor_name",
+            "CLOSED by F2-247 — a SECOND resolver, over tprm.vendors, because ADR-012/018 keep the "
+          + "two modules' internals apart and this register's parent is a different table. "
+          + "TprmService.getVendor now delegates to it, so the module has one tenant predicate "
+          + "rather than two copies nobody was comparing."
+    ));
 
     @Test
     @DisplayName("census: every entity carrying a parent id AND a copy of that parent's identity")
@@ -316,9 +357,15 @@ class ParentIdentityCopyContractTest {
                 .isGreaterThanOrEqualTo(30);
 
         assertThat(pairs.keySet())
-                .as("the register F2-245 closed must stay in the census — if this entity is "
-                  + "renamed the census must move with it rather than quietly shrinking")
-                .contains(CLOSED_THIS_SLICE);
+                .as("every CLOSED register must stay in the census — the pair of columns still "
+                  + "exists, and if an entity is renamed the census must move with it rather than "
+                  + "quietly shrinking")
+                .containsAll(CLOSED.keySet());
+        for (String reason : CLOSED.values()) {
+            assertThat(reason)
+                    .as("a closure must name the slice and the mechanism, not wear a label (F2-228)")
+                    .contains("CLOSED by F2-").hasSizeGreaterThan(140);
+        }
 
         // Every BY_DESIGN verdict must still name a member the scan finds. This is the direction
         // nobody writes first (F2-199), and it is what stops a reason outliving its subject —
@@ -360,10 +407,10 @@ class ParentIdentityCopyContractTest {
         Map<String, List<String>> pairs = measurePairs();
         List<String> unadjudicated = pairs.keySet().stream()
                 .filter(k -> !BY_DESIGN.containsKey(k))
-                .filter(k -> !k.equals(CLOSED_THIS_SLICE))
+                .filter(k -> !CLOSED.containsKey(k))
                 .collect(Collectors.toList());
 
-        System.out.println("F2-245 — unadjudicated: " + unadjudicated.size());
+        System.out.println("F2-245/247 — unadjudicated: " + unadjudicated.size() + "  (closed: " + CLOSED.size() + ", by design: " + BY_DESIGN.size() + ")");
         unadjudicated.forEach(k -> System.out.println("    NEEDS-READING  " + k));
 
         assertThat(unadjudicated)

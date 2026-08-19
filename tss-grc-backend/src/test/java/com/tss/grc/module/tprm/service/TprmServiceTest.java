@@ -51,6 +51,21 @@ class TprmServiceTest {
     @Mock private VendorAssessmentRepository assessmentRepo;
     @InjectMocks private TprmService service;
 
+    /**
+     * F2-247 — a REAL {@link TprmVendorReferenceResolver} over the mocked {@link VendorRepository},
+     * injected by reflection because {@code @InjectMocks} would otherwise leave the field null.
+     *
+     * <p>A <b>mocked</b> resolver would return null from {@code requireOwn} and every cross-tenant
+     * leg in this class would pass while asserting nothing (F2-237). The resolver is a pure
+     * predicate over the repository these tests already mock, so the real one changes no fixture.
+     */
+    @BeforeEach
+    void wireTheRealVendorResolver() throws Exception {
+        var f = TprmService.class.getDeclaredField("vendorRefs");
+        f.setAccessible(true);
+        f.set(service, new TprmVendorReferenceResolver(vendorRepo));
+    }
+
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
 
