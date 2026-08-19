@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,6 +76,8 @@ class CoiServiceTest {
     @Mock private CoiDeclarationRepository declarationRepo;
     @Mock private CoiDisclosedItemRepository itemRepo;
     @Mock private CoiRecusalEventRepository recusalRepo;
+    /** F2-244 — the recusal's subject is resolved in-tenant now, so the service needs a directory. */
+    @Mock private com.tss.grc.module.iam.repository.UserRepository users;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
 
@@ -438,8 +441,28 @@ class CoiServiceTest {
 
     // ─── recordRecusal ─────────────────────────────────────────────
 
+    /**
+     * F2-244 — repurposed, not deleted.
+     *
+     * <p>This test used to pass {@code userId = 1007L} and assert {@code out.userId()} came back as
+     * {@code 1007L} — i.e. <b>that a user id resolving to nobody is stored and returned</b>, which
+     * is exactly the defect. The number was not arbitrary either: 1007 is one of the seeded ids
+     * that names no user in dev or prod ({@code MAX(iam.users.id)} is 8), so the fixture was copied
+     * from the broken rows. The Nth instance of a test asserting the defect as correct (F2-159,
+     * F2-175, F2-227, F2-236, F2-243).
+     *
+     * <p>The audit and event assertions are kept — they protect the record — and the subject is now
+     * a real in-tenant user, with the refusal covered by the two tests below.
+     */
     @Test
     void recordRecusal_persistsAndEmitsEvent() {
+        var subject = new com.tss.grc.module.iam.entity.User();
+        subject.setId(4L);
+        subject.setOrganisationId(ORG_ID);
+        subject.setIsActive(true);
+        subject.setFullNameEn("Faisal Al-Harbi");
+        subject.setFullNameAr("فيصل الحربي");
+        when(users.findById(4L)).thenReturn(java.util.Optional.of(subject));
         when(recusalRepo.save(any(CoiRecusalEvent.class))).thenAnswer(inv -> {
             CoiRecusalEvent r = inv.getArgument(0);
             r.setId(500L);
@@ -447,14 +470,19 @@ class CoiServiceTest {
         });
 
         RecusalEventResponse out = service.recordRecusal(new RecordRecusalRequest(
-                null, 1007L, "BOD-2026-Q1-03", "BOD", null,
+                null, 4L, "BOD-2026-Q1-03", "BOD", null,
                 "Credit facility — related family member",
                 "تسهيل ائتماني — قريب عائلي",
                 "4.2", true));
 
         assertThat(out.id()).isEqualTo(500L);
         assertThat(out.meetingReference()).isEqualTo("BOD-2026-Q1-03");
-        assertThat(out.userId()).isEqualTo(1007L);
+        assertThat(out.userId()).isEqualTo(4L);
+        // F2-244 — the register can name the person now. Before this, the response carried no name
+        // field at all while the frontend read one, so the recusal log named nobody anywhere.
+        assertThat(out.userResolved()).isTrue();
+        assertThat(out.userNameEn()).isEqualTo("Faisal Al-Harbi");
+        assertThat(out.userNameAr()).isEqualTo("فيصل الحربي");
         verify(audit).log(eq("COI_RECUSAL_RECORDED"), eq("CoiRecusalEvent"), eq(500L), any());
 
         ArgumentCaptor<DomainEvent> evt = ArgumentCaptor.forClass(DomainEvent.class);
@@ -462,7 +490,50 @@ class CoiServiceTest {
         assertThat(evt.getValue().triggerEvent()).isEqualTo("COI_RECUSAL_RECORDED");
         assertThat(evt.getValue().payload())
                 .containsEntry("meetingReference", "BOD-2026-Q1-03")
-                .containsEntry("userId", "1007");
+                .containsEntry("userId", "4");
+    }
+
+    /**
+     * F2-244 — the shape the old fixture used is now refused, and nothing is written.
+     *
+     * <p>{@code coi_recusal_event} declares {@code user_id} NOT NULL and has <b>no name column</b>,
+     * so an unresolvable id leaves a SAMA Article 30 record whose subject cannot be recovered by
+     * any means. The {@code verify(never())} matters as much as the throw: refusing after saving
+     * would leave the row and lose only the response.
+     */
+    @Test
+    void recordRecusal_refusesASubjectThatResolvesToNobody() {
+        when(users.findById(1007L)).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> service.recordRecusal(new RecordRecusalRequest(
+                null, 1007L, "BOD-2026-Q1-03", "BOD", null, "reason", "سبب", "4.2", true)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not an active user in this organisation");
+
+        verify(recusalRepo, never()).save(any(CoiRecusalEvent.class));
+        verify(audit, never()).log(eq("COI_RECUSAL_RECORDED"), any(), any(), any());
+    }
+
+    /**
+     * F2-244 — and a user of another tenant is refused for the same reason and with the same
+     * message. This is the leg that makes the check a TENANT check rather than an existence check:
+     * {@code findById} is a bare primary-key lookup, so without the org filter a recusal could name
+     * another organisation's director.
+     */
+    @Test
+    void recordRecusal_refusesAForeignTenantsUser() {
+        var foreign = new com.tss.grc.module.iam.entity.User();
+        foreign.setId(88L);
+        foreign.setOrganisationId(OTHER_ORG);
+        foreign.setIsActive(true);
+        when(users.findById(88L)).thenReturn(java.util.Optional.of(foreign));
+
+        assertThatThrownBy(() -> service.recordRecusal(new RecordRecusalRequest(
+                null, 88L, "BOD-2026-Q1-03", "BOD", null, "reason", "سبب", "4.2", true)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not an active user in this organisation");
+
+        verify(recusalRepo, never()).save(any(CoiRecusalEvent.class));
     }
 
     // ─── Tenant isolation ──────────────────────────────────────────

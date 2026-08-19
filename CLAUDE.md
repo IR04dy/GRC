@@ -1872,6 +1872,90 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **AN AUTHORITY CHECK ON THE CALLER IS NOT A CHECK ON THE REFERENT, AND ONE METHOD
+  VERIFIED ONE OF ITS TWO FOREIGN KEYS WITH A COMMENT SAYING SO** (F2-244, measured 2026-08-19).
+  `CoiService#recordRecusal` stored `req.userId()` verbatim **three lines below**
+  *"If a declaration id is provided, validate it belongs to this tenant."* — and the split ran the
+  same way in the database: `declaration_id` carries `FK_coi_recusal_decl`, `user_id` carries no
+  constraint at all, so the code check and the schema constraint both landed on the same reference.
+  F2-215's two-of-N at its shortest range yet, shorter than F2-243's.
+  🔑🔑 **THE REUSABLE RULE: F2-243 established that a *presence* test on an id is not a check on the
+  thing it names; this is one notch further — a method can be careful, documented and CORRECT about
+  the *right to name a party* while never asking whether the party exists.** `declarantFor` is the
+  sharp one: F2-145(e) put real work into converting three recited role names to `ETHICS:WRITE` so a
+  tenant granting it to a fourth role would not silently lose the capability, and then returned
+  `req.userId()` unresolved. Both questions look like one because both are about *"is this
+  allowed"*, and only one was being asked.
+  ⚠⚠ **NOT A MERE DANGLING REFERENCE: `coi_recusal_event.user_id` is NOT NULL with NO FK and NO NAME
+  COLUMN OF ANY KIND**, so that id is the only thing identifying who recused — and the entity's own
+  javadoc says the subject is a *"director, committee member, or senior executive"* whose recusal the
+  Compliance Officer reports under **SAMA Article 30**. Measured identical in dev and prod: **3 of 8
+  recusals and 8 of 8 non-null declarations name ids 1001-1007 while `MAX(iam.users.id)` is 8 — 11 of
+  28 live rows**, so the register's own per-person query `GET /recusals/user/{userId}` can never reach
+  them from any real person. The **sibling table models it correctly** (`coi_declaration.user_id`
+  NULLABLE + NOT NULL `full_name_en` + `employee_no`), which is what its 12 NULLs are; the recusal
+  table has neither, so the seed had no way to record a director except by inventing an id. ⚠ And the
+  create form asks a human to type a **raw numeric id into a text box** — no picker — which is exactly
+  what produces invented ids.
+  ⚠ **Refusing CAN break a request that succeeds today, and here that is correct.** F2-182's test does
+  not clear it: no upstream coercion, no FK, so a caller typing 1007 gets 201 today and 400 after. But
+  that 201 stores a recusal attributed to nobody, and the Board Secretariat is a present operator who
+  can act on a 400 naming the id — **not** the public-intake case where a lost record is worse than a
+  mis-graded one (F2-179/F2-183). ⚠ One message for *"no such user"* and *"another tenant's user"*,
+  copied from `CommitteeMemberRegistryService#requireUserInTenant`, which records why: distinguishing
+  them lets a caller enumerate foreign user ids from the error text.
+  ⚠⚠ **THE TEST'S OWN JAVADOC OFFERED THE HOLE AS A VIRTUE.** `CoiDeclarantBindingTest` read
+  *"it touches none of the service's six collaborators"*, presented as clean isolation. It was true,
+  and true **because the resolver resolved nothing**. 🔑 **A resolver that touches nothing cannot
+  resolve anything** — the isolation the comment praised was the shape of the defect. Its tests were
+  all about *authority* and every one is kept; the leg it never had is *"is the named declarant real"*.
+  ⚠⚠ **THE DISPLAY HALF WAS THE SAME DEFECT FROM THE CLIENT SIDE, AND THE REGISTER NAMED THE PERSON
+  NOWHERE.** `lib/coi.ts`'s `RecusalResponse` has always declared `userNameEn`/`userNameAr`, the server
+  record declared neither, so `CoiRegisterPage`'s `selected.userNameEn && …` guard could never fire
+  (F2-211: the client nominates, the entity adjudicates) — and the table had **no person column at
+  all**. `userResolved` is a separate field on purpose: a resolvable user with a blank name and an id
+  that resolves to nobody are different facts, and 11 of 28 rows are the second kind, so blanking both
+  would let the register's broken rows read as its tidiest (F2-197; F2-209's three states).
+  ⚠ **`ethics -> iam` is an ordinary business edge, checked not assumed**: `UserRepository` is already
+  read from ten modules outside `iam`, and `ModuleGraphRatchetTest`'s `KERNEL_ISH` is only
+  `{platform, integrations, dashboard}`.
+  ⚠⚠ **A PROBE LEG OF MINE PASSED FOR THE WRONG REASON ON BOTH TREES, AND ONLY THE PRE-FIX RUN
+  EXPOSED IT.** The declaration leg sent `campaignId: null`, and `submitDeclaration` calls
+  `loadCampaign(req.campaignId())` **before** `declarantFor` — so it answered 400 on the campaign, on
+  master and on the fix alike, reading as proof in both directions. Repointed at a real OPEN campaign
+  it shows **201 pre-fix / 400 post-fix**. 🔑 **The fixed tree alone could never have revealed it** —
+  which is the whole argument for running the pre-fix probe rather than reasoning about it.
+  ⚠⚠ **A PROBE THAT PLANTS ROWS MUST CLEAN UP IN A `finally`.** The first run crashed printing an
+  Arabic name (Windows console is cp1252) **after** planting, so its inline cleanup never ran and two
+  `[REVIEW-TEST]` rows were left live in dev. A harness bug is not a reason to leave rows in a real
+  database (house rule 6). `sys.stdout.reconfigure(encoding="utf-8")` and legs-in-a-function.
+  ⚠ **My own `methodBody` helper matched a CALL, not the declaration** — `recordRecusal` calls
+  `requireOwnUser` earlier in the file than the declaration appears, so the tenant-filter leg read a
+  different method's body and failed on a correct tree. 🔑 **A name-keyed lookup finds the first thing
+  with that name, and a call is not a declaration.** Its first fix then blew the stack:
+  `(?:public|private|protected|static|final|\s)+[\w<>,.\[\]?]+\s+` is an alternation of single
+  tokens under `+` and backtracks catastrophically over whitespace — three legs died with
+  `StackOverflowError`.
+  ⚠⚠ **F2-243's PLURAL-LOAD GATE CAUGHT THE SITE THIS SLICE ADDED** (`resolveSubjects`'s
+  `findAllById`) and demanded a verdict for it. 🔑 **The verdict-per-site rule earning its place
+  immediately: a decrease-only count would have absorbed a new site inside a tolerated total.**
+  ⚠ **Re-deriving F2-243's filing corrected it three ways before any code was written** (F2-221):
+  `scm/resilience` is **three** services not two, **none of its three tables has any foreign key at
+  all**, and it holds **40 live rows not 24** with `vendor_id` NULL on 25 — because the create form
+  has no vendor picker and sends only free-text `vendorName`. Re-ranked by *what the FK's target IS*
+  (F2-239's two orderings), that register is the least urgent kind — nothing dereferences the id and
+  no coverage question joins on it yet — so it was filed again with corrected numbers and the slice
+  went to the reference that identifies a **person**. ⚠ 2 of my 24 candidates were refuted by reading,
+  both over-reporting: a guard in a **helper** (`applyDerivation`) and a finder whose **organisation
+  comes first in the method name** (`findByOrganisationIdAndIdAndIsDeletedFalse`).
+  ⚙ **Filed:** the **external-director gap** — this register cannot name a director with no platform
+  login, F2-26's roster models that population properly (`LINKED | EXTERNAL | UNLINKED`), and adopting
+  it needs a migration, a form field and a decision about whether a recusal's subject should be a
+  **committee seat**; the **11 live unresolvable rows** in both databases (repair rewrites governance
+  rows and no mapping from 1001-1007 to a real person exists); `scm/resilience` as re-measured; the
+  **22-site** store-side residue with no verdicts (readiest by harm:
+  `AuditEngagementService#create::annualPlanId`, IIA Standard 2010); **three `ExitPlan` registers for
+  one concept**, two sharing a simple name (F2-222's 15); and the structural `@TenantOwned` root.
 - ⚠⚠ **A FOUR-EYES GATE THAT CONSUMES A FOREIGN KEY MUST *RESOLVE* IT — A PRESENCE TEST ON
   AN ID IS NOT A CHECK ON THE THING IT NAMES** (F2-243, measured 2026-08-19). CLAUDE.md lists
   *"GHG verify needs evidence"* among the platform's server-enforced four-eyes gates.

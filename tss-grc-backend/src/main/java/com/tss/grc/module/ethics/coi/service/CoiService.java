@@ -18,6 +18,8 @@ import com.tss.grc.module.ethics.coi.repository.CoiDeclarationCampaignRepository
 import com.tss.grc.module.ethics.coi.repository.CoiDeclarationRepository;
 import com.tss.grc.module.ethics.coi.repository.CoiDisclosedItemRepository;
 import com.tss.grc.module.ethics.coi.repository.CoiRecusalEventRepository;
+import com.tss.grc.module.iam.entity.User;
+import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -102,6 +104,16 @@ public class CoiService {
     private final CoiDeclarationRepository declarationRepo;
     private final CoiDisclosedItemRepository itemRepo;
     private final CoiRecusalEventRepository recusalRepo;
+    /**
+     * F2-244 — the COI registers name a <em>person</em> by {@code user_id} and nothing resolved it.
+     *
+     * <p>{@code ethics → iam} is an ordinary business edge, not an ADR-002 kernel inversion:
+     * {@code UserRepository} is already read from ten modules outside {@code iam}
+     * ({@code admin/committee}, {@code evidence}, {@code governance}, {@code risk},
+     * {@code signature}, …), and {@code ModuleGraphRatchetTest}'s {@code KERNEL_ISH} set is only
+     * {@code platform | integrations | dashboard}. Checked against the ratchet, not assumed.
+     */
+    private final UserRepository users;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
 
@@ -231,7 +243,12 @@ public class CoiService {
         Long caller = CurrentActor.userId();
         boolean mayFileForOthers = CurrentActor.isPlatformAdmin() || hasAnyAuthority("ETHICS_WRITE");
         if (mayFileForOthers && req.userId() != null) {
-            return req.userId();
+            // F2-244 — this method was rigorous about the AUTHORITY to name somebody else and
+            // silent about whether the person it named exists. Both are needed: the authority
+            // check decides who MAY file for another, and only a resolution decides whether the
+            // other is real. Returning req.userId() unresolved is why 8 of the 8 non-null
+            // declaration user ids in dev and prod name no user at all.
+            return requireOwnUser(req.userId(), "a conflict-of-interest declaration").getId();
         }
         if (caller == null) {
             throw new IllegalStateException(
@@ -239,6 +256,57 @@ public class CoiService {
                     + "declarant — the declaration would be attributable to nobody.");
         }
         return caller;
+    }
+
+    /**
+     * F2-244 — resolve a caller-supplied {@code user_id} inside the caller's tenant, or refuse.
+     *
+     * <p><b>A presence test on an id is not a check on the thing it names</b> (F2-243), and here
+     * there was not even a presence test: {@code recordRecusal} stored {@code req.userId()}
+     * verbatim <em>three lines below</em> a comment announcing that it validates the other
+     * foreign key — <em>"If a declaration id is provided, validate it belongs to this tenant."</em>
+     * F2-215's two-of-N at its shortest range: {@code declaration_id} got the code check
+     * <b>and</b> the database constraint ({@code FK_coi_recusal_decl}), and {@code user_id} got
+     * neither.
+     *
+     * <p>🔑 <b>Why this is not merely a dangling reference.</b> {@code CoiRecusalEvent} has
+     * {@code user_id} NOT NULL and <b>no name column of any kind</b>, so the user id is the only
+     * thing identifying <em>who recused</em> — and the entity's own javadoc says the subject is a
+     * <em>"director, committee member, or senior executive"</em> whose recusal the Compliance
+     * Officer reports under SAMA Article 30. Measured identical in dev and prod: <b>3 of 8
+     * recusals and 8 of 8 non-null declarations name ids in the 1001–1007 range while
+     * {@code MAX(iam.users.id)} is 8</b> — so the register's per-person query
+     * ({@code GET /recusals/user/{userId}}) can never reach them from any real person.
+     *
+     * <p>⚠ <b>This can refuse a request that succeeds today, and that is the point.</b> There is
+     * no upstream coercion and no FK, so F2-182's "nothing could break" argument does not apply
+     * here — a caller typing 1007 gets 201 today and 400 after. But that 201 stores a recusal
+     * attributed to nobody, and the Board Secretariat is a present operator who can correct a
+     * 400 naming the id. This is not the public-intake case where a lost record is worse than a
+     * mis-graded one (F2-179/F2-183): it is an internal governance register.
+     *
+     * <p>⚠ One message for "no such user" and "another tenant's user", copied deliberately from
+     * {@link com.tss.grc.module.admin.committee.service.CommitteeMemberRegistryService}'s
+     * {@code requireUserInTenant} — distinguishing them would let a caller enumerate other
+     * tenants' user ids.
+     *
+     * <p>⚙ What it deliberately does <b>not</b> do: invent a way to name a director who has no
+     * platform login. F2-26's committee roster already models that population properly
+     * ({@code LINKED | EXTERNAL | UNLINKED} via {@code noPlatformUser}); this register has
+     * neither a nullable id nor a name column, so recording an external director's recusal
+     * truthfully needs a schema and form change. Filed as an owner decision rather than guessed
+     * at here.
+     */
+    private User requireOwnUser(Long userId, String what) {
+        Long org = org();
+        return users.findById(userId)
+                .filter(u -> org.equals(u.getOrganisationId()))
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "User " + userId + " is not an active user in this organisation, so "
+                      + what + " cannot be recorded against them. Recording a governance "
+                      + "record against a user id that resolves to nobody leaves it attributable "
+                      + "to nobody."));
     }
 
     private static boolean hasAnyAuthority(String... authorities) {
@@ -450,10 +518,14 @@ public class CoiService {
         if (req.declarationId() != null) {
             loadDeclaration(req.declarationId());
         }
+        // F2-244 — resolve the SUBJECT of the recusal, not just the declaration it may cite.
+        // The line below used to be `r.setUserId(req.userId())`, and the comment above about
+        // validating the declaration is what made it read as covered.
+        User subject = requireOwnUser(req.userId(), "a recusal");
         CoiRecusalEvent r = new CoiRecusalEvent();
         r.setOrganisationId(orgId);
         r.setDeclarationId(req.declarationId());
-        r.setUserId(req.userId());
+        r.setUserId(subject.getId());
         r.setMeetingReference(req.meetingReference());
         r.setCommitteeCode(req.committeeCode());
         r.setRecusalDate(req.recusalDate() != null ? req.recusalDate() : LocalDateTime.now());
@@ -478,13 +550,43 @@ public class CoiService {
         emit("COI_RECUSAL_RECORDED", "CoiRecusalEvent", saved.getId(),
                 saved.getMeetingReference(), payload);
 
-        return RecusalEventResponse.from(saved);
+        // F2-244 — the subject was resolved on the way in, so the response can name them without
+        // a second lookup.
+        return RecusalEventResponse.from(saved, subject);
     }
 
     @Transactional(readOnly = true)
     public List<RecusalEventResponse> listRecusalsByUser(Long userId) {
-        return recusalRepo.findByOrganisationIdAndUserIdOrderByRecusalDateDesc(org(), userId)
-                .stream().map(RecusalEventResponse::from).toList();
+        List<CoiRecusalEvent> events =
+                recusalRepo.findByOrganisationIdAndUserIdOrderByRecusalDateDesc(org(), userId);
+        Map<Long, User> subjects = resolveSubjects(events);
+        return events.stream()
+                .map(e -> RecusalEventResponse.from(e, subjects.get(e.getUserId())))
+                .toList();
+    }
+
+    /**
+     * F2-244 — resolve the recusal subjects for a page of rows in one query, filtering each on the
+     * row's own tenant.
+     *
+     * <p>⚠ The tenant filter is not decoration on a read either. {@code findAllById} is a bare
+     * primary-key lookup with no tenant predicate — F2-243's filed plural-load shape — and the
+     * exemplar for doing it right is already in the tree: {@code CommitteeMemberRegistryService}'s
+     * seat-linkage report does exactly this {@code findAllById} + per-row org check. An
+     * unresolvable id yields {@code null}, which the response reports as
+     * {@code userResolved = false} rather than as a blank name.
+     */
+    private Map<Long, User> resolveSubjects(List<CoiRecusalEvent> events) {
+        List<Long> ids = events.stream().map(CoiRecusalEvent::getUserId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, User> byId = new HashMap<>();
+        if (ids.isEmpty()) return byId;
+        for (User u : users.findAllById(ids)) {
+            if (Objects.equals(u.getOrganisationId(), org()) && Boolean.TRUE.equals(u.getIsActive())) {
+                byId.put(u.getId(), u);
+            }
+        }
+        return byId;
     }
 
     @Transactional(readOnly = true)

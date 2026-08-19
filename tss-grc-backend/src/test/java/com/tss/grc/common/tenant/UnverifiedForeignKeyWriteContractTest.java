@@ -221,7 +221,17 @@ class UnverifiedForeignKeyWriteContractTest {
         "module/cyber/asm/service/AttackSurfaceFindingService.java#assetRepo",
         "REFUTED — SCOPED IN THE STREAM. `mapWithAssets` filters "
         + "`orgId.equals(a.getOrganisationId())` before building the map, so a finding whose asset "
-        + "is not the tenant's renders with no asset rather than another tenant's hostname."
+        + "is not the tenant's renders with no asset rather than another tenant's hostname.",
+
+        "module/ethics/coi/service/CoiService.java#users",
+        "REFUTED — SCOPED IN THE LOOP, and this gate caught the site in the commit that added it. "
+        + "F2-244's `resolveSubjects` batches the recusal subjects for a page of rows and admits "
+        + "each only `if (Objects.equals(u.getOrganisationId(), org()) && isActive)`, so an id that "
+        + "resolves to another tenant's user falls out of the map and the response reports "
+        + "`userResolved = false` — the disclosure — rather than surfacing a foreign person's name. "
+        + "⚠ Worth recording that the gate fired on a NEW site rather than a legacy one: the "
+        + "verdict-per-site rule F2-243 added (instead of a decrease-only count) is what made an "
+        + "addition fail loudly rather than sit inside a tolerated total."
     );
 
     // ── the detector ────────────────────────────────────────────────────────────

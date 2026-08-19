@@ -24,6 +24,7 @@ import {
   coiApi,
   CAMPAIGN_STATUS_LABEL, CAMPAIGN_STATUS_TONE, CAMPAIGN_SCOPE_LABEL,
   ITEM_TYPE_LABEL,
+  recusalSubjectLabel, recusalSubjectIsUnresolved,
   type CampaignResponse, type DeclarationSubmissionRequest,
   type DisclosedItemRequest, type ItemType, type RecusalResponse,
 } from '../../../lib/coi';
@@ -533,6 +534,30 @@ function RecusalLogPanel() {
   }), [rows, committee, fromDate, toDate]);
 
   const cols: Column<RecusalResponse>[] = [
+    // F2-244 — the recusal log had NO person column. Its whole subject is a director, committee
+    // member or senior executive who withdrew from a decision (SAMA CG Art.18 / CMA CG Art.41–43),
+    // and the only place a name was even attempted was the detail modal, behind a `userNameEn`
+    // guard the wire never satisfied. An unresolvable id is DISCLOSED rather than blanked: 11 of
+    // the 28 live COI rows in dev and prod name a user that does not exist, and a blank would make
+    // exactly those rows the tidiest-looking ones (F2-197).
+    {
+      header: t('coi.employee'), width: '200px',
+      cell: r => (
+        <span
+          role={recusalSubjectIsUnresolved(r) ? 'status' : undefined}
+          title={recusalSubjectIsUnresolved(r)
+            ? (lang === 'ar'
+                ? 'سُجِّل هذا التنحّي مقابل مُعرّف مستخدم لا يُطابق أي مستخدم نشط في هذه المنشأة.'
+                : 'This recusal was recorded against a user id that matches no active user in this organisation.')
+            : undefined}
+          style={{
+            fontSize: 12,
+            color: recusalSubjectIsUnresolved(r) ? 'var(--danger)' : 'var(--ink-1)',
+          }}>
+          {recusalSubjectLabel(r, lang)}
+        </span>
+      ),
+    },
     {
       header: t('coi.committeeCode'), width: '160px',
       cell: r => <code style={{ fontSize: 12 }}>{r.committeeCode}</code>,
@@ -651,10 +676,12 @@ function RecusalLogPanel() {
             {selected.agendaItems && (
               <DetailRow label={lang === 'ar' ? 'بنود جدول الأعمال' : 'Agenda items'} value={selected.agendaItems} />
             )}
-            {selected.userNameEn && (
-              <DetailRow label={t('coi.employee')}
-                value={lang === 'ar' ? (selected.userNameAr || '—') : selected.userNameEn} />
-            )}
+            {/* F2-244 — was `selected.userNameEn && …`, a guard the wire could never satisfy, so
+                the panel silently omitted the one person the record is about. Always rendered now,
+                with the three states the server distinguishes. */}
+            <DetailRow label={t('coi.employee')} value={recusalSubjectLabel(selected, lang)} />
+            <DetailRow label={lang === 'ar' ? 'مُعرّف المستخدم' : 'User ID'}
+              value={String(selected.userId)} />
           </div>
         )}
       </Modal>

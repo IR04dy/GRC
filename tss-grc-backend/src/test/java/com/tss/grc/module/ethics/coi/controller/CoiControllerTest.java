@@ -82,9 +82,18 @@ class CoiControllerTest {
                 LocalDateTime.now(), LocalDateTime.now());
     }
 
+    /**
+     * F2-244 — this fixture already used {@code 1007L}, and that is not a coincidence: it was
+     * copied from the seeded rows, where {@code user_id} 1001–1007 name nobody
+     * ({@code MAX(iam.users.id)} is 8). It is kept, now declared for what it is —
+     * {@code userResolved = false} with no name — so the controller path is exercised on the
+     * <em>unresolvable</em> case, which is 11 of the 28 live COI rows in dev and prod. Serving a
+     * blank name for these was what let the register's broken rows read as its tidiest (F2-197).
+     */
     private static RecusalEventResponse stubRecusal() {
         return new RecusalEventResponse(
                 500L, ORG_ID, null, 1007L,
+                false, null, null,
                 "BOD-2026-Q1-03", "BOD",
                 LocalDateTime.now(),
                 "Reason EN", "السبب", "4.2", true,
