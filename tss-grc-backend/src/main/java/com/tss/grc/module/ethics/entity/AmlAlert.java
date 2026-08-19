@@ -84,8 +84,19 @@ public class AmlAlert {
     @Column(name = "first_detected_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime firstDetectedAt;
 
+    /**
+     * F2-250 — <b>no initialiser</b>, and {@code AmlAlertService#create} owns the default.
+     *
+     * <p>It read {@code = "OPEN"}, which did two things. It was a second literal for the state the
+     * machine already declares as its root, so the value the server picks and the value it accepts
+     * could drift (F2-217) — {@code AmlAlertService.INITIAL_STATUS} is derived from
+     * {@code TRANSITIONS} instead. And on an entity-bound PUT it made an <em>omitted</em> status
+     * indistinguishable from a supplied "OPEN" (F2-237), so the echo rule that stops this route
+     * performing a transition would have refused every partial update — a fix failing on correct
+     * code, which is the one failure a fix must never have (F2-214).
+     */
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "OPEN";
+    private String status;
 
     @Column(name = "analyst_name", length = 255)
     private String analystName;

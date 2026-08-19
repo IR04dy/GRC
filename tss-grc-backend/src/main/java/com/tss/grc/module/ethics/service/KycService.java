@@ -24,6 +24,7 @@ public class KycService {
 
     private final KycSubjectRepository subjectRepo;
     private final ScreeningHitRepository hitRepo;
+    private final KycSubjectDirectory directory;
 
     @Transactional(readOnly = true)
     public Page<KycSubject> list(String type, String status, String risk, Pageable pageable) {
@@ -210,10 +211,14 @@ public class KycService {
         if (s.getNotes()                  != null) t.setNotes(s.getNotes());
     }
 
+    /**
+     * F2-250 — the tenant-narrowed resolution is {@link KycSubjectDirectory}'s, converted rather
+     * than left as a second copy (F2-190). Only the <em>refusal</em> stays local: these routes
+     * address a subject by path variable, so a miss is a 404, whereas a register that names a
+     * subject in its body gets the directory's 400. One predicate, two refusals.
+     */
     private KycSubject require(Long id) {
-        Long org = TenantContext.getCurrentTenant();
-        return subjectRepo.findById(id)
-            .filter(s -> s.getOrganisationId().equals(org))
+        return directory.resolve(id)
             .orElseThrow(() -> new EntityNotFoundException("KYC subject not found: " + id));
     }
 

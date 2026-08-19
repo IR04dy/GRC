@@ -486,6 +486,14 @@ class NeverFiringNullGuardContractTest {
             new Moved("BcmComplianceMapping", "isPlaceholder", "setIsPlaceholder", "BcmComplianceMappingService", "create"),
             new Moved("BcmComplianceMapping", "complianceStatus", "setComplianceStatus", "BcmComplianceMappingService", "create"),
             new Moved("Department", "status", "setStatus", "DepartmentService", "create"),
+            // F2-250 — the AML alert register, and here the initialiser was doing TWO wrong things.
+            // It was a second literal for the state AmlAlertService.TRANSITIONS already declares as
+            // its root, so the value the server picks and the value it accepts could drift (F2-217);
+            // and it made an OMITTED status indistinguishable from a supplied "OPEN" on the
+            // entity-bound PUT, so the echo rule that stops that route filing a Suspicious
+            // Transaction Report would have refused every partial update. The create now derives the
+            // default from the machine rather than repeating it.
+            new Moved("AmlAlert", "status", "setStatus", "AmlAlertService", "create"),
             new Moved("Issue", "severity", "setSeverity", "IssueService", "create"),
             new Moved("Issue", "priority", "setPriority", "IssueService", "create"),
             new Moved("Issue", "status", "setStatus", "IssueService", "create"),
