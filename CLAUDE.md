@@ -1872,6 +1872,109 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A GENERALISATION IS ITSELF A VOCABULARY: F2-217 REPLACED A LITERAL FIELD-NAME LIST WITH A
+  *SHAPE*, AND THE SHAPE'S STEMS ARE A LITERAL LIST** (F2-248, measured 2026-08-19).
+  `MassAssignmentRatchetTest` ranks every entity-bound write, and `AGENT_SHAPE` is an alternation of
+  **twelve** agent nouns while `AUTHORITY_SHAPE` is **twenty-nine** verbs suffixed `By`/`At`.
+  `author` and `actor` are ordinary English agent nouns ending in `-or` and are in neither, so
+  `change_mgmt.change_comments :: author_id + author_name` and `ethics.case_actions :: actor_id +
+  actor_name` both ranked **LOW** — of 214 entity-bound writes only **five** were in that tier, and
+  these were two of them. 🔑 **The ranking filed its two forgeable attributions in its smallest and
+  least-attended bucket, and nobody re-reads a rule that looks like a rule.** F2-217's own headline
+  one level up; assume a fourth spelling exists, because a **third** turned up in the same slice.
+  ⚠⚠ **THE SAME DEFECT PRESENTS AS OPPOSITE SYMPTOMS, AND BOTH ARE THE ABSENCE OF A SERVER-OWNED
+  HALF.** The comment thread bound the entity with `if (getAuthorName() == null)
+  setAuthorName("Unknown")` in front — a **default, not a guard** (F2-218) — so probed live as
+  `ranalyst` (a RISK_ANALYST, the least-privileged of seven `CHANGE:WRITE` holders) a comment on a
+  CAB-approved change stored **`author_name = 'so_officer'`, the CISO, at HTTP 201**, and `authorId:
+  8` bound onto a column **NULL on 45/45 dev and 46/46 prod rows**. The ethics action log bound the
+  entity and touched neither half, and because `EthicsPage` sends **no actor at all**, every action
+  recorded through the platform's own screen stored `actor_name = NULL, actor_id = NULL` — the action
+  log of a whistleblowing investigation recording what happened and when, and not who did it.
+  🔑 **A register that does not own WHO either stores a claim or stores nothing, and neither is an
+  attribution.** ⚠ **And PROD HOLDS A ROW WHOSE AUTHOR IS THE LITERAL STRING `'You'`** — the
+  frontend's `getUser()?.username ?? 'You'` fallback having fired, under a comment reading *"CH-8:
+  attribute the comment to the signed-in user, not a hardcoded 'You'"*, three characters from the
+  fallback it claims to have removed (F2-184).
+  ⚠⚠ **`action_at` is `insertable = false`, so the DATABASE owned WHEN while the caller owned WHO** —
+  F2-223's split attribution arriving through the one filling mechanism a setter-matching scan cannot
+  see (F2-226's fourth). That is why no existing instrument reported it, and it is the reason to check
+  the *column mapping* and not just the service when asking who owns a timestamp.
+  ⚠ 🔑 **The audit row contradicted itself on one line**: `platform.audit_log.user_username` held
+  `ranalyst` — the framework already knew who acted — while the message the module composed read
+  *"Comment added to change 273 by You"*. F2-223's quoting-the-claim rule, with the sharper twist
+  that **the truth was already in the row beside it**. Read the audit trail's own actor column before
+  believing a module's message about who did something.
+  ⚠⚠ **A SHORT AGENT-NOUN STEM CANNOT SHARE A LONG ONE'S PREFIX RULE.** `AGENT_SHAPE`'s prefix is
+  `(?:.*[a-z0-9])?`, which matches a single lower-case letter — so putting `actor` there made it
+  match inside `f·actor·Name`, and `contractorName`/`benefactorId` are the same trap. The twelve
+  original stems are long and distinctive enough never to have hit it, which is exactly why the rule
+  was safe to write and is **not** safe to extend. The two short stems get their own
+  camelCase-anchored `SHORT_AGENT_SHAPE`, with **9 must-pair and 8 must-not-pair** cases: a widening
+  too wide silently RE-TIERS the platform, one too narrow silently SHRINKS the work list. Caught on
+  the first run by the leg's **negative half** — the direction nobody writes first.
+  ⚠ **Fix at the wire, not with a guard**: `ChangeCommentRequest(body)` and
+  `CaseActionRequest(actionType, title, description, isConfidential)` replace the entity bindings, so
+  the actor fields are **absent** rather than validated — a field the bound type does not declare can
+  never arrive (F2-233), which `MassAssignmentRatchetTest` already demanded of
+  `ChangeConditionRequest` **by name**: *"a scrub is a list of fields somebody remembered, a DTO is
+  the set of fields that exist."* Each service resolves from **its own module's** declared primitive
+  (`ChangeSoD.actor()` in `change_mgmt`, whose javadoc states the rule — *"the id is the part a gate
+  can stand on, and only the server can know it"* — and `CurrentActor` in `ethics`), never a second
+  mechanism beside an existing one (F2-190). Both **refuse** rather than record a blank (F2-236).
+  ⚠⚠ **A THIRD UNSPELLED NAME, FOUND BY READING THE ONE ROW THE WIDENING SURFACED — AND IT IS AN ACT
+  VERB, NOT AN AGENT NOUN.** `admin.committee_meeting_papers.circulated_by` is a user id, bound from
+  the request, never written by the service, and **NULL on all 21 live rows in both databases**;
+  `circulated` is in none of `AUTHORITY_SHAPE`'s twenty-nine verbs. 🔑 **Two vocabularies found short
+  in one slice by two different routes — a widening, then reading its single new row.**
+  ⚠ **`authorName` beside it is BY DESIGN, verified rather than reasoned**: there is no `author_id`
+  column, `author_role` holds an office (`'Company Secretary'`), and **21 of 21** rows in both
+  databases name a *body* (`'COM-BOARD Secretariat'`) resolving to no `iam.users` row. A committee
+  paper's author is its **preparer** — a third party — and **the schema's own separation of
+  `circulated_by` from `author_name` is what settles it** (F2-236's `counterpartySigner` precedent,
+  F2-247's rule that a table declaring an id beside one label and only a label beside another is
+  stating which reference is meant to resolve). `circulatedAt` stays a **fallback**, stated rather
+  than glossed: back-dating a past circulation is legitimate and F2-233(d) established that a
+  fallback is not an ownership claim, so that endpoint was never the split-attribution shape — it was
+  a column with no writer.
+  ⚠⚠ **MY NEW CENSUS LEG STARTED AS A HARD ZERO AND THE *ASSERTION* WAS THE THING THAT WAS WRONG.**
+  Asking which bound **request** types declare an actor field reports **28**, and a large share are
+  **round-trip** DTOs — `BoardPackDto`, `CapaTaskDto`, `DsrCaseDto`, `NcaEccFilingDto` — used for the
+  response as well as the request. Such a type **must** declare `decidedBy` in order to RETURN it,
+  and whether the write path honours the inbound value is `ServerStampedFieldContractTest`'s
+  question. 🔑 **The question conflated inbound-only types with round-trip ones, so a zero over it
+  would fail on correct code — the one thing a gate must never do** (F2-214). It ships decrease-only
+  with **no verdicts** (F2-188), and F2-204's rule lands on my own leg: when a figure cannot honestly
+  be zero, ask whether the QUESTION was wrong. ⚙ The leg exists at all because **the entity-bound
+  ranking cannot see a request DTO, and binding a narrow record is precisely the recommended fix** —
+  so without it, re-adding `authorName` to `ChangeCommentRequest` would go unnoticed by every gate.
+  ⚠ **The vocabulary is SHARED, not copied.** The new leg calls `isAuthorityField` directly; writing
+  a second agent-noun list in a new gate class would commit the very defect being fixed (F2-177), and
+  the whole finding is that F2-217's shape was still a list. One declaration, two readers.
+  ⚠⚠ **THE MUTATION HARNESS FOUND A REAL HOLE IN MY OWN GATE, AND IT IS F2-217'S FAILURE MODE
+  REINTRODUCED ONE STEM LATER.** Deleting `[Cc]irculated` from the verb list **SURVIVED**: I had
+  added the two agent nouns to the anti-vacuity `measuredOnRealEntities` list and forgotten the verb,
+  so the mutation drops the committee-paper row out of CRIT — which **lowers** the count, and a `<=`
+  ceiling reads that as progress. That leg exists precisely because a ceiling cannot see a detector
+  that stopped matching. **When you widen a vocabulary, add every new token to the anti-vacuity list,
+  not just the ones that produced the finding.** ⚙ One mutation was **withdrawn as invalid** rather
+  than counted: it weakened one of my own assertions, and you can always delete an assertion
+  (F2-206, F2-235).
+  ⚠ **`ChangeCommentProvenanceTest` is the twin `CabVoteProvenanceTest` never got** — DF-4's
+  forged-actor test for the CAB-approval path in the *same service*, while the comment thread beside
+  it had **no test of any kind**. 🔑 **A path with no test is not a path somebody decided was safe.**
+  ⚙ **Filed:** the **38** remaining census members with the classification carried forward (**20**
+  actor-attribution, **18** register-reference — different questions), the two `socops` members still
+  **unwireable** and `bcm.dr_plans` still owner-blocked; the **28-type** request-DTO census;
+  `ethics.case_actions.action_type` free text with **no CHECK** in a schema that has none — cheap now
+  that this slice closed the register's only open writer (F2-183), but blocked on F2-221's finding
+  that **11 of 30 ethics cases already hold a status no route can advance**; the **45 dev / 46 prod
+  comment rows and 15 action rows whose author is an office label** plus the prod `'You'` row (repair
+  rewrites live governance rows in two databases with no office-to-person mapping — **owner
+  decision**); and `change_mgmt.change_condition :: owner_id`, which has no writer at all, holds **0
+  rows in dev** and **does not exist in prod** (~35 migrations behind), where an owner is an
+  *assignment* (F2-226) so free text is defensible and the unwritten id is F2-247's unlinkability
+  shape, latent with no data.
 - ⚠⚠ **TWO SPRING BEANS WITH THE SAME SIMPLE NAME STOP THE APPLICATION STARTING, AND THE WHOLE
   UNIT SUITE PASSES OVER IT** (F2-247, measured 2026-08-19). Spring's default bean name is the
   decapitalised simple class name, so a second `@Component VendorReferenceResolver` — a legitimate

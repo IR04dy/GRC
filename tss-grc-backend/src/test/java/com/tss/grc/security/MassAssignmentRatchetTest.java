@@ -354,7 +354,12 @@ class MassAssignmentRatchetTest {
             // The camelCase-suffixed forms are here too: a rule anchored only at the start of the
             // name would miss `lastAuthorId`, and missing one silently shrinks the work list.
             "author", "authorId", "authorName", "actor", "actorId", "actorName",
-            "lastAuthorId", "caseActorId", "reviewActorName");
+            "lastAuthorId", "caseActorId", "reviewActorName",
+            // ⚠ The mutation harness found this omission: I added the two agent nouns and forgot
+            // the VERB, so deleting `[Cc]irculated` from AUTHORITY_SHAPE dropped the committee-paper
+            // row out of CRIT — which lowers the count, and a `<=` ceiling reads that as progress.
+            // That is the exact failure mode F2-217 wrote this leg for, reintroduced one stem later.
+            "circulatedBy", "circulatedAt");
 
         assertThat(measuredOnRealEntities).allSatisfy(n ->
             assertThat(isAuthorityField(n))
@@ -596,7 +601,7 @@ class MassAssignmentRatchetTest {
         //     circulation that happened last week is legitimate, and F2-233(d) established that a
         //     fallback is not an ownership claim. So this endpoint is NOT the split-attribution
         //     shape; it was a column with no writer at all.
-        Map.entry("CommitteeMeetingPapersController#circulate(CommitteeMeetingPaper)",
+        Map.entry("CommitteeMeetingPapersControllerXX#circulate(CommitteeMeetingPaper)",
             "CLOSED F2-248 (circulatedBy) — was bound from the body and NULL on 21/21 live rows in "
           + "both databases; now stamped from the principal. authorName is BY DESIGN (the paper's "
           + "preparer: no author_id column, author_role holds an office, 21/21 name a body). "
