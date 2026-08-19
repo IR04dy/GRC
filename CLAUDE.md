@@ -1872,6 +1872,120 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A FIX AT A DEDICATED ROUTE IS NOT A FIX WHILE AN ADJACENT ROUTE WRITES THE SAME
+  COLUMN — AND THE RESULT CAN BE WORSE THAN THE DEFECT** (F2-250, measured 2026-08-19).
+  Re-deriving F2-249's 33-member census (F2-221) and ranking by the cheapest universal fact —
+  *id NULL while the label is populated*, which needs **no parent pairing** (F2-246: a guessed
+  pairing manufactures phantom findings) — pointed at `ethics.aml_alerts :: subject_id +
+  subject_name`, **the SUBJECT pair of the entity whose ANALYST pair F2-249 closed eight lines
+  away**. `AmlAlertService` had one blanket `apply()`, shared by create and update, that copied
+  every column a caller sent. So `analystName` was writable and `analystId` was not: probed live,
+  a `PUT` after a real `/assign` left `analyst_id` naming user 4 beside a label naming somebody
+  who was never assigned. 🔑🔑 **That is WORSE than pre-F2-249, because before the fix
+  there was no id for the label to contradict** — closing the dedicated route created the
+  divergence the closure was written to prevent. **After converting a reference, grep the column
+  and read every OTHER writer** (F2-246's rule that an update must not re-open what the create
+  closed, arriving from the inside).
+  ⚠⚠ **THE SAME METHOD ALSO FILED A SUSPICIOUS TRANSACTION REPORT.** `POST {"status":
+  "STR_FILED"}` answered **201** with no disposition and no decider, while `/transition` answers
+  **400** for the identical edge. 🔑 **`ServerStampedFieldContractTest` cannot see it and
+  `AmlAlertService` appears nowhere in its output**: `transition(Long id, String target, …)`
+  writes the status from a **scalar parameter**, so `status` never enters that gate's stamped set
+  — F2-220's recorded transition-by-parameter blind spot, still filed as an unmeasured
+  population, instantiated on a Saudi FIU filing.
+  ⚠ **No escalation to report, and say so.** `auditor` holds `COMPLIANCE:WRITE`, the permission
+  on the create, the PUT, `/assign` and `/transition` alike — the object-level controls were
+  simply the only ones and this route sat beside them (F2-219's shape).
+  🔑 **The unlinked half was the strongest form of F2-249's honest-but-unjoinable symptom yet:
+  the link was AVAILABLE and was not made.** Measured identical in dev and prod — 16 registered
+  KYC subjects, 10 live alerts, 2 linked (both agreeing) and **8 label-only whose labels match a
+  registered subject EXACTLY**. There is even an index for the join (`ix_aml_alerts_subject_id`)
+  and **no query anywhere that performs one**. The collector was the form: a free-text
+  `subjectName` box, no picker, `subjectId` never sent — so every alert the platform's own screen
+  produces is exactly that shape.
+  ⚠ **`FK_aml_subject` EXISTS and does not help, for the reason worth restating**: a foreign key
+  refuses a **nonexistent** id and knows nothing about tenancy, so another tenant's subject is a
+  perfectly valid reference (F2-242/F2-243). Probed: stored at 201 pre-fix.
+  ⚠⚠ **REMOVING THE ENTITY'S `status = "OPEN"` INITIALISER WAS NOT TIDYING — THE ECHO RULE
+  CANNOT WORK WITHOUT IT.** On an entity binding, Jackson deserialises into `new AmlAlert()`, so an
+  **omitted** status arrives as the initialiser's value and is indistinguishable from a supplied
+  `"OPEN"` (F2-237). The echo rule that stops the PUT performing a transition would therefore have
+  refused **every partial update** — a fix failing on correct code, the one failure a fix must
+  never have (F2-214). It was also a **second literal** for a state `TRANSITIONS` already declares
+  as its root (F2-217), so `INITIAL_STATUS` is now derived from the machine and self-checks that
+  the root is unique. F2-240's remedy applies verbatim: **remove the initialiser, own the default
+  on the create path**, and register the triple in
+  `NeverFiringNullGuardContractTest.everyRemovedInitialiserHasAWriterOnTheCreatePath`.
+  ⚙ **The primitive is `module/ethics/service/KycSubjectDirectory`** (`resolve` / `require` /
+  `labelFor` / `requireLabel`, the same shape as F2-249's `TenantUserDirectory`), and
+  `KycService.require` was **converted to delegate** rather than left as a second copy (F2-190) —
+  only its 404 stays local, because those routes address a subject by path variable while a register
+  naming one in its body gets a 400. **One predicate, two refusals.**
+  ⚠ **A bare label stays legal and the schema decides that** (F2-246): `subject_id` nullable
+  beside a nullable `subject_name`, and an alert can concern a party nobody has onboarded — which
+  is why `counterparty_name` has no id at all. All 8 live rows are that shape, so `require` would
+  break every request that works today (F2-182). What is closed is the **appearance** of a link.
+  ⚠ **But editing only the LABEL of an already-linked row must be refused, not silently
+  unlinked.** An entity binding cannot tell `subjectId: null` from an absent key, so "unlink" is
+  not expressible on that route at all; treating a label edit as one quietly undoes a resolved
+  reference, which is the defect rather than the fix.
+  ⚙ **A picker WAS built here, and the difference from F2-249 is a measurement, not a
+  preference.** `GET /api/v1/ethics/kyc` is `COMPLIANCE:READ` and **all 13 roles holding
+  `COMPLIANCE:WRITE` also hold it** in dev and prod, so it cannot 403 on open — where F2-249's
+  `/linkable-users` is `ADMIN:WRITE` and a picker would have 403'd, which is why that slice
+  deliberately built none. **Measure the picker's guard before deciding whether to offer one**
+  (F2-246: an affordance the caller cannot use is its own finding).
+  ⚠⚠ **MY OWN GATE LEG WAS WRONG ABOUT THE CODEBASE, NOT THE REVERSE.** A ban on every `"OPEN"`
+  literal in the service reported **4**; reading them found **one** real second literal (`assign`'s
+  `"OPEN".equals(…)`) and **two legitimate** ones — the analytics bucket list and its
+  `getOrDefault` key, which enumerate the whole vocabulary for a KPI strip and ask a **different**
+  question ("awaiting disposition", deliberately narrower than the machine's non-terminal
+  complement, so F2-196's complement rule does **not** apply). 🔑 **A red leg is a finding only
+  if the code is actually wrong** (F2-206, on an assertion) — rescoped to the claim that was
+  meant: *nothing compares a status against a literal root*.
+  ⚠⚠ **THE PRE-FIX CONTROL REPORTED A DETECTOR SILENT, AND THE CAUSE WAS THE FINDING'S OWN
+  MECHANISM.** The leg asked whether master's `AmlAlertService` contained `requireLabel(` at all —
+  and it does: `directory.requireLabel(…)`, which **F2-249 added for the analyst**. So the control
+  tripped on the very artefact that made this half look covered (F2-215's two-of-N). 🔑 **A
+  detector scoped to "is there a resolver in this file" cannot see a second reference in the same
+  file that has none** — scope it to the reference (F2-192). 8/8 discriminate after.
+  ⚠ **A method-body helper silently returned the WRONG method.** `body()` walks to the first brace
+  after a signature, and a **field initialiser has none**, so asserting against the `TRANSITIONS`
+  declaration read the next method's body — a leg failing for a reason unrelated to its claim
+  (F2-244). Slice to the initialiser instead.
+  ⚠ **A probe leg passed for the wrong reason**: `{"to": "STR_FILED"}` got a 400 reading *"target
+  is required"* — the wrong body key. **Resolve the key from the controller** (the guessed-route
+  family since F2-198); with `target` it refuses for the right reason.
+  ⚠⚠ **THE EMPTY-HEREDOC LANDMINE FIRED AGAIN AND THE RULE IS WIDER THAN IT READS: a POINTLESS
+  `python - <<'X'` with nothing in it hangs the shell for the full timeout and SWALLOWS EVERY
+  COMMAND CHAINED BEHIND IT.** Two minutes lost and a `sed` chain silently unexecuted. The
+  recorded rule is about escapes; the hazard is the heredoc itself. **Use the Write/Edit tools.**
+  ⚠⚠ **`BUILD SUCCESS` OVER AN APP THAT NEVER BOUND A PORT, AND `/actuator/health` SAID UP.**
+  `mvn -o clean package` did **not** kill the old dev listener this time; it deleted and rewrote
+  `target/classes` underneath it. The relaunch logged *"Port 8084 was already in use"* under a
+  `BUILD SUCCESS`, and the surviving PID answered health **UP** while serving code from a
+  directory that had been replaced. 🔑 **Health UP is not proof the listener serves your tree:
+  poll health, then ask who owns the port, then restart** — a stale listener is the most
+  misleading possible input to a fix-verification probe (F2-217).
+  ⚙ **Filed:** the **32** remaining census members, with this slice's own measurements attached —
+  the recorded blockers re-confirmed (`socops.sbom_component` 20/20 and `socops.appsec_finding`
+  10/10 label-only and **unwireable**; `bcm.dr_plans` 16/16 and 8/16, owner-blocked;
+  `cyber.vulnerabilities :: asset_id` 15/20 and `cyber.cyber_incidents :: affected_asset_id` 12/24,
+  blocked on which disjoint asset register is the target) plus three newly measured and **not**
+  blocked — `admin.committee_action_items :: linked_entity_id` (15 of 33) is **polymorphic**
+  (`linked_entity_type` beside the id, so no FK and no single resolver: a different sub-shape),
+  `bcm.strategy_roi_analysis :: strategy_id` 3/3 and `risk.emerging_risks :: linked_risk_id` 2/10.
+  Also: `change_mgmt.change_comments :: author_id` and `ethics.case_actions :: actor_id` are
+  **already closed by F2-248** and still read `NEEDS-READING` in this census, because that slice
+  adjudicated a different instrument — bookkeeping, but **a member listed as unread that has been
+  read is indistinguishable from one nobody looked at**; `ethics.aml_alerts.alert_code` is
+  caller-named with **no minter anywhere and no UNIQUE index** (probed: a duplicate of a real code
+  is accepted — F2-172(d)'s family, outside `ClientSuppliedReferenceRatchetTest`'s
+  `setExternalId`/`setRefNumber` key, F2-248's gate-key-is-a-spelling headline); `sla_due_at` has
+  **no server computation at all** (F2-202); the table has **zero CHECK constraints**, now cheap
+  since its open status writer is closed (F2-183); the **8 live unlinked alerts**, mechanically
+  repairable since all 8 labels match exactly but rewriting live AML rows in two databases is an
+  **owner decision**; and `subject_name` has no `*_ar` (house rule 7).
 - ⚠⚠ **A REGISTER THAT DECLARES A PERSON ID BESIDE A LABEL AND WRITES ONLY THE LABEL FAILS
   IN TWO OPPOSITE WAYS, AND THEY LOOK NOTHING LIKE EACH OTHER** (F2-249, measured 2026-08-19).
   Executing F2-248's work list, the eight actor-attribution members whose parent is a **person**

@@ -693,6 +693,13 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     setItems(AML_ALERTS); setAnalytics(AML_ANALYTICS); setShowingDemo(true);
   }
 
+  // F2-250 — the KYC register, so the alert's subject can be PICKED rather than typed.
+  // Measured before building it (F2-249 could not, and said so): GET /api/v1/ethics/kyc is
+  // COMPLIANCE:READ, and every one of the 13 roles holding COMPLIANCE:WRITE also holds
+  // COMPLIANCE:READ in dev and prod — so this picker cannot 403 for a caller who can reach
+  // the form. An affordance the caller cannot use is its own defect (F2-246).
+  const [kycSubjects, setKycSubjects] = useState<KycSubjectDto[]>([]);
+
   async function load() {
     if (!isAuthenticated()) { applyDemoAml(); return; }
     setLoading(true);
@@ -701,6 +708,9 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
         amlAlertApi.list({ size: 200 }),
         amlAlertApi.analytics().catch(() => null),
       ]);
+      kycApi.list({ size: 500 })
+        .then(p => setKycSubjects(p.content ?? []))
+        .catch(() => setKycSubjects([]));
       const list = page.content ?? [];
       if (list.length === 0) { applyDemoAml(); return; }
       setItems(list);
@@ -719,7 +729,23 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     { kind: 'text',     key: 'titleAr',        label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
     { kind: 'text',     key: 'ruleId',         label: t('amlFldRuleId'), span: 4, placeholder: 'TM-007' },
     { kind: 'text',     key: 'ruleName',       label: t('amlFldRuleName'), span: 8 },
-    { kind: 'text',     key: 'subjectName',    label: t('amlFldSubjectName'), span: 6 },
+    // F2-250 — the subject is PICKED from the KYC register, not typed. The free-text box that
+    // used to be here sent subjectName and never subjectId, which is why subject_id is NULL on
+    // 8 of the 10 live alerts in dev and prod — and all 8 of those labels match a registered
+    // subject exactly, so the register knew which party each alert was about and could not join
+    // to it. The server now derives the label from whatever the id resolves to.
+    { kind: 'select-searchable', key: 'subjectId', label: t('amlFldSubjectLink'), span: 6,
+      placeholder: t('amlFldSubjectPlaceholder'),
+      options: kycSubjects.map(s => ({
+        value: String(s.id),
+        label: s.subjectCode ? `${s.fullName} · ${s.subjectCode}` : s.fullName })),
+      emptyHint: t('amlSubjectHint') },
+    // Optional on purpose, and NOT a duplicate of the picker: an alert can concern a party
+    // nobody has onboarded — which is exactly why counterparty_name exists with no id at all —
+    // so the schema keeps subject_id nullable beside a nullable subject_name (F2-246's rule).
+    // Ignored when a subject is picked; the server refuses a label that contradicts the id.
+    { kind: 'text',     key: 'subjectName',    label: t('amlFldSubjectUnregistered'), span: 6,
+      maxLength: 500, placeholder: t('amlFldSubjectUnregPlaceholder') },
     { kind: 'text',     key: 'counterpartyName', label: t('amlFldCounterparty'), span: 6 },
     { kind: 'text',     key: 'counterpartyCountry', label: t('amlFldCpCountry'), span: 3, placeholder: 'SAU' },
     { kind: 'number',   key: 'transactionCount', label: t('amlFldTxnCount'), span: 3 },
@@ -740,6 +766,12 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       if (typeof v.frameworkId === 'string') v.frameworkId = Number(v.frameworkId);
       if (typeof v.aggregateAmount === 'string') v.aggregateAmount = Number(v.aggregateAmount);
       if (typeof v.transactionCount === 'string') v.transactionCount = Number(v.transactionCount);
+      // F2-250 — the picker yields a string; '' means no subject picked, which must stay ABSENT
+      // rather than arrive as 0, because 0 resolves to no KYC subject and would be refused.
+      if (typeof v.subjectId === 'string') {
+        const n = Number(v.subjectId);
+        if (v.subjectId === '' || Number.isNaN(n)) delete v.subjectId; else v.subjectId = n;
+      }
       if (editing) await amlAlertApi.update(editing.id, v);
       else await amlAlertApi.create(v);
       toast.success(editing ? t('amlUpdated') : t('amlCreated'));
@@ -813,7 +845,22 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
         </div>
       </div>
     ) },
-    { header: t('amlFldSubjectName'), cell: a => a.subjectName ?? '—', width: '180px' },
+    // F2-250 — three states, and the last two must not look alike (F2-209): a subject resolved
+    // in the KYC register; a party recorded by name only, disclosed as unlinked rather than
+    // presented as if it were a register entry; and nothing recorded at all.
+    { header: t('amlFldSubjectName'), width: '200px', cell: a =>
+        !a.subjectName ? '—' : (
+          <div>
+            <div>{a.subjectName}</div>
+            {a.subjectId == null && (
+              <span className="ethics-unlinked" role="status"
+                    title={t('amlSubjectUnlinkedHint')}
+                    aria-label={`${a.subjectName} — ${t('amlSubjectUnlinkedHint')}`}>
+                {t('amlSubjectUnlinked')}
+              </span>
+            )}
+          </div>
+        ) },
     { header: t('amlFldAmount'),   numeric: true, cell: a => a.aggregateAmount
         ? <span className="mono">{a.aggregateAmount.toLocaleString()} {a.currency ?? 'SAR'}</span>
         : '—', width: '160px' },

@@ -67,13 +67,18 @@ class AmlAnalystAssignmentTest {
 
     @Mock AmlAlertRepository repo;
     @Mock UserRepository users;
+    @Mock com.tss.grc.module.ethics.repository.KycSubjectRepository subjectRepo;
 
     AmlAlertService service;
 
     @BeforeEach
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
-        service = new AmlAlertService(repo, new TenantUserDirectory(users));
+        // Both directories are REAL over their mocked repositories, never mocks of the
+        // directories themselves: a mocked resolver returns empty and every refusal leg below
+        // would go green asserting nothing (F2-237).
+        service = new AmlAlertService(repo, new TenantUserDirectory(users),
+                new KycSubjectDirectory(subjectRepo));
         when(repo.findById(ALERT)).thenReturn(Optional.of(alert()));
         when(repo.save(any(AmlAlert.class))).thenAnswer(i -> i.getArgument(0));
         when(users.findById(ANALYST)).thenReturn(Optional.of(user(ANALYST, ORG, "Fahad Al-Otaibi")));

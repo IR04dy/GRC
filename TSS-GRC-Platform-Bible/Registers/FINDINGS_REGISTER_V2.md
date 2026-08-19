@@ -2547,6 +2547,173 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-250 · A soft foreign key whose label travels beside it, and the PUT that performed two other routes' controls
+
+| | |
+|---|---|
+| **ID** | F2-250 |
+| **Status** | ✅ CLOSED 2026-08-19 |
+| **Severity** | P2 |
+| **Area** | `module/ethics` — `ethics.aml_alerts`, the SAMA/AML alert register, and its parent `ethics.kyc_subjects` |
+| **Found by** | executing F2-249's filed 33-member census work list; the sharpest unblocked member was the SUBJECT pair of the entity whose ANALYST pair F2-249 had just closed |
+
+Re-deriving F2-249's work list (F2-221) gave **33 unadjudicated members**, and ranking them by the
+cheapest universal fact — *id NULL while the label is populated*, which needs no parent pairing
+(F2-246: a guessed pairing manufactures phantom findings) — put most of the label-only rows inside
+members already blocked or closed. The sharpest unblocked one was `ethics.aml_alerts :: subject_id +
+subject_name`: **the same entity F2-249 closed the other pair of, eight lines away.**
+
+Measured in dev and prod, identically:
+
+| | |
+|---|---|
+| `ethics.kyc_subjects` | **16** registered subjects |
+| `ethics.aml_alerts` | **10** live — 2 linked (both labels agreeing), **8 label-only** |
+| labels that would have resolved | **8 of 8**, matching a registered subject **exactly** |
+| dangling / cross-tenant / diverged | 0 / 0 / 0 |
+| `FK_aml_subject` | **exists**, on `subject_id → kyc_subjects` |
+| CHECK constraints on the table | **none** |
+
+🔑🔑 **The register knew which of the 16 registered subjects each alert was about and
+could not join to it.** There is even an index for the join — `ix_aml_alerts_subject_id` — and no
+query anywhere that performs one. That is F2-249's *honest but unjoinable* symptom in its strongest
+form: the link was available and was not made, because the create form asked for a label.
+
+**The collector was the form.** `EthicsPage`'s AML tab offered `{ kind: 'text', key: 'subjectName' }`
+and no picker, and `onCreate` never sent `subjectId` — so every alert the platform's own screen
+produces is exactly the label-only shape, which is what the 8 rows are.
+
+⚠ **And the same blanket `apply()` gave the entity-bound PUT two other routes' work.** Probed live
+as `auditor`, who holds `COMPLIANCE:WRITE` — the permission on the create, the PUT, `/assign` and
+`/transition` alike, so **there is no escalation to report**: the object-level controls were simply
+the only ones, and this route sat beside them. Pre-fix **8/8**, post-fix **10/10**, every victim row
+planted by the probe (F2-206):
+
+| leg | pre-fix | post-fix |
+|---|---|---|
+| a label with no id (the screen's own shape) | 201, `subject_id` NULL | **201** — still legal |
+| an id **plus a contradicting label** | 201, both halves stored | **400** naming the subject |
+| **another tenant's** KYC subject | 201 | **400** |
+| a nonexistent subject id | 409 (the FK) | 400 (the resolver, naming the field) |
+| `PUT {"analystName": …}` after a real `/assign` | 200 — **id 4 beside a label naming somebody else** | **400**, and an echo still 200 |
+| `POST {"status":"STR_FILED"}` | **201** — an STR filed outright | **400** |
+| `/transition` on the same edge | 400 | 400 |
+
+🔑 **The PUT re-opened F2-249's fix, and the result is WORSE than pre-F2-249** — before, there
+was no id for the label to contradict. `analystName` was writable and `analystId` was not, so the
+row could assert two different analysts. **A fix at a dedicated route is not a fix while an adjacent
+route writes the same column** (F2-246's rule that an update must not re-open what the create closed).
+
+🔑 **The STR bypass is F2-220's still-open filing, instantiated.** `ServerStampedFieldContractTest`
+cannot see it: `transition(Long id, String target, …)` writes the status from a **scalar parameter**,
+so `status` never enters that gate's stamped set — the recorded transition-by-parameter blind spot.
+`AmlAlertService` appears nowhere in its output, either way.
+
+### The fix
+
+Per F2-213's own prescription — **name the editable set, so everything omitted is closed by
+construction. A scrub is a list of fields somebody remembered; an allow-list is the set of fields
+that exist.**
+
+- **`KycSubjectDirectory`** resolves the subject in-tenant and derives the label from what resolved.
+  `KycService.require` is **converted to delegate** the resolution rather than keeping a second copy
+  (F2-190); only its 404 stays local, because those routes address a subject by path variable while a
+  register naming one in its body gets a 400. Bean name distinguishing, not aliased (F2-247).
+- **A label with no id stays legal.** The schema keeps `subject_id` nullable beside a nullable
+  `subject_name`, which is it stating that an unregistered party is representable (F2-246) — and it
+  is right: an alert can concern a party nobody has onboarded, which is why `counterparty_name` has
+  no id at all. All 8 live rows are that shape, so refusing would break every request that works
+  today (F2-182). The row is **disclosed as unlinked** instead, in three states (F2-209).
+- **Editing only the label of an already-linked alert is refused**, not silently unlinked: an entity
+  binding cannot tell `subjectId: null` from an absent key, so "unlink" is not expressible here, and
+  treating a label edit as one would quietly undo a resolved reference.
+- `status` and `analystName` are held to an **echo** on both write paths (F2-231/F2-234), so a form
+  that round-trips the whole row keeps working — which was mandatory, because `reqFromDto` is
+  `{ ...a }` and every edit sends both.
+- **The entity's `status = "OPEN"` initialiser is removed** and the create owns the default, derived
+  from the machine's only root. It was doing two wrong things: a second literal for a state
+  `TRANSITIONS` already declares (F2-217), and — on an entity binding — making an **omitted** key
+  indistinguishable from a supplied `"OPEN"` (F2-237), so the echo rule would have refused every
+  partial PUT. Registered in `NeverFiringNullGuardContractTest`'s moved-initialiser map.
+- **The create form offers a picker over the real KYC register**, measured reachable *first*:
+  `GET /api/v1/ethics/kyc` is `COMPLIANCE:READ` and **all 13 roles holding `COMPLIANCE:WRITE` hold it
+  too**, in dev and prod — so unlike F2-249, where `/linkable-users` is `ADMIN:WRITE` and a picker
+  would 403 on open, this one cannot. **The same measurement that blocked a picker one slice ago
+  permits one here.**
+
+### What went wrong in the doing
+
+- ⚠ **My own gate leg was wrong about the codebase, not the reverse.** A ban on every `"OPEN"`
+  literal in the service reported 4; reading them found **one** real second literal (`assign`'s
+  `"OPEN".equals(…)`, now `INITIAL_STATUS`) and two legitimate ones — the analytics bucket list and
+  its `getOrDefault` key, which enumerate the whole vocabulary for a KPI strip and ask a **different**
+  question ("awaiting disposition", deliberately narrower than the machine's non-terminal complement).
+  A red leg is a finding only if the code is actually wrong (F2-206); the leg was rescoped to the
+  claim that was meant — *nothing compares a status against a literal root*.
+- ⚠ **The pre-fix control reported one detector SILENT, and the cause is the finding's own
+  mechanism.** D1 asked whether master's service contained `requireLabel(` at all — and it does:
+  `directory.requireLabel(…)`, which **F2-249 added for the analyst**. So the control tripped on the
+  very artefact that made this half look covered (F2-215's two-of-N). Scoped to the subject, 8/8
+  discriminate.
+- ⚠ **A helper for method bodies silently returned the wrong method.** `body()` walks to the first
+  brace after a signature; a **field initialiser has none**, so asserting against the `TRANSITIONS`
+  declaration read the next method's body — a leg failing for a reason unrelated to its claim
+  (F2-244). Sliced to the initialiser instead.
+- ⚠ **A probe leg passed for the wrong reason.** L8 sent `{"to": "STR_FILED"}` and received a 400
+  reading *"target is required"* — the wrong body key, resolved from the controller afterwards
+  (F2-244, and the guessed-route family since F2-198). With `target` it refuses for the right reason:
+  *"Cannot transition from OPEN to STR_FILED"*.
+- ⚠ **The empty-heredoc landmine fired again**, hanging the shell for two minutes and swallowing the
+  `sed` chain behind it. The recorded rule — write file content with the Write/Edit tools, never an
+  inline heredoc — covers a *pointless* heredoc too.
+- ⚠ **`BUILD SUCCESS` over an app that never bound a port**, for the recorded reason: the old PID
+  still owned :8084 and answered `/actuator/health` **UP** while serving code from a `target/classes`
+  that `clean package` had deleted and rewritten. **Poll health, then check who owns the port, then
+  restart** — a stale listener is the most misleading possible result for a fix-verification probe.
+
+### Verification
+
+Suite **4,278/0/0** (up 19: 12 behaviour + 7 gate) · FE **805/805** · `tsc --noEmit` clean · pre-fix
+detector control **8/8 discriminating on master, 0 silent** · mutation **15 killed / 0 survived / 0
+anchor-miss** · probe **8/8 pre-fix, 10/10 post-fix** with residue 0 and the seeded register
+byte-identical afterwards (10 alerts / 8 label-only). **No migration** — V379 remains head.
+
+### Filed
+
+- **The 32 remaining census members** (33 minus this one), no verdicts (F2-188). The recorded
+  blockers stand and were re-confirmed by this slice's measurement: `socops.sbom_component` and
+  `socops.appsec_finding :: application_id` are **unwireable** (20/20 and 10/10 label-only, and no
+  application register exists anywhere); `bcm.dr_plans` needs owner decisions on both halves (16/16
+  and 8/16); `cyber.vulnerabilities :: asset_id` (15/20) and `cyber.cyber_incidents ::
+  affected_asset_id` (12/24) are blocked on **which of the disjoint asset registers is the target**.
+  Newly measured and **not** blocked: `admin.committee_action_items :: linked_entity_id` (15 of 33
+  label-only) is **polymorphic** — `linked_entity_type` beside the id, so it can carry no FK and no
+  single resolver, a genuinely different sub-shape; `bcm.strategy_roi_analysis :: strategy_id` (3/3)
+  and `risk.emerging_risks :: linked_risk_id` (2/10) are the small clean ones.
+- **`change_mgmt.change_comments :: author_id` and `ethics.case_actions :: actor_id` are already
+  CLOSED by F2-248** and still read `NEEDS-READING` in the census, because that slice adjudicated
+  `MassAssignmentRatchetTest`'s ranking rather than this census. Bookkeeping, not a defect — but a
+  member the census lists as unread that has in fact been read is indistinguishable from one nobody
+  has looked at (house rule 3's own warning about a ceiling left in place after a sweep).
+- **`ethics.aml_alerts.alert_code` is caller-named and nothing mints it.** All 10 live codes are
+  `AML-2025-000n` written by the seed, there is **no generator anywhere**, and there is **no UNIQUE
+  index** on the column — probed, a second `AML-2025-0001` is accepted. F2-172(d)'s family, and
+  outside `ClientSuppliedReferenceRatchetTest`'s `setExternalId`/`setRefNumber` key, which is
+  F2-248's headline about a gate whose key is a spelling. Minting it needs a format decision and the
+  gate's key widened across the platform — its own slice.
+- **`sla_due_at` has no server computation**: `applyEditable` is its only writer, so the deadline is
+  the caller's by design rather than by oversight. Filed against F2-202's rule that only the server
+  may issue a deadline.
+- **`ethics.aml_alerts` has zero CHECK constraints** on `status`, `severity` or `alert_type`. Cheap
+  now that this slice closed the register's open status writer (F2-183's rule that a CHECK and its
+  writer land in the same commit) — but the vocabulary must be read from the machine and the
+  live rows first.
+- The **8 live unlinked alerts**: repair means writing the id each label already names, which is
+  mechanical here (all 8 match exactly) but rewrites live AML rows in two databases — **owner
+  decision** (F2-183/F2-196).
+- **`subject_name` has no `*_ar`**, so an AML alert's subject is English-only on an Arabic-primary UI
+  (house rule 7).
+
 ## F2-249 · A register that declares a person id beside a label wrote only the label
 
 | | |

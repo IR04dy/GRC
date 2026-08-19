@@ -351,6 +351,17 @@ class ParentIdentityCopyContractTest {
             // caller free text (ethics) stored a CLAIM, the acting principal (bcm) stored an
             // honest string nothing could join. Both are the absence of the resolvable half.
             Map.entry(
+            "ethics.aml_alerts :: subject_id + subject_name",
+            "CLOSED by F2-250 — the alert's SUBJECT, the pair this register declares beside the one "
+          + "F2-249 closed, in the same entity. AmlAlertService.applySubject resolves the id "
+          + "through KycSubjectDirectory and derives the label from what resolved; a label "
+          + "contradicting the id is refused, another tenant's subject is refused (FK_aml_subject "
+          + "exists and a foreign key knows nothing about tenancy), and a label with no id stays "
+          + "legal because the schema and 8 of the 10 live rows say an unregistered party is "
+          + "representable. The create form now offers a picker over the real KYC register instead "
+          + "of a free-text box — which is why those 8 rows exist, all 8 labels matching a "
+          + "registered subject exactly."),
+            Map.entry(
             "ethics.aml_alerts :: analyst_id + analyst_name",
             "CLOSED by F2-249 — the assignment now goes through TenantUserDirectory: an "
           + "analystUserId is resolved against the caller's own tenant and the label is DERIVED "
