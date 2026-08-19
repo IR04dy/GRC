@@ -3,6 +3,8 @@ package com.tss.grc.support;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -99,5 +101,89 @@ class MigrationVocabulariesTest {
         assertThat(MigrationVocabularies.valuesOf("ck_wb_severity"))
             .isEqualTo(MigrationVocabularies.valuesOf("CK_WB_SEVERITY"))
             .isEqualTo(MigrationVocabularies.valuesOf("CK_wb_severity"));
+    }
+
+    // ── F2-241: the range reading, and the (table, column) address ─────────────────────────────
+
+    @Test
+    @DisplayName("a numeric range is read as an interval, and is NOT offered as a vocabulary")
+    void aRangeIsReadAsABoundNotAsTokens() {
+        List<MigrationVocabularies.Range> all = MigrationVocabularies.ranges();
+        assertThat(all).as("anti-vacuity: 44 single-column numeric CHECKs measured in dev at F2-241")
+            .hasSizeGreaterThanOrEqualTo(20);
+
+        // The two forms this database uses, one of each. ck_ndi_comp_weight is `>= 0 AND <= 10`;
+        // CK_vln_sla_policy_warn_pct is the EXCLUSIVE lower bound `> 0 AND <= 1`, which is the case
+        // a reader that assumed inclusivity would get wrong in the only direction that matters.
+        var weight = named(all, "ck_ndi_comp_weight");
+        assertThat(weight.parsed()).isTrue();
+        assertThat(weight.admits(new BigDecimal("0"))).isTrue();
+        assertThat(weight.admits(new BigDecimal("10"))).isTrue();
+        assertThat(weight.admits(new BigDecimal("10.01"))).isFalse();
+        assertThat(weight.admits(new BigDecimal("-0.01"))).isFalse();
+
+        var warnPct = named(all, "CK_vln_sla_policy_warn_pct");
+        assertThat(warnPct.admits(new BigDecimal("0")))
+            .as("`> 0` excludes zero; an inclusive reading would admit a warning threshold of 0%%")
+            .isFalse();
+        assertThat(warnPct.admits(new BigDecimal("0.750"))).isTrue();
+        assertThat(warnPct.admits(new BigDecimal("1.000"))).isTrue();
+
+        // …and a range must never appear as a vocabulary, which is F2-230's asserted limit.
+        assertThat(MigrationVocabularies.byConstraint()).doesNotContainKey("ck_ndi_comp_weight");
+    }
+
+    @Test
+    @DisplayName("an unparsed bound admits everything, and says so rather than pretending")
+    void anUnparsedBoundIsVisible() {
+        // Nothing may quietly behave as a satisfied bound: admits() returning true for an unparsed
+        // range is deliberate (a gate must not fail on a rule it could not read), so the flag is
+        // what a caller checks. If this count grows, a new predicate shape has arrived.
+        long unparsed = MigrationVocabularies.ranges().stream().filter(r -> !r.parsed()).count();
+        assertThat(unparsed)
+            .as("single-column numeric CHECKs whose interval this reader could not reduce; each one "
+              + "is a bound that admits everything, so the number is worth knowing")
+            .isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("a bare table name that exists in two schemas is refused, not guessed")
+    void anAmbiguousTableNameFailsLoudly() {
+        // scm.vendor_assessments and tprm.vendor_assessments BOTH carry a status vocabulary, and the
+        // tokens differ — ESCALATED is legal in one and not the other. F2-240's filing was written
+        // from the wrong twin of this pair; resolving it by bare name is how that happens.
+        assertThatThrownBy(() -> MigrationVocabularies.vocabularyOn("", "vendor_assessments", "status"))
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("ambiguous")
+            .hasMessageContaining("scm")
+            .hasMessageContaining("tprm");
+
+        // Qualified, each resolves to its own register's vocabulary, and they are NOT the same set.
+        Set<String> scm = MigrationVocabularies.vocabularyOn("scm", "vendor_assessments", "status");
+        Set<String> tprm = MigrationVocabularies.vocabularyOn("tprm", "vendor_assessments", "status");
+        assertThat(scm).contains("ESCALATED");
+        assertThat(tprm).doesNotContain("ESCALATED");
+        assertThat(scm).isNotEqualTo(tprm);
+    }
+
+    @Test
+    @DisplayName("a column with no CHECK returns empty, and that is not an error")
+    void anUnconstrainedColumnIsEmptyRatherThanLoud() {
+        // The distinction matters: valuesOf() throws on a misspelled CONSTRAINT because a name one
+        // letter wrong fails exactly like a missing one (F2-177). But asking what an arbitrary
+        // column admits is a question most columns legitimately answer "nothing in particular" to,
+        // and 169 of the 183 initialiser comparisons F2-241 makes rely on that being cheap.
+        assertThat(MigrationVocabularies.vocabularyOn("tprm", "vendor_assessments", "assessor"))
+            .isEmpty();
+        assertThat(MigrationVocabularies.vocabularyOn("scm", "no_such_table", "status")).isEmpty();
+    }
+
+    private static MigrationVocabularies.Range named(
+            List<MigrationVocabularies.Range> all, String constraint) {
+        return all.stream().filter(r -> r.constraint().equalsIgnoreCase(constraint)).findFirst()
+            .orElseThrow(() -> new AssertionError(
+                "no single-column numeric range named '" + constraint + "'. Parsed "
+                + all.size() + ": " + all.stream().map(MigrationVocabularies.Range::constraint)
+                    .sorted().toList()));
     }
 }
