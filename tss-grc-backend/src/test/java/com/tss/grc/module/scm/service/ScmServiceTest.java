@@ -289,7 +289,10 @@ class ScmServiceTest {
         a.setId(ID);
         a.setOrganisationId(ORG_ID);
         a.setVendorId(VENDOR_ID);
-        a.setStatus("DRAFT");
+        // F2-241 — was "DRAFT", a token CK_scm_assess_status REFUSES, so this fixture described a row
+        // that could not exist in either database. A mocked repository has no constraint, which is
+        // exactly why the illegal initialiser it was copied from looked normal for as long as it did.
+        a.setStatus("PLANNED");
         when(assessmentRepo.findById(ID)).thenReturn(Optional.of(a));
         when(assessmentRepo.save(any(VendorAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vendorRepo.findByOrganisationId(ORG_ID)).thenReturn(List.of(vendor(ORG_ID)));
@@ -321,5 +324,112 @@ class ScmServiceTest {
         assertThat(v.getIsDeleted()).isTrue();
         verify(vendorRepo, times(1)).save(v);
         verify(vendorRepo, never()).deleteById(any());
+    }
+
+    // ─── F2-241: the create's defaults, and the caller's value ───────────────────────────────────
+
+    /**
+     * The behavioural half of {@code EntityInitialiserAcceptedByColumnTest}.
+     *
+     * <p>⚠ <b>No mocked test can reproduce the failure this fixes</b> — a mocked repository has no
+     * CHECK constraint, so the illegal {@code "DRAFT"} was invisible to the whole suite and only the
+     * live probe against real SQL Server disagreed (the same reason CLAUDE.md gives for the ROWVERSION
+     * family). What is assertable here is the property the fix establishes: the values a bare create
+     * lands on are the values the column admits, read from the migration SQL rather than restated.
+     */
+    private AssessmentDtos.Request bareAssessment() {
+        AssessmentDtos.Request r = new AssessmentDtos.Request();
+        r.setVendorId(VENDOR_ID);
+        return r;                        // no type, no status, no rating — all three defaults apply
+    }
+
+    private VendorAssessment createdFrom(AssessmentDtos.Request req) {
+        // Deliberately only the two collaborators createAssessment actually reaches. ⚠ It does NOT
+        // resolve the vendor at all — unlike TprmService#createAssessment, which calls getVendor() to
+        // "verify org ownership" — so stubbing vendorRepo.findById here would be an UnnecessaryStubbing
+        // that hid a real asymmetry. Filed, not fixed in this slice: an SCM assessment can name a
+        // vendor id the caller's tenant does not own. The row is still stamped with the caller's org,
+        // so it is a dangling reference rather than a leak (vendorIndex() cannot resolve the name).
+        when(assessmentRepo.save(any(VendorAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vendorRepo.findByOrganisationId(ORG_ID)).thenReturn(List.of(vendor(ORG_ID)));
+        ArgumentCaptor<VendorAssessment> saved = ArgumentCaptor.forClass(VendorAssessment.class);
+        service.createAssessment(req);
+        verify(assessmentRepo).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void createAssessment_lands_on_values_the_columns_own_CHECKs_admit() {
+        VendorAssessment a = createdFrom(bareAssessment());
+
+        // Compared against the migration SQL, never against a second copy of the vocabulary — a
+        // restated list is the AttachmentAccessPolicy shape (two lists agreeing, maintained by nobody).
+        assertThat(a.getStatus())
+            .as("status was initialised \"DRAFT\", which CK_scm_assess_status refuses, so every "
+              + "create that omitted the key was a refused INSERT -> 500")
+            .isIn(com.tss.grc.support.MigrationVocabularies
+                .vocabularyOn("scm", "vendor_assessments", "status"));
+        assertThat(a.getRiskRating())
+            .as("risk_rating is NOT NULL and had no entity-side filling mechanism at all, so an "
+              + "omitted key arrived as an explicit null — a DB DEFAULT cannot rescue an insertable "
+              + "column (F2-240)")
+            .isIn(com.tss.grc.support.MigrationVocabularies
+                .vocabularyOn("scm", "vendor_assessments", "risk_rating"));
+        assertThat(a.getAssessmentType())
+            .isIn(com.tss.grc.support.MigrationVocabularies
+                .vocabularyOn("scm", "vendor_assessments", "assessment_type"));
+    }
+
+    @Test
+    void createAssessment_keeps_a_value_the_caller_did_supply() {
+        AssessmentDtos.Request r = bareAssessment();
+        r.setStatus("IN_PROGRESS");
+        r.setRiskRating("CRITICAL");
+        r.setAssessmentType("TRIGGERED");
+
+        VendorAssessment a = createdFrom(r);
+        assertThat(a.getStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(a.getRiskRating()).isEqualTo("CRITICAL");
+        assertThat(a.getAssessmentType()).isEqualTo("TRIGGERED");
+    }
+
+    @Test
+    void applyAssessment_normalises_the_casing_the_collation_would_have_let_through() {
+        // F2-179: these columns collate case-INSENSITIVELY, so 'in_progress' was ACCEPTED by the
+        // CHECK and stored verbatim — and ASSESS_STATUS_OPTIONS plus the register's tone map compare
+        // case-sensitively, so the row rendered with no status. Normalising at the boundary makes the
+        // constraint, the Java comparison and the frontend's label map agree.
+        AssessmentDtos.Request r = bareAssessment();
+        r.setStatus("in_progress");
+        r.setRiskRating("  critical  ");
+
+        VendorAssessment a = createdFrom(r);
+        assertThat(a.getStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(a.getRiskRating()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void applyAssessment_refuses_a_token_the_column_does_not_have() {
+        AssessmentDtos.Request r = bareAssessment();
+        r.setStatus("DRAFT");            // the literal pre-fix initialiser: legal nowhere
+
+        assertThatThrownBy(() -> service.createAssessment(r))
+            .as("require, not coerce: nothing upstream coerces this field and the CHECK already "
+              + "refuses it, so every value that succeeds today is a case-variant of a legal token "
+              + "and a 400 naming the field cannot break a working request (F2-182)")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status")
+            .hasMessageContaining("IN_PROGRESS");
+        verify(assessmentRepo, never()).save(any(VendorAssessment.class));
+    }
+
+    @Test
+    void sla_lands_on_the_status_its_column_admits() {
+        // scm.slas has NO create path anywhere — no controller, no route, no frontend client, and
+        // SlaRepository is injected into ScmService and never used. So this asserts the entity, which
+        // is the only artefact that decides the value. It was "ON_TRACK": refused by the CHECK, and
+        // the FLATTERING answer — an SLA nobody has measured is NOT_MEASURED, not on track.
+        assertThat(new Sla().getStatus())
+            .isIn(com.tss.grc.support.MigrationVocabularies.vocabularyOn("scm", "slas", "status"));
     }
 }

@@ -2547,6 +2547,216 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-241 · An entity's field initialiser is a one-token vocabulary, and no instrument had ever compared one against its column's own CHECK
+
+|  |  |
+|---|---|
+| **ID** | F2-241 |
+| **Title** | Two `module/scm` entities initialised a `status` column to a token that column's own CHECK constraint refuses, so the register's create could not succeed without the caller naming the state — and F2-240's filing, which started this, named the wrong table because it was written from the duplicate-simple-name twin |
+| **Severity** | 🟠 P3 (latent-by-caller on one register: `ScmPage` always sends a status, so the browser never met it; unreachable on the other, which has no create path at all. Both refusals are hard — the database rejects the INSERT — and one initialiser is the flattering value) |
+| **Status** | 🟢 CLOSED 2026-08-19 |
+| **Programme** | Platform Bible F2 · server-owned state |
+| **Modules** | `scm` (2 entities, 1 service); `support/MigrationVocabularies` extended; 1 new gate; 1 existing fixture corrected |
+
+### F2-240's filing was wrong in both halves, and the cause is a hazard already on the register
+
+F2-240 filed: *"`tprm.vendor_assessments` has 3 CHECK constraints and `assessment_type` is
+unconstrained — cheap now that this slice closed the register's open writers."* Re-derived per
+F2-221, measured in dev **and** prod:
+
+* `tprm.vendor_assessments` has **2** CHECK constraints and **no `assessment_type` column at all**.
+* The 3-CHECK table whose `assessment_type` **is** constrained (`CK_scm_assess_type`) is
+  **`scm.vendor_assessments`** — a *different table*, in a *different schema*, mapped by a *different
+  entity that happens to have the same simple name*.
+
+🔑 **F2-222 filed exactly this hazard — 15 of 433 entity simple names are declared in two packages —
+and recorded that "nobody is maintaining that."** F2-240's own write-up even records the moment it
+bit: *"my helper's `findFirst()` picked `module/scm`'s twin over `module/tprm`'s."* That was corrected
+in the gate and **leaked into the prose**, where nothing checks it. A filing is the least-verified
+artefact in a slice (F2-178, F2-188), and this is the first instance in this lineage of one being
+wrong about *which table it was talking about*.
+
+⚙ The correction is not the finding. Reading the twin to check the filing is what found the defect.
+
+### The defect: an initialiser the column refuses
+
+`module/scm/entity/VendorAssessment` declared `private String status = "DRAFT"`;
+`CK_scm_assess_status` admits `PLANNED | IN_PROGRESS | COMPLETED | ESCALATED`. `ScmService`
+`#createAssessment` does `new VendorAssessment()` then overwrites `status` only
+`if (req.getStatus() != null)` — so **any caller that omitted the state sent `'DRAFT'` and the
+database refused the INSERT.**
+
+⚠ **The column's DB DEFAULT does not rescue it.** Both columns carry one (`'PLANNED'`,
+`'NOT_MEASURED'`) and the entity maps both insertable, so Hibernate names the column in the INSERT
+and sends the initialiser's value — F2-240 measured exactly that on the *tprm* twin's `status`.
+🔑 **The DEFAULT is still the useful artefact: it is the schema author's own statement of which token
+the initial state should be. Where the entity disagrees with it in the direction the CHECK refuses,
+the entity is the half that is wrong** — and both fixes took the column's own default.
+
+`module/scm/entity/Sla` declared `status = "ON_TRACK"` against `CK_scm_sla_status`'s
+`NOT_MEASURED | AT_RISK | BREACHED | MET`. 🔑 **`ON_TRACK` is also the FLATTERING value** — it asserts
+the supplier is meeting the target — so had anyone "fixed" this by widening the CHECK instead of
+correcting the entity, a brand-new SLA would have claimed compliance it had never demonstrated.
+F2-238 measured that inversion from the other side.
+
+⚠ **Corrected rather than deleted, which is the opposite of F2-240's remedy for the adjacent shape,
+and the discriminator is whether a create path exists to own the default.** `scm.slas` has none at
+all — no controller, no route, no frontend client, and `SlaRepository` is injected into `ScmService`
+and **never used** (F2-204's `NO_SERVER_SURFACE` shape; 14 live rows in dev and prod). Deleting the
+initialiser would leave a NOT NULL column with no writer to fill it, the one hazard F2-238 flagged
+for that fix shape.
+
+### A third site on the same create: NOT NULL with no filling mechanism at all
+
+`scm.vendor_assessments.risk_rating` is NOT NULL with DB default `'MEDIUM'`, the entity gave it **no
+initialiser**, and `applyAssessment` writes it only under a null-guard — so an omitted key arrived as
+an explicit null. Probed live, this fires **first** and **masks the other defect**: the handler
+answers **400 "A required field was not supplied"** with `constraint: null`, naming no field, which is
+F2-210/F2-214's recorded shape where the diagnostic sends the caller nowhere. 🔑 **Two defects on one
+create, and the louder one hid the quieter one** — F2-238's *the throw was holding the write shut*,
+in the other direction.
+
+### Why every existing instrument was blind
+
+The platform has four vocabulary/column instruments and this population sits outside all of them,
+because **a field initialiser is never DECLARED as a vocabulary**:
+
+| instrument | its population |
+|---|---|
+| `ClosedVocabularyPinTest` | narrows on the source string `ClosedVocabulary.of(` and that field type |
+| `HandRolledVocabularyMirrorTest` | six mirrors named in a list |
+| `StateMachineColumnMirrorTest` | a named machine constant — a one-token default is not a machine |
+| `NeverFiringNullGuardContractTest` (F2-240) | **entity-bound** updates; this PUT binds a purpose-built DTO, so the register was outside it by construction |
+
+Ninth appearance of F2-198's shape, and the narrowing is none of the previous ones (a filename, a
+three-entry allow-list, a module name, an `extends` clause, a field-name list, a claim shape): it is
+**the absence of a declaration**. 🔑 **A value nobody wrote down as a vocabulary is still a
+vocabulary to the database.**
+
+### The gate constructs the entity and asks the field
+
+`EntityInitialiserAcceptedByColumnTest` — a **hard zero with no exemption map**, safe because there is
+no correct code for it to fail on (F2-214): a value the column refuses is either a create that cannot
+succeed or an initialiser stating something the register cannot hold, and every CHECK-constrained
+column has at least one legal value.
+
+⚠ **Reflection over the constructed object, never a source regex.** The reconnaissance needed three
+hand-written cases — the `@Column` on the line above, the `@Column` column-aligned on the *same* line
+(this codebase does that), and an initialiser that is a **constant reference** rather than a literal
+(`ChangeModelStatus.DRAFT`) — and it silently skipped the four entities whose `@Table` carries no
+`schema=`. Constructing the entity is fooled by none of them.
+
+Measured, published to `target/entity-initialiser-checks.txt`: **432 shipped entities constructed and
+walked** (the same 432 CLAUDE.md records, which is the corroboration), **170 comparisons against a
+CHECK vocabulary across 22 schemas**, **13 against a numeric range**, 0 unprobeable, 0 with no
+`@Table`, 0 on an `insertable = false` column — and **2 REFUSED**, both fixed.
+
+⚠⚠ **The range half is included on purpose, and F2-230 is why.** That slice established that a range
+is not a vocabulary and asserted the limit deliberately. But a value outside a range CHECK produces
+the *identical* refused INSERT, so excluding ranges would have shipped an invariant whose population
+was half its claim — this programme's most-repeated defect. `MigrationVocabularies` grew `ranges()`
+as a **separate accessor** over **one shared declaration walk**, so the three traps its javadoc
+records are not copied into a second parser.
+
+⚠⚠ **The `(table, column)` lookup refuses an ambiguous bare table name rather than guessing, and this
+slice is the reason.** `vendor_assessments` exists in `scm` **and** `tprm`, both carry a vocabulary
+CHECK on `status`, and **the tokens differ** — `ESCALATED` is legal in one and not the other. A
+bare-name lookup would have compared `scm`'s initialiser against `tprm`'s vocabulary and answered
+confidently. Asserted in both directions.
+
+### Two instrument errors of mine, both found by running things
+
+⚠ **Publishing the NAMES instead of the count found that the scan reached the test tree.** The first
+draft reported "1 `@Entity` with no `@Table`" and the count was unremarkable; the name was
+`ServerOwnedFieldsInvariantTest$SyntheticUnprobeableEntity` — F2-215's own fixture.
+`ClassPathScanningCandidateComponentProvider` walks the whole classpath, so a hard zero would have
+failed on a fixture a later slice deliberately builds to be refused. 🔑 **A count cannot tell you its
+members are the ones you meant** (F2-235). Excluded by **code source**, not by a name ending in
+`Test` — F2-192 recorded that a name test lets any member escape by being renamed.
+
+⚠ **The case-sensitivity leg asserted the vocabulary SET rather than the gate's comparison.**
+`admissible.contains("planned")` is false whether the gate compares case-sensitively or not, so it
+proved neither. Extracted as `accepts()` and asserted directly; mutation M9 (make it
+`equalsIgnoreCase`) is killed only because of that change. **Near the claim rather than the claim** is
+the failure this register has recorded most often.
+
+### The writer, on the same lines
+
+The slice that corrected this register's *defaults* found the *caller's* value unguarded on the same
+lines — F2-215's two-of-N at its most literal, since a reader who sees the initialisers agree with the
+CHECKs has no reason to ask whether the writer does. Three `ClosedVocabulary` declarations, each
+naming its constraint so `ClosedVocabularyPinTest` mirrors it against the migration SQL.
+
+⚠ `require`, not `coerce`, by F2-182's mechanical test — **is there already a coercion upstream?**
+No: `AssessmentDtos.Request` carries no validation annotation of any kind and `applyAssessment`
+checked nothing, so the CHECK was the only thing refusing anything. Every value that succeeds today
+is therefore a case-variant of a legal token, and `require` cannot break a working request.
+
+⚠⚠ **The casing half is live, not hypothetical.** Probed against the real database:
+`status = 'planned'` is **ACCEPTED and stored verbatim** (the columns collate case-insensitively),
+and `ASSESS_STATUS_OPTIONS` plus the register's tone map compare case-sensitively — F2-179's defect on
+a SAMA outsourcing register. ⚙ All three frontend dropdowns were checked against their CHECKs before
+enabling `require`, and all three match exactly; 🔑 **the frontend's own comments state the four-token
+status vocabulary correctly, while the entity three files away initialised to a fifth token no
+vocabulary anywhere contains** — F2-205's *which of them is the server?*, with the FE right and the
+entity, which owns the default, wrong.
+
+### An existing test's fixture used the illegal token
+
+`escalateAssessment_sets_escalatedToRisk_and_status_ESCALATED` set `status("DRAFT")`, describing a row
+that could not exist in either database. 🔑 **A mocked repository has no constraint, which is exactly
+why the illegal initialiser it was copied from looked normal for as long as it did** — and why no unit
+test in the suite could ever have caught this. Corrected to `PLANNED`.
+
+### The probe refuted four of my own expectations, and the corrections are the finding
+
+⚠ **I expected 500s and got a 400 and three 409s.** Pre-fix: omitting both fields is a **400
+REQUIRED_FIELD naming no field** (the NOT NULL masking the CHECK), and a caller-supplied bad token is
+a **409 `VALUE_NOT_ALLOWED` naming the column** — F2-180's improved 547 diagnostic doing its job,
+better than I assumed. ⚠ And my first leg 1 **asserted both defects at once**; splitting it (F2-206's
+one-field-per-question) is what isolated the initialiser defect: omitting *only* `status` reaches the
+column with `'DRAFT'` and is refused, with nothing masking it.
+
+⚠ A separate asymmetry the `UnnecessaryStubbing` failure exposed, filed not fixed:
+**`ScmService#createAssessment` never resolves the vendor at all**, where `TprmService#createAssessment`
+calls `getVendor()` to *"verify org ownership"* — so an SCM assessment can name a vendor id the
+caller's tenant does not own. The row is still stamped with the caller's org, so it is a dangling
+reference rather than a leak.
+
+### Verification
+
+* `EntityInitialiserAcceptedByColumnTest` **6/6**, hard zero with an empty exemption map, evidence
+  published to `target/entity-initialiser-checks.txt`
+* `MigrationVocabulariesTest` **9/9** (4 new: the range interval including an exclusive lower bound,
+  the unparsed-bound census at 0, the ambiguity refusal, the empty-vs-error distinction)
+* `ScmServiceTest` **20/20** (5 new behaviour tests + 1 fixture corrected)
+* **Pre-fix control**: the gate run against the unfixed tree fails naming **exactly the two sites**
+  and nothing else, and the other five legs pass — so the population and floors are live, not rotted
+  (F2-229: a first-run green is also what a rotted detector looks like)
+* Full suite **4,142 / 0 / 0** (+15 on F2-240's 4,127, reconciling exactly)
+* Mutation **11 killed / 0 survived / 0 anchor-miss**, plus 2 recorded EQUIVALENT and 1 INVALID
+* Live probe **pre-fix 12/12** on a backend restarted onto master's entities and **post-fix 14/14**
+  on a restarted backend (F2-217), every victim row planted by the probe (F2-206), re-runnable,
+  `CHARINDEX` cleanup, register restored to **15 live rows** and **0 residual** `[REVIEW-TEST]`
+* No migration: both CHECK constraints already existed and the live rows already agree with them.
+  No frontend file touched.
+
+### Filed
+
+* **`ScmService#createAssessment` does not verify the vendor belongs to the caller's tenant**, unlike
+  its `tprm` twin sixty lines of intent away. Dangling reference, not a leak.
+* **`scm.slas` has no server surface of any kind** — 14 live rows in dev and prod, no controller, no
+  route, no frontend client, `SlaRepository` injected and unused. F2-204's `NO_SERVER_SURFACE`
+  population, whose derived registry was scoped to the four `*_lc` modules and so never saw this one.
+* **The adjacent bucket: NOT NULL columns with no entity-side filling mechanism.** Measured 45, but
+  the majority are **F2-238/F2-239/F2-240's own output** (`cloud_services`, `crisis_events`,
+  `authority_document_citations`, `control_mappings`, `risk_control_links`), already asserted by
+  `everyRemovedInitialiserHasAWriterOnTheCreatePath`. The genuinely unmeasured residue is the
+  complement — read the route and probe it; do **not** write 45 reasons (F2-188).
+* `tprm.vendor_assessments.assessment_type` **does not exist**, so F2-240's filed item is retired
+  rather than carried. `scm.vendor_assessments` needs no new CHECK: it already has three.
+* The structural root is unchanged at **94 entity-bound `PUT`/`PATCH` routes** (owner decision).
+
 ## F2-240 · The residual 19 were all latent-by-caller, so reach could no longer order them — and the gate refused this slice's own fix
 
 |  |  |

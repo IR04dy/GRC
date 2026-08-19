@@ -1,6 +1,7 @@
 package com.tss.grc.module.scm.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.scm.dto.*;
 import com.tss.grc.module.scm.entity.*;
 import com.tss.grc.module.scm.repository.*;
@@ -219,14 +220,52 @@ public class ScmService {
         return toAssessmentResponse(assessmentRepo.save(a), vendorIndex());
     }
 
+    /**
+     * F2-241 — the three columns of {@code scm.vendor_assessments} that carry a CHECK constraint.
+     *
+     * <p>The slice that corrected this register's <em>entity defaults</em> found the caller's value
+     * unguarded on the same lines. Leaving it would be F2-215's two-of-N shape at its most literal:
+     * a reader who sees the initialisers agree with the CHECKs has no reason to ask whether the
+     * writer does.
+     *
+     * <p>⚠ {@code require} rather than {@code coerce}, by F2-182's mechanical test — <b>is there
+     * already a coercion upstream?</b> There is not: {@code AssessmentDtos.Request} carries no
+     * validation annotation of any kind and {@code applyAssessment} checked nothing, so the CHECK is
+     * the only thing refusing anything today. That means every value which currently succeeds is a
+     * case-variant of a legal token, so {@code require} cannot break a working request; it converts a
+     * constraint violation into a 400 naming the field, and normalises the casing that slipped
+     * through.
+     *
+     * <p>⚠⚠ The casing half is not hypothetical. These columns collate case-INSENSITIVELY, so
+     * {@code status: "planned"} was <b>accepted and stored verbatim</b> — and
+     * {@code ASSESS_STATUS_OPTIONS} and the register's tone map compare case-sensitively, so the row
+     * would render with no status at all. F2-179's defect, on a SAMA outsourcing register.
+     */
+    static final ClosedVocabulary ASSESSMENT_TYPE = ClosedVocabulary.of(
+            "assessmentType", "CK_scm_assess_type", "INITIAL", "PERIODIC", "TRIGGERED");
+
+    /** {@code CK_scm_assess_status} — note ESCALATED, which the tprm twin's vocabulary lacks. */
+    static final ClosedVocabulary ASSESSMENT_STATUS = ClosedVocabulary.of(
+            "status", "CK_scm_assess_status", "PLANNED", "IN_PROGRESS", "COMPLETED", "ESCALATED");
+
+    /** {@code CK_scm_assess_rating} — the supplier's assessed risk band. */
+    static final ClosedVocabulary ASSESSMENT_RATING = ClosedVocabulary.of(
+            "riskRating", "CK_scm_assess_rating", "LOW", "MEDIUM", "HIGH", "CRITICAL");
+
     private void applyAssessment(VendorAssessment a, AssessmentDtos.Request req) {
         if (req.getVendorId() != null) a.setVendorId(req.getVendorId());
-        if (req.getAssessmentType() != null) a.setAssessmentType(req.getAssessmentType());
+        if (req.getAssessmentType() != null) {
+            a.setAssessmentType(ASSESSMENT_TYPE.require(req.getAssessmentType()));
+        }
         if (req.getAssessmentDate() != null) a.setAssessmentDate(req.getAssessmentDate());
         if (req.getNextAssessmentDate() != null) a.setNextAssessmentDate(req.getNextAssessmentDate());
         if (req.getOverallScore() != null) a.setOverallScore(req.getOverallScore());
-        if (req.getRiskRating() != null) a.setRiskRating(req.getRiskRating());
-        if (req.getStatus() != null) a.setStatus(req.getStatus());
+        if (req.getRiskRating() != null) {
+            a.setRiskRating(ASSESSMENT_RATING.require(req.getRiskRating()));
+        }
+        if (req.getStatus() != null) {
+            a.setStatus(ASSESSMENT_STATUS.require(req.getStatus()));
+        }
         if (req.getAssessorId() != null) a.setAssessorId(req.getAssessorId());
         if (req.getFindings() != null) a.setFindings(req.getFindings());
         if (req.getRecommendations() != null) a.setRecommendations(req.getRecommendations());

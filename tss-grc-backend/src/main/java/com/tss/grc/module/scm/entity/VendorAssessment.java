@@ -29,7 +29,7 @@ public class VendorAssessment {
     private Long vendorId;
 
     @Column(name = "assessment_type", length = 50)
-    private String assessmentType = "INITIAL";
+    private String assessmentType = "INITIAL";   // legal: CK_scm_assess_type admits INITIAL
 
     @Column(name = "assessment_date")
     private LocalDate assessmentDate;
@@ -40,11 +40,27 @@ public class VendorAssessment {
     @Column(name = "overall_score", precision = 5, scale = 2)
     private BigDecimal overallScore;
 
+    // F2-241 — `risk_rating` is NOT NULL with the database DEFAULT 'MEDIUM' and had NO entity-side
+    // filling mechanism of any kind, while ScmService#applyAssessment writes it only
+    // `if (req.getRiskRating() != null)`. A DB DEFAULT does not rescue that: the column is mapped
+    // insertable, so Hibernate names it in the INSERT and sends an explicit null, and the create
+    // answers 500 for any caller that omits the key. ScmPage always sends one, which is the only
+    // reason it has never been seen — and a defence in one client is not a defence (F2-240).
     @Column(name = "risk_rating", length = 20)
-    private String riskRating;
+    private String riskRating = "MEDIUM";
 
+    // ⚠⚠ F2-241 — this was `= "DRAFT"`, a token `CK_scm_assess_status` REFUSES
+    // (PLANNED | IN_PROGRESS | COMPLETED | ESCALATED). Any create that let the initialiser stand
+    // sent 'DRAFT' and the database refused the INSERT: HTTP 500 on a SAMA outsourcing supplier
+    // assessment. The value here is the column's own DEFAULT — that DEFAULT is the schema author's
+    // statement of which token the initial state should be, and where an entity disagrees with it in
+    // the direction the CHECK refuses, the entity is the half that is wrong.
+    //
+    // 🔑 An initialiser is a one-token vocabulary that nothing had ever compared against the column,
+    // because it is never DECLARED as a vocabulary. EntityInitialiserAcceptedByColumnTest now
+    // constructs every @Entity and asks each field, so this shape cannot recur silently.
     @Column(name = "status", length = 30)
-    private String status = "DRAFT";
+    private String status = "PLANNED";
 
     @Column(name = "assessor_id")
     private Long assessorId;
