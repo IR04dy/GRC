@@ -241,7 +241,17 @@ public class EvidenceItemService {
                     "Auto-expired: " + previousStatus + " → EXPIRED (validTo " + item.getValidTo() + ")");
                 emit("EVIDENCE_EXPIRED", item, previousStatus);
                 if (item.getRequestId() != null) {
-                    requestRepository.findById(item.getRequestId()).ifPresent(r -> {
+                    // F2-242 — anchored on the ITEM's tenant, not on TenantContext, because this
+                    // sweep runs off-request across every organisation. Its on-request sibling
+                    // `fulfilRequest` has always carried `.filter(r -> r.getOrganisationId()
+                    // .equals(orgId))` six methods below; this one never did, so an item whose
+                    // `requestId` names another tenant's request would have had that request
+                    // reopened and its fulfilment attribution cleared. F2-215's two-of-N shape:
+                    // a reader who finds the predicate on one reader of a foreign key has no
+                    // reason to check the other.
+                    requestRepository.findById(item.getRequestId())
+                        .filter(r -> r.getOrganisationId().equals(item.getOrganisationId()))
+                        .ifPresent(r -> {
                         if (!"CLOSED".equals(r.getStatus())) {
                             r.setStatus("OPEN");
                             r.setFulfilledAt(null);
@@ -368,6 +378,18 @@ public class EvidenceItemService {
         item.setTitleAr(req.titleAr());
         item.setDescriptionEn(req.descriptionEn());
         item.setSubControlId(req.subControlId());
+        // F2-242 — resolve the originating request inside the caller's tenant before storing the
+        // reference. This is the root of the sweep defect above: an unverified foreign key is a
+        // cross-tenant write waiting for the row that dereferences it, and `expireStaleEvidence`
+        // is that row. Fixing only the sweep would leave the reference storable, which is an
+        // invitation to the next reader who adds a dereference (F2-214's shape).
+        if (req.requestId() != null) {
+            Long orgId = TenantContext.getCurrentTenant();
+            requestRepository.findById(req.requestId())
+                .filter(r -> r.getOrganisationId().equals(orgId))
+                .orElseThrow(() -> new EntityNotFoundException(
+                    "Evidence request not found: " + req.requestId()));
+        }
         item.setRequestId(req.requestId());
         item.setEvidenceType(req.evidenceType());
         item.setSourceModule(req.sourceModule());

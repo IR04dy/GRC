@@ -159,7 +159,7 @@ public class RiskAcceptanceService {
         a.setStatus("REVOKED");
         a.setRejectionReason(reason);
         RiskAcceptance saved = acceptances.save(a);
-        setRiskStatus(saved.getRiskId(), "UNDER_REVIEW");   // reopen for reassessment
+        setRiskStatus(saved.getRiskId(), saved.getOrganisationId(), "UNDER_REVIEW");   // reopen
         audit.log("REVOKE", "RiskAcceptance", saved.getId(),
             "Acceptance " + saved.getId() + " REVOKED by " + actor
             + " → " + code(saved.getRiskId()) + " reopened" + (reason == null ? "" : " — " + reason));
@@ -178,7 +178,7 @@ public class RiskAcceptanceService {
         for (RiskAcceptance a : due) {
             a.setStatus("EXPIRED");
             acceptances.save(a);
-            setRiskStatus(a.getRiskId(), "UNDER_REVIEW");
+            setRiskStatus(a.getRiskId(), a.getOrganisationId(), "UNDER_REVIEW");
             audit.log("EXPIRE", "RiskAcceptance", a.getId(),
                 "Acceptance " + a.getId() + " EXPIRED (was due " + a.getExpiresAt() + ") → "
                 + code(a.getRiskId()) + " reopened for reassessment");
@@ -201,10 +201,26 @@ public class RiskAcceptanceService {
      * shares the helper because a revocation's audit record belongs to the
      * acceptance, which is where the reason lives.
      */
-    private void setRiskStatus(Long riskId, String status) {
-        risks.findById(riskId).ifPresent(r -> {
-            if (!"CLOSED".equals(r.getStatus())) { r.setStatus(status); risks.save(r); }
-        });
+    /**
+     * F2-242 — the tenant is a parameter, and it is the ACCEPTANCE's tenant rather than
+     * {@code org()}, because {@link #expireSweep()} runs system-wide across every organisation.
+     *
+     * <p>This site was <b>already safe and is now closed anyway.</b> {@code request()} resolves the
+     * risk with {@code .filter(r -> Objects.equals(r.getOrganisationId(), orgId))} before storing
+     * {@code riskId}, so an unscoped load by that stored id could only ever reach a risk of the
+     * acceptance's own tenant — which is precisely the discriminator that made the identical shape
+     * in {@code ScmService} a live cross-tenant write and this one harmless. But what made it
+     * harmless is a predicate in a <em>different method</em>, and nobody was maintaining that
+     * relationship (F2-177). A row arriving by some other route — a data fix, a restore, a future
+     * second producer — would walk straight through: reachability is a fact about today, not a
+     * property of a control (F2-182).
+     */
+    private void setRiskStatus(Long riskId, Long orgId, String status) {
+        risks.findById(riskId)
+            .filter(r -> r.getOrganisationId().equals(orgId))
+            .ifPresent(r -> {
+                if (!"CLOSED".equals(r.getStatus())) { r.setStatus(status); risks.save(r); }
+            });
     }
 
     private RiskAcceptance require(Long id) {
