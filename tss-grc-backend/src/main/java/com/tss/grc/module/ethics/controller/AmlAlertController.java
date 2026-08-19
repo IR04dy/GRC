@@ -1,8 +1,10 @@
 package com.tss.grc.module.ethics.controller;
 
+import com.tss.grc.module.ethics.dto.AssignAnalystRequest;
 import com.tss.grc.module.ethics.entity.AmlAlert;
 import com.tss.grc.module.ethics.service.AmlAlertService;
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -55,12 +57,14 @@ public class AmlAlertController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) { service.delete(id); }
 
+    /**
+     * F2-249 — binds a narrow record instead of an untyped {@code Map}, so the two halves of an
+     * assignment are declared rather than fished out by key. See {@link AssignAnalystRequest}.
+     */
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public AmlAlert assign(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        String name = body.get("analystName") != null ? body.get("analystName").toString() : null;
-        if (name == null) throw new IllegalArgumentException("analystName is required");
-        return service.assign(id, name);
+    public AmlAlert assign(@PathVariable Long id, @Valid @RequestBody AssignAnalystRequest body) {
+        return service.assign(id, body);
     }
 
     @PostMapping("/{id}/transition")

@@ -14,6 +14,7 @@ import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermReposito
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -59,6 +60,7 @@ public class CommitteeMemberRegistryService {
     private final CommitteeRepository            committees;
     private final CommitteeMemberSkillRepository skills;
     private final UserRepository                 users;
+    private final TenantUserDirectory            directory;
     private final AuditLogService                audit;
     private final ApplicationEventPublisher      publisher;
 
@@ -600,16 +602,15 @@ public class CommitteeMemberRegistryService {
      * person twice in the quorum denominator and let them cast two counted votes.
      */
     private void requireUserInTenant(Long userId, Long org, Long committeeId, Long excludeTermId) {
-        User u = users.findById(userId)
-            .filter(x -> org.equals(x.getOrganisationId()))
-            .filter(x -> Boolean.TRUE.equals(x.getIsActive()))
-            .orElseThrow(() -> new IllegalArgumentException(
-                "User " + userId + " is not an active user in this organisation, so the seat "
-              + "cannot be linked to them."));
+        // F2-249 — the resolve-in-tenant half is TenantUserDirectory's; the duplicate-seat check
+        // below is genuinely this register's own and stays here. The label in that message used
+        // to be a null-only fallback, so a user whose full_name_en was the empty string rendered
+        // as "" — the primitive is blank-safe, which is why sharing it is a fix and not a tidy-up.
+        User u = directory.require(userId, "a committee seat");
         if (committeeId != null
                 && terms.countActiveSeatsForUser(org, committeeId, u.getId(), excludeTermId) > 0)
             throw new IllegalStateException(
-                (u.getFullNameEn() == null ? u.getUsername() : u.getFullNameEn())
+                directory.labelFor(u)
               + " already holds an active seat on this committee. One person cannot hold two "
               + "seats — it would count them twice toward quorum and let them cast two votes. "
               + "End the existing term first, or link a different user.");

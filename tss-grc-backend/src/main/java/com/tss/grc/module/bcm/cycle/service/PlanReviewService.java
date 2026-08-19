@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.BcmSettings;
 import com.tss.grc.module.bcm.cycle.entity.BcpPlan;
@@ -65,6 +66,29 @@ public class PlanReviewService {
 
     // ── Attestation ───────────────────────────────────────────────
 
+    /**
+     * F2-249 — the attestation now records <b>which user</b> attested, not only what they are
+     * called.
+     *
+     * <p>The label half was always honest: the controller passes {@code actor()} from the
+     * authenticated principal, so nothing forgeable ever reached {@code attested_by_name}. But
+     * {@code bcm.plan_review_attestations} declares {@code attested_by_id} beside it and
+     * <b>nothing had ever written it</b> — NULL on 5 of 5 live rows in dev and prod, and the same
+     * for the parent plan's {@code last_attested_by_id} on 8 of 8. An ISO 22301 / SAMA BCM plan
+     * review attestation that cannot be joined to a user is a string, not a signature: one live
+     * row names {@code 'Khalid Al-Mutairi'}, who resolves to nobody (F2-207's invented cast, in a
+     * <em>server</em> register).
+     *
+     * <p>⚠ The {@code byName == null ? "system"} default is gone. It was unreachable through the
+     * route — {@code hasPermission('BCM','APPROVE')} guarantees a principal — but F2-236's rule
+     * is that a placeholder attribution is worse than a refusal, because {@code "system"} reads as
+     * an <em>automated</em> attestation when a human performed it, or when nobody did. The
+     * attestation is now refused outright if there is no principal to record.
+     *
+     * <p>⚙ The parent plan's pair is <b>derived from the saved attestation row</b>, both halves
+     * together, so the plan can never disagree with its own most recent attestation. The label
+     * half already worked that way; only the id was missing.
+     */
     @Transactional
     public BcpPlanReviewAttestation attest(Long planId, String outcome,
                                            String notes, String byName,
@@ -91,7 +115,9 @@ public class PlanReviewService {
         row.setOrganisationId(o);
         row.setPlanId(planId);
         row.setPlanVersion(p.getCurrentVersion() == null ? 1 : p.getCurrentVersion());
-        row.setAttestedByName(byName == null ? "system" : byName);
+        row.setAttestedByName(byName == null || byName.isBlank()
+            ? CurrentActor.requireUsername("a plan review attestation") : byName);
+        row.setAttestedById(CurrentActor.requireUserId("a plan review attestation"));
         row.setAttestationOutcome(out);
         row.setNotes(notes);
         row.setPreviousNextReviewDate(previousDate);
@@ -100,7 +126,9 @@ public class PlanReviewService {
 
         // Update the parent
         p.setLastAttestedAt(LocalDateTime.now());
+        // Both halves derived from the row just written, never re-resolved (F2-245's rule).
         p.setLastAttestedByName(saved.getAttestedByName());
+        p.setLastAttestedById(saved.getAttestedById());
         p.setNextReviewDate(newDate);
         p.setReviewState(classify(newDate));
         plans.save(p);

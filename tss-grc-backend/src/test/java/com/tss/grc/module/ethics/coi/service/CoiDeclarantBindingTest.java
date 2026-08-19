@@ -6,6 +6,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.coi.dto.CoiDtos.SubmitDeclarationRequest;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -98,7 +99,13 @@ class CoiDeclarantBindingTest {
     private Long resolve(SubmitDeclarationRequest req) throws Exception {
         // F2-244 — `users` is the fifth argument now. It is the collaborator this class's javadoc
         // once boasted the resolver did not need.
-        CoiService service = new CoiService(null, null, null, null, users, null, null);
+        //
+        // F2-249 — the sixth is a REAL TenantUserDirectory over that same mocked repository, not a
+        // mock of it. F2-237's rule: a mocked collaborator returns null, and every refusal leg
+        // below would then go green asserting nothing at all. The primitive is pure logic over the
+        // repository, so using the real one keeps the mock's stubbing load-bearing.
+        CoiService service = new CoiService(null, null, null, null, users,
+                new TenantUserDirectory(users), null, null);
         Method m = CoiService.class.getDeclaredMethod("declarantFor", SubmitDeclarationRequest.class);
         m.setAccessible(true);
         return (Long) m.invoke(service, req);

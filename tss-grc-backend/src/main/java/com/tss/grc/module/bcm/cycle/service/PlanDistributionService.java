@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.BcpPlan;
 import com.tss.grc.module.bcm.cycle.entity.BcpPlanAcknowledgement;
@@ -99,7 +100,13 @@ public class PlanDistributionService {
             existing.setRecipientEmail(r.email);
             existing.setRecipientRole(r.role);
             existing.setDistributedAt(now);
-            existing.setDistributedByName(distributedByName);
+            // F2-249 — the label was always the acting principal (the controller passes
+            // actor()), but distributed_by_id was NULL on 8 of 8 live rows in dev and prod
+            // because nothing wrote it. A distribution record that cannot be joined to a user
+            // cannot answer "who sent this version of the plan out" from the roster.
+            existing.setDistributedByName(distributedByName == null || distributedByName.isBlank()
+                ? CurrentActor.requireUsername("a plan distribution") : distributedByName);
+            existing.setDistributedById(CurrentActor.requireUserId("a plan distribution"));
             existing.setDistributionChannel(ch);
             existing.setDistributionNotes(notes);
             existing.setStatus("PENDING");

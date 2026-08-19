@@ -61,6 +61,9 @@ class CoiUserReferenceResolutionContractTest {
 
     private static final Path SERVICE = Path.of(
         "src/main/java/com/tss/grc/module/ethics/coi/service/CoiService.java");
+    /** F2-249 — where the resolve-in-tenant predicate lives now that it is shared. */
+    private static final Path DIRECTORY = Path.of(
+        "src/main/java/com/tss/grc/module/iam/service/TenantUserDirectory.java");
     private static final Path FE_CLIENT = Path.of("..", "tss-grc-ui-v2", "src", "lib", "coi.ts");
     private static final Path FE_PAGE = Path.of(
         "..", "tss-grc-ui-v2", "src", "pages", "ethics", "coi", "CoiRegisterPage.tsx");
@@ -150,15 +153,43 @@ class CoiUserReferenceResolutionContractTest {
             .contains("requireOwnUser(");
     }
 
+    /**
+     * ⚠ F2-249 — this leg FOLLOWS THE DELEGATION rather than asserting the predicate's location.
+     *
+     * <p>The predicate moved into {@code TenantUserDirectory} when four hand-written copies of it
+     * were consolidated. Scoped to {@code CoiService}'s own body, this leg then went red on
+     * <b>correct code</b> — the one failure a gate must never have, because it trains the next
+     * reader to edit the assertion rather than the code (F2-214). The claim it makes is unchanged
+     * and still true; only the file holding the answer changed, so the gate resolves that file.
+     *
+     * <p>🔑 The alternative — deleting or relaxing the assertion — always passes and proves
+     * nothing (F2-206/F2-235). Following the delegation keeps the claim enforced.
+     */
     @Test
     @DisplayName("the refusal does not distinguish 'no such user' from 'another tenant's user'")
     void theRefusalCannotBeUsedToEnumerateForeignUserIds() throws IOException {
         String src = strip(read(SERVICE));
         String body = methodBody(src, "requireOwnUser");
+        if (body.contains("directory.require(")) {
+            // The predicate is split across the primitive's two methods: `resolve` narrows by
+            // tenant and `require` turns an empty result into the refusal. Assert each where it
+            // actually lives — pointing both claims at one method name is how F2-244's own
+            // name-keyed lookup read a CALL for a DECLARATION.
+            String directory = strip(read(DIRECTORY));
+            assertThat(methodBody(directory, "resolve"))
+                .as("the delegation target must narrow by tenant, or the shared primitive is a "
+                  + "cross-tenant read that every caller now trusts")
+                .contains("getOrganisationId()");
+            body = methodBody(directory, "require");
+            assertThat(body)
+                .as("and it must declare require(), or CoiService delegates to nothing")
+                .isNotBlank();
+        } else {
+            assertThat(body)
+                .as("the resolver must filter on the tenant, or it is not a tenant check at all")
+                .contains("getOrganisationId()");
+        }
 
-        assertThat(body)
-            .as("the resolver must filter on the tenant, or it is not a tenant check at all")
-            .contains("getOrganisationId()");
         assertThat(body)
             .as("""
                 One orElseThrow for both cases. CommitteeMemberRegistryService#requireUserInTenant

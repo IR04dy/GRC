@@ -776,10 +776,30 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     try { await amlAlertApi.transition(a.id, body); toast.success(`→ ${target}`); await load(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Transition failed'); }
   }
+  /**
+   * F2-249 — this used to be `window.prompt(t('amlAssignPrompt'))`, i.e. the screen asked a human
+   * to TYPE the analyst's name, and whatever they typed became the register's record of who was
+   * investigating the alert. 0 of the 3 stored labels resolved to any real user, and `analyst_id`
+   * was NULL on 10 of 10 live rows in dev and prod.
+   *
+   * F2-223 deleted this page's `amlDecidedByPrompt` — the AML *decider* — and left this one
+   * beside it (F2-215's two-of-N).
+   *
+   * ⚠ It still collects a NAME, and that is deliberate rather than unfinished. The stored labels
+   * the register really uses are organisational — 'Financial Crime Unit', 'Head of FCC' — so a
+   * picker alone would refuse the assignments this team actually makes (F2-214). What changed is
+   * that the field now says what it records, and the row discloses that it is unlinked.
+   *
+   * ⚙ No user picker is offered because there is nothing this persona could source it from:
+   * `/api/v1/committees/registry/linkable-users` is guarded ADMIN:WRITE and the AML operator
+   * holds COMPLIANCE:WRITE, so a picker here would 403 on open. Offering an affordance the
+   * caller cannot use is F2-246's own finding, so the id path stays on the wire (the server
+   * accepts and resolves `analystUserId`) and the gap is filed rather than papered over.
+   */
   async function assign(a: AmlAlertDto) {
-    const name = window.prompt(t('amlAssignPrompt'), a.analystName ?? '');
+    const name = window.prompt(t('amlAssignTeamPrompt'), a.analystName ?? '');
     if (!name) return;
-    try { await amlAlertApi.assign(a.id, name); toast.success(t('amlAssigned')); await load(); }
+    try { await amlAlertApi.assign(a.id, { analystName: name }); toast.success(t('amlAssigned')); await load(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
@@ -800,6 +820,23 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     { header: t('amlFldSeverity'), cell: a => <Badge tone={AML_SEVERITY_TONE[a.severity] ?? 'neutral'} dot>{a.severity}</Badge>, width: '110px' },
     { header: t('colStatus'),      cell: a => <Badge tone={AML_STATUS_TONE[a.status] ?? 'neutral'} dot>{a.status.replace(/_/g, ' ')}</Badge>, width: '140px' },
     { header: t('amlFldStr'),      cell: a => a.strFiled ? <Badge tone="danger">{a.strReference ?? 'STR'}</Badge> : '—', width: '120px' },
+    /*
+     * F2-249 — the analyst was ASSIGNED by this page and displayed nowhere, so nothing could
+     * disagree with the label. Three states, and the last two must not look alike (F2-209):
+     * a resolved person; a label with no resolvable user behind it, disclosed as such; and
+     * nobody assigned yet.
+     */
+    { header: t('amlFldAnalyst'), width: '190px',
+      cell: a => {
+        if (!a.analystName) return <span className="ethics-cell-sub">—</span>;
+        if (a.analystId != null) return <span>{a.analystName}</span>;
+        return (
+          <span role="status" className="ethics-unlinked"
+                title={t('amlAnalystUnlinkedHint')} aria-label={t('amlAnalystUnlinkedHint')}>
+            {a.analystName} <Badge tone="neutral">{t('amlAnalystUnlinked')}</Badge>
+          </span>
+        );
+      } },
     { header: '', align: 'end', width: '300px',
       cell: a => {
         const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];

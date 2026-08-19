@@ -9,6 +9,7 @@ import com.tss.grc.module.ethics.entity.EthicsCase;
 import com.tss.grc.module.ethics.repository.CaseActionRepository;
 import com.tss.grc.module.ethics.repository.CaseLinkRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,7 @@ public class EthicsCaseService {
     private final EthicsCaseRepository caseRepo;
     private final CaseActionRepository actionRepo;
     private final CaseLinkRepository linkRepo;
+    private final TenantUserDirectory directory;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
@@ -117,7 +119,7 @@ public class EthicsCaseService {
             }
             case "INVESTIGATION" -> {
                 if (c.getInvestigationStarted() == null) c.setInvestigationStarted(LocalDateTime.now());
-                if (body.get("investigatorName") != null) c.setInvestigatorName(body.get("investigatorName").toString());
+                applyInvestigator(c, body);
                 if (body.get("committeeName")    != null) c.setCommitteeName(body.get("committeeName").toString());
             }
             case "SUBSTANTIATED", "UNSUBSTANTIATED", "NO_VIOLATION" -> {
@@ -357,6 +359,56 @@ public class EthicsCaseService {
                 + " not a finding.");
         }
     }
+
+    /**
+     * F2-249 — who is investigating this case, with the id and the label made to agree.
+     *
+     * <p>{@code ethics.cases} declares {@code investigator_id} beside {@code investigator_name},
+     * and nothing had ever written the id: it is populated on 6 of 30 live rows in dev and prod,
+     * all of them by the seed, and <b>0 of the 14 stored labels resolve to any real user</b>. The
+     * label came straight from {@code body.get("investigatorName")}, so a misconduct or
+     * whistleblowing case entered INVESTIGATION naming an investigator who need not exist —
+     * probed live as {@code auditor}, HTTP 200.
+     *
+     * <p>⚠ Free text stays legal, because the labels the register really holds are
+     * <b>functions</b>: {@code 'Internal Audit'}, {@code 'Group Legal'}, {@code 'External
+     * Investigator'}, {@code 'Forensic Accountant'}. Several are deliberately outside the
+     * platform — an external investigator has no login by definition — so requiring a resolvable
+     * user here would refuse the very cases where independence matters most. The nullable id
+     * beside the nullable name is the schema saying exactly that (F2-246's rule).
+     *
+     * <p>What is closed is the <em>appearance</em> of a link: an id is resolved against this
+     * tenant and the label is derived from it, so no caller can produce a row whose two halves
+     * describe different people.
+     */
+    private void applyInvestigator(EthicsCase c, Map<String, Object> body) {
+        Object idRaw = body.get("investigatorUserId");
+        Object nameRaw = body.get("investigatorName");
+        String name = nameRaw == null ? null : blankToNull(nameRaw.toString());
+
+        if (idRaw != null) {
+            Long userId;
+            try {
+                userId = Long.valueOf(idRaw.toString().trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                    "investigatorUserId '" + idRaw + "' is not a user id.");
+            }
+            String derived = directory.requireLabel(userId, "an investigator assignment");
+            if (name != null && !name.equalsIgnoreCase(derived))
+                throw new IllegalArgumentException(
+                    "investigatorName '" + name + "' does not name user " + userId + " ('"
+                  + derived + "'). Send the id alone to assign a platform user, or the name alone "
+                  + "to record an external or functional investigator.");
+            c.setInvestigatorId(userId);
+            c.setInvestigatorName(derived);
+        } else if (name != null) {
+            c.setInvestigatorId(null);
+            c.setInvestigatorName(name);
+        }
+    }
+
+    private static String blankToNull(String s) { return (s == null || s.isBlank()) ? null : s; }
 
     private EthicsCase require(Long id) {
         Long org = TenantContext.getCurrentTenant();
