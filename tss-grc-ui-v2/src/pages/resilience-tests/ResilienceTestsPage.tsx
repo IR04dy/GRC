@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { api } from '../../lib/api';
+import { loadVendorOptions, type VendorOption } from '../../lib/vendorOptions';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -32,6 +33,20 @@ export function ResilienceTestsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  // F2-246 — the vendor picker's options, loaded from the tenant's own register the
+  // first time a create modal opens. A picker built from the register cannot name a
+  // vendor this tenant does not own, so the refusal the server now makes should never
+  // be reached from this screen.
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
+
+  useEffect(() => {
+    if (!createOpen || vendorOptions.length > 0) return;
+    void (async () => {
+      try { setVendorOptions(await loadVendorOptions(lang)); }
+      catch { setVendorOptions([]); }
+    })();
+  }, [createOpen, vendorOptions.length, lang]);
+
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -90,7 +105,14 @@ export function ResilienceTestsPage() {
 
   const CREATE_FIELDS: FieldDef[] = [
     { kind: 'text', key: 'testCode',   label: t('srtColCode'), span: 4, placeholder: 'SRT-2026-009' },
-    { kind: 'text', key: 'vendorName', label: t('srtColVendor') + ' *', required: true, span: 8 },
+    // F2-246 — the vendor PICKER, not a free-text name. The old field was a required
+    // text box and the payload carried no id, so every row this form created was
+    // unjoinable: 32 of 53 live rows across the four SCM vendor registers carry a
+    // label and no link (dev = prod). The server derives the label from the vendor
+    // this id resolves to, so nothing here sends a vendor name any more.
+    { kind: 'select-searchable', key: 'vendorId', label: t('srtColVendor') + ' *',
+      required: true, span: 8, options: vendorOptions,
+      placeholder: t('vendorPickerPlaceholder'), emptyHint: t('vendorPickerEmpty') },
     { kind: 'text', key: 'titleEn',    label: t('srtColTitle') + ' (EN) *', required: true, span: 12 },
     { kind: 'text', key: 'titleAr',    label: t('srtColTitle') + ' (AR)', span: 12 },
     { kind: 'select', key: 'testType', label: t('srtColType') + ' *', required: true, span: 6,
@@ -109,7 +131,7 @@ export function ResilienceTestsPage() {
     try {
       await api.post('/api/scm/resilience/tests', {
         testCode: String(values.testCode ?? '').trim() || undefined,
-        vendorName: String(values.vendorName ?? '').trim(),
+        vendorId: values.vendorId ? Number(values.vendorId) : undefined,
         titleEn: String(values.titleEn ?? '').trim(),
         titleAr: String(values.titleAr ?? '').trim() || undefined,
         testType: values.testType,

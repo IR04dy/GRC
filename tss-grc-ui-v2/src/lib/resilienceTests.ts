@@ -10,6 +10,9 @@ export type SrtOutcome = 'PASS' | 'PASS_WITH_OBSERVATIONS' | 'FAIL' | 'NOT_RUN';
 export interface SupplierResilienceTest {
   id: number;
   testCode?: string;
+  // F2-246 — `vendorName` is DERIVED from `vendorId` when the row is linked, and is the
+  // caller's own text when it is not. NOT NULL in the column, so a response always carries
+  // one; the create payload is where the id replaces it.
   vendorId?: number;
   vendorName: string;
   titleEn: string; titleAr?: string;

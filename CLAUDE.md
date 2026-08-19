@@ -1872,6 +1872,95 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A FORM THAT COLLECTS A *LABEL* INSTEAD OF A *LINK* PRODUCES A ROW NOTHING CAN JOIN,
+  AND THE WIRE CONTRACT DECLARED IT: THE LABEL WAS MANDATORY AND THE LINK OPTIONAL**
+  (F2-246, measured 2026-08-19). Executing F2-245's filed work list — re-derived first
+  (F2-221) — gave two results before any code was read: **22 of the 24 parent-register pairs
+  carry no FOREIGN KEY at all**, and the live half of this family is not divergence but **a
+  stored parent label with no id**. Four `module/scm` registers share one concept, the vendor:
+  `exit_plans` 7 of 13, `alternate_suppliers` 10 of 16, `supplier_resilience_tests` 8 of 11,
+  `fourth_party_exposures` 7 of 13 — **32 of 53 live rows, byte-identical in dev and prod**,
+  and the labels are annotated prose (`'AWS (managed cloud services)'`, `'TCS Saudi Arabia
+  (payroll BPO)'`), which is *why* they can never join. Divergence is **0 of the 21 linked
+  rows**, unlike F2-245's 11 of 11, so here the divergence is latent and the unlinked half is
+  live. 🔑 **All four create DTOs read `Long <x>VendorId` (no annotation) beside `@NotBlank
+  @Size(max = 255) String <x>VendorName`**, and all four create forms offered a `required:
+  true` free-text vendor box with no picker and sent no id — so **the rows the platform's own
+  screens produce are exactly the unlinked ones**, and the 21 linked came from the seed.
+  `ExitPlanRepository.findByOrganisationIdAndVendorId…` is a coverage query over that id, so
+  *"which vendors have an exit plan?"* — SAMA outsourcing — could never return 7 of 13 real
+  plans; both coverage clients are also declared dark, so the query exists and 60% of the data
+  could not answer it. Probed live as `ranalyst` against a planted org-2 victim, 17/17: a
+  label-only create 201, another tenant's vendor 201, `999999` 201, a lying label stored
+  beside a real id 201.
+  🔑🔑 **WHICH HALF IS WRONG IS SETTLED BY THE SCHEMA, NOT BY TASTE.** `AlternateSupplier`
+  declares `primary_vendor_id` **and** `primary_vendor_name` for the vendor being replaced and
+  for the replacement only `alternate_vendor_name` — **there is no `alternate_vendor_id`
+  column anywhere**; `FourthPartyExposure` is the same shape. So a substitute or downstream
+  party is deliberately free text because it need not be registered, while the **subject**
+  vendor has an id column *and* a coverage query and is meant to resolve. **When a table
+  declares an id beside a label for one party and only a label for another, the schema is
+  stating which reference is supposed to be resolvable.**
+  ⚠ **Keep the label where there is no id.** Nothing refuses a label-only create today and 32
+  live rows were made that way, so `require` would break working requests (F2-182); the row is
+  disclosed as *unlinked* instead (F2-209's three states). The **subject** label is relaxed on
+  the wire while the two id-less ones stay mandatory, asserted in both directions so "relax
+  them too" fails.
+  ⚠ **The one UPDATE that writes a vendor label is how a linked row's copy diverges after the
+  fact.** `FourthPartyExposureService#update` declares `primaryVendorName` and no id, so it now
+  accepts an **echo** and refuses a **change** (F2-231/F2-234) — a form that round-trips the
+  whole row keeps working, and an update cannot re-open what the create closed.
+  ⚠⚠ **MY OWN FIX WAS WRONG IN 1 OF THE 4 REGISTERS AND ONLY THE LIVE PROBE CAUGHT IT.**
+  `FourthPartyExposureService` resolved the vendor **18 lines above** `e.setOrganisationId(...)`,
+  so the tenant argument was null, the filter could never match, and **every LINKED create
+  answered 404**; the other three were safe by accident of statement order. 🔑 **The two probe
+  legs that expect a REFUSAL passed on the broken code — a refusal caused by a null tenant is
+  indistinguishable from a correct one — so only the leg asserting the DERIVED label could see
+  it.** Fix the class, not the instance: every site reads the tenant from the request, and a
+  gate leg bans taking it from the half-built row.
+  ⚠ **Two of my own gate legs failed on CORRECT code**, the one failure a gate must never have
+  (F2-214): one asserted the word `organisationId` over comment-stripped source where the code
+  says `getOrganisationId`, and one banned a load shape `stampVendorOnboarding` (F2-242's
+  deliberately scoped write helper) uses legitimately. F2-206's rule on an assertion — **a red
+  leg is a finding only if the code is actually wrong** — and scoping the ban to the *refusal*
+  made it true, which then exposed **three hand-spelled copies** of `requireOwnVendor`'s
+  predicate in `getVendor`/`updateVendor`/`deleteVendor`, converted rather than exempted.
+  ⚠ **Relaxing a type on the RESPONSE is a different claim from relaxing it on the REQUEST.**
+  My first type edit hit all four response interfaces; `vendor_name` is `nullable = false`, so
+  the server always sends a label and only the create request may omit it. `npx tsc` found it
+  at a display site (`TprmConsolidatedOverview` passing the name into a `string` parameter).
+  ⚠ **A mocked collaborator would have silenced six existing cross-tenant legs.**
+  `ScmServiceTest` now gets a **real** `VendorReferenceResolver` over its mocked repository,
+  because a mock returns null and every F2-242 refusal leg would have gone green asserting
+  nothing (F2-237).
+  ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN — EIGHTH CONSECUTIVE SLICE — AND IT WAS
+  A PROMISE, NOT A FIGURE.** `SearchableSelect` hard-coded its search placeholder as *"Search
+  or create new…"* / *"ابحث أو أنشئ جديداً…"* **unconditionally**, while the create row 130 lines
+  above is correctly gated on `!!onCreate`: **the affordance was conditional and only the
+  promise was not.** Measured **17 of the 19 `select-searchable` fields wire no `onCreate`** —
+  including F2-245's risk picker, shipped one slice earlier — so almost every picker in the
+  platform invited an operator to create a record it cannot create. F2-184's shape at the level
+  of the text a user reads, and **no code-scoped gate can see a string that is wrong only in
+  relation to a sibling prop.** Fixed in both languages, because F2-208 found this class of
+  drift in the Arabic half alone (house rule 7).
+  ⚠ **A probe that plants a fixture should CLONE a real row.** Hand-built placeholders must
+  satisfy every CHECK on the table (`scm.vendors` constrains `category`), and losing that fight
+  one constraint at a time teaches nothing; a clone satisfies all of them and only the tenant
+  and names change. And **a cross-schema text comparison needs an explicit `COLLATE`** — `scm.*`
+  is `Latin1_General_100_CI_AS_SC_UTF8` against a `SQL_Latin1_General_CP1_CI_AS` database
+  default, so the measurement died on error 468 (the F2-174 landmine) before producing a number.
+  ⚙ **Filed:** the **43** remaining work-list members with no verdicts — least urgent by reach
+  but the most complete instances of this shape are the ones whose id is populated on *no* row
+  (`bcm.dr_plans :: critical_system_id` 16 of 16, `socops.sbom_component :: application_id`
+  20 of 20, `socops.appsec_finding` 10 of 10, `bcm.strategy_roi_analysis` 3 of 3,
+  `change_mgmt.change_requests :: change_owner_id` 15 of 17), while `cyber.vulnerabilities ::
+  asset_id` (15 of 20) and `cyber.cyber_incidents :: affected_asset_id` (12 of 24) are sharper
+  by harm and blocked on **which of the several disjoint asset registers is the target**
+  (F2-196's shape, an owner decision); the **32 live unlinked rows**, whose repair means
+  deciding per row which registered vendor an annotated label meant (owner decision); the four
+  tables still having **no FOREIGN KEY** on their vendor column, now cheap but blocked on those
+  32 rows; and `scm.vendors` existing for **organisation 1 only**, so the picker is empty for
+  any other tenant.
 - ⚠⚠ **A SOFT FK THAT ALSO CARRIES THE PARENT'S IDENTITY IS MAKING TWO CLAIMS, AND ONLY THE
   PARENT CAN ANSWER THE SECOND** (F2-245, measured 2026-08-19). `risk.scenarios` stores `risk_id`
   (which row) beside `risk_code` and `risk_title_en` (what it is called), and

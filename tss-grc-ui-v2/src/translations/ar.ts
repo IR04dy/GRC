@@ -5277,6 +5277,8 @@ export const ar = {
   srpKpiPlansActivated:        'خطط خروج مُفعَّلة',
   srpKpiTestOverdue:           'خطط متأخر اختبارها',
 
+  vendorPickerPlaceholder: 'ابحث في سجل الموردين…',
+  vendorPickerEmpty: 'لا يوجد موردون في هذا السجل بعد — أضف المورد أولاً، ثم اربط هذا السجل به.',
   srpAltPrimaryVendor:         'المورد الأساسي',
   srpAltAltVendor:             'المورد البديل',
   srpAltCountry:               'الدولة (ISO-3)',

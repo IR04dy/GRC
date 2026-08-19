@@ -2,6 +2,7 @@ package com.tss.grc.module.scm.resilience.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.scm.service.VendorReferenceResolver;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.PlanCreateRequest;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.PlanTestRequest;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.PlanUpdateRequest;
@@ -45,6 +46,9 @@ public class ExitPlanService {
 
     private final ExitPlanRepository repo;
 
+    /** F2-246 - the single writer of this register's (vendor id, vendor name) pair. */
+    private final VendorReferenceResolver vendorRefs;
+
     @Transactional(readOnly = true)
     public Page<ExitPlan> list(Pageable pageable) {
         return repo.findByOrganisationIdOrderByCreatedAtDesc(TenantContext.getCurrentTenant(), pageable);
@@ -74,8 +78,19 @@ public class ExitPlanService {
         p.setOrganisationId(TenantContext.getCurrentTenant());
         p.setExternalId("EXP_" + UUID.randomUUID().toString().substring(0, 12));
         p.setPlanCode(generatePlanCode());
-        p.setVendorId(req.vendorId());
-        p.setVendorName(req.vendorName());
+        // F2-246 - one resolver owns both halves of the vendor reference: an id is
+        // resolved inside this tenant and the label DERIVED from the row it resolved;
+        // with no id the caller's label is all that identifies the supplier, and the
+        // row is disclosed as unlinked rather than reading like a resolved one.
+        // The tenant is read directly rather than from the half-built row: a resolve
+        // placed above the organisation stamp would pass null, the filter could never
+        // match, and EVERY linked create would answer 404. Found by the live probe -
+        // and the probe legs that expect a refusal cannot see it, because a refusal
+        // caused by a null tenant looks exactly like a correct one.
+        var vendor = vendorRefs.resolve(req.vendorId(), req.vendorName(),
+                TenantContext.getCurrentTenant());
+        p.setVendorId(vendor.id());
+        p.setVendorName(vendor.name());
         p.setContractCode(req.contractCode());
         p.setTitleEn(req.titleEn());
         p.setTitleAr(req.titleAr());

@@ -2,6 +2,7 @@ package com.tss.grc.module.scm.resilience.service;
 
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.scm.service.VendorReferenceResolver;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestCreateRequest;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import com.tss.grc.module.scm.resilience.repository.SupplierResilienceTestRepository;
@@ -28,6 +29,9 @@ public class SupplierResilienceTestService {
     private static final Set<String> OUTCOMES = Set.of("PASS", "PASS_WITH_OBSERVATIONS", "FAIL", "NOT_RUN");
 
     private final SupplierResilienceTestRepository repo;
+
+    /** F2-246 - the single writer of this register's (vendor id, vendor name) pair. */
+    private final VendorReferenceResolver vendorRefs;
     @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
@@ -53,8 +57,13 @@ public class SupplierResilienceTestService {
         // audit, soft-delete and rowVersion columns are server-controlled
         // (SEC-FIN-004) — never taken from the request body.
         SupplierResilienceTest e = new SupplierResilienceTest();
-        e.setVendorId(req.vendorId());
-        e.setVendorName(req.vendorName());
+        // F2-246 - resolve the vendor in-tenant and derive its label, rather than storing
+        // the caller's claim about both. An ISO 22301 supplier test that cannot be found
+        // from the supplier it tested is not evidence about that supplier.
+        var vendor = vendorRefs.resolve(req.vendorId(), req.vendorName(),
+                TenantContext.getCurrentTenant());
+        e.setVendorId(vendor.id());
+        e.setVendorName(vendor.name());
         e.setTestCode(req.testCode());
         e.setTitleEn(req.titleEn());
         e.setTitleAr(req.titleAr());

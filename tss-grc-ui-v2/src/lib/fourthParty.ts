@@ -49,6 +49,10 @@ export function isConcentrationAtLeast(
 
 export interface FourthPartyExposure {
   id: number;
+  // F2-246 — `primaryVendorName` is DERIVED from `primaryVendorId` when the row is linked.
+  // NOT NULL in the column, so a response always carries one. `fourthPartyName` stays free
+  // text because a fourth party is not one of our vendors and has no id column anywhere in
+  // the schema.
   primaryVendorId?: number;
   primaryVendorName: string;
   fourthPartyName: string;
