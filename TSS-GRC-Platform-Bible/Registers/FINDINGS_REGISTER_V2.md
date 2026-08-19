@@ -2734,6 +2734,19 @@ this slice, which is part of the finding.
   three parameters for two markers, and two column names (`title_en` on `risk_lc.treatment_plans`,
   `risk_code` on `risk.risks`) had to be resolved rather than guessed — *"Invalid column name" reads
   exactly like "the data isn't there"*.
+* ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN, and it was a comment of mine claiming a
+  behaviour that did not exist.** The register's risk cell rendered `title={r.riskCode}` under a
+  comment reading *"The `title` states that"* about the English-only limitation — it stated the
+  UUID and nothing else. **F2-184's shape, self-inflicted, in the same commit that filed the gap
+  it claimed to disclose.** 🔑 **A comment describing a behaviour that does not exist is worse
+  than no comment, because it answers the question a reader was about to ask** — and writing the
+  filing and the comment in one sitting is exactly how the two come apart. Closed with
+  `parentRiskTooltip(row, lang)` (the reference, plus the reason in Arabic), 4 vitest cases, and a
+  gate leg asserting the **call shape** `parentRiskTooltip\s*\(` while banning the
+  `title={r.riskCode` form that produced it. ⚙ The browser also settled the filing's shape:
+  **`risk.risks` DOES store `title_ar`** — the new picker renders 51 risks in Arabic — so the gap
+  is the snapshot column, not the data.
+
 * ⚠ **F2-210's rule earned its place again: the pairing IS the measurement.** I compared
   `risk.scenarios.risk_code` against `risk.risks.external_id` *by assumption* and only then resolved
   `risk.risks`' column list to confirm there is no `risk_code` column for it to have meant instead.

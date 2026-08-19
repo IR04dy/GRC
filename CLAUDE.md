@@ -1933,6 +1933,15 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   event happened*), the other 47 a **work list with no verdicts** (F2-188). ⚠ Roughly half that raw
   population is `*_by_id + *_by_name`, i.e. F2-236's **actor-attribution** family — a different
   question whose answer is the authenticated principal, not a derived copy. Classify before reading.
+  ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN, AND IT WAS MY OWN COMMENT CLAIMING A
+  BEHAVIOUR THAT DID NOT EXIST.** The risk cell rendered `title={r.riskCode}` under a comment
+  reading *"The `title` states that"* about the English-only limitation; it stated the UUID.
+  F2-184's shape, self-inflicted, **in the same commit that filed the gap the comment claimed to
+  disclose** — 🔑 **writing the filing and the comment in one sitting is how the two come apart.**
+  Closed with `parentRiskTooltip(row, lang)` and gated by **call shape**
+  (`parentRiskTooltip\s*\(`) plus a ban on the `title={r.riskCode` form. ⚙ The browser also
+  settled the filing: **`risk.risks` DOES store `title_ar`** (the new picker renders 51 risks in
+  Arabic), so the gap is the snapshot column, not the data.
   ⚙ **Filed:** the 47-site work list (F2-243's filing already noticed `scm.exit_plans`, one of its
   four `scm` members); the **11 live divergent scenarios + 1 dangling `risk_id = 25`**, where repair
   means choosing per row whether the id or the label was the intent (owner decision);
