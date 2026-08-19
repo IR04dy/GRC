@@ -1872,6 +1872,85 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A REGISTER THAT DECLARES A PERSON ID BESIDE A LABEL AND WRITES ONLY THE LABEL FAILS
+  IN TWO OPPOSITE WAYS, AND THEY LOOK NOTHING LIKE EACH OTHER** (F2-249, measured 2026-08-19).
+  Executing F2-248's work list, the eight actor-attribution members whose parent is a **person**
+  split by where their label came from. From the **principal**: the record is honest and
+  **unjoinable** — `bcm.plan_review_attestations.attested_by_id` **0 of 5**,
+  `bcm.bcp_plans.last_attested_by_id` **0 of 8**, `bcm.plan_acknowledgements.distributed_by_id`
+  **0 of 8**, one of them naming `'Khalid Al-Mutairi'`, who resolves to nobody (F2-207's cast, in a
+  *server* register). From the **caller**: the record is a **claim** — `ethics.aml_alerts.analyst_id`
+  **0 of 10** and `ethics.cases.investigator_id` seed-only, with **0 of 3 analyst labels and 0 of 14
+  investigator labels resolving to any real user**. Probed live as `auditor` (`COMPLIANCE:WRITE`): an
+  AML alert moved `OPEN → INVESTIGATING` naming an analyst who does not exist, and a misconduct case
+  entered `INVESTIGATION` with an invented investigator, both **HTTP 200**.
+  🔑🔑 **F2-245 established that a description travelling BESIDE an id can describe the wrong row;
+  this is the description travelling ALONE — and a reader who fixes the honest-but-unjoinable symptom
+  will not recognise the claim symptom, because only one of the two looks like a defect.**
+  ⚠⚠ **THE SCREEN WAS THE COLLECTOR, AND THE SLICE BEFORE IT DELETED THE PROMPT NEXT DOOR.**
+  `EthicsPage` called `window.prompt(t('amlAssignPrompt'))` — it asked a human to **type** the
+  analyst's name. F2-223 removed this page's `amlDecidedByPrompt` and left this one, and
+  `decidedByName` twenty lines below in the same service has resolved from `CurrentActor` ever since.
+  🔑 **A reader who finds `CurrentActor` in a service does not then ask which of its OTHER
+  people-columns still comes from the body** (F2-215). CH-8 ("replace window.prompt/confirm") is a
+  completed task and this prompt survived it — **grep `window.prompt` when you touch an attribution.**
+  ⚠⚠ **FOUR HAND-WRITTEN COPIES OF resolve-a-user-in-my-tenant WERE LIVE AND TWO DISAGREED.**
+  `CoiService.requireOwnUser`, `CommitteeMemberRegistryService.requireUserInTenant`,
+  `SignatureService.resolveSignerName` and the committee registry's own error text — and two differed
+  on whether a **BLANK** `full_name_en` falls back to the username, so a user with an empty display
+  name rendered as an empty cell in one place and as their username in the other. **Use
+  `module/iam/service/TenantUserDirectory`** (`resolve` / `require` / `labelFor` / `requireLabel`);
+  do not hand-roll a fifth (F2-190). It lives in `module/iam` because `iam` owns `users` and
+  `X → iam` is an ordinary business edge — **`common/` would be worse, because it sits OUTSIDE
+  `ModuleGraphRatchetTest`'s population entirely, so the dependency would be neither forbidden nor
+  measured.**
+  ⚠⚠ **A BARE LABEL STAYS LEGAL, AND THE SCHEMA DECIDES THAT.** A nullable id *beside* a nullable
+  name states that an unresolvable party is representable (F2-246), and the live labels prove it:
+  `'Financial Crime Unit'`, `'Internal Audit'`, `'External Investigator'`. An external investigator
+  has no login **by definition**, so requiring a resolvable user would refuse exactly the ethics cases
+  where independence matters most — a fix failing on correct usage (F2-214). Contrast F2-244, which
+  **refused**: `coi_recusal_event` declares a NOT NULL id and **no name column at all**. What to close
+  is the **appearance** of a link: resolve the id in-tenant, **derive** the label from what resolved,
+  refuse a label that contradicts it, and accept an **echo** (F2-231/F2-234).
+  ⚠ **The gate's load-bearing leg must be the POSITIVE one.** On a path that never wrote the field,
+  *"the service does not write X from the request"* is **vacuous** — there is no setter for a negative
+  scan to find, so that leg passes forever over the defect (F2-247). Assert the id half **is** written,
+  from the resolver or the principal, **and that it is not merely cleared**: dropping
+  `setInvestigatorId(userId)` SURVIVED because the file still held `setInvestigatorId(null)` in the
+  no-assignee branch, so a presence check was satisfied by the clear.
+  ⚠ **An echo comparison is case-INSENSITIVE, so assert which SPELLING is stored.**
+  `setAnalystName(label != null ? label : derived)` survived until a leg pinned the derived casing:
+  with the contradiction check in place the mutation's only observable effect is the caller's casing
+  winning, i.e. a register whose spelling of a person's name depends on how a caller typed it
+  (F2-179's collation family, one character deep).
+  ⚠ **A hard zero on the obvious rule was MEASURED AND REJECTED**: *no one may hand-spell a
+  tenant-narrowed user load* returns **25 sites across 9 files** and most are correct. Measuring
+  before writing the assertion is the only reason it did not ship as a gate failing on working code.
+  ⚠ **Converting a predicate breaks the gate that asserted its LOCATION, and the response is to
+  follow the delegation** — never to relax the assertion, which always passes (F2-206/F2-235).
+  F2-244's leg asserted the tenant filter inside `CoiService`'s own body; because the predicate is now
+  split across the primitive's `resolve` (tenant) and `require` (refusal), **each half is asserted
+  where it actually lives** (a name-keyed lookup pointed at one method reads a CALL for a DECLARATION).
+  ⚠ **19 existing tests failed on `directory is null`, and the fix is a REAL primitive over the
+  mocked repository, never a mock of it** — a mocked resolver returns empty and every refusal leg goes
+  green asserting nothing (F2-237). `ReflectionTestUtils.setField` is the house idiom for `@InjectMocks`.
+  ⚙ **No picker was built, deliberately**: `/api/v1/committees/registry/linkable-users` is
+  `ADMIN:WRITE` and the AML operator holds `COMPLIANCE:WRITE`, so a picker would **403 on open** —
+  offering an affordance the caller cannot use is F2-246's own finding. The id path stays on the wire,
+  and the register discloses an unlinked assignment in three states (F2-209).
+  ⚠ **A probe leg failed for a reason unrelated to its claim**: the investigator id-path leg re-used
+  the case the previous leg had moved to `INVESTIGATION`, and the machine has no
+  `INVESTIGATION → INVESTIGATION` edge, so the 400 read exactly like the fix refusing a valid id
+  (F2-244). **Plant a fresh row per transition leg.**
+  ⚙ **Filed:** the **33** remaining census members, now weighted toward **register** references
+  (`cyber.vulnerabilities :: asset_id`, `cyber.cyber_incidents :: affected_asset_id`, `socops.*`,
+  `bcm.dr_plans`); **`evidence.evidence_items :: collector` has NO writer of either half** (77 of 78
+  rows populated by the seed — honest data behind no code, so it cannot regress and cannot be
+  maintained); **no user-listing endpoint is reachable by `COMPLIANCE:WRITE`**, so neither ethics
+  register can offer a picker (an owner decision about who may enumerate colleagues); the unresolvable
+  live labels (**owner decision** — repair means deciding per row which real person an office label
+  meant, in two databases, with no mapping); and neither `analyst_name` nor `investigator_name` has an
+  `*_ar`, so both are English-only on an Arabic-primary UI (house rule 7).
 - ⚠⚠ **A GENERALISATION IS ITSELF A VOCABULARY: F2-217 REPLACED A LITERAL FIELD-NAME LIST WITH A
   *SHAPE*, AND THE SHAPE'S STEMS ARE A LITERAL LIST** (F2-248, measured 2026-08-19).
   `MassAssignmentRatchetTest` ranks every entity-bound write, and `AGENT_SHAPE` is an alternation of
