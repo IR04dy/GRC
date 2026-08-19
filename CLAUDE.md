@@ -1872,6 +1872,54 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **TWO SPRING BEANS WITH THE SAME SIMPLE NAME STOP THE APPLICATION STARTING, AND THE WHOLE
+  UNIT SUITE PASSES OVER IT** (F2-247, measured 2026-08-19). Spring's default bean name is the
+  decapitalised simple class name, so a second `@Component VendorReferenceResolver` — a legitimate
+  one, over `tprm.vendors` where F2-246's serves `scm.vendors`, and ADR-012/018 forbid sharing the
+  primitive — made component scanning throw `ConflictingBeanDefinitionException` while parsing the
+  configuration class. **4,229 tests green, then no port bound.** Nothing in the suite boots a Spring
+  context, and `mvn -o clean package` is deliberately hermetic (no database, no secrets), so the
+  build never starts the app either. 🔑 **The only instrument that could see it was launching it,
+  and a launch is not part of the build** — under a Maven `BUILD SUCCESS`, per the recorded landmine
+  that `BUILD SUCCESS` is not a start signal for `spring-boot:run`. F2-222 filed this shape for
+  *entities* and measured it latent (15 of 433 names in two packages); for a bean it is fatal.
+  `UniqueBeanNameContractTest` holds it at a hard zero over **744** component-scanned beans, with no
+  exemption map — an explicit `@Component("name")` is always available, so there is no correct code
+  for it to fail on (F2-214). Prefer the distinguishing NAME over the alias: when two modules each
+  resolve their own register, a reader reaching for whichever they found first is the real hazard.
+  ⚠⚠ **`io.open(path, "w")` TRUNCATES ON OPEN, so an exception during the write leaves the file at
+  ZERO BYTES — and that destroyed the 1.79 MB findings register.** The write raised
+  `UnicodeEncodeError` (lone surrogates: `\ud83d\udd11` written as two escapes is two unpaired
+  surrogates, not the character), by which point the file was already empty. 🔑 **Every subsequent
+  grep then answered "not found", which reads as the anchor having moved rather than as the file
+  having been destroyed** — three tool calls went into hunting a phantom rename. It was tracked and
+  uncommitted, so `git checkout --` restored it. **Build the content, write a TEMP file, assert the
+  round-trip, then `os.replace`.** ⚠ Its sibling in the same session: a patch script whose write
+  handle was never closed, so its own verifying `assert` re-read an unflushed file, found nothing and
+  passed vacuously. **Use a context manager, and never let a script certify its own write.**
+  ⚠⚠ **AN ENTITY-BOUND CREATE HAS NO SETTER FOR A SCAN TO FIND, so "the service does not write X
+  from the request" is VACUOUS over it.** My first gate leg asserted exactly that and the pre-fix
+  control reported it **SILENT ON MASTER** — Jackson had already bound `vendorId` and `vendorName`
+  onto the entity and the service mentioned neither, so there was nothing for `setX(req.…)` to
+  match, and the leg would have passed forever over the defect it was written for. 🔑 **On an
+  entity-bound endpoint the load-bearing assertion has to be the POSITIVE** — the field must be
+  *overwritten from the resolver* — which is the only shape that can see a create doing nothing at
+  all. This is why F2-206's introspector exists for the server-owned fields; a business foreign key
+  has no such mechanism.
+  ⚠ **`vendor_country` looked like a third identity copy and deriving it would have CORRUPTED the
+  column**: the assessment stores `'SA'` where `tprm.vendors` stores `'Saudi Arabia'` — two notations
+  for one concept (F2-203's shape) — and the form caps the field at `maxLength: 3`. 🔑 **Before
+  deriving a second copy from a resolved parent, check the two sides use the same notation**; the
+  form's own cap was the tell.
+  ⚙ **Filed:** the **40**-member work list (the two `socops` `application_id` members are
+  **unwireable** — no application register exists anywhere, F2-204's shape — and `bcm.dr_plans` needs
+  an owner decision on both halves, with neither of its id columns having *any* writer);
+  `cyber.cyber_controls` latent (both halves caller-supplied, no tenant check on the framework, 0
+  rows affected today); `ethics.aml_alerts :: rule_name` written from the source rather than a
+  resolved rule; the **8 unlinked live rows** and the missing FOREIGN KEY blocked on them; and **two
+  vendor registers for one concept** (`scm.vendors` 31, `tprm.vendors` 28) hence two resolvers —
+  **that the shape recurs once per module BECAUSE the primitive cannot be shared is the structural
+  finding**, an owner decision.
 - ⚠⚠ **A FORM THAT COLLECTS A *LABEL* INSTEAD OF A *LINK* PRODUCES A ROW NOTHING CAN JOIN,
   AND THE WIRE CONTRACT DECLARED IT: THE LABEL WAS MANDATORY AND THE LINK OPTIONAL**
   (F2-246, measured 2026-08-19). Executing F2-245's filed work list — re-derived first
