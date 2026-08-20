@@ -2547,6 +2547,64 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-253 · Every PDPL Article 30 write was administrator-only, and the census bucket for exactly that read 0
+
+| Field | Content |
+|---|---|
+| **ID** | F2-253 *(measured 2026-08-20. Provenance is a sentence in `CLAUDE.md`, not a filed item: "existing is not held — several surviving names resolve to roles with **0 active users**, which fails identically and **is not counted by anything**.")* |
+| **Category** | Authorisation — a role-name guard naming a role nobody holds · an instrument whose bucket for that defect tests existence instead of holding |
+| **Severity** | **P2.** All seven write routes of the PDPL Article 30 sub-processor register — create, update, transition, **approve**, **review**, material-change and the event ledger — admitted `PLATFORM_ADMIN` and nobody else, identically in dev and prod, over **8 live sub-processors** (Azure KSA, SIMAH, the SDAIA Tawakkalna platform). Not data loss; a governance capability the Data Protection Officer owns, unavailable to every persona including the DPO's own, with a 403 indistinguishable from a deliberate refusal. |
+| **Provenance** | Not a filed finding — a **parenthetical warning in `CLAUDE.md`** that said this population existed and was uncounted. Executing it required re-deriving the population first ([[F2-221]]): `Appendix/scripts/role_guard_census.py` already computes a holder count, so the question was why its report showed none. |
+| **Current State** | ✔ **FIXED 2026-08-20.** `SubprocessorController.WRITE_GUARD` is `hasPermission('PRIVACY','WRITE')`. `BASELINE_PURE_ROLE_SITES` **404 → 397**, re-derived from the build rather than subtracted ([[F2-207]]). The census script grew section **B2b** and now runs at all. |
+| **Problem** | `WRITE_GUARD` was `hasAnyRole('DPO','PLATFORM_ADMIN')` and **`DPO` is held by no user** — 0 holders in dev and 0 in prod. A role guard gets no `PLATFORM_ADMIN` bypass (`ModulePermissionEvaluator` is never called), so that expression passed only because it happened to *name* the administrator. Probed live as `compliance`, who holds `PRIVACY:WRITE`: **7 of 7 write routes answered 403** while `admin` created at 201 and the read guard admitted the same caller at 200. |
+| **Root Cause** | RC-C — authorisation written as identity rather than capability. A role name is not grantable without a jar and carries no admin bypass, so a role that is never assigned turns a guard into a permanently-narrow one with no diagnostic. |
+| **Business Impact** | PDPL Article 30 requires a controller to authorise and keep records of sub-processors. The register holds 8 approved sub-processors, three of them Saudi national infrastructure. Recording a **12-month review**, a **material change** (which forces re-review) or a **DPO approval** was impossible for anyone but a platform administrator — who is not a data-protection officer, and whose acting on that register produces an attribution nobody intended. |
+| **Technical Impact** | ⚠⚠ **The instrument built for this defect reported 0.** `ROLE_GUARD_CENSUS.md` has a bucket named *"left admitting PLATFORM_ADMIN alone, by attrition"* and it read **0**, because it tests whether the other named roles are **absent from `iam.roles`** rather than whether anybody **holds** them. The script computes `holders` at the top and uses it in exactly one bucket, `thin`, which requires *every* alive name to be unheld — and almost every guard in this platform names `PLATFORM_ADMIN`, which is held, so `thin` can never fire for them. **The question the report exists to answer was being asked of existence.** Measured: **24 pure guards** admit nobody but an administrator, identically in dev and prod. |
+| **UX Impact** | None visible, which is the problem. A 403 from a role guard looks exactly like a 403 that was meant. |
+| **Recommendation** | 1. As shipped. 2. **17 guards remain** in the same state — a work list, deliberately with no verdicts ([[F2-188]]). 3. The read half is an **owner decision** (see Trade-offs). 4. Two ghosts exist in the deployed database — see Alternatives. |
+| **Alternatives** | Granting `DPO` to a seeded user was rejected: it fixes one seed and leaves the class, and says nothing about a customer who never assigns the role. ⚠ **Filed, and sharper than it looks:** `BASELINE_GHOST_ROLE_NAMES` is a **hard zero** asserted against `ROLE_CATALOGUE`, a constant whose own javadoc says it was *"read 2026-08-06 (58 rows), then 2026-08-07 (69)"* — i.e. from **dev**. Prod holds exactly **58** roles, and `CIO` and `CRO` are recited by guards and **absent from `iam.roles` there**. So that invariant is a statement about the *packaged* platform, and the deployed database has **2 real ghosts** until the 35 pending migrations land. |
+| **Trade-offs** | ⚠⚠ **`READ_GUARD` was deliberately NOT converted, and the reason is a measurement rather than caution.** It names `CISO`, `COMPLIANCE_OFFICER` and `RISK_MANAGER`; all three are **HELD**, and **none holds `PRIVACY:READ`**. So converting drops three live roles — probed: `so_officer` (CISO, no privacy grant at all) reads the register at 200 today — and granting them `PRIVACY:READ` instead widens them from this register to the **whole privacy read surface**, the DSR queue and the breach register, which carry data subjects' identities. That is a decision about who may read personal data, not a side effect of a guard fix. Conversely `VIEWER` holds `PRIVACY:READ` and is refused this register today, so converting would also *add* it. **Owner decision.** |
+| **Effort** | **S** for the guard; **XS** for the census script. No migration; V379 remains head. |
+| **Priority** | Done. |
+| **Verification** | Live probe **9/9 pre-fix** and **9/9 post-fix** as `compliance` (`admin` proves nothing about authorization), against a sub-processor the probe **planted itself** ([[F2-206]]) — never one of the 8 seeded PDPL records — hard-deleted with `CHARINDEX` in a `finally`, residue 0, register back to 8 rows both times. Plus a **6/6 non-regression** probe: `viewer` (holds `PRIVACY:READ`, not `WRITE`) still refused every write, `so_officer` still reads at 200, `ranalyst` refused both. `SubprocessorPermissionConversionTest` **5/5**; pre-fix control **3 of 5 legs fire on master**, and the two that do not are named in the test — one is a deliberate pin, the other was a leg that could only pass and was rescoped because of it. `RoleGuardConversionRatchetTest` 4/4 at the re-derived 397, `RoleNameSurfaceRatchetTest` 2/2, `ControllerAuthorizationRatchetTest` 3/3. Census independently reproduced by a throwaway script over both databases: **380 of 397** pure guards reachable by a non-administrator, matching the regenerated report exactly. |
+| **Status** | ✅ **CLOSED 2026-08-20** — the guard and the instrument. The read half, the 17 remaining guards and the two prod ghosts are filed. |
+| **References** | `module/privacy/subprocessor/controller/SubprocessorController` (`WRITE_GUARD`, `READ_GUARD`), `SubprocessorPermissionConversionTest` (new), `RoleGuardConversionRatchetTest.BASELINE_PURE_ROLE_SITES`, `Appendix/scripts/role_guard_census.py` (§B2b), `Appendix/ROLE_GUARD_CENSUS.md`, `module/attachment/service/AttachmentAccessPolicy` (`SUBPROCESSOR`, unchanged **on purpose**) |
+| **Lesson** | 🔑🔑 **A ROLE THAT EXISTS AND IS HELD BY NOBODY FAILS EXACTLY LIKE A GHOST, AND EVERY BUCKET IN THE INSTRUMENT WAS KEYED ON EXISTENCE.** `hasAnyRole('X')` tests for the granted authority `ROLE_X`; an unassigned role grants it to no one. The only difference from a ghost is that an administrator can fix it without a jar — **which is a remedy, not a defence, and says nothing about the platform as shipped.** The census's own header even explains why ghosts matter *"because a role guard has no administrator bypass"*, and then tests for absence, on a corpus where almost every guard names the administrator. 🔑 **And the guard's own javadoc is the finding's witness.** [[F2-52]] audited this exact pair, wrote eleven lines correcting a ghost on `READ_GUARD` — *"Correcting a ghost widens access and dropping one does not"* — and left `WRITE_GUARD` naming a zero-holder role **one line below**. That rule is about *existence* and has no vocabulary for the case one line down. [[F2-215]]'s two-of-N, in a comment whose entire subject is this question. ⚠⚠ **A third finding, measured and filed rather than fixed, and it nearly caught me:** `RoleGuardConversionRatchetTest` line 929 is `boolean composed = HAS_PERMISSION.matcher(expr).find()` — **presence, not conjunction** — while the census prints that bucket as *"role leg ANDed onto a permission — already tight"* and the ratchet's javadoc counts it out of F2-05's backlog on that basis. Measured: **96 of the 99 are ORs**, and an OR leg is *wider* than the permission alone. Most are correct designs (`permission or admin`; [[F2-159]]/[[F2-161]]'s `roles or record-OWNER`), but roughly ten still carry their **general** audience on a role list while being labelled tight. I was about to add `or hasPermission('PRIVACY','READ')` to the read guard to close a write-without-read hazard — which would have made a widened guard read as a tightening, and passed. ⚙ Two smaller ones. **The script could not run at all**: it prints an arrow and an em-dash, a Windows console is cp1252, so every invocation died in `emit` before writing a line — *"nothing runs it"* was literally true. And **a prose claim wraps**, so asserting one needs FLOWED javadoc with quoted spans stripped *after* isolating the comments — line-scoped stripping cannot cross the newline inside a wrapped quotation, and whole-file stripping pairs a citation's quote with an unrelated string literal's ([[F2-216]]). |
+
+### Filed
+
+- **17 pure guards still admit nobody but a platform administrator** — a work list with **no verdicts**
+  ([[F2-188]]), printed as §B2b of `ROLE_GUARD_CENSUS.md` and identical in dev and prod:
+  `module.bcm` **10** (`BcpBinderController#archive`, `BiaQuantitativeController#archive`, `#boardApprove`,
+  `#cfoApprove`, `ExerciseRuntimeController#start`, `ExerciseScenarioLibraryController#instantiate`,
+  `MtpdInheritanceController#publish`, `ProcessVendorDependencyController#create`/`#update`/`#delete`) ·
+  `module.ai` **3** (`AiLifecycleController#transition`, `#transitionRec`, `#transitionRetraining`) ·
+  `module.audit_committee` **3** (`AuditCommitteeDashboardController#finalizeSnapshot`, `#generate`,
+  `#recordResolution`) · `module.rrp` **1** (`RrpController#submit`). The unheld roles are `BCM_MANAGER`
+  ([[F2-161]] already found it unheld once), `EXECUTIVE_REVIEWER`, `CFO`, `CRO`, `CIO`, `DPO`
+  ([[F2-209]] already found *that* one), `BOARD_SECRETARY`. 🔑 **Two of these roles have each been
+  reported unheld before, one endpoint at a time — which is what a population looks like when nothing
+  counts it.** Read each guard and measure its permission's grant diff before converting; two of them
+  (`#cfoApprove`, `#boardApprove`) are **distinct approval tiers of one BIA** and collapsing them onto
+  one permission would retire a four-eyes distinction, so they are not a mechanical sweep.
+- **The read half of this controller** — an owner decision, stated in Trade-offs above and pinned by
+  `SubprocessorPermissionConversionTest#theReadGuardStillNamesRolesAndTheAttachmentSurfaceStillMirrorsIt`
+  so that converting it fails the build until `AttachmentAccessPolicy`'s entry moves in the same commit.
+- **`COMPOSED` means "mentions `hasPermission`", not "ANDed onto one"** — 96 of 99, with roughly ten
+  still authorising their general population by role name while sitting outside F2-05's backlog. Fixing
+  it means splitting the kind in the extractor and in the script that parses its output, which changes a
+  published artefact's schema, so it is its own slice.
+- **`CIO` and `CRO` are ghosts in the deployed database** (58 roles at Flyway head V344 against a
+  packaged head of V379). The hard-zero ghost invariant holds against the packaged catalogue only.
+- **30 of the 38 recited role names are held by nobody in dev** (28 in prod). No pure guard is closed to
+  everyone, because each also names a held role — so the harm is narrowness rather than closure, and
+  that distinction is what §B2b now measures.
+- **`SubprocessorService.create` honours a client-supplied `subprocessorCode`** — F2-172(d)'s family, on
+  the reference an auditor cites. Outside `ClientSuppliedReferenceRatchetTest`'s key, which is
+  `setExternalId`/`setRefNumber`: [[F2-248]]'s headline that a gate key is a spelling.
+
+---
+
 ## F2-252 · Editing a cyber control destroyed its framework link, and a five-name dropdown stood in for the register
 
 | Field | Content |

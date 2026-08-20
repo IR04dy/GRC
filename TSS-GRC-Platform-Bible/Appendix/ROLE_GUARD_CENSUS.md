@@ -23,8 +23,8 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 503 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **404** |
+| Guard sites with a role leg | 496 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **397** |
 | … composed (role leg ANDed onto a permission — already tight) | 99 |
 | Module packages holding pure role guards | 29 |
 | Distinct role names recited by any role guard | 38 |
@@ -33,8 +33,10 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
+| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **17** |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 404 |
+| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 397 |
+| … of those, reachable by a NON-administrator | 380 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
@@ -58,6 +60,38 @@ different conversation. The distinction is invisible in the code, which is why i
 computed here rather than eyeballed.
 
 None.
+
+## B2b. Effectively PLATFORM_ADMIN-only — by HOLDER attrition (F2-253)
+
+Section B2 asks whether a named role **exists**. This one asks whether anybody **holds**
+it, which is the question `hasAnyRole` actually puts: it tests for the granted authority
+`ROLE_X`, and a role assigned to no user grants it to nobody. A guard naming four roles of
+which only `PLATFORM_ADMIN` is held is administrator-only in exactly the way B2 describes —
+and B2 reported none of these, because every name in them is present in `iam.roles`.
+
+An administrator can assign the missing role without a new jar, which is what separates
+this from section B. That is a remedy, not a defence: as shipped and as seeded, the persona
+each of these features was built for cannot use it, and nothing in the platform says so.
+
+| Module | Guard site | Roles named | Named but held by nobody |
+|---|---|---|---|
+| `module.ai` | `AiLifecycleController#transition` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
+| `module.ai` | `AiLifecycleController#transitionRec` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
+| `module.ai` | `AiLifecycleController#transitionRetraining` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
+| `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
+| `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
+| `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
+| `module.bcm` | `BcpBinderController#archive` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `BiaQuantitativeController#archive` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `BiaQuantitativeController#boardApprove` | `EXECUTIVE_REVIEWER`, `PLATFORM_ADMIN` | `EXECUTIVE_REVIEWER` |
+| `module.bcm` | `BiaQuantitativeController#cfoApprove` | `CFO`, `PLATFORM_ADMIN` | `CFO` |
+| `module.bcm` | `ExerciseRuntimeController#start` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `ExerciseScenarioLibraryController#instantiate` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `MtpdInheritanceController#publish` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `ProcessVendorDependencyController#create` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `ProcessVendorDependencyController#delete` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.bcm` | `ProcessVendorDependencyController#update` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
+| `module.rrp` | `RrpController#submit` | `PLATFORM_ADMIN`, `CRO`, `CFO` | `CRO`, `CFO` |
 
 ## B3. Wide despite dead role names — the camouflage sites
 
@@ -101,13 +135,13 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.outsourcing` | 17 |  |
 | `module.regreporting` | 17 |  |
 | `module.rrp` | 17 |  |
-| `module.privacy` | 14 |  |
 | `module.dataclass` | 13 |  |
 | `module.workflow` | 11 |  |
 | `module.ccm` | 10 |  |
 | `module.reginspect` | 10 |  |
 | `module.opres` | 9 |  |
 | `module.audit_committee` | 7 |  |
+| `module.privacy` | 7 |  |
 | `module.integrations` | 5 |  |
 | `module.iam` | 4 |  |
 | `module.platform` | 4 |  |

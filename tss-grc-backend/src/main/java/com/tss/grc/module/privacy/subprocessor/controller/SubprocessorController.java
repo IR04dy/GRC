@@ -32,8 +32,12 @@ import java.util.UUID;
  * REST surface for PDPL sub-processor tracking — Sprint 11.
  *
  * <p>Read guard is wide (DPO, Compliance, Privacy, CISO, Risk, Audit,
- * Platform Admin). Write guard is narrow (DPO + Platform Admin)
- * because every write is an audited PDPL Article 30 record.
+ * Platform Admin) and is still a role list — see {@link #READ_GUARD} for why it
+ * could not be converted with the write guard. Writes are guarded by
+ * {@code PRIVACY:WRITE} (F2-253); the sentence that used to stand here said
+ * <i>"Write guard is narrow (DPO + Platform Admin) because every write is an
+ * audited PDPL Article 30 record"</i>, which described an audience of two where
+ * the measured audience was one.
  *
  * <p>The public-list endpoint
  * {@code GET /api/v1/privacy/subprocessors/public} is wired to
@@ -70,8 +74,47 @@ public class SubprocessorController {
      */
     private static final String READ_GUARD =
             "hasAnyRole('DPO','COMPLIANCE_OFFICER','PRIVACY_MANAGER','CISO','RISK_MANAGER','AUDITOR','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('DPO','PLATFORM_ADMIN')";
+
+    /**
+     * F2-253 — {@code hasAnyRole('DPO','PLATFORM_ADMIN')} became {@code hasPermission('PRIVACY','WRITE')},
+     * because {@code DPO} is held by <b>no user at all</b>, in dev and in prod.
+     *
+     * <p>A role guard gets no {@code PLATFORM_ADMIN} bypass — {@code ModulePermissionEvaluator} is
+     * never called — so that expression passed only because it happened to <em>name</em> the
+     * administrator. Measured 2026-08-20 and probed live as {@code compliance} (who holds
+     * {@code PRIVACY:WRITE}): all seven write routes answered <b>403</b>, while {@code admin}
+     * created at 201 and the read guard admitted the same caller at 200. So the effective audience
+     * of the PDPL Article 30 register's every mutation was one account, and the 403 the Data
+     * Protection Officer's own organisation received is indistinguishable from a deliberate refusal.
+     *
+     * <p><b>The audience diff was measured before the conversion, not after</b> (the V362 landmine).
+     * Identical in both databases: converting <em>loses nothing</em> — {@code DPO} holds
+     * {@code PRIVACY:WRITE} too, so it keeps the named audience — and gains {@code GRC_ADMINISTRATOR}
+     * (held), {@code ORG_ADMIN} and {@code PRIVACY_MANAGER} (both unheld today). No reader-only role
+     * is admitted: {@code VIEWER} and {@code AUDITOR} hold {@code PRIVACY:READ} and not
+     * {@code PRIVACY:WRITE}. The module's own convention is what settles the target —
+     * {@code DpiaController}, {@code ConsentRecordController} and {@code CyberPdplBridgeController}
+     * already guard with {@code hasPermission('PRIVACY',…)}, including DPIA's Article 25
+     * approve/reject, so {@code approve} and {@code review} landing on {@code PRIVACY:WRITE} follows
+     * this module rather than inventing a rule for it.
+     *
+     * <p>⚠⚠ <b>{@link #READ_GUARD} is deliberately NOT converted, and the reason is a measurement.</b>
+     * Its role list names {@code CISO}, {@code COMPLIANCE_OFFICER} and {@code RISK_MANAGER}, and all
+     * three are HELD and none of them holds {@code PRIVACY:READ}. Converting would drop three live
+     * roles, and granting them {@code PRIVACY:READ} to compensate would widen them from this register
+     * to the whole privacy read surface — the DSR queue and the breach register, which carry data
+     * subjects' identities. That is an owner decision about who may read personal data, not a side
+     * effect of a guard fix, so it is filed. Nothing here creates a write-without-read hole for the
+     * seeded personas ({@code compliance} holds {@code COMPLIANCE_OFFICER}), but it is representable
+     * for a tenant that grants {@code PRIVACY:WRITE} to {@code ORG_ADMIN} — filed with the read half,
+     * which is what closes it.
+     *
+     * <p>⚠ {@code AttachmentAccessPolicy}'s {@code SUBPROCESSOR} entry mirrors the <em>read</em>
+     * guard, so it is correct as it stands and must NOT be edited for this change. The instruction on
+     * {@link #READ_GUARD} to change it in the same edit applies to a change of the read guard; F2-52
+     * learned that the hard way, and the same rule points the other way here.
+     */
+    private static final String WRITE_GUARD = "hasPermission('PRIVACY','WRITE')";
 
     private final SubprocessorService service;
     private final SubprocessorEventService eventService;
