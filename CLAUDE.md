@@ -1872,6 +1872,74 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THAT FINDING HAD ONE INSTANCE AND READ AS BAD LUCK — THERE ARE THREE, AND EACH IS A
+  PRIOR SLICE THAT CORRECTED A GHOST IN ONE OF THESE EXPRESSIONS AND LEFT A ZERO-HOLDER ROLE STANDING
+  BESIDE IT** (F2-254, measured 2026-08-20). Executing F2-253's filed `module.bcm` block — re-derived
+  against both databases first (F2-221) — `hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')` guarded eight
+  writes, `BCM_MANAGER` is held by **no user** in dev or prod, and probed live as `compliance` (who
+  holds `BCM:WRITE`, `BCM:DELETE` *and* `BCM:APPROVE`) **13 of 13 answered 403** while `admin` reached
+  the handler on every one: archiving a BCP binder or a quantitative BIA, starting an exercise run,
+  instantiating a scenario, publishing an MTPD inheritance assessment, the whole 12-row
+  process-vendor-dependency register, and five run-scoped writes.
+  🔑🔑 **`BOARD_APPROVE_GUARD`'s javadoc names its own defect: F2-52 chose `EXECUTIVE_REVIEWER` because
+  it *"already holds `BCM:APPROVE`, so it is a role the platform already trusts with BCM approvals"* —
+  a fact about GRANTS. Whether a guard admits anybody is a fact about `iam.user_roles`.** A role's
+  grant list tells you what the platform trusts it with; only its holders tell you whether it is
+  anybody. The third instance is F2-161 on `ExerciseRuntimeController#start`, whose comment removed
+  `FACILITATOR` for matching no row in `iam.roles` and *"admitting nobody"* while keeping a name with
+  exactly that property. **Measured, not reasoned: the one live quantitative BIA in dev AND prod is
+  still parked at `CFO_APPROVED` with `board_approved_at` NULL — exactly where F2-52's own javadoc
+  found it, so its fix never moved the row it was written for.**
+  ⚠⚠ **THE COMPOSED BUCKET HID FIVE OF THE THIRTEEN, so the filed count was half the module's
+  real total.** `ROLE_GUARD_CENSUS.md` files a guard as COMPOSED when the expression MENTIONS
+  `hasPermission`, not when the permission is **ANDed** — F2-253 filed that and this slice shows it
+  hides real members rather than merely mislabelling them. 🔑 **A filed count is only as complete as
+  the bucket that produced it**; when you split that kind, re-run §B2b, because **the count will go up**.
+  ⚠⚠ **AND AN OWNERSHIP LEG CANNOT RESCUE A CREATE.** F2-161 added
+  `or hasPermission(#id,'EXERCISE_RUN','OWNER')` so a facilitator could drive their own run; `#start`
+  has no such leg **because there is no run yet to own**. So four of the five composed writes were
+  carried by the facilitator and the one that creates the record was not — probed, `ranalyst` (no BCM
+  grant of any kind) transitions the run they facilitate and is **403 on `#start`**. **A facilitator
+  could drive an exercise run they were not allowed to create**, and the four seeded runs exist because
+  an administrator made them. Isolate that leg with a planted run facilitated by a persona holding
+  **no** module permission: the seeded facilitator is `rmanager`, who also holds `BCM:WRITE`, so
+  driving them proves nothing about ownership.
+  ⚠⚠ **BOTH PRE-EXISTING GATES FAILED ON THE CORRECT CONVERSION, AND BOTH WERE KEYED ON A
+  SPELLING RATHER THAN ON THEIR OWN CLAIM** — the one failure a gate must never have (F2-214), because
+  it trains the next reader to edit the assertion instead of the code. `ExerciseRunOwnershipGuardTest`
+  asserted `!guard.contains("hasAnyRole(")` while its claim is *an oversight leg EXISTS*: it **failed on
+  the change that made its own claim more true**, since the "oversight" it was checking for admitted the
+  administrator alone and `hasPermission('BCM','WRITE')` admits three live roles (F2-197: a gate keyed on
+  an identifier breaks on your own refactor). `BiaApprovalChainGuardTest`'s ghost detector ran a
+  quoted-token regex over the whole expression, so `hasPermission('BCM','DELETE')` read as two roles
+  called `BCM` and `DELETE` — 🔑 **a ghost-role gate that flags every role-to-permission conversion
+  F2-05 exists to make** — and its body walked **every method** while its name says *"no STAGE"*, so it
+  owned an opinion about routes it had never reviewed. **The control that matters for a detector repair
+  is that the repaired detector still passes on the tree the original passed on**; both do.
+  ⚠ **Convert the ROLE leg of a composed guard, never the whole expression**: the ownership clause is
+  preserved verbatim, and its parameter name differs by controller (`#id` on the runtime console,
+  `#runId` on the observer console — the recorded trap, where a copied constant answers **500**, not 403).
+  ⚠ **Measure the audience diff before converting** (the V362 landmine), and state what is NOT admitted:
+  `BCM:WRITE` is held by `GRC_ADMINISTRATOR`/`PLATFORM_ADMIN`/`RISK_MANAGER` and `BCM:DELETE` by the
+  first two, both named roles hold both, so nobody is dropped — and `AUDITOR`/`VIEWER` hold
+  `READ`+`EXPORT` and neither, so no reader-only role slips in. **Read guards were deliberately
+  untouched: `CISO` is named on them and holds only `BCM:EXPORT`, so converting one would DROP a live
+  role** (F2-253's asymmetry, and a gate leg now fails the build if somebody "finishes the sweep").
+  ⚠⚠ **The two BIA approval tiers are NOT a mechanical sweep, and the blocker is now measured.**
+  `cfo-approve` and `board-approve` are distinct tiers of one BIA; `BCM:APPROVE` is one permission and
+  also includes `BCM_MANAGER`, stage **one** of the same chain. The four-eyes bar that would make sharing
+  it safe is **unbuildable today**: `sys.columns` says `bcm.bia_quantitative` carries a caller-supplied
+  `cfo_approver_name` and **no `board_approved_by` column at all**. 🔑 **The guard lockout and the
+  missing attribution are one problem and F2-52 filed them as two** — F2-152's recorded blocker
+  (*"nothing enforces that they are different people"*) is removable by building the thing it says is
+  missing, which is F2-178's rule about re-measuring a blocker before believing its estimate.
+  ⚙ **Five guessed names in one slice** — three tables (`bcp_binder_exports`, `exercise_scenario_library`,
+  `business_processes`), one column (`run_id` for `exercise_run_id`) and one method (`listAssessments`).
+  🔑 **The column one threw inside a `finally`, which is the worst place for it**: the cleanup died and
+  left a planted row live. Resolve from `sys.tables`/`sys.columns`, and make the resolver print
+  **near-misses** — that is what turned three of those into one line of output instead of three
+  confident "no data" claims. ⚠ And **my own patch-script assertion failed on a correct edit**, because
+  an insertion-style edit legitimately keeps its anchor (F2-206's rule, applied to an assertion).
 - ⚠⚠ **A ROLE THAT EXISTS AND IS HELD BY NOBODY FAILS EXACTLY LIKE A GHOST, AND EVERY BUCKET
   IN THE INSTRUMENT WAS KEYED ON EXISTENCE** (F2-253, measured 2026-08-20). `hasAnyRole('X')` tests
   for the granted authority `ROLE_X`; a role assigned to no user grants it to nobody, and a role
