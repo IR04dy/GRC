@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V378 packaged; next free V379** (366 files; ⚠ this line said "V1→V295 / next free
+— **V1→V381 packaged; next free V382** (369 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V378 are pending** the
-next jar — 34 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V381 are pending** the
+next jar — 37 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V378 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V381 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,93 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE PLATFORM'S CHOSEN REMEDY FOR A LOCKED-OUT ROUTE ALREADY SHIPPED, NAMED THE ROUTE,
+  AND LEFT IT EXACTLY AS CLOSED AS IT FOUND IT — BECAUSE SEATING A ROLE ASSIGNS IT TO NOBODY**
+  (F2-258, measured 2026-08-20). Executing F2-255's filing, re-derived first (F2-221): the filed
+  conversion target `AI:APPROVE` **does not exist**, and the population is **six** routes not three.
+  `AiLifecycleController`'s three creates were `hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','CIO','DPO')`
+  and its three `/transition` routes `hasAnyRole('PLATFORM_ADMIN','CRO','CIO','DPO')`; `CIO`, `CRO` and
+  `DPO` are held by **no user** in dev or prod. Probed live as `rmanager` and `compliance`, both holding
+  `AI:WRITE`: **403 on all three transitions**, over 16 validations / 11 retraining events / 13
+  recertifications identical in both databases — and all six routes are wired to routed pages, so the
+  Move control on three AI-lifecycle screens failed for every non-administrator.
+  🔑🔑 **V373 was written for these routes — its header names `AiLifecycleController#transition` and
+  describes it, before the fix, in the words this finding would use — and chose remedy (3), SEATING
+  `CIO`/`CRO`, over remedy (1), conversion. Its closing line is the tell: 79 guard sites are now
+  *"satisfiable"*.** F2-253's distinction exactly: `hasAnyRole` tests for a **granted authority**, so a
+  role assigned to nobody admits nobody, and dev has held both roles with **0 grants of any module**
+  ever since. **Satisfiable is a property of the guard; satisfied is a property of `iam.user_roles`.**
+  ⚠⚠ **And the reason it picked the wrong remedy here is that the measurement it made was about four
+  OTHER modules.** V373: *"Unavailable: DATACLASS, OUTSOURCING, REGREPORTING and RRP have NO catalogued
+  permissions at all … so converting means first cataloguing four new modules."* True of those four
+  (still true — F2-257 filed that half). The fifth was swept in one sentence earlier by resemblance
+  (*"AiLifecycleController#transition … is the same shape"*) and then justified on a **different and
+  circular** ground: *"only AI is catalogued at all, where AiLifecycleController is role-guarded anyway,
+  so any grant would be inert."* The grant was inert **because the guard was a role guard**, which is the
+  half that could change; `AI:READ`/`WRITE`/`EXPORT` have been catalogued since V313 and `AI:WRITE` is
+  held by **8 live roles**. 🔑 **F2-215's two-of-N at the level of a REMEDY: the same defect shape across
+  five modules, four genuinely unconvertible, and the sentence saying "the same shape" is what stops a
+  reader asking whether the same remedy applies.**
+  ⚠ **A guard conversion can need a MIGRATION, and skipping it is a policy change disguised as a
+  refactor.** Of the retired names `DPO` already held `AI:WRITE` while `CIO`/`CRO` held **no module
+  permission at all**, so converting alone would have **narrowed the shipped audience by two roles**.
+  V381 grants them `AI:READ`+`AI:WRITE` as **declared literals** with five THROWing self-checks (the
+  grant landmine: `INSERT … SELECT … JOIN … WHERE NOT EXISTS` grants nothing when either side is
+  catalogued later and cannot tell *already granted* from *nothing matched*; check 0 refuses outright
+  when V373 has not run). Live effect **none** — both roles are held by nobody — so what changes is what
+  a tenant administrator gets when they assign one. State the widening rather than letting it be a side
+  effect (V362's landmine): `AI:WRITE` also opens **7** `AiSuggestionController` routes these two were
+  not named on.
+  ⚠⚠ **The load-bearing measurement is on the half you must NOT convert.** `AUDITOR` is named on the READ
+  tier, **is** held, and holds `AI:EXPORT` and **not** `AI:READ` — the only role in either database with
+  that shape, and deliberate (`MlModelController.EXPORT_GUARD` is `hasPermission('AI','EXPORT') and
+  hasAnyRole(…,'AUDITOR',…)`). So `hasPermission('AI','READ')` there would take five live roles to four
+  and **drop the examiner**: F2-253's asymmetry, and a gate leg now fails the build if somebody finishes
+  the sweep (F2-254's precedent). ⚙ Assert the converted tier by **claim** (a permission guard citing the
+  pair), never by banning `hasAnyRole` — F2-254 had two pre-existing gates fail on a *correct* conversion
+  for exactly that reason, and a gate that fails on correct code trains the next reader to edit the
+  assertion (F2-214). Reflect over `@PreAuthorize` rather than scanning source: the annotation takes a
+  compile-time constant, so a renamed or relocated constant cannot fool it (F2-187).
+  ⚠⚠ **TWO OF MY OWN GATE LEGS FELL TO THE MUTATION HARNESS AND ONE WAS AN EQUIVALENT MUTANT WORTH
+  CONVERTING RATHER THAN RECORDING.** (a) `contains("THROW 51381")` **SURVIVED** the mutation removing
+  check 0, because V381 carries **five** of them — F2-194's substring-satisfied-by-something-else, in a
+  gate written after quoting it; replaced by a **count** plus that check's own message anchor. (b) The
+  mutation making the guard reader skip unguarded methods **SURVIVED**, and the mutated code was **not
+  wrong on this corpus** (every route is guarded, so it returns the identical map — F2-206). A
+  **synthetic fixture** — a nested controller with a mapped, unguarded method, asserted to be *reported*
+  rather than skipped — turns it into a kill. 🔑 **A reader that omits what it cannot explain shrinks its
+  own population, and a smaller population reads exactly like a cleaner tree.** 8 killed / 0 survived
+  after; the pre-fix control fires naming all six routes exactly.
+  ⚠⚠ **THE ESCAPE-COLLAPSE LANDMINE FIRED TWICE IN ONE SLICE THROUGH INLINE `py -c`, AND THE SECOND TIME
+  A `sed` FILTER SWALLOWED THE EVIDENCE.** Once a `\\(\\s*` collapsed inside a Java string literal (a loud
+  `javac` *"illegal escape character"*); once a `\n` became a **raw newline inside a Python string
+  literal**, and because the run was piped through `sed -n '/marker/,$p'` the resulting `SyntaxError`
+  printed nothing at all — the harness read as producing no output rather than as failing.
+  🔑 **The recorded rule names heredocs and the hazard is the inline script: use the Write/Edit tools for
+  any file content carrying escapes, and never filter a harness's stderr through a marker-anchored
+  `sed`.**
+  ⚠ **And one assertion was wrong about the codebase rather than the reverse:** `contains("'AI', 'WRITE'")`
+  failed because V313 writes `('AI','WRITE',` with no space. An assertion that depends on a formatting
+  choice fails on a correct tree the day somebody reformats the file — parse whitespace-tolerantly.
+  ⚙ **Corrected in passing:** `RoleGuardConversionRatchetTest`'s javadoc said
+  *"`BASELINE_PURE_ROLE_SITES` is 404"* while the constant read **389** — the prose-versus-constant drift
+  this file warns about, inside the file that owns the constant. Ceiling lowered to **383** in the same
+  commit as the sweep, re-derived rather than subtracted (F2-207); census §B2b **9 → 6**.
+  ⚙ **Filed:** the **six** remaining §B2b guards as a work list with no verdicts (F2-188) —
+  `module.audit_committee` 3 (`BOARD_SECRETARY`, 0 holders; a committee-seat question, so F2-177's
+  `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` may be the mechanism rather than a module
+  permission), `module.bcm` 2 (F2-254's two BIA tiers, blocked on a migration — no `board_approved_by`
+  column), `module.rrp` 1 (the SAMA recovery-and-resolution filing V373 itself calls the sharp case,
+  blocked on `RRP` having no catalogued permissions — F2-257's filed gap); the **four-eyes question this
+  conversion makes askable** (catalogue `AI:APPROVE`, guard the three transitions with it, compare the
+  decider against `validator_user_id`/`owner_user_id` — an **owner decision**, and F2-256 already filed
+  that `model_validation` has no completer column and `retraining_event` no approver column at all);
+  **all three `AiLifecycleService` creates honouring a client-supplied `@NotBlank reference`** with **no
+  UNIQUE index** on any of the three columns, F2-172(d)'s family in the `SubprocessorService.create`
+  shape (mandatory, so no null-coalesce, so outside `ClientSuppliedReferenceRatchetTest`'s key); and
+  **`role_guard_census.py` still hardcoding `DATABASE=TSS_GRC`**, so every holder figure it publishes —
+  §B2b included — is a statement about **dev** (F2-253 filed it; it cost a re-measurement here, because
+  prod has `CIO`/`CRO` *absent* rather than unheld while V373 is pending).
 - ⚠⚠ **A COLUMN NOBODY SETS CONTRIBUTES TO NEITHER HALF OF A PAIR BUILT FROM SETTER CALL
   SITES, SO "NOBODY OWNS WHO" IS INVISIBLE TO THE GATE BUILT TO FIND "THE CALLER OWNS WHO"**
   (F2-256, measured 2026-08-20). Executing F2-255's filing, re-derived first (F2-221):
@@ -2097,7 +2184,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   instead of invisible; back-filling it is an **owner decision**.
   ⚠ **The authority for "does this permission exist in the platform" is the MIGRATION SET, never
   either database.** Prod shows **27** cited pairs absent from `iam.permissions` across `AML`,
-  `AUTOMATION`, `CONSUMER`, `CPTY`, `ETHICS`, `OPENBANKING`, `SHARIA` — that is the V345–V380
+  `AUTOMATION`, `CONSUMER`, `CPTY`, `ETHICS`, `OPENBANKING`, `SHARIA` — that is the V345–V381
   deployment gap, which Flyway closes on deploy, **not 27 defects**. One database can be behind and
   the other ahead via bootstrap; only the migrations say what ships.
   ⚙ **V380 narrows the READ tier rather than promoting it**, which is the V362 landmine as an
