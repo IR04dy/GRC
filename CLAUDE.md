@@ -1872,6 +1872,104 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **CAPTURING ONE PARTY'S ID CAN RETIRE THE ONLY BAR THAT COULD DECIDE ANOTHER —
+  AND THE COMMIT THAT DOES IT LOOKS LIKE A STRICT IMPROVEMENT** (F2-251, measured 2026-08-20).
+  Executing F2-250's census (re-derived first — 48 pairs, 32 unadjudicated — F2-221) and ranking
+  by *id NULL while the label is populated* put `change_mgmt.change_requests`'s two people pairs
+  top among the unblocked members. `change_owner_id` has **no writer anywhere in the platform**
+  (NULL on 17 of 17 dev and 15 of 15 prod), so the owner is nameable only by label; and of the
+  module's five self-review refusals, **three kept a hand-written or merged comparison and keyed
+  the name fallback on something other than the party being compared** — the CAB vote (CM-C2) on
+  **both ids being null**, `requireRatificationSeparation` (ADR-017 D-3) on **the ACTOR having no
+  id**, and `assertNotSelfWaiver` plus `assertNotSelfSatisfaction` on a merged `Party(id, label)`. Since CE-15 stamps `requested_by_id` on every
+  create and `GrcUserDetails` always carries an id, the owner's only bar was dead. Probed live as
+  `rmanager` (`CHANGE:APPROVE`) against planted rows, 8/8 pre-fix: the change **owner cast a CAB
+  vote on their own change at 201** and **ratified their own emergency change at 200** (on a legacy
+  row, so no missing-id excuse), while the identical vote with `requested_by_id` NULLed answered
+  **409**. 🔑🔑 **The two legs differ in exactly one column and the one that refuses
+  is the one where LESS was captured — CE-15's improvement is what switched the owner's bar off.
+  After adding a server-stamped id, re-read every predicate that consults the pair.**
+  ⚠⚠ **THE MEASUREMENT DECIDES WHICH REMEDY THIS FAMILY WANTS, AND HERE IT WAS THE OPPOSITE
+  OF THE LAST THREE SLICES'.** Identical in dev and prod: **0 of 34** requester/owner labels resolve
+  to a platform user — they are offices and teams (`'CIO Office'`, `'Head of IAM'`, `'Chief People
+  Officer'`, `'AppSec on-call'`) — and `create()`'s own CE-15 comment says the id is *who keyed the
+  change in* while the name is *"whatever the tenant typed, since a team ('CloudOps') is a
+  legitimate thing to record as the requesting party."* 🔑 **So the label is NOT a copy of the
+  id's identity: deriving it (F2-245/F2-246/F2-250's fix) would DESTROY information, and the defect
+  is in the READERS.** `ParentIdentityCopyContractTest`'s own framing — *"a parent id AND A COPY OF
+  THAT PARENT'S IDENTITY"* — is what disguised it. **Ask whether the label is a copy before
+  reaching for the fix that worked last time**, and note the corollary: because the two halves may
+  legitimately name different parties, **both** must be compared and neither may switch the other
+  off. The PUT storing a label that differs from the stamped id is **BY DESIGN**, asserted in both
+  probe modes so a later slice cannot "fix" it.
+  ⚠⚠ **THE PRIMITIVE PREDICTED THIS IN ITS OWN JAVADOC AND TWO OF THREE CALLERS BROKE THE
+  RULE ANYWAY.** `ChangeSoD` exists as *"the platform's one answer to 'is the acting principal the
+  same person as this named party?'"* and says a second copy *"lies the first time one copy learns
+  something the others do not."* One of the three gates over the change's people was converted to
+  it; **the two that were not are the two that lie** — the prediction and the failure in one file
+  (F2-190/F2-177). `compareAny`'s javadoc even states the exact rule: *"build one party **per bar**
+  rather than per person — `Party(id, null)` and `Party(null, label)` as separate entries, **never
+  `Party(id, label)`** … a refusal removed by a change that looks like a tidy-up."*
+  🔑 **A rule with no enforcement is a rule two of five sites follow.** Fix: one predicate,
+  `selfReviewBars` / `cabDecisionBars` / `conditionOwnerBars`, an id bar and a name bar per person.
+  ⚠⚠ **A REPORT BUILT TO ASK "CAN THIS GATE FIRE?" PUBLISHED FOUR GATES WHILE THE MODULE
+  ENFORCED SIX, AND THE TWO ABSENT WERE THE TWO THAT COULD NOT FIRE.**
+  `GET /api/v1/changes/sod-coverage` is CE-15's answer to F2-112. Both missing refusals were
+  enforced, unit-tested and shipped, so nothing looked unfinished, and the one artefact that would
+  have surfaced them had them outside its scope **by construction**. 🔑 **The instrument was
+  real; its POPULATION was `ChangeSoD.GATES`** — the same narrowing this codebase has been caught
+  by at a filename, a three-entry allow-list, a module name, an `extends` clause, a field-name list
+  inside a fix and a claim shape in a gate. `ChangeSodGateCoverageContractTest` derives it from the
+  refusals themselves (a method that throws on a `ChangeSoD` verdict), both directions, `GATES`
+  now seven. ⚠ And `Coverage`'s javadoc called a label-only party *"UNVERIFIABLE"* — **false**,
+  rule 2 compares it by name — which is **exactly the belief the two hand-written copies encoded
+  as "legacy fallback only"**. A description that answers the question a reader was about to ask is
+  how a wrong belief propagates into code (F2-184, in an instrument's own documentation).
+  ⚠⚠ **MY OWN GATE REFUTED MY OWN MAP ON ITS FIRST RUN: 5 REFUSALS, NOT 3 — AND TWO OF MY
+  THREE EXEMPTIONS ANSWERED A DIFFERENT QUESTION FROM THE ONE THE SCAN ASKS.** I wrote fluent
+  reasons saying two refusals *"sit outside `selfReviewBars`"*: true, and irrelevant, because the
+  derivation is keyed on *throwing on a `ChangeSoD` verdict* and both do. 🔑 **An exemption
+  that answers a different question reads exactly like a correct exemption** — two in three fell,
+  against this programme's usual ~2-in-10 (F2-188/F2-192/F2-204/F2-211/F2-250), and the **reverse**
+  leg caught it (F2-199). ⚙ Correcting it paid at once: promoting `assertNotSelfSatisfaction` into
+  the population surfaced a **fourth** merged site no reading had found — latent (`change_condition`
+  holds 0 rows in dev and **does not exist in prod**), fixed anyway (F2-182/F2-215).
+  ⚠⚠ **AND THE MUTATION HARNESS FOUND THIS SLICE'S OWN FINDING INSIDE MY OWN GATE.** The
+  per-bar leg iterated `List.of("selfReviewBars", "cabDecisionBars")` — two names long because
+  those were the two builders I had written by then — so re-merging the fourth site **SURVIVED the
+  whole build**. 🔑 **A real rule over a population that is a list somebody wrote is the
+  defect this slice is about, one level up.** Population derived by signature
+  (`List<ChangeSoD.Party> \w+\(`); 10 killed / 0 survived / 0 anchor-miss after.
+  ⚠ **Two more gate-leg errors, both failing on CORRECT code** (F2-206/F2-214): a name-bar
+  detector keyed on the receiver `c.` could not see `cond.getOwnerName()` — **the receiver is not
+  part of the claim** (F2-197's local-alias rule) — and the comment-stripper's negative control used
+  a **complete** `/* … */` inside a `//` comment, which the two-pass form handles correctly; the
+  corruption needs an **unterminated** delimiter plus a closer downstream.
+  ⚠ **The pre-fix control tripped on my own quotation**, because this register's convention is
+  that a correction QUOTES the sentence it replaces. Strip double-quoted spans first (F2-193), and
+  note that **a detector whose claim is about prose cannot share the comment-stripping harness.**
+  8/8 discriminate after.
+  ⚠ **No escalation, and say so**: `CHANGE:APPROVE` guards the CAB vote, the ratification and the
+  waiver alike, so nothing crossed a permission boundary — the object-level machine was the only
+  control and two of its three bars were inert (F2-219's shape).
+  ⚠ Four probe legs failed for reasons unrelated to their claims (F2-244): the transition body key
+  is **`target`** not `to` (**resolve it from the controller** — F2-250 recorded this exact one),
+  the CAB decision vocabulary is `APPROVE` not `APPROVED`, `EMERGENCY_APPROVED` needs
+  `CHANGE:APPROVE` so `ranalyst` cannot drive it, and the emergency approval must be cast by a
+  **third** persona or `selfApprover` fires first and masks the owner leg.
+  ⚙ **Filed:** the **28** remaining census members — `change_mgmt` still holds **9** and they are
+  a *different question*, **actor attribution** (F2-236), not parent references, with
+  `change_approvals :: approver_id` (31 rows, **28 linked**) the one where divergence rather than
+  unlinkability is measurable; **`change_owner_id` having no writer** is an owner decision (the
+  labels are offices, so requiring a resolvable user refuses the register's own data, and no
+  user-listing endpoint is reachable by `CHANGE:WRITE` so a picker would 403 — F2-250's
+  measure-the-picker rule); two `sod-coverage` rows count a change `checkable` when only the
+  requester has an id, because the two people share one row; and all three people columns are
+  English-only free text with no `*_ar` (house rule 7). ⚙ Verified **already correct** while
+  ranking, and worth knowing because they are the shape this family usually gets wrong:
+  `admin.committee_meetings :: committee_id` (34/34 linked, NOT NULL) and
+  `iam.sod_violations :: rule_id` (9/9) both **derive** their label from a resolved parent at every
+  writer and bind purpose-built request records, so neither has an entity-bound route to re-open it.
 - ⚠⚠ **A FIX AT A DEDICATED ROUTE IS NOT A FIX WHILE AN ADJACENT ROUTE WRITES THE SAME
   COLUMN — AND THE RESULT CAN BE WORSE THAN THE DEFECT** (F2-250, measured 2026-08-19).
   Re-deriving F2-249's 33-member census (F2-221) and ranking by the cheapest universal fact —
