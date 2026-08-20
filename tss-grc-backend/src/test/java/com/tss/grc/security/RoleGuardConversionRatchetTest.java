@@ -425,8 +425,22 @@ class RoleGuardConversionRatchetTest {
      * so converting the read tier widens a governance dashboard to any authenticated reader (§B3's
      * {@code BoardPackController} defect), and converting the attest tier would drop
      * {@code EXTERNAL_AUDITOR}, which holds no {@code AUDIT} grant at all.
+     *
+     * <p>⬜ <b>F2-260: 380 → 363, the largest single drop this figure has taken.</b> All three of
+     * {@code RrpController}'s tiers moved to {@code hasPermission('RRP', READ|WRITE|APPROVE)} — 17
+     * routes — after <b>V383</b> catalogued the module, which had <b>no catalogued permission of any
+     * kind</b> in either database (F2-257's filed gap, first of five closed). The finding was the
+     * APPROVE tier: {@code hasAnyRole('PLATFORM_ADMIN','CRO','CFO')} on the route that lodges the
+     * Recovery &amp; Resolution Plan with SAMA, where {@code CRO} and {@code CFO} are held by no
+     * user in either database and {@code CRO} is absent from prod's {@code iam.roles} outright.
+     * ⚠ Unlike F2-253/F2-254/F2-258/F2-259 there was no tenant remedy at all here: nothing could be
+     * granted because nothing existed to grant. Re-derived from this build, not subtracted
+     * (role-leg total 474 → 457). {@code RrpGuardConversionTest} holds the tier map, that
+     * {@code #submit} is the <b>only</b> APPROVE route, and that {@code RISK_MANAGER} is <b>not</b>
+     * granted {@code RRP:APPROVE} — so the persona that prepares and board-approves a cycle still
+     * cannot lodge it, which is the one separation the shipped guard expressed.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 380;
+    private static final int BASELINE_PURE_ROLE_SITES = 363;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -821,7 +835,7 @@ class RoleGuardConversionRatchetTest {
      * short — would be a permanently false leg in exactly the way a ghost role name was, so the
      * committee-type vocabulary is pinned there at a hard zero too.
      *
-     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 380 as this is written
+     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 363 as this is written
      * — it read "404" here for months while the constant said 389, which is the prose-versus-constant
      * drift CLAUDE.md warns about, in the file that owns the constant. Read the field, not this
      * sentence: that many endpoints still

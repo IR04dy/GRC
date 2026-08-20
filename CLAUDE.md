@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V382 packaged; next free V383** (370 files; ⚠ this line said "V1→V295 / next free
+— **V1→V383 packaged; next free V384** (371 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V382 are pending** the
-next jar — 38 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V383 are pending** the
+next jar — 39 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V382 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V383 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,112 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE FINDING THAT COINED "EXISTENCE IS A WEAKER QUESTION THAN HOLDING" WAS ITSELF ONE OF
+  THE SITES STILL OPEN, AND ITS EXIT CONDITION NAMED THE REMEDY THAT DOES NOT WORK** (F2-260,
+  measured 2026-08-21). Executing F2-259's §B2b list, re-derived first (F2-221):
+  `RrpController` carried three pure role guards over 17 routes and the APPROVE tier was
+  `hasAnyRole('PLATFORM_ADMIN','CRO','CFO')` — `CRO` and `CFO` held by **no user** in dev or prod,
+  `CRO` **absent from prod's `iam.roles`** because V373 is pending there. So
+  `POST /api/v1/rrp/cycles/{id}/submit`, the route that lodges the Recovery & Resolution Plan with
+  **SAMA**, was reachable by the platform administrator and nobody else.
+  🔑 **Why it bit rather than merely being narrow:** `/transition` carries the WRITE tier, which
+  `RISK_MANAGER` holds, so a risk manager drives a cycle `DRAFT → IN_PREPARATION → BOARD_REVIEW →
+  APPROVED`; `RrpService.transition` then explicitly refuses the `SUBMITTED` edge (*"Use the
+  dedicated /submit endpoint to lodge with SAMA"*) and `ALLOWED.get("APPROVED")` is
+  `{IN_PREPARATION}` — so for every non-administrator **APPROVED was a dead end, its only forward
+  edge the administrator-only submit and its only other move backwards into preparation.**
+  Identical in dev and prod: 5 cycles, 46 critical functions, 31 indicators, 32 recovery options,
+  and **no cycle has ever reached SUBMITTED**. Probed live: `rmanager` drove a planted cycle to
+  APPROVED (200/200/200) and was refused the filing at **403**; so was `compliance`; `admin` lodged
+  at 200.
+  🔑🔑 **F2-130 FOUND ALL OF THIS ON 2026-08-06.** Its Lesson cell is the sentence the whole
+  F2-253 → F2-259 lineage rests on — *"Ask of an authorisation list not do these names exist but
+  **can anybody satisfy it today**. Existence is a weaker question than holding, and the weaker
+  question is the one four findings had been asking."* It stayed 🔴 OPEN for fifteen days, and its
+  stated reason was right as far as it went: *"converting to `hasPermission` is F2-05's ratified
+  direction… This is the fourth data point for sequencing F2-05, not a fourth patch."*
+  ⚠⚠ **And its exit condition pointed at the remedy that does not work.** The pin's trigger read
+  *"When CRO is created or CFO is granted, close the finding and update this"* — **seating**, and
+  only that, in a javadoc whose prose had just named conversion as ratified. V373 then chose exactly
+  that remedy for exactly these two roles, and **`CRO` was created and the finding stayed open**,
+  because seating a role assigns it to nobody (F2-258: 79 sites *satisfiable*, not satisfied).
+  🔑 **A pin that names three remedies in its prose and phrases its tripwire in terms of one of them
+  points the next reader at that one** — and the one it named is the one this register has since had
+  to write two findings to correct. ⚙ One of its measurements had also aged: *"CRO does not exist"*
+  was true that day, false in dev from V373 on, and still true in prod.
+  ⚠⚠ **THIS ONE HAD NO ADMINISTRATOR REMEDY AT ALL, WHICH IS A DIFFERENT KIND OF LOCKOUT.**
+  F2-253 is explicit that an unheld role *"has an administrator remedy — a remedy, not a defence"*.
+  `RRP` had **no row in `iam.permissions` of any kind**, so nothing could be granted because nothing
+  existed to grant: F2-257's catalogue gap, first of five closed (`DATACLASS`, `OUTSOURCING`,
+  `REGINSPECT`, `REGREPORTING` remain). 🔑 **Ask which of the two you have before proposing a fix:
+  "assign the role" is available for four of the five slices in this lineage and was unavailable
+  here, and the two look identical from the guard.** ⚙ Note the direction of travel is the opposite
+  of `ETHICS`'s entry in the same census row: there the catalogue existed and no guard consulted it,
+  here the guards existed and there was nothing to cite. Both end up in that column and only the
+  order tells you which failure it was.
+  ⚠ **V383 catalogues exactly the three tiers the controller declares** — read off its three guard
+  constants, never inferred from method shape, which is V362's landmine (it classified by shape and
+  promoted whole WRITE tiers to APPROVE in four of six modules; V367/V368 undid it). Check 1b
+  refuses a fourth `RRP` action so a later tier is a decision rather than a default.
+  ⚠⚠ **A MIGRATION MAY ASSERT ITS OWN WRITES AND MUST NOT ASSERT TENANT DATA.** The natural fifth
+  self-check was the one the file exists for — *does any active user now hold a role granted
+  `RRP:APPROVE`?*, F2-253's satisfiable-versus-satisfied distinction — and it was written and
+  **removed**: a brand-new deployment runs the chain with a bootstrap administrator and no
+  `GRC_ADMINISTRATOR` seated, so it would THROW and block V383 and every migration after it, i.e.
+  F2-214 at the schema. The roles V383 *grants* are safe to require because migrations before it
+  create them (V362 seats `BOARD_SECRETARY` and `CFO`, V373 seats `CRO` — **resolved from the
+  migration set, not assumed**); who *holds* them is not. Same reason check 6's catalogue floor is
+  **50** and not the ~140 both live databases carry: F2-255 measured that a fresh Flyway install
+  from V1 builds only **93** pairs, because 36 core pairs exist in dev and prod solely because the
+  Python bootstrap made them. 🔑 **"Did this unlock anybody?" is a probe's question, not a
+  migration's** — and the gate asserts the absence structurally so the next author does not re-add
+  it.
+  ⚠⚠ **`RISK_MANAGER` IS DELIBERATELY WITHHELD FROM `RRP:APPROVE`, AND CONVENTION ARGUED THE OTHER
+  WAY.** It holds `RISK:APPROVE`; the shipped guard pointedly did not name it, and WRITE and APPROVE
+  overlapped on `CRO` and nothing else. Granting it would let the persona that prepares **and
+  board-approves** the cycle also lodge it with the regulator, retiring the one separation this
+  controller expresses. V383's check 4 fails the migration if a second role ever holds both, and the
+  probe asserts it from the outside — post-fix `rmanager` still answers **403** on submit while
+  driving the cycle to APPROVED at 200. `AUDITOR`, `VIEWER` and `REGULATOR_VIEWER` are withheld from
+  READ although all three hold `BCM:READ` and `RISK:READ`: a resolution plan is the most sensitive
+  document in a bank's contingency set. 🔑 **"Follow the platform's convention" settles a conversion
+  TARGET (F2-253) and does not settle a GRANT — for a grant the shipped guard's own audience is the
+  evidence, and convention is the thing to argue against.**
+  ⚠⚠ **THE THIRD INSTANCE OF ONE DETECTOR BUG, IN A THIRD MODULE, ONE PER CONVERTING SLICE.**
+  `RrpLifecycleTest.rolesIn` scanned `'([A-Z_]+)'` across the whole guard initialiser, so
+  `hasPermission('RRP','READ')` parsed as two role names — `RRP` and `READ`. F2-254 repaired exactly
+  this in `BiaApprovalChainGuardTest`, F2-259 in `AuditCommitteeGuardTest.namesIn`, now here.
+  🔑 **A quoted-token scan over a guard expression flags every role-to-permission conversion F2-05
+  exists to make**, and because each copy only bites when its own module converts, **the shape
+  recurs once per module for want of a shared primitive.** Measured: **5** hand-rolled copies across
+  the test tree — `sharia` and `openbanking` were quietly updated when F2-145(e) converted them, and
+  `cpty` is still latent. Extracting one test-support helper is filed (F2-190: do not hand-roll a
+  fifth).
+  ⚠ **F2-225's lesson from the other side: a pinned known-defect test passes on a defective tree by
+  design, so the codebase's own record of this defect was invisible to every scan and the finding
+  had to be made twice.** Its tripwire then did its job — it failed the build the instant the guards
+  were converted, and `FindingsRegisterConsistencyTest` required the register cell to move in the
+  same commit. Two instruments in series, both working.
+  ⚙ **Two things verified CORRECT in passing, worth recording because this family usually gets them
+  wrong.** `SubmitCycleRequest.regulatorAckReference` is `@NotBlank` and **caller-supplied** — which
+  is right rather than F2-172(d): a SAMA acknowledgement reference is *received from the authority
+  and recorded*, never minted, and F2-209's own rule says so. And `title_ar` is `@NotBlank` on the
+  create, so house rule 7 holds.
+  ⚙ **The probe's two runs validate each other, which is worth copying when a conversion is
+  population-preserving.** All three tiers admit exactly the roles they used to, so the *only*
+  behavioural difference is the submit unlock: post-fix code loaded during a "pre" run would have
+  answered 200 on leg 11 and **failed** rather than passing for the wrong reason. That is a stronger
+  guarantee than polling `/actuator/health`, which a stale listener also satisfies (F2-252/F2-256).
+  ⚙ **Filed:** §B2b is down to **2**, both `module.bcm` (`BiaQuantitativeController#boardApprove`
+  and `#cfoApprove` — F2-254's two BIA tiers, still blocked on a migration, since
+  `bcm.bia_quantitative` has a caller-supplied `cfo_approver_name` and **no `board_approved_by`
+  column at all**, so the four-eyes bar that would make one shared `BCM:APPROVE` safe cannot be
+  built yet); the **shared role-name extractor** (5 copies, 3 already bitten); F2-257's catalogue
+  gap now at **four** modules, each the same two-step this slice was; `COMPLIANCE:APPROVE` existing
+  with **0 grants** in both databases (F2-253's attrition one level up, at the permission rather
+  than the role, like `CPTY:APPROVE`); and the whole **`rrp` schema having zero CHECK constraints**,
+  so `rrp_cycle.status` is narrowed only by `RrpService.ALLOWED` — F2-221's shape, and not cheap
+  here, because this slice touched the module's guards and not its writers (F2-183).
 - ⚠⚠ **A GHOST ROLE LOOKS WRONG IN THE SOURCE AND AN UNHELD REAL ROLE LOOKS CORRECT, SO A SITE
   THAT HAS ALREADY BEEN AUDITED FOR THIS FAMILY IS THE HARDEST PLACE TO SEE IT** (F2-259, measured
   2026-08-20). Executing F2-258's filed §B2b work list, re-derived first (F2-221):

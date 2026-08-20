@@ -31,20 +31,20 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 474 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **380** |
+| Guard sites with a role leg | 457 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **363** |
 | … composed (role leg ANDed onto a permission — already tight) | 94 |
-| Module packages holding pure role guards | 29 |
+| Module packages holding pure role guards | 28 |
 | Distinct role names recited by any role guard | 38 |
 | … **that do not exist in `iam.roles`** | **0** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
-| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **3** |
+| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **2** |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 380 |
-| … of those, reachable by a NON-administrator | 377 |
+| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 363 |
+| … of those, reachable by a NON-administrator | 361 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
@@ -85,7 +85,6 @@ each of these features was built for cannot use it, and nothing in the platform 
 |---|---|---|---|
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `EXECUTIVE_REVIEWER`, `PLATFORM_ADMIN` | `EXECUTIVE_REVIEWER` |
 | `module.bcm` | `BiaQuantitativeController#cfoApprove` | `CFO`, `PLATFORM_ADMIN` | `CFO` |
-| `module.rrp` | `RrpController#submit` | `PLATFORM_ADMIN`, `CRO`, `CFO` | `CRO`, `CFO` |
 
 ## B3. Wide despite dead role names — the camouflage sites
 
@@ -127,7 +126,6 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.compliance` | 26 |  |
 | `module.outsourcing` | 17 |  |
 | `module.regreporting` | 17 |  |
-| `module.rrp` | 17 |  |
 | `module.ai` | 14 |  |
 | `module.dataclass` | 13 |  |
 | `module.workflow` | 11 |  |

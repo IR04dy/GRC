@@ -227,31 +227,62 @@ class RrpLifecycleTest {
     // ── F2-130 ───────────────────────────────────────────────────────────────
 
     /**
-     * F2-130, pinned. See the class javadoc: {@code APPROVE_GUARD} is satisfiable only by
-     * {@code PLATFORM_ADMIN}, because {@code CRO} does not exist and {@code CFO} exists with no
-     * holders. Filed rather than fixed — creating roles or granting them is a governance decision, and
-     * converting to {@code hasPermission} is F2-05's ratified direction.
+     * F2-130 — <b>CLOSED 2026-08-21 by F2-260.</b> This pin used to assert the three role lists and
+     * record that only {@code PLATFORM_ADMIN} could approve a SAMA recovery plan. Its tripwire fired
+     * the moment the guards were converted, which is what a pin is for.
+     *
+     * <h3>What the pin got right, and the one thing it got wrong</h3>
+     * F2-130 is the row that <b>coined</b> the distinction the whole F2-253 → F2-259 lineage rests
+     * on — its own Lesson cell reads <i>"Ask of an authorisation list not do these names exist but
+     * can anybody satisfy it today"</i> — and its javadoc named the remedy correctly:
+     * <i>"converting to {@code hasPermission} is F2-05's ratified direction"</i>.
+     *
+     * <p>⚠⚠ But its <b>exit condition</b> was written as <i>"When CRO is created or CFO is granted,
+     * close the finding and update this"</i> — the <b>seating</b> remedy, and only that one. V373
+     * later chose exactly that remedy for these roles and F2-258 measured what it achieved:
+     * seating a role assigns it to nobody, so 79 guard sites became <i>satisfiable</i> rather than
+     * satisfied. 🔑 <b>A pin that names three remedies in its prose and phrases its tripwire in terms
+     * of one of them points the next reader at that one.</b> {@code CRO} was in fact created (V373)
+     * and the finding stayed open, because creation was never the thing that mattered.
+     *
+     * <p>⚙ And one of its measurements had aged: <i>"CRO does not exist"</i> was true on 2026-08-06
+     * and false in dev from V373 onward, while remaining true in prod. That is F2-221's rule — a
+     * filing's measurements are the least-verified thing in it, so re-derive before executing.
+     *
+     * <p>What is pinned now is the converted state. The role-list assertions are kept as the
+     * historical record of what those three tiers used to admit, so the diff between the two is
+     * legible: {@link RrpGuardConversionTest} holds the live contract, V383 holds the catalogue.
      */
     @Test
-    @DisplayName("F2-130: the guard constants are as reviewed, and their unusable roles recorded")
+    @DisplayName("F2-130 CLOSED: the three tiers are permissions, and the old role lists are recorded")
     void theGuardConstantsArePinnedWithTheirUnusableRoles() {
         String ctl = source("controller", "RrpController.java");
 
-        assertThat(rolesIn(ctl, "READ_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "RISK_MANAGER", "COMPLIANCE_OFFICER", "INTERNAL_AUDITOR",
-            "BCM_MANAGER", "BOARD_SECRETARY", "CFO", "CRO");
-        assertThat(rolesIn(ctl, "WRITE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "RISK_MANAGER", "BCM_MANAGER", "CRO");
-        assertThat(rolesIn(ctl, "APPROVE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "CRO", "CFO");
+        assertThat(rolesIn(ctl, "READ_GUARD"))
+            .as("F2-260: no role name survives on any tier — all three are hasPermission('RRP',…)")
+            .isEmpty();
+        assertThat(rolesIn(ctl, "WRITE_GUARD")).isEmpty();
+        assertThat(rolesIn(ctl, "APPROVE_GUARD")).isEmpty();
 
-        // ⚠ CRO is fictional; CFO and BCM_MANAGER exist with zero holders. A test cannot join to
-        // iam.roles without a database, so what is pinned here is the recited SET — and the finding
-        // records which members are unusable and why the two failure modes differ.
-        assertThat(rolesIn(ctl, "APPROVE_GUARD")).as(
-            "F2-130 — of these three, only PLATFORM_ADMIN can approve a SAMA recovery plan today. "
-            + "When CRO is created or CFO is granted, close the finding and update this.")
-            .hasSize(3).contains("CRO", "CFO");
+        assertThat(ctl).as(
+            "F2-130's Severity cell was \"no business role can approve a Recovery & Resolution "
+            + "Plan; approval authority is the platform superuser alone\". Probed live 13/13 both "
+            + "ways: pre-fix `compliance` and `rmanager` were refused the SAMA filing at 403 and "
+            + "`admin` lodged at 200; post-fix `compliance` (GRC_ADMINISTRATOR, granted "
+            + "RRP:APPROVE by V383) lodges at 200 while `rmanager` — which drives the cycle to "
+            + "APPROVED — is still refused, because the preparer may not lodge.")
+            .contains("hasPermission('RRP','READ')")
+            .contains("hasPermission('RRP','WRITE')")
+            .contains("hasPermission('RRP','APPROVE')");
+
+        // The historical record. F2-130 measured these on 2026-08-06: of APPROVE_GUARD's three
+        // names only PLATFORM_ADMIN was satisfiable, CRO did not exist at all, and CFO existed
+        // with zero holders — the observation that made "existence" a weaker question than
+        // "holding" and gave four earlier findings (F2-116/120/127/130) a common shape.
+        assertThat(ctl).as(
+            "the retired role lists must stay recorded in the constants' javadoc, so the reason "
+            + "this module was converted is legible where the guards are")
+            .contains("hasAnyRole('PLATFORM_ADMIN','CRO','CFO')");
     }
 
     @Test
@@ -317,15 +348,36 @@ class RrpLifecycleTest {
         }
     }
 
+    /**
+     * The ROLE NAMES a guard constant recites — from {@code hasAnyRole(…)} / {@code hasRole(…)}
+     * argument lists only.
+     *
+     * <p>⚠⚠ <b>F2-260 — this used to scan {@code '([A-Z_]+)'} across the whole initialiser, so
+     * {@code hasPermission('RRP','READ')} parsed as two role names, {@code RRP} and {@code READ}.</b>
+     * It is the <b>third</b> instance of that one extractor bug: F2-254 repaired it in
+     * {@code BiaApprovalChainGuardTest}, F2-259 in {@code AuditCommitteeGuardTest.namesIn}, and here.
+     * 🔑 <b>A quoted-token scan over a guard expression flags every role-to-permission conversion
+     * F2-05 exists to make</b> — a gate that fails on correct code, which is the one failure a gate
+     * must never have (F2-214). Each instance bit on the slice that converted its own module, so the
+     * shape recurs once per module <b>because there is no shared primitive</b> — measured at 5
+     * hand-rolled copies across the test tree, of which `sharia` and `openbanking` were quietly
+     * updated when F2-145(e) converted them and `cpty` is still latent. Extracting one helper is
+     * filed (F2-190's rule: do not hand-roll a fifth).
+     */
     private static Set<String> rolesIn(String src, String constant) {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile(
             "String\\s+" + constant + "\\s*=\\s*(.*?);", java.util.regex.Pattern.DOTALL).matcher(src);
         assertThat(m.find()).as("guard constant %s must be declared — a pattern that matches nothing "
             + "passes forever", constant).isTrue();
         Set<String> out = new TreeSet<>();
-        java.util.regex.Matcher r = java.util.regex.Pattern.compile("'([A-Z_]+)'").matcher(m.group(1));
-        while (r.find()) {
-            out.add(r.group(1));
+        java.util.regex.Matcher call = java.util.regex.Pattern.compile(
+            "has(?:Any)?Role\\s*\\(([^)]*)\\)").matcher(m.group(1));
+        while (call.find()) {
+            java.util.regex.Matcher r =
+                java.util.regex.Pattern.compile("'([A-Z_]+)'").matcher(call.group(1));
+            while (r.find()) {
+                out.add(r.group(1));
+            }
         }
         return out;
     }

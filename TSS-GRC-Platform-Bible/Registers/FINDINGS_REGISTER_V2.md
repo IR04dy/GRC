@@ -2547,6 +2547,153 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-260 · The finding that coined "existence is weaker than holding" was one of the sites still open
+
+| Field | Content |
+|---|---|
+| **ID** | F2-260 *(measured 2026-08-20/21. Provenance is [[F2-259]]'s filed §B2b work list. Re-deriving it first ([[F2-221]]) mattered twice: [[F2-130]]'s recorded measurement `"CRO does not exist"` had aged — V373 created it in dev and it remains absent in prod — and the block's recorded blocker, `RRP` having no catalogued permission, turned out to be a migration this slice could write rather than an owner decision.)* |
+| **Category** | Authorization — a role guard admitting the platform administrator alone, on a module with **no catalogued permission of any kind**, so there was no tenant remedy either |
+| **Severity** | **P2.** `POST /api/v1/rrp/cycles/{id}/submit` — the route that lodges the Recovery &amp; Resolution Plan with SAMA — was reachable by the platform administrator and nobody else, in both databases, with no configuration that could change it. |
+| **Provenance** | [[F2-259]] filed the three remaining §B2b guards, naming `module.rrp` 1 as *"the SAMA recovery-and-resolution filing V373 itself calls the sharp case, blocked on `RRP` having no catalogued permissions"*. |
+| **Current State** | ✔ **FIXED 2026-08-21** (`682052ee`). All three tiers converted to `hasPermission('RRP', READ│WRITE│APPROVE)` across 17 routes — the largest single conversion `BASELINE_PURE_ROLE_SITES` has recorded (380 → **363**); **V383** catalogues the module and grants it; `RrpGuardConversionTest` (6 legs); census §B2b **3 → 2**; MEASURED_BASELINE permission modules 37 → **38** and zero-`hasPermission` packages 10 → **9**. Probed live **13/13 pre-fix and 13/13 post-fix**. **Closes [[F2-130]].** |
+| **Problem** | `APPROVE_GUARD` was `hasAnyRole('PLATFORM_ADMIN','CRO','CFO')`. `CRO` and `CFO` are held by **no user** in dev or prod, and `CRO` is **absent from prod's `iam.roles` entirely** because V373 is pending there. A role guard never reaches `ModulePermissionEvaluator`, so it never reaches the PLATFORM_ADMIN bypass either. |
+| **Root Cause** | RC-B — object-level authorisation expressed as a role name rather than a permission, compounded by RC-catalogue: the module the guards would have to cite did not exist. Fifth closure of [[F2-253]]'s holder-attrition shape after [[F2-253]], [[F2-254]], [[F2-258]] and [[F2-259]], and the first where the ordinary remedy was unavailable rather than merely ineffective. |
+| **Evidence** | `iam.roles` / `iam.user_roles` / `iam.permissions` in **both** databases; the migration set for the catalogue ([[F2-255]]'s rule); the cycle state machine read from `RrpService.ALLOWED`; live probe 13/13 in both modes with pre and post validating each other; pre-fix control RED naming the routes; mutation harness 11 killed / 0 survived / 0 anchor-miss; V383 applied twice to dev, prod pre-flighted |
+
+**Finding.** `RrpController` carried three pure role guards over 17 routes:
+
+```
+READ     hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',
+                    'BCM_MANAGER','BOARD_SECRETARY','CFO','CRO')     -- 7 routes · 3 live non-admin
+WRITE    hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','BCM_MANAGER','CRO')  -- 9 routes · 1 live non-admin
+APPROVE  hasAnyRole('PLATFORM_ADMIN','CRO','CFO')                    -- 1 route  · ADMIN ALONE
+```
+
+🔑 **Why the APPROVE tier bit rather than merely being narrow.** `/cycles/{id}/transition` carries the
+WRITE tier, which `RISK_MANAGER` holds, so a risk manager can drive a cycle
+`DRAFT → IN_PREPARATION → BOARD_REVIEW → APPROVED`. `RrpService.transition` then **explicitly refuses**
+the `SUBMITTED` edge — *"Use the dedicated /submit endpoint to lodge with SAMA"* — and
+`ALLOWED.get("APPROVED")` is `{IN_PREPARATION}`. So for every non-administrator **APPROVED was a dead
+end: its only forward edge was the administrator-only submit, and its only other move was backwards
+into preparation.** Measured identically in dev and prod: 5 cycles (3 `IN_PREPARATION`, 2 `CLOSED`), 46
+critical functions, 31 indicators, 32 recovery options, 14 events — and **no cycle has ever reached
+`SUBMITTED`**, for which this guard is a sufficient explanation. Probed live: `rmanager` drove a planted
+cycle to APPROVED (200/200/200) and was refused the filing at **403**; so was `compliance`; `admin`
+lodged at **200**.
+
+🔑🔑 **THE HEADLINE: [[F2-130]] found this in full on 2026-08-06, coined the distinction the whole
+[[F2-253]] → [[F2-259]] lineage rests on, and was itself one of the sites still open.** Its Lesson cell
+reads *"Ask of an authorisation list not do these names exist but **can anybody satisfy it today**.
+Existence is a weaker question than holding, and the weaker question is the one four findings had been
+asking."* That is precisely the question the last five slices have been closing one guard at a time —
+and the row that wrote it down stayed 🔴 OPEN for fifteen days. Its stated reason was correct as far as
+it went: *"converting to `hasPermission` is F2-05's ratified direction, which makes the names
+irrelevant… This is the fourth data point for sequencing F2-05, not a fourth patch."*
+
+⚠⚠ **And its exit condition pointed at the remedy that does not work.** The pin's own trigger read
+*"When CRO is created or CFO is granted, close the finding and update this"* — **seating**, and only
+that. V373 then chose exactly that remedy for exactly these two roles, and [[F2-258]] measured what it
+achieved: seating creates a role and assigns it to nobody, so 79 guard sites became *satisfiable*
+rather than satisfied. **`CRO` was created and this finding stayed open**, because creation was never
+the thing that mattered. 🔑 **A pin that names three remedies in its prose and phrases its tripwire in
+terms of one of them points the next reader at that one** — and the one it named is the one this
+register has since had to write two findings to correct.
+
+**What made this different in kind from the four attrition sites.** [[F2-253]] is explicit that an
+unheld role *"has an administrator remedy — a remedy, not a defence"*. Here there was no remedy at all:
+`RRP` had **no row in `iam.permissions` of any kind**, so nothing could be granted because nothing
+existed to grant. [[F2-257]] filed five such modules (`DATACLASS`, `OUTSOURCING`, `REGINSPECT`,
+`REGREPORTING`, `RRP`); this closes the first, and it is the first entry in
+`MEASURED_BASELINE`'s permission-module row whose module had no catalogue at all beforehand rather than
+a partial or mis-derived one. 🔑 Note the direction of travel is the **opposite** of `ETHICS`'s: there
+the catalogue existed and no guard consulted it, here the guards existed and there was nothing to cite.
+Both end up in that column and only the order tells you which failure it was.
+
+**V383 catalogues exactly the three tiers the controller declares** — read off its three guard
+constants, never inferred from method shape, which is V362's landmine (it classified by shape and
+promoted whole WRITE tiers to APPROVE in four of six modules, and V367/V368 had to undo it). Check 1b
+refuses a fourth `RRP` action so a later tier is a decision rather than a default.
+
+**Grants, per role, measured before converting rather than after** (V362's landmine), identical in both
+databases. READ and WRITE are **population-preserving**: every role the old lists named is granted,
+including the four held by nobody, so a tenant administrator assigning one still gets what the shipped
+guard promised. `RRP:APPROVE` goes to `CRO`, `CFO` and `GRC_ADMINISTRATOR` — the last being the unlock
+and the only live holder admitted, chosen because it holds `APPROVE` on `BCM`, `RISK` and `ADMIN` alike
+rather than because it was convenient. **So the live audience change is one role on one route.**
+
+⚠⚠ **`RISK_MANAGER` is deliberately withheld from `RRP:APPROVE`, and that is the sharpest decision in
+the slice.** It holds `RISK:APPROVE`, so convention argues for it — and the shipped guard pointedly did
+not name it: WRITE and APPROVE overlapped on `CRO` and nothing else. Granting it would let the persona
+that prepares *and board-approves* the cycle also lodge it with the regulator, retiring the one
+separation this controller expresses. V383's **check 4** fails the migration if a second role ever
+holds both, and the probe asserts it from the outside: post-fix `rmanager` still gets **403** on submit
+while driving the cycle to APPROVED at 200. `AUDITOR`, `VIEWER` and `REGULATOR_VIEWER` are likewise
+withheld from READ although all three hold `BCM:READ` and `RISK:READ` — a resolution plan is the most
+sensitive document in a bank's contingency set, and the shipped read guard names none of them.
+
+⚠⚠ **A MIGRATION MAY ASSERT ITS OWN WRITES AND MUST NOT ASSERT TENANT DATA.** The natural fifth
+self-check was the one this file exists for — *does any active user now hold a role granted
+`RRP:APPROVE`?*, [[F2-253]]'s satisfiable-versus-satisfied distinction. It was written and **removed**:
+a brand-new deployment runs this chain with a bootstrap administrator and no `GRC_ADMINISTRATOR`
+seated, so it would THROW and block V383 and every migration after it — a self-check that fails on
+correct usage, which is [[F2-214]] at the schema. The roles V383 *grants* are safe to require because
+migrations before it create them (V362 seats `BOARD_SECRETARY` and `CFO`, V373 seats `CRO` — resolved
+from the migration set, not assumed); who *holds* them is not. For the same reason check 6's catalogue
+floor is **50** rather than the ~140 both live databases carry: [[F2-255]] measured that a fresh Flyway
+install from V1 builds only **93** pairs, because 36 core pairs exist in dev and prod solely because
+the Python bootstrap made them. So "did this unlock anybody?" is proved by the probe and held by the
+gate, and `RrpGuardConversionTest` asserts the absence structurally so the next author does not re-add
+it.
+
+⚠⚠ **THE THIRD INSTANCE OF ONE DETECTOR BUG, IN A THIRD MODULE.**
+`RrpLifecycleTest.rolesIn` scanned `'([A-Z_]+)'` across the whole guard initialiser, so
+`hasPermission('RRP','READ')` parsed as two role names — `RRP` and `READ`. [[F2-254]] repaired exactly
+this in `BiaApprovalChainGuardTest`; [[F2-259]] repaired it in `AuditCommitteeGuardTest.namesIn`; and
+here again. 🔑 **A quoted-token scan over a guard expression flags every role-to-permission conversion
+[[F2-05]] exists to make**, and each instance has bitten on the slice that converted its own module —
+so **the shape recurs once per module because there is no shared primitive.** Measured at **5**
+hand-rolled copies across the test tree: `sharia` and `openbanking` were quietly updated when F2-145(e)
+converted them, and `cpty` is still latent because its module has not converted. Extracting one helper
+is filed ([[F2-190]]: do not hand-roll a fifth).
+
+⚠ **[[F2-225]]'s lesson, arriving from the other side.** F2-130 was held by a **pinned known-defect
+test**, which passes on a defective tree by design — so the codebase's own record of this defect was
+invisible to every scan, and the finding had to be made twice. Its tripwire then worked exactly as
+designed: it failed the build the moment the guards were converted, and `FindingsRegisterConsistencyTest`
+required the register cell to move in the same commit. Two instruments in series, both doing their job.
+
+⚙ **Verified correct in passing, and worth recording because this family usually gets it wrong.**
+`SubmitCycleRequest.regulatorAckReference` is `@NotBlank` and **caller-supplied** — which is right, not
+F2-172(d): a SAMA acknowledgement reference is *received from the authority and recorded*, never minted
+by the server, and [[F2-209]]'s own rule says so (*"a reference only an outside authority can issue is
+not one the server may mint either"*). `title_ar` is `@NotBlank` on the create, so house rule 7 holds.
+
+**Verification.** Pre-fix control RED naming the routes · live probe **13/13 pre-fix and 13/13
+post-fix**, the two runs validating each other because all three tiers are population-preserving by
+design and the *only* behavioural difference is the submit unlock (so post-fix code loaded during a
+"pre" run would have failed leg 11 rather than passing for the wrong reason) · mutation harness **11
+killed / 0 survived / 0 anchor-miss** · V383 applied **twice** to dev, idempotent, with prod
+pre-flighted (its `CRO` refusal is check 0 working, since Flyway runs V373 before V383) · cleanup
+restored the exact 5/14/31/32/46 baseline in all five `rrp` tables on both runs · suite **4,362/0/0**.
+
+**Filed.**
+- §B2b is down to **2**, both `module.bcm`: `BiaQuantitativeController#boardApprove` and
+  `#cfoApprove`, [[F2-254]]'s two BIA tiers. Still blocked on a migration rather than on effort —
+  `bcm.bia_quantitative` has a caller-supplied `cfo_approver_name` and **no `board_approved_by` column
+  at all**, so the four-eyes bar that would make one shared `BCM:APPROVE` safe cannot be built yet.
+  [[F2-254]] already recorded that the guard lockout and the missing attribution are one problem that
+  F2-52 filed as two.
+- **The shared role-name extractor**: 5 hand-rolled copies, 3 of which have now failed on a correct
+  conversion, one per converting slice. One test-support helper would make the fourth impossible.
+- **[[F2-257]]'s catalogue gap is down to four**: `DATACLASS`, `OUTSOURCING`, `REGINSPECT` and
+  `REGREPORTING` still have no `WRITE`/`APPROVE` row in `iam.permissions`. All four are in
+  `MEASURED_BASELINE`'s zero-`hasPermission` column, so each is the same two-step this slice was.
+  Separately `COMPLIANCE:APPROVE` exists with **0 grants** in both databases — [[F2-253]]'s attrition
+  one level up, at the permission rather than the role, like `CPTY:APPROVE`.
+- The whole **`rrp` schema has zero CHECK constraints**, so `rrp_cycle.status` is narrowed only by
+  `RrpService.ALLOWED` — [[F2-221]]'s shape, and now cheap, since this slice touched the module's
+  guards but not its writers ([[F2-183]]: the constraint and its writer land in the same commit).
+
 ## F2-259 · The guard was corrected once, and correcting it changed nothing
 
 | Field | Content |
@@ -10809,7 +10956,7 @@ authority, not the tier.
 | **ID** | F2-130 *(found writing F2-03's floor for `rrp`; the fourth instance of F2-116's shape, and the one that refines how the shape must be measured)* |
 | **Module** | `rrp` — `RrpController` |
 | **Severity** | **P2** — no business role can approve a Recovery &amp; Resolution Plan; approval authority is the platform superuser alone |
-| **Current State** | 🔴 **OPEN.** Pinned by `RrpLifecycleTest.theGuardConstantsArePinnedWithTheirUnusableRoles` |
+| **Current State** | ✔ **CLOSED 2026-08-21 by [[F2-260]].** All three tiers converted to `hasPermission('RRP', READ|WRITE|APPROVE)` across 17 routes, after **V383** catalogued a module that had **no permission row of any kind** — so unlike F2-116/120/127 there was no "grant the role" remedy available at all: nothing could be granted because nothing existed to grant. READ and WRITE are population-preserving (every named role granted, including the four held by nobody); `RRP:APPROVE` goes to `CRO`, `CFO` and `GRC_ADMINISTRATOR`, the last being the only live holder and chosen because it holds APPROVE on `BCM`, `RISK` and `ADMIN` alike. Probed live **13/13 pre-fix and 13/13 post-fix**. ⚠⚠ **This row's exit condition pointed at the wrong remedy.** Its pin read *"When CRO is created or CFO is granted, close the finding and update this"* — and `CRO` **was** created, by V373, and this stayed open, because seating a role assigns it to nobody ([[F2-258]] measured what V373 actually achieved: 79 sites *satisfiable* rather than satisfied). The javadoc beside it named conversion as F2-05's ratified direction and the tripwire named only seating. 🔑 **A pin that names three remedies in prose and phrases its trigger in terms of one of them points the next reader at that one.** ⚙ And one measurement had aged: *"CRO does not exist"* was true on 2026-08-06 and false in dev from V373 on, true in prod still — F2-221's rule. |
 | **Problem** | `APPROVE_GUARD` names three roles. Measured against `iam.roles` **and `iam.user_roles`** on 2026-08-06, exactly **one** is satisfiable: `PLATFORM_ADMIN` exists with 1 holder; **`CRO` does not exist**; **`CFO` exists with 0 holders**. `WRITE_GUARD` is 2 of 4 for the same reason (`BCM_MANAGER` exists, 0 holders) and `READ_GUARD` 4 of 8 |
 | **⚠ THE REFINEMENT, and it changes how F2-52 should be read** | F2-116, F2-120 and F2-127 were each measured by asking *does this name exist in `iam.roles`* — and **`CFO` passes that check**. A role that exists with **no holders** is equally unusable and fails differently: a name-existence join reports it as fine. So **F2-52's platform-wide figure (~50% of 74 recited names do not exist) is a LOWER BOUND** on the unusable population. There are two ways a role-name guard authorises nobody, and only one of them has been counted |
 | **The pattern, four for four** | `outsourcing` (F2-116) · `sharia` (F2-120) · `openbanking` (F2-127) · `rrp`. Each recites the **domain-specialist** role it was designed around — Chief Risk Officer, Sharia Officer, Open Banking Officer, CRO/CFO — and none of those is usable. **The guards were written from an org chart, not from the role table** |

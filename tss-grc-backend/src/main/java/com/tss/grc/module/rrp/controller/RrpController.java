@@ -49,13 +49,59 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class RrpController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER',"
-            + "'INTERNAL_AUDITOR','BCM_MANAGER','BOARD_SECRETARY','CFO','CRO')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','BCM_MANAGER','CRO')";
-    private static final String APPROVE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','CRO','CFO')";
+    /**
+     * F2-260 — all three tiers were pure role guards, and the APPROVE one admitted the platform
+     * administrator alone.
+     *
+     * <h3>The lockout</h3>
+     * {@code APPROVE_GUARD} was {@code hasAnyRole('PLATFORM_ADMIN','CRO','CFO')}. {@code CRO} and
+     * {@code CFO} are held by <b>no user in dev or prod</b>, and {@code CRO} is additionally
+     * <b>absent from prod's {@code iam.roles}</b> because V373 is pending there. A role guard never
+     * reaches {@code ModulePermissionEvaluator}, so it never reaches the PLATFORM_ADMIN bypass
+     * either: {@code POST /cycles/{id}/submit} — the route that lodges the Recovery &amp; Resolution
+     * Plan with SAMA — was reachable by the platform administrator and nobody else.
+     *
+     * <p>🔑 <b>Why that mattered rather than merely being narrow.</b> {@code /transition} carries the
+     * WRITE tier, which {@code RISK_MANAGER} holds, so a risk manager can drive a cycle
+     * {@code DRAFT → IN_PREPARATION → BOARD_REVIEW → APPROVED}. {@code RrpService.transition} then
+     * explicitly refuses the {@code SUBMITTED} edge (<i>"Use the dedicated /submit endpoint to lodge
+     * with SAMA"</i>) and {@code ALLOWED.get("APPROVED")} is {@code {IN_PREPARATION}} — so for every
+     * non-administrator <b>APPROVED was a dead end: the only forward edge was the administrator-only
+     * submit and the only other move was backwards into preparation.</b> Measured identically in dev
+     * and prod: 5 cycles, 46 critical functions, 31 indicators, 32 recovery options, and
+     * <b>no cycle has ever reached SUBMITTED</b>.
+     *
+     * <h3>Why this needed a migration and not a guard edit</h3>
+     * {@code RRP} had <b>no catalogued permission of any kind</b> in either database — F2-257 filed
+     * that {@code DATACLASS}, {@code OUTSOURCING}, {@code REGINSPECT}, {@code REGREPORTING} and
+     * {@code RRP} have no {@code WRITE}/{@code APPROVE} row at all. So unlike F2-253's attrition
+     * sites there was no remedy available to a tenant administrator: nothing could be granted because
+     * nothing existed to grant. <b>V383</b> catalogues exactly the three tiers these three constants
+     * express — read off the guards, never inferred from method shape, which is V362's landmine — and
+     * grants them as declared literals.
+     *
+     * <p>⚠ <b>Audience diff, measured before converting rather than after (V362's landmine) and
+     * identical in both databases.</b> READ and WRITE are <b>population-preserving</b>: every role
+     * the old lists named is granted, including the four held by nobody, so a tenant administrator
+     * assigning one still gets what the shipped guard promised. APPROVE goes from the platform
+     * administrator alone to <b>the platform administrator plus {@code GRC_ADMINISTRATOR}</b> — one
+     * role, one live holder, on one route, and it follows the platform's own convention rather than a
+     * preference: {@code GRC_ADMINISTRATOR} holds {@code APPROVE} on {@code BCM}, {@code RISK} and
+     * {@code ADMIN} alike.
+     *
+     * <p>⚠⚠ <b>{@code RISK_MANAGER} is deliberately NOT granted {@code RRP:APPROVE}, and that is the
+     * sharpest decision here.</b> It holds {@code RISK:APPROVE}, so convention argues for it — and
+     * the shipped guard pointedly did not name it: WRITE and APPROVE overlapped on {@code CRO} and
+     * nothing else. Granting it would let the persona that prepares and board-approves the cycle also
+     * lodge it, retiring the one separation this controller does express. V383's check 4 fails the
+     * migration if a second role ever holds both. {@code AUDITOR}, {@code VIEWER} and
+     * {@code REGULATOR_VIEWER} are likewise withheld from READ although all three hold
+     * {@code BCM:READ} and {@code RISK:READ}: a resolution plan is the most sensitive document in a
+     * bank's contingency set, and the shipped read guard names none of them.
+     */
+    private static final String READ_GUARD = "hasPermission('RRP','READ')";
+    private static final String WRITE_GUARD = "hasPermission('RRP','WRITE')";
+    private static final String APPROVE_GUARD = "hasPermission('RRP','APPROVE')";
 
     private final RrpService service;
 
