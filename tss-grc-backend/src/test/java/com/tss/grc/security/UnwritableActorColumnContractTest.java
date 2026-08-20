@@ -434,42 +434,42 @@ class UnwritableActorColumnContractTest {
     /**
      * Read the code before writing a reason. These are measured members with NO verdicts.
      *
-     * <p>The largest sub-shape is its own finding and is deliberately left whole rather than
-     * adjudicated nine times: <b>nine event registers declare {@code actorName} beside an
-     * {@code actorUserId} their service DOES write</b> ({@code AiLifecycleEvent}, {@code CptyEvent},
-     * {@code DataclassEvent}, {@code FraudCaseUpdate}, {@code ObEvent}, {@code OutsourcingEvent},
-     * {@code RegInspectionUpdate}, {@code RegReportEvent}, {@code RrpEvent}, {@code ShariaEvent}).
-     * For the one that was read, {@code AiLifecycleService#timeline} writes
-     * {@code e.setActorUserId(currentUserId())} and never the name, while
-     * {@code AiLifecycleService#toEvent} returns {@code e.getActorName()} — so 🔑 <b>the id is
-     * stored and the NAME is the half the response carries</b>, and every timeline entry renders a
-     * blank actor. Whether the other eight share that is a question for a reader, not for this map.
+     * <p><b>F2-257 closed the largest sub-shape and corrected this paragraph twice.</b> It read
+     * "nine event registers declare {@code actorName} beside an {@code actorUserId} their service
+     * DOES write" and then listed <b>ten</b> — the nine on this list plus {@code FraudCaseUpdate},
+     * which is not a member of the census at all because its clock is a field initialiser. 🔑 <b>A
+     * member excluded by an instrument's blind spot reads exactly like a member that was checked and
+     * cleared</b>, and here the prose and the list disagreed by one in the reassuring direction.
+     * Resolved from {@code sys.columns} in both databases, ten tables declare both halves and every
+     * one of them is now written.
+     *
+     * <p>The second correction is the consequence. This paragraph said "every timeline entry renders
+     * a blank actor". Measured across {@code tss-grc-ui-v2}, <b>no screen renders any of these ten
+     * actors</b> — {@code EthicsPage} is the only surface in the platform that reads an
+     * {@code actorName}, and that is the register F2-248 closed. So the blank reached API consumers
+     * and the export surface rather than a page. 🔑 <b>A claim about a consequence is the
+     * least-verified part of a filing</b> (F2-192), and it is worth stating narrowly: this is a fact
+     * about today, not a property of the control (F2-182), since the field is on the wire and the
+     * next client to declare it would render nothing.
+     *
+     * @see #theActorPairIsAlwaysWrittenTogether()
      */
     private static final Set<String> WORK_LIST = Set.of(
         "AccessReviewItem#userId",
-        "AiLifecycleEvent#actorName",
         "AiSuggestion#reviewedBy",
         "AlternateSupplier#lastAssessedBy",
         "AppetiteBreachEvent#acknowledgedById",
         "ChangeCondition#ownerId",
-        "CptyEvent#actorName",
         "CrisisAar#approvedBy",
-        "DataclassEvent#actorName",
         "EvidenceItem#chainLastVerifiedBy",
         "EvidenceVersion#chainVerifiedBy",
         "EvidenceVersion#snapshottedBy",
         "FourthPartyExposure#lastValidatedBy",
         "MtpdInheritanceAssessment#computedByUserId",
         "NdiSubmissionPackage#reviewerName",
-        "ObEvent#actorName",
-        "OutsourcingEvent#actorName",
-        "RegInspectionUpdate#actorName",
-        "RegReportEvent#actorName",
         "ReportingYear#approvedBy",
         "ReportingYear#reviewedBy",
         "RiskAttestation#attestedBy",
-        "RrpEvent#actorName",
-        "ShariaEvent#actorName",
         "SustainabilityReport#generatedBy",
         "SustainabilityReport#reviewedBy",
         "VendorBcpAttestation#escalatedToUserId"
@@ -616,6 +616,99 @@ class UnwritableActorColumnContractTest {
     }
 
     @Test
+    @DisplayName("F2-257: an entity declaring both halves of the actor pair must have both written")
+    void theActorPairIsAlwaysWrittenTogether() {
+        // The claim that prevents drift is about WHERE the writes live (F2-245). Ten event/timeline
+        // registers declared actor_user_id AND actor_name, every service wrote only the id, and
+        // NOTHING in the platform wrote the name — so the half the response carried was the half
+        // nobody filled in. This is a hard zero with no exemption map, and that is safe rather than
+        // strict (F2-214): a register that does not want to record a display name should not declare
+        // the column, and one that does has CurrentActor.username() available with no new module
+        // edge. There is no correct code for it to fail on.
+        List<String> idWithoutName = new ArrayList<>();
+        List<String> pairs = new ArrayList<>();
+        for (Class<?> entity : shippedEntities()) {
+            Set<String> fields = ownFields(entity);
+            if (!fields.contains("actorUserId") || !fields.contains("actorName")) { continue; }
+            pairs.add(entity.getSimpleName());
+            if (writtenOn(entity, "actorUserId") && !writtenOn(entity, "actorName")) {
+                idWithoutName.add(entity.getSimpleName() + "#actorName");
+            }
+        }
+        assertThat(pairs)
+            .as("""
+                anti-vacuity: the derived population. sys.columns says ten tables declare both \
+                halves in dev and in prod, so a smaller number here means reflection or ownFields \
+                stopped resolving and the hard zero below is a report about an empty set.""")
+            .hasSizeGreaterThanOrEqualTo(10)
+            .contains("AiLifecycleEvent", "CptyEvent", "DataclassEvent", "FraudCaseUpdate",
+                      "ObEvent", "OutsourcingEvent", "RegInspectionUpdate", "RegReportEvent",
+                      "RrpEvent", "ShariaEvent");
+        assertThat(idWithoutName)
+            .as("""
+                a register that records WHICH user acted and never WHAT they are called publishes a \
+                response field nothing can fill. Both halves come from the same primitive, so \
+                writing one and not the other is not a decision anybody made — it is the id write \
+                having been added and the name write never following it.""")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("F2-257: the ten registers take the name from the principal, and do not refuse on it")
+    void theActorNameComesFromThePrincipalAndNeverRefuses() {
+        // Two things this leg exists to stop, and neither is visible from the pair invariant above.
+        //
+        // (a) The name must come from the authenticated principal, never from a request body — that
+        //     is F2-223's split attribution, which is the whole family this gate belongs to.
+        // (b) It must be username(), NOT requireUsername(...). The id half is nullable and comes
+        //     from the same primitive, so refusing on the name would make the two halves behave
+        //     differently in a writer whose only job is to record a side effect: a timeline write
+        //     that throws aborts the business operation it was recording (F2-191). Both null
+        //     together is the property, and `ob_event` holds six live rows whose actor is a machine
+        //     ('System (cert-monitor)', 'System (SIEM detection)') with no user id at all — so a
+        //     register in this family legitimately has actorless events.
+        Map<String, String> services = new TreeMap<>();
+        services.put("ai/lifecycle", "AiLifecycleService");
+        services.put("cpty", "CptyService");
+        services.put("dataclass", "DataclassService");
+        services.put("openbanking", "ObService");
+        services.put("outsourcing", "OutsourcingService");
+        services.put("reginspect", "RegInspectService");
+        services.put("regreporting", "RegReportingService");
+        services.put("rrp", "RrpService");
+        services.put("sharia", "ShariaService");
+        services.put("fraud", "FraudService");
+
+        List<String> problems = new ArrayList<>();
+        for (Map.Entry<String, String> e : services.entrySet()) {
+            String src = null;
+            for (String s : mainSources()) {
+                if (s.contains("class " + e.getValue() + " ")
+                    || s.contains("class " + e.getValue() + "\n")
+                    || s.contains("public class " + e.getValue())) {
+                    if (s.contains("setActorName(")) { src = s; break; }
+                }
+            }
+            if (src == null) { problems.add(e.getValue() + ": source not resolved"); continue; }
+            String helper = methodBody(src, "currentActorName");
+            if (helper == null) { problems.add(e.getValue() + ": no currentActorName() helper"); continue; }
+            if (!helper.contains("CurrentActor.username()")) {
+                problems.add(e.getValue() + ": the helper does not delegate to CurrentActor.username()");
+            }
+            if (helper.contains("requireUsername")) {
+                problems.add(e.getValue() + ": refuses on the name half while the id half is nullable");
+            }
+            if (count(src, "setActorName\\s*\\(\\s*currentActorName\\s*\\(") == 0) {
+                problems.add(e.getValue() + ": writes the name from something other than the helper");
+            }
+            if (count(src, "setActorName\\s*\\(\\s*(?:req|body|request)\\b") > 0) {
+                problems.add(e.getValue() + ": takes the actor name from the request body");
+            }
+        }
+        assertThat(problems).as("F2-257's fix shape, per register").isEmpty();
+    }
+
+    @Test
     @DisplayName("anti-vacuity: the scan resolves the whole entity population")
     void thePopulationIsLargeEnoughToBeReal() {
         // A floor has to sit above the largest WRONG answer, not above zero (F2-215). The wrong
@@ -671,7 +764,13 @@ class UnwritableActorColumnContractTest {
             .contains("occurredAt", "actorName");
         assertThat(isPersonField("actorName")).isTrue();
         assertThat(writtenOn(fraud, "actorName"))
-            .as("its actor column still has no writer — that half of the shape is real").isFalse();
+            .as("""
+                F2-257 gave it a writer, so it is now out of the census for TWO independent reasons \
+                and only one of them is this blind spot. The exemplar is kept because the CLOCK half \
+                has not changed and that is what this leg is about — but note what the change means: \
+                while the actor half was unwritten, the ONLY thing keeping this register out of the \
+                census was the initialiser, and it was a real member of the family the whole time.""")
+            .isTrue();
         assertThat(serverStampedClocks(fraud, fields))
             .as("""
                 …and its clock is an initialiser, not a stamp, so this gate cannot see it. If this \
