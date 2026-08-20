@@ -1,6 +1,7 @@
 package com.tss.grc.module.audit_committee;
 
 import com.tss.grc.module.audit_committee.dashboard.controller.AuditCommitteeDashboardController;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,8 +13,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -115,10 +114,17 @@ class AuditCommitteeGuardTest {
      * every conversion F2-05 exists to make. Now scoped to the argument list of
      * {@code hasAnyRole(…)} / {@code hasRole(…)}, which is the shape the claim is about: this class
      * asks whether a recited ROLE NAME exists, and a permission pair is not a role name.
+     *
+     * <p>⚠ <b>F2-262 — the pattern moved out of this class rather than being deleted.</b> This
+     * repair was the third of five, one per converting slice, and the fifth arrived before anybody
+     * extracted the primitive: measured, <b>eight</b> test classes hand-rolled this question in
+     * <b>three</b> mechanisms and <b>six</b> spellings. It now lives once, in
+     * {@link GuardExpressions#rolesRecitedBy}. The positive control below is unchanged and is now
+     * more valuable, because it guards the shared answer rather than this copy of it.
      */
-    private static final Pattern ROLE_CALL =
-            Pattern.compile("has(?:Any)?Role\\s*\\(([^)]*)\\)");
-    private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
+    private static Set<String> namesIn(String guard) {
+        return GuardExpressions.rolesRecitedBy(guard);
+    }
 
     private static Map<String, String> guards() {
         Map<String, String> found = new TreeMap<>();
@@ -134,19 +140,6 @@ class AuditCommitteeGuardTest {
             found.size(), EXPECTED.size())
             .hasSize(EXPECTED.size());
         return found;
-    }
-
-    /** Role names recited by this guard — from role-call argument lists only (see {@link #ROLE_CALL}). */
-    private static Set<String> namesIn(String guard) {
-        Set<String> out = new TreeSet<>();
-        Matcher call = ROLE_CALL.matcher(guard);
-        while (call.find()) {
-            Matcher m = QUOTED.matcher(call.group(1));
-            while (m.find()) {
-                out.add(m.group(1));
-            }
-        }
-        return out;
     }
 
     @Test
@@ -190,7 +183,7 @@ class AuditCommitteeGuardTest {
     }
 
     /**
-     * F2-259 — the positive control for the {@link #ROLE_CALL} repair, carrying the literal pre-fix
+     * F2-259 — the positive control for the role-extractor repair, carrying the literal pre-fix
      * and post-fix guard shapes.
      *
      * <p>F2-254's rule for a detector repair is that <b>the repaired detector must still answer the
@@ -243,7 +236,7 @@ class AuditCommitteeGuardTest {
         }
         // Anti-vacuity. Measured 11 after F2-259 (READ 7 + ATTEST 4; the write tier recites none),
         // down from 13. A floor has to sit above the largest WRONG answer, and the wrong answer here
-        // is a ROLE_CALL pattern that stops matching and returns nothing at all (F2-215).
+        // is an extractor that stops matching and returns nothing at all (F2-215).
         assertThat(checked).as("no role names parsed out of any guard — the scan collapsed")
             .isGreaterThanOrEqualTo(11);
         assertThat(offenders).as("""

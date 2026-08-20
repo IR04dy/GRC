@@ -291,14 +291,15 @@ class DataOfficerLifecycleTest {
         // already bypasses for it, so the disjunct is redundant rather than dangerous. What must
         // never appear is a CRO/CIO/SHARIA_OFFICER-style name, which is how `outsourcing` (F2-116)
         // and `sharia` (F2-120) came to authorise nobody.
-        java.util.Set<String> namedRoles = new java.util.TreeSet<>();
-        java.util.regex.Matcher rm =
-            java.util.regex.Pattern.compile("has(?:Any)?Role\\(([^)]*)\\)").matcher(ctl);
-        while (rm.find()) {
-            for (String part : rm.group(1).split(",")) {
-                namedRoles.add(part.trim().replace("'", "").replace("\"", ""));
-            }
-        }
+        // F2-262 — was a hand-rolled `has(?:Any)?Role\(` scan with a comma split. It was the NINTH
+        // copy of this question and my own consolidation gate found it, after a narrower scan had
+        // put the population at eight: a detector scoped to the shapes I had already seen returned a
+        // SMALLER population, which reads exactly like a complete sweep (F2-198). Its own narrowing
+        // was the missing `\s*` before the paren, latent because no guard in the tree writes
+        // `hasAnyRole (` — closed anyway, because what made it harmless was nine regexes agreeing and
+        // nobody maintaining that (F2-177).
+        java.util.Set<String> namedRoles =
+            new java.util.TreeSet<>(com.tss.grc.support.GuardExpressions.rolesRecitedBy(ctl));
         assertThat(namedRoles).as(
             "only PLATFORM_ADMIN may be named as a role; anything else is F2-116/F2-120's class")
             .containsExactly("PLATFORM_ADMIN");

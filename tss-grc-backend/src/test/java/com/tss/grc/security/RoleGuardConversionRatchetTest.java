@@ -1,5 +1,6 @@
 package com.tss.grc.security;
 
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
@@ -69,31 +70,28 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class RoleGuardConversionRatchetTest {
 
-    /** {@code hasAnyRole('A','B')} / {@code hasRole('A')} — any whitespace, any arity. */
-    private static final Pattern ROLE_CALL =
-        Pattern.compile("has(?:AnyRole|Role)\\(([^)]*)\\)");
-
-    /**
-     * {@code hasAuthority('X')} / {@code hasAnyAuthority(...)} — two different things, depending on
-     * the string.
+    /*
+     * F2-262 — the four extraction patterns that used to live here are now
+     * com.tss.grc.support.GuardExpressions, the platform's single answer to "which role names does
+     * this guard recite". This class was the widest of eight hand-rolled copies and therefore the
+     * model for the helper; the verification for the consolidation is that the census figures below
+     * do not move, because a helper that changed them would be changing findings rather than
+     * sharing code.
      *
-     * <p>{@code hasAuthority('ROLE_X')} is {@code hasRole('X')} written longhand, and is counted
-     * with the role calls: splitting them would let the ratchet be satisfied by respelling a guard
-     * rather than converting it.
+     * The distinction the helper keeps as two methods, and why it must not become one total:
      *
-     * <p>{@code hasAuthority('KB_WRITE')} is something else — a <em>permission</em> spelled as the
-     * raw granted authority, which is what {@code ModulePermissionEvaluator} emits. It reads like
-     * {@code hasPermission('KB','WRITE')} and is not the same expression: the evaluator is never
-     * called, so everything it does is skipped, starting with the hardcoded PLATFORM_ADMIN bypass
-     * that the other 1,400 guards rely on. Classified as {@code RAW_AUTHORITY} and reported
-     * separately, because the conversion is a different one-line change and its failure mode is the
-     * opposite direction — too tight rather than too loose.
+     *   hasAuthority('ROLE_X') is hasRole('X') written longhand, and counts WITH the role calls —
+     *   splitting them would let this ratchet be satisfied by respelling a guard rather than
+     *   converting it. GuardExpressions.rolesRecitedBy() strips the prefix and includes it.
+     *
+     *   hasAuthority('KB_WRITE') is something else: a PERMISSION spelled as the raw granted
+     *   authority, which is what ModulePermissionEvaluator emits. It reads like
+     *   hasPermission('KB','WRITE') and is not the same expression — the evaluator is never called,
+     *   so everything it does is skipped, starting with the hardcoded PLATFORM_ADMIN bypass the
+     *   other 1,400 guards rely on. GuardExpressions.rawAuthoritiesIn() answers that separately,
+     *   because the conversion is a different one-line change and its failure mode is the opposite
+     *   direction — too tight rather than too loose.
      */
-    private static final Pattern AUTHORITY_CALL =
-        Pattern.compile("has(?:AnyAuthority|Authority)\\(([^)]*)\\)");
-
-    private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
-    private static final Pattern HAS_PERMISSION = Pattern.compile("hasPermission\\(");
 
     /** {@code PACKAGE CLASS#member KIND ROLE|ROLE...} per line, for the census script. */
     private static final Path OUT = Path.of("target", "role-guard-sites.txt");
@@ -1006,22 +1004,14 @@ class RoleGuardConversionRatchetTest {
             return;
         }
         String expr = pa.value();
-        boolean composed = HAS_PERMISSION.matcher(expr).find();
+        boolean composed = GuardExpressions.hasPermissionLeg(expr);
 
-        Set<String> roles = new LinkedHashSet<>();
-        Set<String> rawAuthorities = new LinkedHashSet<>();
-        collectNames(ROLE_CALL.matcher(expr), roles);
-        // hasAuthority splits by prefix: ROLE_* is a role said longhand, anything else is a
-        // permission said longhand. Same call, two different findings.
-        Set<String> authorities = new LinkedHashSet<>();
-        collectNames(AUTHORITY_CALL.matcher(expr), authorities);
-        for (String a : authorities) {
-            if (a.startsWith("ROLE_")) {
-                roles.add(a.substring("ROLE_".length()));
-            } else {
-                rawAuthorities.add(a);
-            }
-        }
+        // F2-262 — extraction is GuardExpressions', bucketing stays here. hasAuthority splits by
+        // prefix: ROLE_* is a role said longhand, anything else is a permission said longhand, which
+        // bypasses the evaluator. Same call, two different findings, which is why the helper answers
+        // them as two methods rather than one total.
+        Set<String> roles = new LinkedHashSet<>(GuardExpressions.rolesRecitedBy(expr));
+        Set<String> rawAuthorities = new LinkedHashSet<>(GuardExpressions.rawAuthoritiesIn(expr));
 
         if (!roles.isEmpty()) {
             out.add(new String[] { member, composed ? "COMPOSED" : "PURE", String.join("|", roles) });
@@ -1031,12 +1021,4 @@ class RoleGuardConversionRatchetTest {
         }
     }
 
-    private static void collectNames(Matcher call, Set<String> into) {
-        while (call.find()) {
-            Matcher q = QUOTED.matcher(call.group(1));
-            while (q.find()) {
-                into.add(q.group(1));
-            }
-        }
-    }
 }
