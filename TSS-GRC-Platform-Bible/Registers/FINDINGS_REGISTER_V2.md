@@ -2547,6 +2547,171 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-259 · The guard was corrected once, and correcting it changed nothing
+
+| Field | Content |
+|---|---|
+| **ID** | F2-259 *(measured 2026-08-20. Provenance is [[F2-258]]'s filing. Re-deriving it first ([[F2-221]]) refuted my own reason for picking this slice: I had called `module.audit_committee` the one §B2b block "not blocked on a migration or a catalogue gap", and the first measurement said `AUDIT_LC` and `AUDIT_COMMITTEE` have **no catalogued permissions at all** — which is [[F2-255]]'s catalogue gap. Both true and both irrelevant: I had taken the module name from `@RequireModule`, the **SKU** gate, and the permission module is `AUDIT`.)* |
+| **Category** | Authorization — a role guard whose only non-administrator name is held by nobody, on a site a previous slice had already **corrected** |
+| **Severity** | **P2.** `AuditCommitteeDashboardController`'s three snapshot-mutating routes — `#generate`, `#recordResolution`, `#finalizeSnapshot` — were reachable by the platform administrator and **nobody else**, in both databases. All three are wired to `/audit-committee/dashboard`, a routed and sidebar-linked page, so Generate snapshot / Record resolution / Finalize answered 403 for every non-administrator. The artefact is the one SAMA CG §6 and CMA CG Article 54 require the Audit Committee to report from. |
+| **Provenance** | [[F2-258]] filed the six remaining §B2b guards as a work list with no verdicts, naming `module.audit_committee` 3 (`BOARD_SECRETARY`, 0 holders) and suggesting [[F2-177]]'s committee-**seat** relation might be the mechanism. |
+| **Current State** | ✔ **FIXED 2026-08-20** (`fc2e39fe`). Three routes converted to `hasPermission('AUDIT','WRITE')`; the read and attest tiers deliberately left as role guards, both for measured reasons; **V382** grants `AUDIT:WRITE` to `BOARD_SECRETARY` so the conversion drops nobody; `AuditCommitteeGuardConversionTest` (8 legs) plus a repair to the pre-existing `AuditCommitteeGuardTest`; `BASELINE_PURE_ROLE_SITES` 383 → 380, census §B2b 6 → 3, MEASURED_BASELINE "packages with zero `hasPermission`" 11 → 10. Probed live 13/13 pre-fix and 13/13 post-fix. |
+| **Problem** | `hasAnyRole` tests for a **granted authority** and gets no `PLATFORM_ADMIN` bypass. `BOARD_SECRETARY` **exists** in `iam.roles` in both databases and is held by no user, so the guard admitted the platform administrator alone. |
+| **Root Cause** | RC-B — object-level authorisation expressed as a role name rather than a permission. Fourth recorded closure of [[F2-253]]'s holder-attrition shape, after [[F2-253]], [[F2-254]] and [[F2-258]] — and the first where the site had already been *audited and edited* for this exact family. |
+| **Evidence** | `iam.roles` / `iam.user_roles` / `iam.role_permissions` in **both** databases; the migration set for the catalogue ([[F2-255]]'s rule); live probe 13/13 both modes; pre-fix control RED naming all three routes; mutation harness 9 killed / 0 survived / 0 anchor-miss; V382 applied twice to dev with prod pre-flighted clean |
+
+**Finding.** The controller carried three tiers:
+
+```
+READ    hasAnyRole('CISO','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',
+                   'EXTERNAL_AUDITOR','BOARD_SECRETARY','PLATFORM_ADMIN')     -- live: 4 non-admin
+WRITE   hasAnyRole('BOARD_SECRETARY','PLATFORM_ADMIN')                        -- live: ADMIN ALONE
+ATTEST  hasAnyRole('EXTERNAL_AUDITOR','INTERNAL_AUDITOR','BOARD_SECRETARY',
+                   'PLATFORM_ADMIN')                                          -- live: 1 non-admin
+```
+
+Probed live pre-fix, 13/13: `compliance` (GRC_ADMINISTRATOR) and `auditor` (INTERNAL_AUDITOR), **both
+holding `AUDIT:WRITE`**, answered **403** on all three routes while `admin` generated at 201.
+`audit_committee.dashboard_snapshot` holds **0 rows in dev and prod**, and the lockout is a
+sufficient explanation for that: the register that exists to hold the committee's reporting artefact
+is empty, and the only persona who could ever have filled it is the platform administrator.
+
+🔑🔑 **The headline: this guard had already been corrected for this exact family, and the correction
+said so.** F2-52 audited it, found `hasAnyRole('AUDIT_COMMITTEE_CHAIR','COMPANY_SECRETARY',
+'PLATFORM_ADMIN')` — two of three names in no database — replaced the ghost `COMPANY_SECRETARY` with
+the real `BOARD_SECRETARY`, and wrote into the constant's javadoc:
+
+> 🔑 **`COMPANY_SECRETARY` was a near-miss.** The platform ships `BOARD_SECRETARY` ("Board
+> Secretary"), which is that person, and the guard did not name it. Corrected, **which restores one
+> of the two intended personas**.
+
+It restored nobody. **Asking whether a recited role EXISTS is not asking whether anybody HOLDS it** —
+[[F2-253]]'s distinction, and the same one V373 missed one level up when it chose *seating* as the
+remedy and made 79 sites *satisfiable* rather than satisfied ([[F2-258]]). The class-level javadoc
+then said the snapshot was *"mutated by the Board Secretary and the platform administrator"*, so
+every artefact a reader would consult described a two-persona audience that had only ever been one.
+
+⚠⚠ **And this is why a corrected site is worse than an uncorrected one.** F2-52's own heading on that
+constant is *"this said 'restricted to the Chair + Secretary + Platform Admin' and admitted the
+platform administrator alone"* — so the file contains a precise description of the defect, immediately
+above the defect, presented as history. A ghost name looks wrong in the source; **an unheld real role
+looks correct**, and `MEASURED_BASELINE.md` listed the package in its *"zero `hasPermission` usage"*
+column with a guard that read as fixed.
+
+**The target was settled by measurement, not preference.** Every peer controller under the same
+`@RequireModule("AUDIT_LC")` SKU — `AuditLifecycleController`, `FindingController`, `IaController`,
+`AuditEngagementController` — guards with `hasPermission('AUDIT', …)`: **55 of 55 guarded routes**,
+unanimous. ⚠ **The SKU code is not the permission module**, and taking it from `@RequireModule` is
+what made this look unconvertible: `AUDIT_LC` and `AUDIT_COMMITTEE` have no catalogued permission at
+all, and *"none catalogued"* reads exactly like [[F2-255]]'s catalogue gap. The catalogued module is
+`AUDIT`.
+
+**Audience diff, measured before converting rather than after** (V362's landmine), identical in both
+databases: nothing live dropped; `GRC_ADMINISTRATOR` and `INTERNAL_AUDITOR` admitted; containment
+holds (everything admitted also holds `AUDIT:READ`). Internal audit is admitted **deliberately** —
+`AUDIT:WRITE` already lets it author the findings, engagements, annual plans and working papers this
+snapshot aggregates, and the artefact is internal audit's own reporting pack to its committee. That
+is the opposite case from **V380**, where `INTERNAL_AUDITOR` was withheld from the audit-log integrity
+seal because operating it would make internal audit the author of the evidence it examines. Stating
+which of the two you are in is the whole of that decision.
+
+⚠ **V382 exists because converting alone would have narrowed the shipped audience.**
+`BOARD_SECRETARY` held `AUDIT:READ` **and `AUDIT:EXPORT`** and not `AUDIT:WRITE` — so the platform
+already let that role read and take out the audit register and withheld only the ability to prepare
+its own committee's snapshot. Converting without the grant retires the persona the guard was written
+for, which is a policy change disguised as a refactor ([[F2-258]]'s precedent, now a recognised step
+rather than a one-off). Live effect **none** — nobody holds the role — so what changes is what a
+tenant administrator gets on assigning it, which is exactly the remedy §B2b describes and exactly why
+that remedy is not a defence. ⚠ The pre-existing `AUDIT:EXPORT` grant was found by **check 1
+THROWing** on a first draft that assumed the set was `{READ}` alone: the migration refused rather
+than proceeding on a wrong premise, which is the argument for writing self-checks rather than
+comments.
+
+⚠⚠ **Two tiers were measured and deliberately NOT converted, and the reasons point in opposite
+directions.**
+
+- **READ** — `hasPermission('AUDIT','READ')` is held by **7 live roles including `VIEWER` and
+  `AUDITOR`**, so converting it would widen a governance dashboard's read to any authenticated
+  reader. That is precisely the defect `ROLE_GUARD_CENSUS.md` §B3 records against
+  `BoardPackController`, where ghost roles sat above a comment saying reads were for *"a
+  board/governance audience, not any authenticated principal"* while `REPORTING_READ` admitted
+  `viewer`. Four live non-administrator roles already read this dashboard, so there was no lockout
+  here to fix.
+- **ATTEST** — converting would **drop `EXTERNAL_AUDITOR`**, which holds no `AUDIT` grant at all and
+  is the one signatory whose independence is the point; an external auditor may not be a platform
+  principal ([[F2-256]]'s `EXTERNAL_AUDIT` rule). It is not a §B2b site either: `INTERNAL_AUDITOR` is
+  named and held.
+
+🔑 **A side effect worth naming: the attest tier was WIDER than the tier producing the artefact it
+attests to.** Probed pre-fix, `auditor` signed an attestation at **201** against a snapshot it was
+refused permission to generate at **403** — so the only reason nobody hit that inversion is that the
+register is empty. The conversion closes it, because `INTERNAL_AUDITOR` holds `AUDIT:WRITE`.
+
+⚠⚠ **A PRE-EXISTING GATE FAILED ON THE CORRECT CONVERSION — BOTH ITS LEGS — AND IT IS F2-254'S
+FINDING VERBATIM IN A SIBLING FILE.** `AuditCommitteeGuardTest`'s `namesIn()` ran a quoted-token
+regex over the **whole** guard expression, so `hasPermission('AUDIT','WRITE')` parsed as two role
+names, `AUDIT` and `WRITE`, and `noGuardNamesANonexistentRole` reported them as ghosts. [[F2-254]]
+repaired the identical defect in `BiaApprovalChainGuardTest` — **same author slice (F2-52), same
+purpose, and this sibling kept the bug**, so a ghost-role detector written as a bare quoted-token
+scan flags **every** role-to-permission conversion [[F2-05]] exists to make. Scoped to the argument
+list of `hasAnyRole(…)` / `hasRole(…)`, which is the shape its claim is about. 🔑 **A gate that fails
+on correct code is worse than no gate: it trains the next reader to edit the assertion rather than
+the code** ([[F2-214]]) — and here the assertion it would have trained them to edit is a *ghost-role*
+assertion.
+
+⚙ **The control for a detector repair is mechanical now, not argued.** [[F2-254]]'s rule is that the
+repaired detector must still answer the same on the tree the original passed on; a new leg asserts
+exactly that, against the **literal pre-fix and post-fix guard shapes** plus a composed guard (whose
+role leg must still be seen — the shape [[F2-159]]/[[F2-161]] controls are built from) and a
+three-argument ownership guard (which names no role). Its anti-vacuity floor moved 13 → **11** with
+the reason recorded, because the write tier now recites no role at all.
+
+⚙ **`role_guard_census.py` took `--database`**, closing a gap [[F2-253]] and [[F2-258]] each filed:
+`DATABASE=TSS_GRC` was hardcoded, so every holder figure the report has ever published described
+**dev** while reading as a statement about the platform. The report now names the database it read,
+and says why that matters — two databases differ by **absence** as well as by holders, because a role
+a pending migration has not seated is missing from `iam.roles` on the deployed server and merely
+unheld in dev.
+
+⚠ **The mutation harness found one real weakness in my own gate.** The peer-convention leg was
+`anyMatch(guard contains "hasPermission('AUDIT',")`, and moving **two of `FindingController`'s five**
+routes off the permission left three still citing it, so the leg **SURVIVED while the convention it
+certifies was eroding**. The mutated code was not wrong about the claim I had written — the claim was
+weaker than the leg's purpose. Replaced by the negative form that actually holds (measured 55 of 55):
+**no peer route may be a *pure* role guard**, which kills the mutation, tolerates a legitimate
+composed or record-ownership guard ([[F2-254]]: never ban `hasAnyRole` outright), and tolerates
+routes being added. An anti-vacuity floor of 50 rides with it so a renamed or emptied peer class
+cannot make every assertion above it pass over nothing.
+
+**Verification.** Pre-fix control RED naming all three routes · live probe **13/13 pre-fix and 13/13
+post-fix** as `compliance`/`auditor`/`viewer`/`rmanager` against a snapshot the probe plants itself
+([[F2-206]]), cleaned back to the measured 0/0 baseline in a `finally` by `CHARINDEX` with the child
+rows removed by parent id ([[F2-257]]) · mutation harness **9 killed / 0 survived / 0 anchor-miss** ·
+V382 applied **twice** to dev with prod pre-flighted clean · suite **4,356/0/0**.
+
+**Filed.**
+- The **three** remaining §B2b guards, still a work list with **no verdicts** ([[F2-188]]):
+  `module.bcm` 2 (`BiaQuantitativeController#boardApprove`/`#cfoApprove` — [[F2-254]]'s two BIA
+  tiers, blocked on a migration, since `bcm.bia_quantitative` has no `board_approved_by` column) and
+  `module.rrp` 1 (`RrpController#submit`, the SAMA recovery-and-resolution filing V373 itself calls
+  the sharp case, blocked on `RRP` having no catalogued permissions — [[F2-257]]'s gap).
+- **[[F2-151]] is unchanged and is now the only thing standing between this surface and a real
+  committee control.** The Chair leg still cannot be expressed: `admin.committee_member_terms
+  .member_user_id` is NULL on **all five** audit-committee seats in **both** databases, so
+  [[F2-177]]'s `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` would answer false for everyone
+  ([[F2-178]]'s measurement, re-confirmed) — a control that cannot fire ([[F2-112]]'s shape). And
+  `AttestRequest.attestedRole` is still **self-declared**: an admitted `INTERNAL_AUDITOR` can record
+  an attestation as `CHAIR`, because the signer's identity is stamped from the principal and hashed
+  while the capacity they signed in is checked against nothing. Both halves need the same roster
+  linkage; seating those five terms is a **tenant data task**, not a jar.
+- `GenerateSnapshotRequest.snapshotCode` is caller-supplied — F2-172(d)'s family on a code an
+  auditor cites. ⚠ **Read, not assumed: it is collision-safe** (`UQ_ac_snap_code` exists and the
+  service appends a uniqueness suffix rather than throwing, deliberately, because "two snapshots in a
+  day" is a legitimate workflow). So it is a naming question, not a defect.
+- `audit_committee` has **2 CHECK constraints** and both agree with their DTO `@Pattern`
+  ([[F2-180]]'s check, performed rather than assumed): `CK_ac_snap_meeting_type` and
+  `CK_ac_att_role`. Nothing owed here.
+
 ## F2-258 · The remedy chosen for these routes in a migration, and the reason it did not move them
 
 | Field | Content |
