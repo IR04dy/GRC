@@ -1935,8 +1935,8 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   quote with an unrelated string literal's. **Isolate the comments, flow them, then strip.**
   ⚠ **A leg scoped to "routes whose guard already equals the target" can only pass.** My first draft
   checked for a role name only on routes whose guard was already the permission — an empty set on the
-  pre-fix tree. **The pre-fix control is what exposed it** (3 of 5 legs fired on master; this was one
-  of the two that did not), and the other non-firing leg is a deliberate **pin** whose tripwire is in
+  pre-fix tree. **The pre-fix control is what exposed it** (its first run fired 3 of 5 legs on
+  master and this was one of the two that did not; the rescoped gate fires 4 of 5), and the other non-firing leg is a deliberate **pin** whose tripwire is in
   the future — said out loud in the test, because "green on master" is otherwise indistinguishable
   from a regex that stopped matching.
   ⚙ **Filed:** the **17** remaining administrator-only guards, a work list with **no verdicts**
