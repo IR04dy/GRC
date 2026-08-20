@@ -1872,6 +1872,106 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A SOFT FOREIGN KEY WHOSE ID SPACE IS VALID IN TWO REGISTERS DEREFERENCES CLEANLY
+  AGAINST THE WRONG ONE AND LIES** (F2-252, measured 2026-08-20). Executing F2-251's 28-member
+  census (re-derived from the shipped gate's own stdout first — F2-221), the ranking said what the
+  filing had not: **every remaining `change_mgmt` member holds 0 rows in dev and has NO TABLE in
+  prod**, and the two nobody had read (`iam.access_review_items`, `socops.ir_playbook_run`) are
+  empty in both — so the live weight was `cyber.cyber_controls :: framework_id + framework_name`,
+  75 rows in dev and prod, filed *latent* by F2-247. Measuring its divergence against a **guessed**
+  parent (`compliance.frameworks`) reported **75 of 75 rows divergent**, with example rows naming
+  real frameworks: a complete, plausible, **entirely false** finding. Measured against the register
+  the rows actually use (`cyber.cyber_frameworks`) the same 75 **agree**.
+  🔑🔑 **F2-246 established that a scan locates and THE PAIRING IS THE MEASUREMENT; this is the
+  mechanism — when two registers share an id space a wrong pairing cannot fail loudly. It joins,
+  and it produces a name.** `cyber.cyber_frameworks` (6 rows, tenant-owned: NCA ECC / ISO 27001 /
+  PCI DSS / NCA CCC / NCA CSCC / NCA OTCC) and `compliance.frameworks` (24 rows, **global — no
+  `organisation_id`**, W2-1a-i's ratified regulator catalogue) both hold ids 1–6 and name
+  **different frameworks**: id 2 is `'ISO 27001'` here and `'NCA Cloud Cybersecurity Controls'`
+  there. **V342 added a FOREIGN KEY on `framework_id` for the five tables pointing at
+  `compliance.frameworks` and this column got none, because it points at the other one** — so the
+  schema records the disjointness and nothing reconciles it (F2-196's shape; picking a winner
+  changes what the platform reports about NCA ECC coverage, an **owner decision**).
+  ⚠⚠ **DERIVE THE PARENT COLUMN, NEVER PICK THE ONE WHOSE NAME LOOKS RIGHT.** Compare the child's
+  label against **every text column of every candidate parent** and report the agreement rate. Done
+  that way the answer was unambiguous (75/75 with `cyber_frameworks.name`, **0/75** with anything in
+  `compliance.frameworks`) and it refuted **4 of 4** of my guessed pairings:
+  `evidence.evidence_items.collector_name` holds an **office** (`'Cyber Risk & Compliance Officer /
+  أخصائي…'`) not a person, `bcm.mtpd_inheritance_finding.vendor_name` a **role description**
+  (`'Hyperscaler Cloud Region'`) not a vendor name, and `change_mgmt.change_approvals.approver_name`
+  an office title — none is a copy of any parent column, i.e. **F2-251's third kind of census
+  member**, where deriving the label would destroy information. 🔑 **A no-column-agrees answer is a
+  finding, not a failed lookup.**
+  ⚠⚠ **AND THE P1 WAS NOT IN THE FAMILY I CAME TO FIX — IT WAS ONE LINE ABOVE IT.**
+  `CyberPage`'s `CONTROL_EMPTY` and `controlToReq` carried `frameworkName` and **no `frameworkId`**
+  while `applyEditable` wrote both columns unconditionally, so **editing any control's title NULLED
+  its framework link at HTTP 200** — on a column populated on **75 of 75** live rows in both
+  databases — and left the label standing, so the register still rendered the framework and only a
+  join could tell. F2-212's headline verbatim: **a wire-contract gate proves the TYPES agree and
+  cannot prove the payload BUILDER sends what the type permits, and on a full-replace verb that gap
+  is silent data destruction.** `CyberControlRequest` has always declared `frameworkId`.
+  ⚠ **`FullReplaceUpdateContractTest` is green over it for two structural reasons, both worth
+  knowing**: its hard-zero leg bans a method that loads a `T` and persists its own `T` **parameter**
+  (this one persists the loaded row), and its coverage leg asks whether a written field is
+  *declarable* by the frontend type — and `frameworkId` is. **Assert the ASSIGNMENT at the payload
+  builder, never the field's presence on the type** (F2-212's own remedy, unapplied here).
+  ⚠⚠ **A JAVADOC CERTIFYING A METHOD AGAINST ONE FAMILY READS AS CERTIFYING IT.**
+  `applyEditable`'s comment was written by **F2-213** and says this is *"the one member of the family
+  that was NOT losing data"* — true of the family F2-213 measured (a service persisting its own
+  request object) and false of the defect its own client caused. It was converted *"anyway, because
+  persisting the REQUEST OBJECT leaves the hazard latent rather than absent"* — correct reasoning
+  that then listed the framework pair among the thirteen editable columns, which is what made the
+  destruction unconditional. 🔑 **The next reader does not ask which family a certification covers.**
+  ⚠ **Two more on the same pair, both probed live as `so_officer` against planted rows** (F2-206;
+  `admin` proves nothing about authorization): a **nonexistent** framework id (999999) and **another
+  tenant's** framework were stored at 200 — `CyberFrameworkRepository.findByIdAndOrganisationId` has
+  existed since SEC-CYB-001 and this path never called it (F2-242, F2-215's two-of-N) — and a label
+  contradicting the id was stored (`framework_id = 1` "NCA ECC" beside `'ISO 27001'`, F2-245).
+  ⚙ **The fix shape**: `CyberFrameworkReferenceResolver` (`resolve`/`require`/`labelFor`, the
+  F2-249/F2-250 primitive shape, named distinctly per F2-247's duplicate-bean landmine) plus
+  `applyFrameworkReference` as the pair's **single writer** — the label DERIVED from the resolved
+  framework, a contradiction **refused**, an **echo accepted** so a round-tripping form keeps working
+  (F2-231/F2-234), a **bare label still legal** because both columns are nullable and live rows are
+  made that way (F2-182), and an **omitted id on UPDATE leaving the stored link alone**, which is the
+  destruction fix. Relinking by NAME was rejected: with two registers sharing an id space and
+  carrying near-identical names, a name lookup is the least safe operation available.
+  ⚠ **The dropdown was five hard-coded names and only THREE were real.** `FRAMEWORK_OPTIONS` offered
+  NCA ECC / ISO 27001 / PCI DSS / **NIST CSF** / **SAMA CSF**; the register holds those first three
+  plus **NCA CCC / NCA CSCC / NCA OTCC**. So two options named frameworks this register does not have
+  (they live in the *other* one) and three registered frameworks with real controls filed against
+  them **could not be selected at all** — F2-180's shape in both directions, with the page's own
+  comment 400 lines below reading *"the register carries four NCA frameworks (ECC 29, CCC 24, …)"*.
+  ⚙ **Measure the picker's guard before offering one** (F2-250): `GET /api/v1/cyber/frameworks` is
+  `CYBER:READ` and the form is behind `CYBER:WRITE`, so it cannot 403 on open.
+  ⚠⚠ **THE MUTATION HARNESS PRODUCED ONE *EQUIVALENT* MUTANT WORTH KEEPING RATHER THAN COUNTING.**
+  Taking the tenant from `c.getOrganisationId()` instead of the caller's `orgId` **SURVIVED**,
+  because `saveControl` stamps the org on the line before — so the two expressions hold the same
+  value and the mutant is not wrong (F2-206: a surviving mutant is a hole only if the mutated code
+  is actually WRONG). It is banned **structurally** anyway, because that is exactly how F2-246's
+  404-on-every-linked-create was safe in three of four registers *"by accident of statement order"*:
+  moving one line turns this equivalent mutant into that defect, and **no behaviour test would
+  notice, because a refusal caused by a null tenant is indistinguishable from a correct refusal.**
+  ⚠⚠ **`JAVA_HOME` UNSET MADE A STALE SUREFIRE REPORT READ AS A FRESH FAILURE.** On JDK 11
+  `mvn -o test` dies in `spring-boot-maven-plugin:build-info` (*"class file version 61.0 … only
+  recognizes up to 55.0"*) **before running anything**, leaves the previous run's `.txt` on disk, and
+  prints `BUILD FAILURE` — so the four failures I read were the *earlier* run's and I nearly fixed
+  them twice. 🔑 **`BUILD FAILURE` with no `Tests run:` line in the same output means nothing ran;
+  the report on disk is then answering an older question.** Landmine #1 of this file, and the tell is
+  the absence of a line rather than the presence of one.
+  ⚠ **DevTools did not restart, and checking is what saved the probe.** After `mvn -o compile` the
+  listener answered `/actuator/health` **UP** with `Restarting due to` appearing **0 times** in its
+  log — so it was still serving pre-fix code, and a post-fix probe against it would have scored
+  8/8 for the wrong reason. **Grep the log for the restart, not the port and not health** (F2-217).
+  ⚙ **Filed:** which framework register is authoritative for a cyber control, and the FOREIGN KEY
+  that depends on it (both **owner decisions**); the **23** remaining census members, now with this
+  slice's measurements attached — **6 `change_mgmt` members are 0 rows in dev and absent from prod**,
+  `iam.access_review_items :: role_id` and `socops.ir_playbook_run :: playbook_id` are **0 rows in
+  both** (latent, no data), `ethics.aml_alerts :: rule_id` is **REFUTED as a member** (it is
+  `nvarchar(100)`, an upstream engine's rule code with no register anywhere — F2-244's
+  `annualPlanId` shape), and `admin.committee_action_items :: linked_entity_id` is **33 rows with 0
+  ids and 15 labels**, polymorphic (`linked_entity_type` beside it, so no FK and no single resolver);
+  `cyber.cyber_controls.framework_name` has **no `*_ar`** while `cyber_frameworks` carries `name_ar`,
+  so the register's framework label is English-only on an Arabic-primary UI (house rule 7).
 - ⚠⚠ **CAPTURING ONE PARTY'S ID CAN RETIRE THE ONLY BAR THAT COULD DECIDE ANOTHER —
   AND THE COMMIT THAT DOES IT LOOKS LIKE A STRICT IMPROVEMENT** (F2-251, measured 2026-08-20).
   Executing F2-250's census (re-derived first — 48 pairs, 32 unadjudicated — F2-221) and ranking
