@@ -34,6 +34,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * produced by nobody but the platform administrator, and an audit-committee attestation could be
  * signed by the auditors being assured and by no committee member at all.
  *
+ * <p>⚠⚠ <b>F2-259 — the WRITE row above was corrected and stayed administrator-only, and this class
+ * could not see that.</b> Replacing the ghost {@code COMPANY_SECRETARY} with the real
+ * {@code BOARD_SECRETARY} left a tier whose only non-administrator name is <b>held by no user in
+ * either database</b>. 🔑 This class asks whether a recited name <em>exists</em>; the question
+ * {@code hasAnyRole} puts is whether anybody <em>holds</em> it, and only the second one decides a
+ * request. The three snapshot-mutating routes are now {@code hasPermission('AUDIT','WRITE')} — the
+ * permission all four peer controllers under this same SKU already use — with V382 granting the
+ * retired role that pair so the conversion drops nobody. The read and attest tiers are deliberately
+ * unchanged; {@code AuditCommitteeGuardConversionTest} records why for all three.
+ *
  * <p>🔑 {@code COMPANY_SECRETARY} was a <b>near-miss</b>: {@code BOARD_SECRETARY} exists and is that
  * person. The Chair has no equivalent — no role expresses committee membership and F2-26's
  * {@code committee_member_terms.member_user_id} is NULL on all five audit-committee seats — so the
@@ -60,17 +70,54 @@ class AuditCommitteeGuardTest {
     private static final Set<String> ATTEST_TIER = new TreeSet<>(Set.of(
         "EXTERNAL_AUDITOR", "INTERNAL_AUDITOR", "BOARD_SECRETARY", "PLATFORM_ADMIN"));
 
-    /** Endpoint -> the audience it must have. Exhaustive: an unlisted endpoint fails. */
+    /**
+     * Endpoint -> the ROLE audience it must have. Exhaustive: an unlisted endpoint fails.
+     *
+     * <p>⚠ F2-259 — the three snapshot-mutating routes recite no role at all now; they are guarded
+     * by {@code hasPermission('AUDIT','WRITE')}. An empty expectation on its own would also be
+     * satisfied by a route with <b>no guard</b>, so {@link #PERMISSION_GUARDED} pins what replaced
+     * the names and both are asserted. {@link #WRITE_TIER} is kept as the historical record of what
+     * that audience used to be.
+     */
     private static final Map<String, Set<String>> EXPECTED = new LinkedHashMap<>() {{
         put("live",             READ_TIER);
         put("list",             READ_TIER);
         put("get",              READ_TIER);
-        put("generate",         WRITE_TIER);
-        put("recordResolution", WRITE_TIER);
-        put("finalizeSnapshot", WRITE_TIER);
+        put("generate",         Set.of());
+        put("recordResolution", Set.of());
+        put("finalizeSnapshot", Set.of());
         put("attest",           ATTEST_TIER);
     }};
 
+    /**
+     * F2-259 — the routes whose audience is a permission rather than a role list, and the exact
+     * expression each must carry. {@code BOARD_SECRETARY} was the only non-administrator name on
+     * {@link #WRITE_TIER} and <b>is held by no user in either database</b>, so that tier admitted the
+     * platform administrator alone — which is what the class javadoc above says F2-52 was fixing.
+     * F2-52 asked whether the name existed; the question {@code hasAnyRole} puts is whether anybody
+     * holds it. V382 grants the retired role {@code AUDIT:WRITE} so the conversion drops nobody.
+     */
+    private static final Map<String, String> PERMISSION_GUARDED = new LinkedHashMap<>() {{
+        put("generate",         "hasPermission('AUDIT','WRITE')");
+        put("recordResolution", "hasPermission('AUDIT','WRITE')");
+        put("finalizeSnapshot", "hasPermission('AUDIT','WRITE')");
+    }};
+
+    /**
+     * ⚠⚠ <b>F2-259 — this used to be {@code '([^']*)'} run over the WHOLE expression, so
+     * {@code hasPermission('AUDIT','WRITE')} parsed as two role names, {@code AUDIT} and
+     * {@code WRITE}, and both legs below failed on a CORRECT role-to-permission conversion.</b>
+     *
+     * <p>That is the one failure a gate must never have (F2-214): it trains the next reader to edit
+     * the assertion rather than the code. It is also <b>the identical defect F2-254 repaired in
+     * {@code BiaApprovalChainGuardTest}</b> — same author slice (F2-52), same purpose, and this
+     * sibling kept the bug, so 🔑 a ghost-role detector written as a bare quoted-token scan flags
+     * every conversion F2-05 exists to make. Now scoped to the argument list of
+     * {@code hasAnyRole(…)} / {@code hasRole(…)}, which is the shape the claim is about: this class
+     * asks whether a recited ROLE NAME exists, and a permission pair is not a role name.
+     */
+    private static final Pattern ROLE_CALL =
+            Pattern.compile("has(?:Any)?Role\\s*\\(([^)]*)\\)");
     private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
 
     private static Map<String, String> guards() {
@@ -89,11 +136,15 @@ class AuditCommitteeGuardTest {
         return found;
     }
 
+    /** Role names recited by this guard — from role-call argument lists only (see {@link #ROLE_CALL}). */
     private static Set<String> namesIn(String guard) {
         Set<String> out = new TreeSet<>();
-        Matcher m = QUOTED.matcher(guard);
-        while (m.find()) {
-            out.add(m.group(1));
+        Matcher call = ROLE_CALL.matcher(guard);
+        while (call.find()) {
+            Matcher m = QUOTED.matcher(call.group(1));
+            while (m.find()) {
+                out.add(m.group(1));
+            }
         }
         return out;
     }
@@ -122,6 +173,59 @@ class AuditCommitteeGuardTest {
             someone outside the assurance chain produce or sign the committee's reporting artefact; \
             narrowing leaves the committee unable to report at all, which is how this started.""")
             .isEmpty();
+
+        // F2-259: an empty role audience is also what an UNGUARDED route yields, so the three
+        // permission-guarded routes are pinned by expression as well.
+        Map<String, String> permMismatch = new TreeMap<>();
+        for (var e : PERMISSION_GUARDED.entrySet()) {
+            if (!e.getValue().equals(actual.get(e.getKey()))) {
+                permMismatch.put(e.getKey(), String.valueOf(actual.get(e.getKey())));
+            }
+        }
+        assertThat(permMismatch).as("""
+            F2-259: these routes must be guarded by the permission, not by a role list and not by \
+            nothing. BOARD_SECRETARY exists in iam.roles and is held by nobody, so the role guard \
+            they used to carry admitted the platform administrator alone.""")
+            .isEmpty();
+    }
+
+    /**
+     * F2-259 — the positive control for the {@link #ROLE_CALL} repair, carrying the literal pre-fix
+     * and post-fix guard shapes.
+     *
+     * <p>F2-254's rule for a detector repair is that <b>the repaired detector must still answer the
+     * same on the tree the original passed on</b>. Arguing that is not the same as checking it, so
+     * this asserts it: the two pure role guards that survive this slice parse to exactly the role
+     * sets the old whole-expression scan produced, and the permission guard that replaced the third
+     * parses to <b>nothing</b> — where the old scan produced {@code [AUDIT, WRITE]} and failed the
+     * build on correct code.
+     */
+    @Test
+    @DisplayName("the role-name extractor reads role calls only — pre-fix and post-fix shapes")
+    void theRoleNameExtractorIsScopedToRoleCalls() {
+        String preFixWrite = "hasAnyRole('BOARD_SECRETARY','PLATFORM_ADMIN')";
+        String postFixWrite = "hasPermission('AUDIT','WRITE')";
+        String preFixRead = "hasAnyRole('CISO','RISK_MANAGER','COMPLIANCE_OFFICER',"
+                + "'INTERNAL_AUDITOR','EXTERNAL_AUDITOR','BOARD_SECRETARY','PLATFORM_ADMIN')";
+
+        assertThat(namesIn(preFixWrite))
+            .as("a pure role guard must parse exactly as it always did")
+            .containsExactlyInAnyOrderElementsOf(WRITE_TIER);
+        assertThat(namesIn(preFixRead))
+            .as("the read tier is untouched by this slice and must parse identically")
+            .containsExactlyInAnyOrderElementsOf(READ_TIER);
+        assertThat(namesIn(postFixWrite))
+            .as("F2-259: a permission pair is NOT a pair of role names. The old scan returned "
+                + "[AUDIT, WRITE] here and failed the build on a correct conversion — F2-254's "
+                + "finding, in a sibling gate written by the same slice.")
+            .isEmpty();
+        assertThat(namesIn("hasPermission('AUDIT','WRITE') or hasAnyRole('BOARD_SECRETARY')"))
+            .as("a COMPOSED guard must still yield its role leg — scoping the scan must not blind "
+                + "it to the shape F2-159/F2-161 controls are built from")
+            .containsExactly("BOARD_SECRETARY");
+        assertThat(namesIn("hasPermission(#id,'EXERCISE_RUN','OWNER')"))
+            .as("a three-argument ownership guard names no role either")
+            .isEmpty();
     }
 
     @Test
@@ -137,7 +241,11 @@ class AuditCommitteeGuardTest {
                 offenders.put(e.getKey(), bad);
             }
         }
-        assertThat(checked).as("no role names parsed out of any guard — the scan collapsed").isGreaterThan(10);
+        // Anti-vacuity. Measured 11 after F2-259 (READ 7 + ATTEST 4; the write tier recites none),
+        // down from 13. A floor has to sit above the largest WRONG answer, and the wrong answer here
+        // is a ROLE_CALL pattern that stops matching and returns nothing at all (F2-215).
+        assertThat(checked).as("no role names parsed out of any guard — the scan collapsed")
+            .isGreaterThanOrEqualTo(11);
         assertThat(offenders).as("""
             %s names a role absent from iam.roles. hasAnyRole('X') tests for the authority ROLE_X, so \
             this is a permanently false OR leg: no compile error, no startup warning, no log line. It \

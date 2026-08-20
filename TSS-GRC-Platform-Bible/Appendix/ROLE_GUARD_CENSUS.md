@@ -5,6 +5,14 @@ set (`RoleGuardConversionRatchetTest` → `target/role-guard-sites.txt`) joined 
 live `iam.roles` / `iam.role_permissions`. Do not hand-edit: the next run overwrites it.
 Narrative belongs in the script.
 
+⚠ **Every holder figure below was read from `TSS_GRC`.** The guard set is compiled from the
+packaged jar and is the same everywhere; *who holds a role* is per database, and the two
+can differ by **absence** as well as by holders — a role a pending migration has not
+seated yet is missing from `iam.roles` on the deployed server while merely unheld in dev.
+Re-run with `--database TSS_GRC_Deployment` to read the deployed server. (F2-259: this was hardcoded
+to `TSS_GRC`, so section B2b's question — *does anybody hold this role?* — was being
+answered about one database while the report read as a statement about the platform.)
+
 `hasAnyRole('X')` tests for the granted authority `ROLE_X`. There is no fallback and no
 PLATFORM_ADMIN bypass — `ModulePermissionEvaluator` is never called, so the platform
 administrator passes a role guard only when the guard names a role they hold. A guard
@@ -23,8 +31,8 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 477 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **383** |
+| Guard sites with a role leg | 474 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **380** |
 | … composed (role leg ANDed onto a permission — already tight) | 94 |
 | Module packages holding pure role guards | 29 |
 | Distinct role names recited by any role guard | 38 |
@@ -33,9 +41,9 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
-| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **6** |
+| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **3** |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 383 |
+| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 380 |
 | … of those, reachable by a NON-administrator | 377 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
@@ -75,9 +83,6 @@ each of these features was built for cannot use it, and nothing in the platform 
 
 | Module | Guard site | Roles named | Named but held by nobody |
 |---|---|---|---|
-| `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
-| `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
-| `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `EXECUTIVE_REVIEWER`, `PLATFORM_ADMIN` | `EXECUTIVE_REVIEWER` |
 | `module.bcm` | `BiaQuantitativeController#cfoApprove` | `CFO`, `PLATFORM_ADMIN` | `CFO` |
 | `module.rrp` | `RrpController#submit` | `PLATFORM_ADMIN`, `CRO`, `CFO` | `CRO`, `CFO` |
@@ -129,9 +134,9 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.ccm` | 10 |  |
 | `module.reginspect` | 10 |  |
 | `module.opres` | 9 |  |
-| `module.audit_committee` | 7 |  |
 | `module.privacy` | 7 |  |
 | `module.integrations` | 5 |  |
+| `module.audit_committee` | 4 |  |
 | `module.iam` | 4 |  |
 | `module.platform` | 4 |  |
 | `module.approvals` | 1 |  |

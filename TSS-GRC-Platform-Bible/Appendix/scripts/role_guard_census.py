@@ -39,14 +39,26 @@ except ImportError:
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 SITES = os.path.join(ROOT, "tss-grc-backend", "target", "role-guard-sites.txt")
 REPORT = os.path.join(ROOT, "TSS-GRC-Platform-Bible", "Appendix", "ROLE_GUARD_CENSUS.md")
-CONN = ("DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=TSS_GRC;"
+CONN = ("DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=%s;"
         "UID=sa;PWD=tss.123;TrustServerCertificate=yes")
+
+# F2-259 — this was hardcoded to TSS_GRC, so EVERY holder figure this report has ever
+# published was a statement about **dev** while reading as a statement about the platform.
+# F2-253 filed it, F2-258 filed it again and it cost that slice a re-measurement (prod has
+# CIO/CRO *absent* rather than merely unheld, because V373 is pending there). Two databases
+# can differ by ABSENCE as well as by holders, and section B2b's whole question — does
+# anybody hold this role? — is answered per database. The document now names the one it read.
+DEV_DB = "TSS_GRC"
+PROD_DB = "TSS_GRC_Deployment"
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sites", default=SITES)
     ap.add_argument("--md", default=REPORT)
+    ap.add_argument("--database", default=DEV_DB,
+                    help="database to read holders from (default %s; the deployed server is %s)"
+                         % (DEV_DB, PROD_DB))
     args = ap.parse_args()
 
     if not os.path.exists(args.sites):
@@ -62,7 +74,7 @@ def main():
             bucket, site, kind, names = ln.split(" ", 3)
             sites.append((bucket, site, kind, names.split("|")))
 
-    cn = pyodbc.connect(CONN)
+    cn = pyodbc.connect(CONN % args.database)
     c = cn.cursor()
 
     c.execute("SELECT role_name FROM iam.roles WHERE is_deleted = 0")
@@ -204,6 +216,17 @@ def main():
     emit("set (`RoleGuardConversionRatchetTest` → `target/role-guard-sites.txt`) joined against the")
     emit("live `iam.roles` / `iam.role_permissions`. Do not hand-edit: the next run overwrites it.")
     emit("Narrative belongs in the script.")
+    emit()
+    emit("⚠ **Every holder figure below was read from `%s`.** The guard set is compiled from the"
+         % args.database)
+    emit("packaged jar and is the same everywhere; *who holds a role* is per database, and the two")
+    emit("can differ by **absence** as well as by holders — a role a pending migration has not")
+    emit("seated yet is missing from `iam.roles` on the deployed server while merely unheld in dev.")
+    emit("Re-run with `--database %s` to read the deployed server. (F2-259: this was hardcoded"
+         % PROD_DB)
+    emit("to `%s`, so section B2b's question — *does anybody hold this role?* — was being"
+         % DEV_DB)
+    emit("answered about one database while the report read as a statement about the platform.)")
     emit()
     emit("`hasAnyRole('X')` tests for the granted authority `ROLE_X`. There is no fallback and no")
     emit("PLATFORM_ADMIN bypass — `ModulePermissionEvaluator` is never called, so the platform")

@@ -410,8 +410,23 @@ class RoleGuardConversionRatchetTest {
      * {@code AiLifecycleGuardConversionTest} fails the build if somebody converts it: {@code AUDITOR}
      * is named there, is held, and holds {@code AI:EXPORT} but not {@code AI:READ}, so the
      * conversion that widens the write side would narrow the read side.
+     *
+     * <p>⬜ <b>F2-259: 383 → 380.</b> {@code AuditCommitteeDashboardController}'s three
+     * snapshot-mutating routes ({@code #generate}, {@code #recordResolution},
+     * {@code #finalizeSnapshot}) moved to {@code hasPermission('AUDIT','WRITE')} — the permission
+     * every peer controller under the same {@code @RequireModule("AUDIT_LC")} SKU already uses. The
+     * guard was {@code hasAnyRole('BOARD_SECRETARY','PLATFORM_ADMIN')} and {@code BOARD_SECRETARY}
+     * is held by no user in either database, so it admitted the platform administrator alone —
+     * exactly what F2-52's own heading on that constant says it was fixing, because F2-52 asked
+     * whether the name <em>existed</em>. Re-derived from this build, not subtracted (role-leg total
+     * 477 → 474). ⚠ <b>Two of that controller's three tiers are deliberately still role guards and
+     * {@code AuditCommitteeGuardConversionTest} fails the build if somebody converts either:</b>
+     * {@code hasPermission('AUDIT','READ')} is held by 7 live roles <em>including {@code VIEWER}</em>,
+     * so converting the read tier widens a governance dashboard to any authenticated reader (§B3's
+     * {@code BoardPackController} defect), and converting the attest tier would drop
+     * {@code EXTERNAL_AUDITOR}, which holds no {@code AUDIT} grant at all.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 383;
+    private static final int BASELINE_PURE_ROLE_SITES = 380;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -806,7 +821,7 @@ class RoleGuardConversionRatchetTest {
      * short — would be a permanently false leg in exactly the way a ghost role name was, so the
      * committee-type vocabulary is pinned there at a hard zero too.
      *
-     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 383 as this is written
+     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 380 as this is written
      * — it read "404" here for months while the constant said 389, which is the prose-versus-constant
      * drift CLAUDE.md warns about, in the file that owns the constant. Read the field, not this
      * sentence: that many endpoints still
