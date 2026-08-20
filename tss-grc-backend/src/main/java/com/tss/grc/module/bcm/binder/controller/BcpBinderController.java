@@ -104,8 +104,15 @@ public class BcpBinderController {
     }
 
     /** Soft-delete (archive) — status flips to ARCHIVED and is_deleted=1. */
+    // F2-254: was hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') and BCM_MANAGER is held by NO user
+    // in dev or prod, so this admitted the platform administrator and nobody else. Audience diff
+    // measured before converting (the V362 landmine): both names hold BCM:DELETE, so nobody is
+    // dropped and GRC_ADMINISTRATOR is admitted. AUDITOR and VIEWER hold BCM:READ+EXPORT and NOT
+    // DELETE, and RISK_MANAGER holds WRITE and not DELETE - probed, so no reader-only role and no
+    // write-only role slips in. The READ guards on this controller keep their role lists: CISO is
+    // named there and holds only BCM:EXPORT, so converting them would drop a live role.
     @DeleteMapping("/binders/{exportId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','DELETE')")
     public ResponseEntity<BinderResponse> archive(@PathVariable Long exportId) {
         return ResponseEntity.ok(service.archive(exportId));
     }

@@ -85,7 +85,15 @@ public class ExerciseRuntimeController {
     @ResponseStatus(HttpStatus.CREATED)
     // F2-161: names no single run, so there is no facilitator to be — role-only, with the
     // ghost FACILITATOR removed (it matched no row in iam.roles and admitted nobody).
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    // F2-254: ...and BCM_MANAGER is held by NO user either, in dev or prod. The comment above
+    // removed FACILITATOR for matching no row in iam.roles and "admitting nobody" - and kept a name
+    // with exactly that property, because "does this name exist?" was the only question being asked.
+    // KEY: this is the one route on this controller the ownership leg CANNOT rescue. Its three
+    // sibling writes are `hasAnyRole(...) or hasPermission(#id,'EXERCISE_RUN','OWNER')`, so the
+    // facilitator drives them; #start names no run, so there is no record to own yet. Probed live:
+    // `ranalyst` (no BCM grant at all) transitions the run they facilitate and is 403 on #start.
+    // A facilitator could drive an exercise run they were not allowed to create.
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public RunSummary start(@RequestBody @Valid StartRunRequest req) {
         return service.startRun(req);
     }
@@ -122,7 +130,7 @@ public class ExerciseRuntimeController {
     }
 
     @PostMapping("/{id}/injects/{injectId}/dispatch")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+    @PreAuthorize("hasPermission('BCM','WRITE') "
                 + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public InjectView dispatch(@PathVariable Long id, @PathVariable Long injectId) {
         return service.dispatchInject(id, injectId);
@@ -147,7 +155,7 @@ public class ExerciseRuntimeController {
 
     @PostMapping("/{id}/custom-inject")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+    @PreAuthorize("hasPermission('BCM','WRITE') "
                 + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public InjectView customInject(
         @PathVariable Long id,
@@ -156,7 +164,7 @@ public class ExerciseRuntimeController {
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+    @PreAuthorize("hasPermission('BCM','WRITE') "
                 + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public RunSummary transition(
         @PathVariable Long id,

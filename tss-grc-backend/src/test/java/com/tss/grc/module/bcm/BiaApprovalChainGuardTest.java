@@ -75,14 +75,36 @@ class BiaApprovalChainGuardTest {
         return out;
     }
 
+    /**
+     * The ROLE names in a guard — not every quoted token in it.
+     *
+     * <p>⚠⚠ <b>F2-254: this used to run {@code QUOTED} over the whole expression, so
+     * {@code hasPermission('BCM','DELETE')} yielded two "role names" called {@code BCM} and
+     * {@code DELETE} and {@code noStageNamesANonexistentRole} failed on a correct conversion.</b> A
+     * quoted-token extractor has no notion of which function the token is an argument to, so a
+     * ghost-role detector built on one flags <em>every</em> role-to-permission conversion — the
+     * change F2-05 exists to make — as a pair of ghosts. It is the one failure a gate must never
+     * have (F2-214), and it fired the first time anything on this controller was converted.
+     *
+     * <p>Scoped to {@code hasAnyRole(...)} argument lists. A converted stage therefore contributes
+     * <b>no</b> names, which is deliberate: {@code everyStageHasItsReviewedAudience} then reports
+     * drift, because an audience that is no longer expressible as role names is exactly the
+     * re-decision {@code boardApproveIsNotSilentlyConvertedToBcmApprove} demands be made explicitly.
+     */
     private static Set<String> namesIn(String guard) {
         Set<String> out = new TreeSet<>();
-        Matcher m = QUOTED.matcher(guard);
-        while (m.find()) {
-            out.add(m.group(1));
+        Matcher role = HAS_ANY_ROLE.matcher(guard);
+        while (role.find()) {
+            Matcher m = QUOTED.matcher(role.group(1));
+            while (m.find()) {
+                out.add(m.group(1));
+            }
         }
         return out;
     }
+
+    /** The argument list of a {@code hasAnyRole(...)} call, which is the only place a role is named. */
+    private static final Pattern HAS_ANY_ROLE = Pattern.compile("hasAnyRole\\(([^)]*)\\)");
 
     @Test
     @DisplayName("every stage of the approval chain has its reviewed audience")
@@ -101,20 +123,33 @@ class BiaApprovalChainGuardTest {
             what keep them separate people.""").isEmpty();
     }
 
+    /**
+     * ⚠ <b>F2-254: the name says "no STAGE" and the body walked every METHOD on the controller.</b>
+     * The other three legs are all scoped to {@code STAGES}; this one was not, so it owned an opinion
+     * about routes it had never reviewed — and the first conversion on this controller
+     * ({@code #archive} → {@code hasPermission('BCM','DELETE')}) failed it. Scoped to the four stages,
+     * which is what it claims to check. The module-wide question — does any write guard recite a role
+     * held by nobody — is {@code BcmAdminOnlyGuardConversionTest}'s, over the whole package.
+     */
     @Test
     @DisplayName("no stage names a role that does not exist")
     void noStageNamesANonexistentRole() {
+        Map<String, String> guards = methodGuards();
         Map<String, List<String>> bad = new TreeMap<>();
         int names = 0;
-        for (var e : methodGuards().entrySet()) {
-            Set<String> named = namesIn(e.getValue());
+        for (String stage : STAGES.keySet()) {
+            Set<String> named = namesIn(guards.get(stage));
             names += named.size();
             List<String> ghosts = named.stream().filter(n -> !REAL_ROLES.contains(n)).sorted().toList();
             if (!ghosts.isEmpty()) {
-                bad.put(e.getKey(), ghosts);
+                bad.put(stage, ghosts);
             }
         }
-        assertThat(names).as("no role names parsed — the scan collapsed").isGreaterThan(10);
+        // Derived from STAGES rather than typed, so a collapsed extractor cannot pass and the floor
+        // cannot go stale — it sits at the exact answer, not above zero (F2-215).
+        assertThat(names).as("the extractor stopped matching: %d names parsed from %d stages",
+                names, STAGES.size())
+            .isEqualTo(STAGES.values().stream().mapToInt(Set::size).sum());
         assertThat(bad).as("""
             %s names a role absent from iam.roles. That is a permanently false OR leg — it is how \
             board-approve came to admit the platform administrator alone, on the step that records a \

@@ -77,9 +77,15 @@ public class ExerciseScenarioLibraryController {
         return service.detail(id);
     }
 
+    // F2-254: was hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') and BCM_MANAGER is held by NO user
+    // in dev or prod - a role guard never reaches ModulePermissionEvaluator, so it never reaches
+    // the PLATFORM_ADMIN bypass either; this passed only because it happened to NAME the
+    // administrator. Audience diff measured first: both names hold BCM:WRITE, so nobody is dropped
+    // and GRC_ADMINISTRATOR + RISK_MANAGER are admitted. AUDITOR and VIEWER hold READ+EXPORT only.
+    // The READ guards here keep their role lists: CISO is named on them and holds only BCM:EXPORT.
     @PostMapping("/{id}/instantiate")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public InstantiatedExercise instantiate(
             @PathVariable Long id,
             @RequestBody @Valid InstantiateRequest req) {

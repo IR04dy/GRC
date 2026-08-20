@@ -73,9 +73,15 @@ public class ExerciseObserverController {
 
     // ─── Observer assignment ────────────────────────────────────────────
 
+    // F2-254: the role leg was hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') and BCM_MANAGER is held
+    // by NO user in dev or prod, so the only thing admitting a non-owner was the administrator. The
+    // census filed this route as COMPOSED — "role leg ANDed onto a permission, already tight" — but
+    // it is an OR, and the census's bucket is keyed on the expression MENTIONING hasPermission. Five
+    // writes shared this dead leg; three are on ExerciseRuntimeController and these two are the pair
+    // here. F2-161's ownership leg is untouched: note it resolves #runId, not #id.
     @PostMapping("/{runId}/observers")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+    @PreAuthorize("hasPermission('BCM','WRITE') "
                 + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public AssignmentView assignObserver(
         @PathVariable Long runId,
@@ -83,8 +89,14 @@ public class ExerciseObserverController {
         return service.assignObserver(runId, req);
     }
 
+    // F2-254: DELETE rather than WRITE, matching every other delete verb this slice converted
+    // and this module's own convention. It does create one asymmetry worth naming: RISK_MANAGER
+    // holds BCM:WRITE and not BCM:DELETE, so they can now assign an observer and not remove one.
+    // That is the permission catalogue's decision rather than this slice's, and the person who
+    // actually manages a run's roster is unaffected — the facilitator is admitted by the
+    // ownership leg on both routes.
     @DeleteMapping("/{runId}/observers/{assignmentId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+    @PreAuthorize("hasPermission('BCM','DELETE') "
                 + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ResponseEntity<Void> removeObserver(
         @PathVariable Long runId,

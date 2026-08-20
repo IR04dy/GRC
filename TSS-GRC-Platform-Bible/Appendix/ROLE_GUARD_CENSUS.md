@@ -23,9 +23,9 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 496 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **397** |
-| … composed (role leg ANDed onto a permission — already tight) | 99 |
+| Guard sites with a role leg | 483 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **389** |
+| … composed (role leg ANDed onto a permission — already tight) | 94 |
 | Module packages holding pure role guards | 29 |
 | Distinct role names recited by any role guard | 38 |
 | … **that do not exist in `iam.roles`** | **0** |
@@ -33,9 +33,9 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
-| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **17** |
+| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **9** |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 397 |
+| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 389 |
 | … of those, reachable by a NON-administrator | 380 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
@@ -81,16 +81,8 @@ each of these features was built for cannot use it, and nothing in the platform 
 | `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
-| `module.bcm` | `BcpBinderController#archive` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `BiaQuantitativeController#archive` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `EXECUTIVE_REVIEWER`, `PLATFORM_ADMIN` | `EXECUTIVE_REVIEWER` |
 | `module.bcm` | `BiaQuantitativeController#cfoApprove` | `CFO`, `PLATFORM_ADMIN` | `CFO` |
-| `module.bcm` | `ExerciseRuntimeController#start` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `ExerciseScenarioLibraryController#instantiate` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `MtpdInheritanceController#publish` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `ProcessVendorDependencyController#create` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `ProcessVendorDependencyController#delete` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
-| `module.bcm` | `ProcessVendorDependencyController#update` | `BCM_MANAGER`, `PLATFORM_ADMIN` | `BCM_MANAGER` |
 | `module.rrp` | `RrpController#submit` | `PLATFORM_ADMIN`, `CRO`, `CFO` | `CRO`, `CFO` |
 
 ## B3. Wide despite dead role names — the camouflage sites
@@ -127,7 +119,7 @@ closed guards is a correctness fix, not only a modelling one.
 | Module package | Pure role guards | Closed to everyone |
 |---|---|---|
 | `module.socops` | 110 |  |
-| `module.bcm` | 41 |  |
+| `module.bcm` | 33 |  |
 | `module.cyber` | 31 |  |
 | `module.risk` | 28 |  |
 | `module.compliance` | 26 |  |
