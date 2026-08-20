@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm;
 
 import com.tss.grc.module.bcm.controller.BiaQuantitativeController;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,8 +13,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,8 +57,6 @@ class BiaApprovalChainGuardTest {
         put("boardApprove",    new TreeSet<>(Set.of("EXECUTIVE_REVIEWER", "PLATFORM_ADMIN")));
     }};
 
-    private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
-
     private static Map<String, String> methodGuards() {
         Map<String, String> out = new TreeMap<>();
         for (Method m : BiaQuantitativeController.class.getDeclaredMethods()) {
@@ -90,21 +87,18 @@ class BiaApprovalChainGuardTest {
      * <b>no</b> names, which is deliberate: {@code everyStageHasItsReviewedAudience} then reports
      * drift, because an audience that is no longer expressible as role names is exactly the
      * re-decision {@code boardApproveIsNotSilentlyConvertedToBcmApprove} demands be made explicitly.
+     *
+     * <p>⚠ <b>F2-262: the F2-254 repair was correct and narrower than its own claim.</b> It
+     * scoped to {@code hasAnyRole\(} — so it could not see the singular {@code hasRole(} at all,
+     * which <b>67</b> guards in the tree use, nor a role said longhand as
+     * {@code hasAuthority('ROLE_X')}. Latent here (this controller uses neither), and the direction
+     * matters: an extractor that cannot see a name reports a <em>smaller</em> audience, which reads
+     * exactly like a guard that recites nothing. Now {@link GuardExpressions#rolesRecitedBy}, which
+     * takes the widest correct reading of every axis, so this can only ever gain a name.
      */
     private static Set<String> namesIn(String guard) {
-        Set<String> out = new TreeSet<>();
-        Matcher role = HAS_ANY_ROLE.matcher(guard);
-        while (role.find()) {
-            Matcher m = QUOTED.matcher(role.group(1));
-            while (m.find()) {
-                out.add(m.group(1));
-            }
-        }
-        return out;
+        return GuardExpressions.rolesRecitedBy(guard);
     }
-
-    /** The argument list of a {@code hasAnyRole(...)} call, which is the only place a role is named. */
-    private static final Pattern HAS_ANY_ROLE = Pattern.compile("hasAnyRole\\(([^)]*)\\)");
 
     @Test
     @DisplayName("every stage of the approval chain has its reviewed audience")

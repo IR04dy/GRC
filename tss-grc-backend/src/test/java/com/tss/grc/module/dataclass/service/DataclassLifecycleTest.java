@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.DashboardResponse;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.TransitionAssetRequest;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.TransitionExceptionRequest;
@@ -393,18 +394,28 @@ class DataclassLifecycleTest {
         }
     }
 
+    /**
+     * The ROLE names a guard constant recites.
+     *
+     * <p>⚠⚠ <b>F2-262 — this asserted that the constant's initialiser <em>IS</em> a
+     * {@code hasAnyRole} string, so the conversion of this very module would have failed the build
+     * with <i>"guard constant READ must be a hasAnyRole string"</i>.</b> That is the third mechanism
+     * of this defect family: not a false ghost-role accusation (F2-254, F2-259, F2-260) but a hard
+     * refusal of the change F2-05 exists to make. Either way it is a gate failing on correct code,
+     * the one failure a gate must never have (F2-214), and it would have trained the next reader to
+     * edit the assertion rather than the code.
+     *
+     * <p>🔑 <b>It was not hypothetical: {@code DATACLASS} is one of the four modules F2-257 filed as
+     * having no catalogued permissions, i.e. one of the next conversions in this programme's own
+     * backlog.</b> The fourth failure was scheduled, not possible.
+     *
+     * <p>{@link GuardExpressions#rolesRecitedByConstant} keeps the anti-vacuity half — an absent
+     * constant still throws, because a regex that matches nothing satisfies every downstream
+     * assertion forever — and drops the requirement that the initialiser be a role guard. A
+     * converted constant now yields an empty set, so {@code theGuardsRecitedTheirReviewedAudience}
+     * reports drift and names the re-decision instead of refusing it.
+     */
     private static Set<String> rolesIn(String src, String constant) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-            "String " + constant + "\\s*=\\s*\"hasAnyRole\\(([^)]*)\\)\"").matcher(src);
-        assertThat(m.find()).as("guard constant %s must be a hasAnyRole string — a pattern that "
-            + "matches nothing passes forever", constant).isTrue();
-        Set<String> out = new TreeSet<>();
-        for (String part : m.group(1).split(",")) {
-            String r = part.trim().replace("'", "");
-            if (!r.isEmpty()) {
-                out.add(r);
-            }
-        }
-        return out;
+        return GuardExpressions.rolesRecitedByConstant(src, constant);
     }
 }

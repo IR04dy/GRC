@@ -6,6 +6,7 @@ import com.tss.grc.module.integrations.servicenow.webhook.ServiceNowWebhookContr
 import com.tss.grc.module.integrations.splunk.controller.SplunkController;
 import com.tss.grc.module.integrations.splunk.webhook.SplunkWebhookController;
 import com.tss.grc.module.integrations.tenable.controller.TenableController;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,8 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -125,8 +124,10 @@ class IntegrationsAuthorizationTest {
         "SOC_AUTOMATION", "INTEGRATION_SERVICE", "SOC_ANALYST",
         "SOC_TIER_2", "INCIDENT_COMMANDER", "BOARD_MEMBER");
 
-    private static final Pattern ROLE_CALL = Pattern.compile("has(?:AnyRole|Role)\\(([^)]*)\\)");
-    private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
+    // F2-262 — role extraction and role-leg classification are both
+    // com.tss.grc.support.GuardExpressions now. This was one of eight hand-rolled copies; the
+    // helper's role call is `has(?:Any)?Role\s*\(`, one whitespace-tolerant character class wider
+    // than the pattern that stood here, so this class can only ever see more.
 
     // ── the partition ─────────────────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ class IntegrationsAuthorizationTest {
             if (expr.startsWith(READ)) onRead.add(site);
             else if (expr.startsWith(WRITE)) onWrite.add(site);
             else if (expr.startsWith(CYBER_WRITE)) onCyberWrite.add(site);
-            else if (ROLE_CALL.matcher(expr).find()) roleGuarded.add(site);
+            else if (GuardExpressions.hasRoleLeg(expr)) roleGuarded.add(site);
             else unclassified.add(site);
         });
 
@@ -185,11 +186,7 @@ class IntegrationsAuthorizationTest {
     void noGuardHereRecitesARoleThatDoesNotExist() {
         Set<String> named = new TreeSet<>();
         for (String expr : guards().values()) {
-            Matcher call = ROLE_CALL.matcher(expr);
-            while (call.find()) {
-                Matcher q = QUOTED.matcher(call.group(1));
-                while (q.find()) named.add(q.group(1));
-            }
+            named.addAll(GuardExpressions.rolesRecitedBy(expr));
         }
         System.out.println("[A17-D8] role names recited in module/integrations = " + named);
 

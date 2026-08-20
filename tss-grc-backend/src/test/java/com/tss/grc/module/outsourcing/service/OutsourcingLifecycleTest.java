@@ -24,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.CloudServiceTransitionRequest;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.ExitPlanTransitionRequest;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.TransitionRequest;
@@ -377,18 +378,24 @@ class OutsourcingLifecycleTest {
         return Files.readString(p, StandardCharsets.UTF_8);
     }
 
+    /**
+     * The ROLE names a guard constant recites.
+     *
+     * <p>⚠⚠ <b>F2-262 — this required the initialiser to BE a {@code hasAnyRole} string, so
+     * converting this module would have failed the build with <i>"guard constant READ_GUARD must be
+     * declared as a hasAnyRole string"</i>.</b> Its twin in {@code DataclassLifecycleTest} carried
+     * the identical defect in a slightly different spelling ({@code \\n?} for a wrapped initialiser
+     * here, {@code "String " +} as the anchor there) — two copies of one predicate, neither aware of
+     * the other, which is F2-190's rule and the whole argument for the shared primitive.
+     *
+     * <p>🔑 <b>{@code OUTSOURCING} is one of the four modules F2-257 filed as having no catalogued
+     * permissions</b>, so this refusal was queued behind the next conversion rather than being a
+     * theoretical risk. A gate that refuses the change it exists to encourage is worse than no gate.
+     *
+     * <p>{@link GuardExpressions#rolesRecitedByConstant} keeps the anti-vacuity half and drops the
+     * role-guard requirement, so a converted constant reports drift rather than refusing to parse.
+     */
     private static Set<String> rolesIn(String src, String constant) {
-        Matcher m = Pattern.compile(
-            constant + "\\s*=\\s*\\n?\\s*\"hasAnyRole\\(([^\\)]*)\\)\"").matcher(src);
-        assertThat(m.find()).as("guard constant %s must be declared as a hasAnyRole string — a "
-            + "pattern that matches nothing passes forever", constant).isTrue();
-        Set<String> out = new TreeSet<>();
-        for (String part : m.group(1).split(",")) {
-            String r = part.trim().replace("'", "");
-            if (!r.isEmpty()) {
-                out.add(r);
-            }
-        }
-        return out;
+        return GuardExpressions.rolesRecitedByConstant(src, constant);
     }
 }

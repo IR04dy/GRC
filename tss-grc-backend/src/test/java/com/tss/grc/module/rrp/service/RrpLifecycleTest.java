@@ -29,6 +29,7 @@ import com.tss.grc.module.rrp.repository.RrpCycleRepository;
 import com.tss.grc.module.rrp.repository.RrpEventRepository;
 import com.tss.grc.module.rrp.repository.RrpIndicatorRepository;
 import com.tss.grc.module.rrp.repository.RrpRecoveryOptionRepository;
+import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.testsupport.StateMachineContract;
 
 import org.junit.jupiter.api.AfterEach;
@@ -363,22 +364,23 @@ class RrpLifecycleTest {
      * hand-rolled copies across the test tree, of which `sharia` and `openbanking` were quietly
      * updated when F2-145(e) converted them and `cpty` is still latent. Extracting one helper is
      * filed (F2-190's rule: do not hand-roll a fifth).
+     *
+     * <p>⚠⚠ <b>F2-262 executed that filing, and re-deriving the population first (F2-221) refuted
+     * three of the five members above.</b> {@code sharia}, {@code openbanking} and {@code cpty} hold
+     * {@code hasPermission('MODULE','ACTION')} <b>pair</b> extractors — a different question — so
+     * they were never members of this population, while the one copy that still had the defect
+     * ({@code CrisisRoomGuardTest}) was not in the list at all. 🔑 <b>A filing that names its members
+     * by MODULE inherits the module list of the slice that filed it, and a module can host a
+     * different question's extractor.</b> Re-derived: <b>8</b> members, <b>3</b> mechanisms,
+     * <b>6</b> spellings, <b>5</b> slices already bitten.
+     *
+     * <p>Two properties this copy had and the helper now gives every caller: the constant must
+     * exist (anti-vacuity), and the extraction must be tolerant of what it contains. This copy's own
+     * narrowing was the inner {@code '([A-Z_]+)'}, which cannot see a role name carrying a digit —
+     * latent, since all 38 recited names are upper snake case, and closed anyway because what made
+     * it harmless was six regexes agreeing and nobody maintaining that (F2-177).
      */
     private static Set<String> rolesIn(String src, String constant) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-            "String\\s+" + constant + "\\s*=\\s*(.*?);", java.util.regex.Pattern.DOTALL).matcher(src);
-        assertThat(m.find()).as("guard constant %s must be declared — a pattern that matches nothing "
-            + "passes forever", constant).isTrue();
-        Set<String> out = new TreeSet<>();
-        java.util.regex.Matcher call = java.util.regex.Pattern.compile(
-            "has(?:Any)?Role\\s*\\(([^)]*)\\)").matcher(m.group(1));
-        while (call.find()) {
-            java.util.regex.Matcher r =
-                java.util.regex.Pattern.compile("'([A-Z_]+)'").matcher(call.group(1));
-            while (r.find()) {
-                out.add(r.group(1));
-            }
-        }
-        return out;
+        return GuardExpressions.rolesRecitedByConstant(src, constant);
     }
 }

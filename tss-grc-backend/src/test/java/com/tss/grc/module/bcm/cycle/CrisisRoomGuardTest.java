@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle;
 
 import com.tss.grc.module.bcm.cycle.controller.CrisisEventController;
 import com.tss.grc.module.bcm.cycle.controller.MobileCrisisController;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,8 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,8 +51,6 @@ class CrisisRoomGuardTest {
     private static final Set<String> REMOVED_GHOSTS = Set.of(
         "CRISIS_COMMANDER", "INCIDENT_COMMANDER");
 
-    private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
-
     private static String guardOf(Class<?> controller, String method) {
         for (Method m : controller.getDeclaredMethods()) {
             if (m.getName().equals(method)) {
@@ -67,13 +64,28 @@ class CrisisRoomGuardTest {
             + "this test cannot assert anything about a method that is gone");
     }
 
+    /**
+     * The ROLE names in a guard — not every quoted token in it.
+     *
+     * <p>⚠⚠ <b>F2-262: this ran a bare {@code '([^']*)'} over the whole expression, with no notion
+     * of which function a token was an argument to.</b> It was the last of eight hand-rolled
+     * extractors and the only one still completely unscoped, so the moment
+     * {@link #theGuardIsNotQuietlyReplacedByTheModuleRead} were ever answered in the affirmative —
+     * i.e. the moment somebody converted this guard — {@code hasPermission('BCM','READ')} would
+     * have yielded two "role names" called {@code BCM} and {@code READ}, and
+     * {@link #theAudienceIsTheReviewedOne} would have reported <b>both as ghost roles</b>. That is
+     * a gate failing on correct code (F2-214), and it is the same defect F2-254, F2-259 and F2-260
+     * each repaired in their own module's copy.
+     *
+     * <p>🔑 It was latent only because {@code CRISIS_ROOM_GUARD} happens to be a pure role guard,
+     * while every other guard on the same controller is {@code hasPermission('BCM', …)} — so the
+     * detonator is the conversion this class's fourth test is written to adjudicate. Reachability is
+     * a fact about today, not a property of a control (F2-182).
+     *
+     * <p>Now {@link GuardExpressions#rolesRecitedBy}, the platform's single answer to this question.
+     */
     private static Set<String> namesIn(String guard) {
-        Set<String> out = new TreeSet<>();
-        Matcher m = QUOTED.matcher(guard);
-        while (m.find()) {
-            out.add(m.group(1));
-        }
-        return out;
+        return GuardExpressions.rolesRecitedBy(guard);
     }
 
     @Test
