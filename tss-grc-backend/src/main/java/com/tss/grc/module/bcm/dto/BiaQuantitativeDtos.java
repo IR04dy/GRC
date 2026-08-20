@@ -87,6 +87,9 @@ public final class BiaQuantitativeDtos {
         String cfoApproverName,
         String cfoComments,
         LocalDateTime boardApprovedAt,
+        // F2-261 — the board signatory. The column did not exist until V384: this tier
+        // stamped the clock and recorded no actor, while both lower tiers recorded theirs.
+        String boardApprovedBy,
         String boardMinutesRef,
         String rejectionReason,
         LocalDateTime createdAt,

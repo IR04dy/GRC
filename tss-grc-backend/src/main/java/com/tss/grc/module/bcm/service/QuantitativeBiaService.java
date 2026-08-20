@@ -174,6 +174,7 @@ public class QuantitativeBiaService {
 
         String to = "APPROVE".equals(req.decision()) ? "CFO_APPROVED" : "REJECTED";
         guardTransition(h.getStatus(), to);
+
         String from = h.getStatus();
 
         if ("APPROVE".equals(req.decision())) {
@@ -222,6 +223,51 @@ public class QuantitativeBiaService {
         }
     }
 
+    /**
+     * F2-261 — the board sign-off, the third and highest tier of this ladder.
+     *
+     * <h3>It stamped WHEN and recorded no WHO</h3>
+     * This method wrote {@code boardApprovedAt} from {@code LocalDateTime.now()} and a
+     * board-minutes reference, and there was <b>no column for the person and no actor parameter</b>
+     * — while {@link #bcmLeadReview} takes the actor from the controller and {@link #cfoApprove}
+     * has taken it from {@code CurrentActor} since F2-223. 🔑 <b>So the attribution quality
+     * decreased as the authority increased, and the tier with none was the board approval</b> — the
+     * artefact an ISO 22301 or SAMA business-continuity reviewer reads. F2-256's shape (a
+     * server-owned clock with nobody owning the actor beside it) at the top of the chain rather
+     * than at its edge. <b>V384</b> adds the column.
+     *
+     * <p>⚠ It <b>refuses</b> rather than storing a blank, which is deliberately louder (F2-236): a
+     * board approval whose signatory is the empty string reads as an attribution, so it is worse
+     * than one that could not be written.
+     *
+     * <h3>⚠⚠ The four-eyes bar this column makes possible is deliberately NOT enforced yet, and
+     * the live probe is what settled that</h3>
+     * {@code guardTransition} enforces the <em>order</em> of the three stages and nothing enforces
+     * that they are different people — {@code BiaQuantitativeController}'s javadoc says so, and it
+     * is the reason {@code BCM:APPROVE} was rejected as a conversion target. With
+     * {@code boardApprovedBy} in place the comparison is finally <b>writable</b>: board signatory ≠
+     * CFO approver ≠ BCM lead reviewer, on three now-comparable parties. It was written, probed, and
+     * withdrawn to a filing.
+     *
+     * <p><b>Because every principal who can reach the top two tiers is the same one.</b> Measured
+     * from the guards and {@code iam.user_roles} in both databases: {@code cfo-approve} admits
+     * {@code CFO} + {@code PLATFORM_ADMIN} and {@code board-approve} admits
+     * {@code EXECUTIVE_REVIEWER} + {@code PLATFORM_ADMIN}, and {@code CFO} and
+     * {@code EXECUTIVE_REVIEWER} are held by <b>nobody</b> — they are the last two rows of
+     * {@code ROLE_GUARD_CENSUS.md} §B2b. So the only way to complete this chain today is
+     * {@code admin} taking both approvals, <b>which is exactly what the bar must refuse</b>. Probed
+     * live: with the bar wired, {@code admin} board-approving what it had CFO-approved answered
+     * <b>409</b> — correct, and the only path that works.
+     *
+     * <p>🔑 <b>So the missing column, the missing bar and the two zero-holder roles are one problem,
+     * not three.</b> F2-254 wrote that "the guard lockout and the missing attribution are one
+     * problem and F2-52 filed them as two"; there is a third. Enforcing the bar without closing the
+     * lockout yields a correctly-controlled feature nobody can use — F2-112's shape inverted, a
+     * control that can only ever refuse. Closing the lockout without the bar yields a usable feature
+     * with no separation. Doing both means deciding who may give a board-level approval, which is a
+     * governance decision about a customer's organisation and not a side effect of an attribution
+     * fix. <b>What this method ships is the half that breaks nothing: the record now says who.</b>
+     */
     @Transactional
     public BiaQuantitativeResponse boardApprove(UUID externalId, String minutesRef) {
         if (minutesRef == null || minutesRef.isBlank()) {
@@ -229,15 +275,19 @@ public class QuantitativeBiaService {
         }
         BiaQuantitative h = loadOrThrow(externalId);
         guardTransition(h.getStatus(), "BOARD_APPROVED");
+
+        String actor = CurrentActor.requireUsername("board approval of a quantitative BIA");
+
         String from = h.getStatus();
         h.setStatus("BOARD_APPROVED");
         h.setBoardApprovedAt(LocalDateTime.now());
+        h.setBoardApprovedBy(actor);
         h.setBoardMinutesRef(minutesRef);
         h.setUpdatedAt(LocalDateTime.now());
         BiaQuantitative saved = repo.save(h);
         audit.log("BOARD_APPROVE", "BiaQuantitative", saved.getId(),
-            "Quantitative BIA board-approved: " + saved.getAssessmentCode()
-                + " (minutes ref: " + minutesRef + ")");
+            "Quantitative BIA board-approved by " + saved.getBoardApprovedBy() + ": "
+                + saved.getAssessmentCode() + " (minutes ref: " + minutesRef + ")");
         emit("BIA_QUANT_BOARD_APPROVED", saved, from);
         return toResponse(saved);
     }
@@ -493,6 +543,7 @@ public class QuantitativeBiaService {
             h.getCfoApproverName(),
             h.getCfoComments(),
             h.getBoardApprovedAt(),
+            h.getBoardApprovedBy(),
             h.getBoardMinutesRef(),
             h.getRejectionReason(),
             h.getCreatedAt(),

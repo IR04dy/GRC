@@ -2547,6 +2547,128 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-261 · The attribution quality decreased as the authority increased
+
+| Field | Content |
+|---|---|
+| **ID** | F2-261 *(measured 2026-08-21. Provenance is [[F2-260]]'s filing — §B2b's last two rows — via [[F2-254]]'s recorded blocker and [[F2-152]]'s filing. Re-derived first ([[F2-221]]), which corrected the filing before any code was written.)* |
+| **Category** | Attribution — a server-owned clock with nobody owning the actor beside it, at the **top** of a three-stage approval ladder whose two lower stages both record theirs |
+| **Severity** | **P2.** Every board sign-off of a quantitative Business Impact Analysis recorded the moment, the board-minutes reference and **no person**. That is the artefact an ISO 22301 or SAMA business-continuity reviewer reads to accept that a named body approved the loss model. |
+| **Provenance** | [[F2-152]] filed *"a board approval with no signer, and a CFO approval whose signer is whatever the request says"*; [[F2-254]] recorded the four-eyes bar as *"not buildable today"* because `sys.columns` showed no `board_approved_by` column. |
+| **Current State** | ✔ **FIXED 2026-08-21** (`e9c5f466`). **V384** adds `board_approved_by`; `boardApprove` stamps it from the authenticated principal and refuses without one; the field is on the wire. `QuantitativeBiaFourEyesTest` (5 legs). Probed **13/13 pre-fix and 13/13 post-fix**. **Closes the real half of [[F2-152]]** and discharges the technical half of [[F2-254]]'s blocker. The four-eyes bar itself is **withdrawn to a filing** — see below. |
+| **Problem** | `QuantitativeBiaService.boardApprove` wrote `boardApprovedAt` from `LocalDateTime.now()` and `boardMinutesRef`, and took no actor parameter — there was no column for one. |
+| **Root Cause** | RC-attribution — [[F2-256]]'s shape (the server owns WHEN and nobody owns WHO), landing on the highest tier of a ladder rather than at its edge. |
+| **Evidence** | `sys.columns` and the live row in **both** databases; the three guards read from the controller; `iam.user_roles` for the two zero-holder roles; live probe 13/13 in both modes, discriminating on `stage3=None` vs `stage3='admin'`; V384 applied twice to dev with both databases pre-flighted |
+
+**Finding.** Three stages, three different attribution mechanisms:
+
+```
+POST …/bcm-review     -> setBcmLeadReviewedBy(actor)                  the controller's actor()
+POST …/cfo-approve    -> setCfoApproverName(CurrentActor.username())  since F2-223
+POST …/board-approve  -> setBoardApprovedAt(now()) + minutesRef       AND NOTHING ELSE
+```
+
+🔑 **So the attribution quality decreased as the authority increased**, and the tier with none was
+the board sign-off. Stage 0 already demonstrated the correct shape — `preparedByUserId` beside
+`preparedByName` — and each approval stage degraded from it.
+
+⚠⚠ **A correction, and it had been repeated into three artefacts.** [[F2-152]]'s filing said *"a CFO
+approval whose signer is whatever the request says"*; F2-52's javadoc on `BOARD_APPROVE_GUARD` said
+it; [[F2-254]]'s javadoc repeated it eight paragraphs later. **F2-223 had already converted
+`cfoApprove` to `CurrentActor.username()`, with a comment saying so.** Only the board half was ever
+real. 🔑 **A claim about a consequence is the least-verified part of a filing** ([[F2-192]]), and this
+one propagated through three readings without anybody opening the service.
+
+**V384** adds `board_approved_by NVARCHAR(255)`, mirroring `cfo_approver_name` and
+`bcm_lead_reviewed_by` in type, width **and** nullability — check 2 asserts that mirror, because the
+comparison the column exists for treats all three parties as strings and a narrower column could
+truncate one and make two different people compare equal. ⚠ An id would be the better shape in the
+abstract, since a username can be renamed and the history then lies; converting all three together is
+filed, because **doing one of three is what produced the divergence being fixed** ([[F2-190]]). It
+backfills nothing and refuses nothing: measured in dev and prod, the table holds **one row**, at
+`CFO_APPROVED`, with `board_approved_at` NULL — so no completed approval's approver has to be invented
+([[F2-196]]), and there is deliberately no check refusing such a row either, because on a customer's
+database that is a pre-fix approval to disclose ([[F2-209]]'s third state) and not a reason to block
+their migration chain ([[F2-183]]).
+
+⚠⚠ **THE FOUR-EYES BAR WAS WRITTEN, PROBED AND WITHDRAWN, AND THAT IS THE FINDING.** With the column
+in place the comparison is finally **writable** — board signatory ≠ CFO approver ≠ BCM lead reviewer,
+on three now-comparable parties, which is exactly the prerequisite `BiaQuantitativeController`'s
+javadoc said was missing. It was implemented, unit-tested and probed. Then measured, from the guards
+and `iam.user_roles` in both databases:
+
+```
+bcm-review     hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')       live: so_officer, admin
+cfo-approve    hasAnyRole('CFO','PLATFORM_ADMIN')                      live: admin ALONE
+board-approve  hasAnyRole('EXECUTIVE_REVIEWER','PLATFORM_ADMIN')       live: admin ALONE
+```
+
+`CFO` and `EXECUTIVE_REVIEWER` are held by **nobody** — they are §B2b's last two rows. **So the only
+way to complete this chain today is `admin` taking both approvals, which is precisely what the bar
+must refuse.** Probed live with the bar wired: `admin` board-approving what it had CFO-approved
+answered **409** — correct, and the only path that works. The post-fix row makes it visible without
+any bar at all: `stage1=so_officer, stage2=admin, stage3=admin`.
+
+🔑🔑 **So the missing column, the missing bar and the two zero-holder roles are ONE problem, not
+three.** [[F2-254]] wrote that *"the guard lockout and the missing attribution are one problem and
+F2-52 filed them as two"* — there is a third. Enforcing the bar without closing the lockout yields a
+correctly-controlled feature **nobody can use**: [[F2-112]]'s shape inverted, not a control that
+cannot fire but one that can only ever fire. Closing the lockout without the bar yields a usable
+feature with no separation. Doing both means deciding who may give a board-level approval, which is a
+governance decision about a customer's organisation and not a side effect of an attribution fix.
+**What ships is the half that breaks nothing.**
+
+⚙ **The recorded blocker was two claims stacked in one sentence, and only one was a blocker.**
+[[F2-254]]'s javadoc read *"the four-eyes bar that would make that safe is not buildable today: …
+there is no identity for either tier to compare. Fixing F2-152 is the prerequisite, and choosing who
+holds a financial versus a board approval is an owner decision plus a migration."* (a) no identity
+exists, and (b) who may take which approval is an owner decision. **(a) was a blocker and is now
+closed; (b) is a question.** Stating them as one sentence made the whole thing read as owner-gated,
+which is how it survived F2-52, [[F2-152]], [[F2-254]] and [[F2-260]]. [[F2-178]]'s rule — re-measure
+a recorded blocker before believing its estimate — with the estimate right about (b) and wrong about
+(a) being permanent. The correction is written where the claim is, because **a stale blocker is the
+input to somebody's next estimate**.
+
+⚙ **The gate asserts the withdrawal in both directions**, so the next reader cannot add the bar
+without also closing §B2b: the attribution must be stamped from the principal, **and** neither
+approval method may contain a segregation refusal. A one-directional gate here would have let the
+bar reappear and the feature quietly stop working.
+
+⚠ **Three of my own errors, every one caught by running something.** Two guessed names —
+`bcm.business_process` (it is `bcm.critical_processes`, and the register's own `process_id` was the
+better source) and `bia_id` on the loss-line table — the recurring guessed-name family; and a fixture
+whose plain-String principal made `CurrentActor.requireUsername` throw its **no-actor refusal**,
+which reads exactly like the four-eyes bar not firing. 🔑 The last is worth keeping: a refusal thrown
+for the wrong reason is indistinguishable from the right one in a pass/fail line, and only the message
+separated them. ⚠ Also [[F2-203]]'s landmine: `mvn -o compile` restarts DevTools **while the listener
+stays bound**, so `netstat` says LISTENING through a window where every request is refused — a
+`sleep` is not a substitute for polling `/actuator/health`, and a refused connection reads exactly
+like a dead backend.
+
+**Verification.** Pre-fix control **13/13** and post-fix **13/13**, discriminating on `stage3=None`
+versus `stage3='admin'`, with L7 — `admin` still board-approves at 200 — the load-bearing
+non-regression leg passing in **both** modes · V384 applied **twice** to dev, idempotent, both
+databases pre-flighted (0 completed board approvals, so no backfill and no disclosure gap) · cleanup
+restored the 1-row baseline on both runs · suite **4,367/0/0**.
+
+**Filed.**
+- **§B2b's last two rows are unchanged and now have a sharper description**: both `module.bcm`
+  approval tiers are administrator-only, and closing them is the *same* decision as enabling the
+  four-eyes bar. Enabling the bar alone breaks the feature; converting the guards alone removes the
+  separation; the two together decide who may give a board-level approval. One owner decision, three
+  symptoms.
+- **The three attribution columns hold usernames, not ids.** A rename makes the history lie, and the
+  bar (when enabled) would compare stale strings. Converting all three to `BIGINT` with derived
+  labels is one coherent slice ([[F2-249]]'s `TenantUserDirectory` is the primitive); doing one is
+  what produced this divergence.
+- `bcm.bia_quantitative` has **zero CHECK constraints** and its status vocabulary lives only in
+  `guardTransition` — [[F2-221]]'s shape. Not cheap here: this slice touched one writer of one
+  column, and a constraint lands in the commit that closes a column's writers ([[F2-183]]).
+- The live row's three parties are **invented officers with titles** (`'Faisal Al-Subaie (Group
+  CFO)'`, `'Abdulrahman Al-Ghamdi (BCM Manager)'`, `'Layla Al-Otaibi (BCM Lead, Risk & Resilience)'`)
+  — seed-origin, [[F2-207]]'s measured cast of 65. Repair rewrites a live governance row: owner
+  decision.
+
 ## F2-260 · The finding that coined "existence is weaker than holding" was one of the sites still open
 
 | Field | Content |
@@ -10290,7 +10412,7 @@ authority, not the tier.
 | **ID** | F2-152 *(measured fixing [[F2-52]]'s last attrition lockout, 2026-08-06)* |
 | **Category** | Attribution — [[F2-22b]]'s forgeable-authorship shape, on a three-stage approval chain |
 | **Severity** | **P2.** The audit ledger records the acting principal, so the act is traceable; the **record** is not. A quantitative BIA is BCM evidence read by an examiner from the row, not from the ledger |
-| **Current State** | ⬜ **Open, filed not fixed.** [[F2-52]] fixed *who may* board-approve; this is *what gets written when they do* |
+| **Current State** | ✔ **CLOSED 2026-08-21 by [[F2-261]]** (the board half) — and the CFO half was closed earlier by [[F2-223]], which nobody noticed. **V384** adds `bcm.bia_quantitative.board_approved_by`, `boardApprove` stamps it from the authenticated principal and refuses without one, and the field is on the wire. Probed **13/13 pre-fix and 13/13 post-fix**. ⚠⚠ **This row's other half had been false for weeks and was quoted three times.** *"a CFO approval whose signer is whatever the request says"* was true when written and [[F2-223]] fixed it with a comment saying so — yet F2-52's javadoc on `BOARD_APPROVE_GUARD` repeated it, and [[F2-254]] repeated it again eight paragraphs later. 🔑 **A claim about a consequence is the least-verified part of a filing** ([[F2-192]]), and a filing that is half true is quoted whole. ⚠ The four-eyes bar this row's fix makes writable is deliberately **not enforced**: `cfo-approve` and `board-approve` both admit only the platform administrator in practice (§B2b's last two rows), so the bar could only ever refuse the one path that works — see [[F2-261]] |
 | **Provenance** | Not sought. F2-52 asked what the board-approve stage records, to judge whether the guard was the only control. It is |
 | **🔑 Half one — the board approval has no signer** | `QuantitativeBiaService.boardApprove` sets `status`, `boardApprovedAt`, `boardMinutesRef` and `updatedAt`. **There is no `board_approved_by` column and none is written.** So the row says *a board approved this, at this time, per these minutes* and cannot say who signed. Compare the stage before it, which has `cfo_approved_at`, `cfo_approver_name` **and** `cfo_comments` |
 | **⚠ Half two — and the CFO's approver name is supplied by the caller** | `CfoApprovalRequest` carries `@NotBlank String approverName`, written to `cfo_approver_name`. It is never compared to the principal. So the one stage that *does* record a signer records **whatever the request body says** — exactly [[F2-22b]](vi)'s `draftedBy` defect, which the board-pack slice fixed by stamping from the principal and marking the field READ_ONLY. The same fix applies here and was not in this slice's scope |

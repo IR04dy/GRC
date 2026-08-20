@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V383 packaged; next free V384** (371 files; ⚠ this line said "V1→V295 / next free
+— **V1→V384 packaged; next free V385** (372 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V383 are pending** the
-next jar — 39 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V384 are pending** the
+next jar — 40 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V383 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V384 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,91 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE ATTRIBUTION QUALITY DECREASED AS THE AUTHORITY INCREASED, AND THE TIER WITH NONE WAS
+  THE BOARD SIGN-OFF** (F2-261, measured 2026-08-21). Executing F2-260's filing of §B2b's last two
+  rows, re-derived first (F2-221). One ladder, three stages, three different mechanisms:
+  `bcm-review` records the actor from the controller, `cfo-approve` records it from
+  `CurrentActor` (since F2-223), and `board-approve` stamped `board_approved_at` from the server's
+  clock plus a board-minutes reference and took **no actor parameter, because there was no column
+  for one**. F2-256's shape — the server owns WHEN and nobody owns WHO — at the **top** of a chain
+  rather than at its edge, on the artefact an ISO 22301 or SAMA business-continuity reviewer reads.
+  🔑 **Stage 0 already demonstrated the correct form** (`preparedByUserId` beside
+  `preparedByName`) and each approval stage degraded from it, so the shape to look for is not "is
+  there an attribution" but **"does it get worse as you climb?"**
+  ⚠⚠ **A CLAIM IN THAT FILING HAD BEEN FALSE FOR WEEKS AND WAS QUOTED THREE TIMES.** F2-152 filed
+  *"a board approval with no signer, and a CFO approval whose signer is whatever the request
+  says"*. F2-223 fixed the CFO half **with a comment saying so**; F2-52's javadoc on
+  `BOARD_APPROVE_GUARD` repeated the whole sentence anyway, and F2-254's javadoc repeated it again
+  eight paragraphs later. 🔑 **A filing that is half true gets quoted whole** — F2-192's rule that a
+  claim about a consequence is the least-verified part of a filing, compounded because nobody who
+  quoted it opened the service.
+  ⚠⚠ **THE FOUR-EYES BAR WAS WRITTEN, UNIT-TESTED, PROBED AND WITHDRAWN, AND THE WITHDRAWAL IS THE
+  FINDING.** With `board_approved_by` in place the comparison is finally **writable** — board
+  signatory ≠ CFO approver ≠ BCM lead reviewer, three now-comparable parties, exactly the
+  prerequisite `BiaQuantitativeController`'s javadoc said was missing. Then measurement killed it:
+  `cfo-approve` admits `CFO` + `PLATFORM_ADMIN`, `board-approve` admits `EXECUTIVE_REVIEWER` +
+  `PLATFORM_ADMIN`, **both those roles are held by nobody in either database**, and they are
+  §B2b's last two rows. **So the only way to complete this chain today is `admin` taking both
+  approvals — which is precisely what the bar must refuse.** Probed live with the bar wired: 409,
+  correct, on the one path that works. The post-fix row shows it without any bar:
+  `stage1=so_officer, stage2=admin, stage3=admin`.
+  🔑🔑 **So the missing column, the missing bar and the two zero-holder roles are ONE problem, not
+  three.** F2-254 wrote that *"the guard lockout and the missing attribution are one problem and
+  F2-52 filed them as two"*; there is a third. Enforcing the bar alone yields a correctly-controlled
+  feature **nobody can use** — F2-112's shape **inverted**: not a control that cannot fire but one
+  that can only ever fire. Converting the guards alone removes the separation. Doing both decides
+  who may give a board-level approval, which is a governance decision about a customer's
+  organisation and not a side effect of an attribution fix. **Ship the half that breaks nothing,
+  and say why the other half is one decision rather than two tasks.**
+  ⚠ **The gate has to assert a withdrawal in BOTH directions**: the attribution is stamped **and**
+  neither approval method contains a segregation refusal. A one-directional gate would let the bar
+  reappear and the feature quietly stop working — which is the failure mode a reader would blame on
+  the guards rather than on the bar.
+  ⚠⚠ **A RECORDED BLOCKER CAN BE TWO CLAIMS STACKED IN ONE SENTENCE, AND ONLY ONE OF THEM A
+  BLOCKER.** F2-254's read *"the four-eyes bar that would make that safe is not buildable today: …
+  there is no identity for either tier to compare. Fixing F2-152 is the prerequisite, and choosing
+  who holds a financial versus a board approval is an owner decision plus a migration."* That is
+  (a) no identity exists — a fact, and fixable — and (b) who may take which approval — a question.
+  🔑 **Stating them as one sentence made the whole thing read as owner-gated, which is how it
+  survived F2-52, F2-152, F2-254 and F2-260 without anybody building the buildable half.** F2-178's
+  rule with a new edge: re-measure a recorded blocker, and **split it into its claims before
+  believing any of them.** Correct it where the claim is written, because a stale blocker is the
+  input to somebody's next estimate.
+  ⚠ **Mirror a new column on its siblings in type, width AND nullability, and assert it.** The
+  comparison the column exists for treats all three parties as strings, so a narrower column could
+  truncate one party and make two different people compare equal. ⚠ An id would be the better shape
+  — a username can be renamed and the history then lies — and converting **one** of three is
+  exactly what produced the divergence being fixed (F2-190), so all three together is a slice and
+  one of them is a defect.
+  ⚙ **A migration that adds a column to a live governance register: backfill nothing and refuse
+  nothing.** Measured first — one row, at `CFO_APPROVED`, `board_approved_at` NULL in both databases
+  — so no completed approval's approver has to be invented (F2-196), and deliberately **no check
+  refusing a row that DOES have a board approval with no approver**, because on a customer's
+  database that is a pre-fix approval to disclose (F2-209's third state) and not a reason to block
+  their whole migration chain (F2-183).
+  ⚠⚠ **A REFUSAL THROWN FOR THE WRONG REASON IS INDISTINGUISHABLE FROM THE RIGHT ONE IN A
+  PASS/FAIL LINE.** My unit fixture authenticated a plain `String` principal;
+  `CurrentActor.username()` returns null for anything but a `GrcUserDetails`, so
+  `requireUsername` threw its **no-actor** refusal and the four-eyes assertion failed looking
+  exactly like the bar not firing. Only the message separated them. **Assert on the message, not
+  just the exception type** — and copy the house `GrcUserDetails` fixture idiom rather than
+  inventing one (it lives in `com.tss.grc.security`, not `common.security`).
+  ⚠ **F2-203's landmine again, and `sleep` is not the fix.** `mvn -o compile` rewrites
+  `target/classes` and DevTools restarts the context **while the listener stays bound**, so
+  `netstat` reports LISTENING through a window in which every request is refused — and a refused
+  connection reads exactly like a dead backend, which sends you looking for a crash that did not
+  happen. **Poll `/actuator/health` in a loop; never time a restart.**
+  ⚠ **And two more guessed names in one slice** (`bcm.business_process` — it is
+  `bcm.critical_processes` — and `bia_id` on the loss-line table, which broke a probe's cleanup and
+  left four tagged rows for the next run to trip over). The register's own `process_id` was the
+  better source than any table name: **when you need a valid foreign key for a fixture, read one
+  out of the register you are about to write to.**
+  ⚙ **Filed:** §B2b's last two rows unchanged but better described (one owner decision, three
+  symptoms); all three attribution columns holding **usernames rather than ids**;
+  `bcm.bia_quantitative` having **zero CHECK constraints** with its status vocabulary only in
+  `guardTransition` (F2-221's shape — not cheap here, since this slice touched one writer of one
+  column); and the live row's three parties being **invented officers with titles** (F2-207's cast
+  of 65), whose repair rewrites a live governance row and is an owner decision.
 - ⚠⚠ **THE FINDING THAT COINED "EXISTENCE IS A WEAKER QUESTION THAN HOLDING" WAS ITSELF ONE OF
   THE SITES STILL OPEN, AND ITS EXIT CONDITION NAMED THE REMEDY THAT DOES NOT WORK** (F2-260,
   measured 2026-08-21). Executing F2-259's §B2b list, re-derived first (F2-221):
