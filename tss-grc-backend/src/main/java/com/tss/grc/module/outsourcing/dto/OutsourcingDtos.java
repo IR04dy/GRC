@@ -169,7 +169,7 @@ public final class OutsourcingDtos {
             Long id, Long arrangementId, Long cloudServiceId,
             Long reviewId, Long exitPlanId,
             LocalDateTime occurredAt, String eventType,
-            String actorName, String statusAfter,
+            Long actorUserId, String actorName, String statusAfter,
             String noteEn, String noteAr
     ) {}
 

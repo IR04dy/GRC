@@ -377,6 +377,7 @@ public class RegInspectService {
         u.setOccurredAt(LocalDateTime.now());
         u.setUpdateType(updateType);
         u.setActorUserId(currentUserId());
+        u.setActorName(currentActorName());
         u.setStatusAfter(statusAfter);
         u.setNoteEn(noteEn);
         u.setNoteAr(noteAr);
@@ -385,6 +386,19 @@ public class RegInspectService {
     }
 
     private static Long org() { return TenantContext.requireOrganisationId(); }
+
+    /**
+     * F2-257 — the display half of the actor pair, from the same primitive as {@link
+     * #currentUserId()}.
+     *
+     * <p>Deliberately {@code username()} and not {@code requireUsername(...)}: the id half is
+     * nullable and comes from the same place, so both halves are populated together or absent
+     * together. Refusing here would let a timeline write abort the business operation it exists to
+     * record.
+     */
+    private static String currentActorName() {
+        return com.tss.grc.common.security.CurrentActor.username();
+    }
 
     private static Long currentUserId() {
         return com.tss.grc.common.security.CurrentActor.userId();

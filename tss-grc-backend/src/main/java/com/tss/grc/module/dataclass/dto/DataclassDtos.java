@@ -100,7 +100,7 @@ public final class DataclassDtos {
     public record EventResponse(
             Long id, Long dataAssetId, Long dataFlowId, Long dataExceptionId,
             LocalDateTime occurredAt, String eventType,
-            String actorName, String statusAfter,
+            Long actorUserId, String actorName, String statusAfter,
             String noteEn, String noteAr
     ) {}
 

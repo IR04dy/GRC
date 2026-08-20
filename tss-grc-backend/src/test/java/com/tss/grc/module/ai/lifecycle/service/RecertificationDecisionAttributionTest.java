@@ -198,6 +198,45 @@ class RecertificationDecisionAttributionTest {
     }
 
     @Test
+    @DisplayName("F2-257: the timeline row records BOTH halves of the actor pair")
+    void theTimelineRowRecordsBothHalvesOfTheActorPair() {
+        signIn();
+        parked("IN_REVIEW", null);
+
+        svc.transitionRecertification(9L, to("RECERTIFIED"));
+
+        ArgumentCaptor<AiLifecycleEvent> ev = ArgumentCaptor.forClass(AiLifecycleEvent.class);
+        verify(eventRepo).save(ev.capture());
+        assertThat(ev.getValue().getActorUserId()).isEqualTo(ACTOR_ID);
+        assertThat(ev.getValue().getActorName())
+            .as("""
+                ai_governance.ai_lifecycle_event declares actor_name beside actor_user_id and the \
+                response record carried ONLY the name, so before F2-257 every event this service \
+                wrote identified its actor nowhere the client could see. Ten registers had that \
+                shape and nothing in the platform wrote the name.""")
+            .isEqualTo("cro_user");
+    }
+
+    @Test
+    @DisplayName("F2-257: with no principal BOTH halves are null — never one without the other")
+    void anActorlessTimelineRowLeavesBothHalvesNull() {
+        // IN_REVIEW does not call recordDecision, so this path does not refuse — which is the point.
+        // A timeline writer records a side effect; making it throw would abort the operation it
+        // exists to describe (F2-191), and openbanking.ob_event holds six live rows whose actor is a
+        // machine with no user id at all. Both null together is the invariant, not "never null".
+        parked("DUE", null);   // no signIn()
+
+        svc.transitionRecertification(9L, to("IN_REVIEW"));
+
+        ArgumentCaptor<AiLifecycleEvent> ev = ArgumentCaptor.forClass(AiLifecycleEvent.class);
+        verify(eventRepo).save(ev.capture());
+        assertThat(ev.getValue().getActorUserId()).isNull();
+        assertThat(ev.getValue().getActorName())
+            .as("requireUsername() here would have thrown and rolled back a legal transition")
+            .isNull();
+    }
+
+    @Test
     @DisplayName("an illegal transition is still refused by the machine before any attribution runs")
     void theMachineStillGuardsTheTransition() {
         signIn();

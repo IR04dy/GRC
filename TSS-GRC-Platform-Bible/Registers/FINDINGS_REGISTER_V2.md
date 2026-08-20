@@ -2547,6 +2547,183 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-257 · Ten timeline registers recorded WHICH user acted and never WHAT they are called
+
+| Field | Content |
+|---|---|
+| **ID** | F2-257 *(measured 2026-08-20. Provenance is [[F2-256]]'s own filing. Re-deriving it first ([[F2-221]]) corrected it twice: the filing said **nine** registers and its own javadoc **listed ten**, and it claimed *"every timeline entry renders a blank actor"* when no screen in the platform renders any of these ten actors.)* |
+| **Category** | Attribution — a register that records WHICH user acted and never WHAT they are called, publishing a response field nothing can fill · and the question of whether a label is a **copy** of the id's identity or information the id cannot express |
+| **Severity** | **P2.** Ten event/timeline registers across ten modules — including a SAMA/NCA regulatory-inspection log, a Sharia non-compliance timeline, a SAMA counterparty-rating trail and an ISO/IEC 42001 model-lifecycle history — published an actor field that nothing in the platform ever filled in. No screen reads it, so the blank reached API consumers rather than a page; the field is on the wire, so the next client to declare it renders nothing. |
+| **Provenance** | [[F2-256]] filed *"nine event registers declare `actorName` beside an `actorUserId` their service DOES write"* as the largest sub-shape of its 27-member work list, deliberately left whole rather than adjudicated nine times ([[F2-188]]). |
+| **Current State** | ✔ **FIXED 2026-08-20** (`3ba40611`). Each register's single timeline writer now stamps `setActorName(currentActorName())` beside its existing id write, from `CurrentActor.username()`; `actorUserId` is on the wire for the three responses that carried only the name; and `UnwritableActorColumnContractTest` gains a pair invariant (hard zero, no exemptions) plus a fix-shape leg. Probed live 14/14 across three registers as three personas. |
+| **Problem** | Every one of the ten services wrote `setActorUserId(currentUserId())` inside a private `timeline(...)` helper and never the name half; `setActorName` appeared **nowhere in the platform** outside the register [[F2-248]] closed. |
+| **Root Cause** | RC-D — a governance record whose attribution is only half written, the fourth variant after [[F2-223]] (the caller owns it), [[F2-236]] (it arrives as a parameter) and [[F2-256]] (nobody owns it). |
+| **Evidence** | `sys.columns` in both databases, ASM over `target/classes`, live probe 14/14, pre-fix control 4 of 12 legs |
+
+
+**Finding.** Ten event/timeline registers declare `actor_user_id` **and** `actor_name`. Every
+service writes only the id — `e.setActorUserId(currentUserId())` inside a private `timeline(...)`
+helper — and **nothing in the platform writes the name anywhere**. The response DTO carries it, so
+every event the platform itself produced described its actor with a null.
+
+Resolved from `sys.columns` (never guessed — [[F2-252]]), identical in dev and prod: ten tables
+declare both halves, and the population divides into four data shapes, so the filed claim was true
+of only part of it —
+
+| register | rows | id | name | shape |
+|---|---|---|---|---|
+| `reginspect.reginspect_inspection_update` | 20 | 20 | **0** | id only |
+| `rrp.rrp_event` | 14 | 14 | **0** | id only |
+| `regreporting.regreport_event` | 51 | 33 | **0** | id only |
+| `dataclass.dataclass_event` | 0 | 0 | 0 | latent |
+| `cpty.cpty_event` | 75 | 75 | 75 | both |
+| `ai_governance.ai_lifecycle_event` | 13 | 13 | 9 | both |
+| `outsourcing.outsourcing_event` | 10 | 10 | 6 | both |
+| `fraud.fraud_case_update` | 16 | 16 | 12 | both |
+| `sharia.sharia_event` | 33 / **30 prod** | 3 / **0 prod** | 30 | name only |
+| `openbanking.ob_event` | 10 / **6 prod** | 4 / **0 prod** | 6 | name only |
+
+⚠ **dev and prod disagree on two of them**, which is unusual for this programme and worth stating:
+prod's `sharia_event` and `ob_event` carry **no ids at all**.
+
+🔑🔑 **The stored names are almost never people, and that decides which fix is correct.**
+`'Credit Officer / Risk Management Secretariat'` on all 75 cpty rows,
+`'Procurement Officer / موظف المشتريات'`, `'Internal Audit / المراجعة الداخلية'`,
+`'Sharia Audit Team'`, `'Finance Reconciliation Team'`; the AI ones are **committees**
+(`'لجنة أخلاقيات الذكاء الاصطناعي — AI Ethics Committee (COM-AIETHICS)'`) and one is an **external
+regulator** (`'هيئة الحكومة الرقمية — مراجعة مستقلة (DGA)'`, the Digital Government Authority); and
+`ob_event` holds **machine actors** — `'System (cert-monitor)'`, `'System (SIEM detection)'`,
+`'System (consent-cache audit)'`. So this is [[F2-251]]'s case, not [[F2-249]]'s: **the label is not a
+copy of the id's identity, so deriving it from the resolved user would destroy information**, and
+[[F2-245]]/[[F2-246]]/[[F2-250]]'s derive-from-the-parent fix is the wrong instrument here. **Ask
+whether the label is a copy before reaching for the fix that worked last time.**
+
+⚠⚠ **THE THREE SHARPEST ARE THE ONES WHOSE RESPONSE CARRIED ONLY THE NAME.**
+`AiLifecycleDtos.EventResponse`, `DataclassDtos.EventResponse` and `OutsourcingDtos.EventResponse`
+declare `actorName` and **no `actorUserId`** — while the column beside it is populated on 13 of 13,
+0 of 0 and 10 of 10 rows. So for those three the response's *only* actor field was the half nothing
+wrote, and the half that was written was never on the wire at all: [[F2-198]]'s `crossBorderTransfer`
+shape, both halves in one record. The id is now on the wire for all three.
+
+🔑 **The pre-fix witness was in the data and needed no probe.**
+`ai_governance.ai_lifecycle_event` id=1 — `RECERTIFICATION_EXPIRED`, `actor_user_id = 1`,
+`actor_name` NULL, `created_at` 2026-05-26 04:33:40 — is the [[F2-256]] transition, **the only row
+in that register the platform itself has ever written**, and the only row of the thirteen with an id
+and no name. The other nine were seeded in one bulk write at 2026-06-27 11:53:35 and all carry a
+name. *One register, one API-written row, and it is the one with the blank.*
+
+⚠⚠ **F2-256's filing was wrong in two ways and both corrections matter.**
+(a) It said **nine** registers and its own javadoc **listed ten** — the tenth, `FraudCaseUpdate`, is
+outside the census because its clock is a **field initialiser** ([[F2-215]]'s third filling
+mechanism), which is an *instrument blind spot* and not a judgement on the merits.
+🔑 **A member excluded by a blind spot reads exactly like a member that was checked and cleared**,
+and the prose and the list disagreed by one in the reassuring direction.
+(b) It claimed *"every timeline entry renders a blank actor"*. Measured across `tss-grc-ui-v2`:
+**no screen renders any of these ten actors.** `EthicsPage` is the only surface in the platform that
+reads an `actorName`, and that is the register [[F2-248]] closed. The blank reached **API consumers**,
+not a page. 🔑 **A claim about a consequence is the least-verified part of a filing** ([[F2-192]]) —
+and it is a fact about today rather than a property of the control ([[F2-182]]): the field is on the
+wire, so the next client to declare it renders nothing.
+
+**Fix.** At each register's single timeline writer, beside the existing id write:
+`setActorName(currentActorName())`, where `currentActorName()` is a private one-line sibling of the
+`currentUserId()` helper that every one of the ten already has. One writer per register ([[F2-245]] —
+the claim that prevents drift is about *where* the writes live).
+
+⚠ **Deliberately `CurrentActor.username()` and not `requireUsername(...)`.** The id half is nullable
+and comes from the same primitive, so refusing on the name would make the two halves behave
+differently in a writer whose only job is to record a side effect — a timeline write that throws
+aborts the business operation it exists to describe ([[F2-191]]) — and `ob_event`'s six machine-actor
+rows show that an actorless event is a real category in this family. **Both null together** is the
+invariant, not *never null*.
+
+⚠ **Deliberately not [[F2-249]]'s `TenantUserDirectory`.** Measured: **none of these ten modules
+contains a single `com.tss.grc.module.iam` import**, so a directory would add ten edges to a
+decrease-only module-graph ratchet that may never be raised (house rule 3). `CurrentActor` lives in
+`common/`, which sits outside that population entirely, and it is the precedent [[F2-248]] set when it
+closed this same shape on `ethics.case_actions`. **One primitive, not a second mechanism**
+([[F2-190]]).
+
+**Instrument.** `UnwritableActorColumnContractTest`'s `WORK_LIST` drops the nine (census 33 → 24) and
+gains two legs:
+- **the pair invariant** — every shipped `@Entity` declaring both halves must have both written; a
+  hard zero with **no exemption map**, which is safe rather than strict ([[F2-214]]): a register that
+  does not want a display name should not declare the column, and one that does has
+  `CurrentActor.username()` available with no new edge, so there is no correct code for it to fail on;
+- **the fix shape** — per register, the name must come from the principal and never from a request
+  body ([[F2-223]]), and the helper must not refuse.
+
+⚠⚠ **MY OWN PAIR INVARIANT WAS VACUOUS AS FIRST WRITTEN AND THE MUTATION HARNESS PROVED IT.** It read
+`if (writtenOn(e,"actorUserId") && !writtenOn(e,"actorName")) collect;` and asserted the collection
+empty. Forcing that condition false **SURVIVED**: on a fixed tree there is nothing left to collect,
+and **an empty list is what both a correct gate and a dead one produce.** Rewritten as the **positive
+equality of two measured sets** — `nameWritten` must contain exactly `idWritten`, with a floor of ten
+under `idWritten` so the two cannot match by both being empty. 🔑 **Assert the positive**
+([[F2-208]]), and note this is the same family as [[F2-256]]'s own M8 one slice earlier: *a condition
+that cannot fail passes forever, and its output is indistinguishable from success.*
+
+⚠ **One survivor is a recorded equivalent mutant, not a hole.** Pointing the `nameWritten` collector
+at `actorUserId` is undetectable on a clean corpus, because on this tree every register writes both;
+its only discriminator is the pre-fix control ([[F2-206]] — a surviving mutant is a hole only if the
+mutated code is wrong, and here it is wrong in a way no clean corpus can show). A fifth mutation was
+**withdrawn as invalid**: deleting the `requireUsername` ban is the delete-an-assertion family, and
+M3 — a register that actually refuses — already demonstrates the ban discriminates, from the side
+where the mutated code is genuinely wrong.
+
+⚠ **The pre-fix control is the load-bearing verification, and my first run of it did not run at all.**
+The `git checkout master --` paths were backend-relative against a repo-root `cwd`, so every checkout
+failed, the gate stayed green, and the harness printed *"THE CONTROL DID NOT FIRE — the new legs are
+vacuous."* 🔑 **A control that cannot restore the pre-fix tree reads exactly like a gate that is
+vacuous**, and both readings end with the author editing the gate. Corrected, it fires **4 of 12
+legs** naming `AiLifecycleEvent`, `CptyEvent`, `ShariaEvent` and `RegReportEvent` exactly.
+
+⚠⚠ **MY PROBE MUTATED A REAL SEEDED GOVERNANCE ROW — [[F2-206]]'s rule broken by my own leg.** Leg 3
+transitioned `REC-2026-FRD` (recertification id=2) from DUE to IN_REVIEW rather than planting its own
+victim. Restored field-for-field from prod, which holds the identical seed and was never in scope,
+**including `updated_by` and `updated_at`** — a status restored under a row stamp naming the probe is
+a repair that still records the intrusion. All five touched tables reconciled against prod afterwards.
+
+⚠ **And the cleanup missed a row for a reason worth knowing: the service composes the note, so the
+`[REVIEW-TEST]` tag never reaches `note_en`.** A `CHARINDEX` cleanup keyed on a tag can only see rows
+whose text the probe wrote; a child row the *service* authored carries nothing to match.
+🔑 **Clean a child row by its parent id, not by a tag the child never carries.**
+
+⚠ **Two guessed names again, both caught by running things** (the family recurring since [[F2-198]]):
+`cpty.counterparties` — it is `cpty.counterparty` — and a `sharia/nc-events` payload missing the
+`@NotBlank reference` and `@NotNull snciAmountSar` the request record declares. Resolve table names
+from `sys.tables` and payload shapes from the request record, never from the plural of the entity.
+
+**Verification.** Post-fix live probe **14/14** across three registers as three personas —
+`compliance` (`SHARIA:WRITE`), `rmanager` (`CPTY:WRITE`) and `admin` for `ai-lifecycle`, whose route
+is `hasAnyRole('PLATFORM_ADMIN','CRO','CIO','DPO')` with no live holder for any of the three domain
+roles ([[F2-255]]'s open filing), so `admin` is the only caller and the leg is about data semantics
+rather than authorization. The cpty leg is the sharp one: that register already held an **office
+label on all 75 rows**, and the probe asserts the stored value is `rmanager` and *not* the seed's
+label — proving the fix stamps the principal rather than echoing whatever was there. Gate pre-fix
+control 4 of 12 · mutation harness **4 killed / 1 recorded equivalent / 1 withdrawn / 0 anchor-miss**
+· gates 73 green across this gate and the four sibling attribution gates · suite green. No migration.
+
+**Filed.**
+- ⚠⚠ **`reginspect.reginspect_inspection_update` holds 6 of 20 rows whose `actor_user_id` names a user
+  in ANOTHER TENANT**, identical in dev and prod — all six are `admin` (organisation 1) on rows
+  belonging to organisations 2 and 3, all written at one timestamp (`2026-05-25 19:40:34`, 4 distinct
+  seconds across 20 rows), so **seed-origin**: the writer takes the actor from `currentUserId()` and
+  is correct. This is [[F2-242]]/[[F2-243]]'s unverified-reference shape in a SAMA/NCA regulatory
+  inspection register. Repair rewrites live governance rows in two databases with no mapping from
+  `admin` to the officer each tenant meant — **owner decision**.
+- ⚠⚠ **Five of the ten registers have no `WRITE` or `APPROVE` row in `iam.permissions` at all** —
+  `DATACLASS`, `OUTSOURCING`, `REGINSPECT`, `REGREPORTING`, `RRP`. That is [[F2-255]]'s catalogue-gap
+  shape, so those five registers are reachable only through the PLATFORM_ADMIN code bypass and no
+  tenant administrator can grant access to them. `CPTY:APPROVE` exists with **0 holders**
+  ([[F2-253]]'s attrition shape). Both are **owner decisions** with a per-tenant impact question.
+- The **24** remaining `WORK_LIST` members, still with no verdicts ([[F2-188]]).
+- The columns now hold **two vocabularies** — seeded office/committee labels and platform usernames —
+  which is [[F2-236]]'s already-filed office-versus-person question, now in ten more columns. None of
+  the ten has an `*_ar` sibling, so the label is English-only on an Arabic-primary UI (house rule 7).
+- `data_officer.do_event` and `cpty.rating_action` declare `actor_user_id` and **no name column**, so
+  their responses carry a raw user id and nothing else — [[F2-249]]'s *unjoinable* shape, a different
+  question with a different answer, deliberately not folded into this one.
+
 ## F2-256 · A decision recorded WHEN and never WHO — and the gate built to find a forged actor cannot see an absent one
 
 | Field | Content |

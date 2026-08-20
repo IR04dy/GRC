@@ -85,7 +85,7 @@ public final class AiLifecycleDtos {
     public record EventResponse(
             Long id, Long modelId, Long validationId, Long retrainingId, Long recertificationId,
             LocalDateTime occurredAt, String eventType,
-            String actorName, String statusAfter,
+            Long actorUserId, String actorName, String statusAfter,
             String noteEn, String noteAr
     ) {}
 
