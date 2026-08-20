@@ -89,6 +89,13 @@ public class BiaQuantitativeController {
      * caller-supplied {@code approverName}. Filed as F2-152 — a board approval with no signer, and a
      * CFO approval whose signer is whatever the request says.
      *
+     * <p>⚠ <b>F2-261 — half of that paragraph was already false when F2-254 repeated it, and it had
+     * been repeated into three artefacts.</b> F2-223 converted {@code cfoApprove} to
+     * {@code CurrentActor.username()}, with a comment saying so, and the CFO half of F2-152 has been
+     * closed ever since; only the board half was real. 🔑 <b>A claim about a consequence is the
+     * least-verified part of a filing</b> (F2-192), and this one propagated from F2-152's filing into
+     * this javadoc and then into the F2-254 block below without anybody opening the service.
+     *
      * <h3>F2-254 — this guard is STILL administrator-only, and that is deliberate</h3>
      * {@code EXECUTIVE_REVIEWER} is a row in {@code iam.roles} in both databases and is held by
      * <b>no user</b> in either, so this expression admits {@code PLATFORM_ADMIN} and nobody else —
@@ -113,6 +120,31 @@ public class BiaQuantitativeController {
      * caller-supplied string) and <b>no {@code board_approved_by} column at all</b>, so there is
      * no identity for either tier to compare. Fixing F2-152 is the prerequisite, and choosing who
      * holds a financial versus a board approval is an owner decision plus a migration. Filed.
+     *
+     * <h3>F2-261 — the blocker had two halves and one of them is gone</h3>
+     * The paragraph above is two claims stacked: <i>(a)</i> no identity exists to compare, and
+     * <i>(b)</i> who may take a financial versus a board approval is an owner decision. 🔑 <b>Only
+     * (a) was a blocker; (b) is a question, and stating them as one sentence made the whole thing
+     * read as owner-gated.</b> F2-178's rule — re-measure a recorded blocker before believing its
+     * estimate — and here the estimate was right about (b) and wrong about (a) being permanent.
+     *
+     * <p><b>(a) is closed.</b> V384 adds {@code board_approved_by}, {@code boardApprove} stamps it
+     * from the authenticated principal and refuses without one, and
+     * {@code QuantitativeBiaService.requireDifferentParty} now enforces that the board signatory is
+     * neither the CFO approver nor the BCM lead reviewer — with the same bar one stage lower, so
+     * "review it, then approve your own review as CFO" is refused too. So the sentence three
+     * paragraphs up — <i>"nothing enforces that they are different people, so the guard is the only
+     * separation there is"</i> — <b>is no longer true, and the guard is no longer the only
+     * separation.</b> ⚠ The CFO half of the prerequisite needed nothing: F2-223 had already done it.
+     *
+     * <p><b>(b) is still an owner decision, and this slice deliberately does not take it.</b> A
+     * board sign-off is a higher authority than a CFO sign-off; sharing one permission would let
+     * anybody entitled to the financial tier take the board tier on any record they had not
+     * personally CFO-approved. The four-eyes bar makes that <em>safe from self-approval</em>, which
+     * is not the same as making it <em>right</em>. So both guards stay as they are, both remain
+     * administrator-only in practice ({@code EXECUTIVE_REVIEWER} and {@code CFO} are held by no user
+     * in either database), and §B2b keeps both rows — now with the technical prerequisite discharged
+     * and only the authority question outstanding.
      */
     private static final String BOARD_APPROVE_GUARD =
             "hasAnyRole('EXECUTIVE_REVIEWER','PLATFORM_ADMIN')";

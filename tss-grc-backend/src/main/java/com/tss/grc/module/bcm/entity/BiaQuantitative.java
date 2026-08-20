@@ -121,6 +121,25 @@ public class BiaQuantitative {
     @Column(name = "board_approved_at")
     private LocalDateTime boardApprovedAt;
 
+    /**
+     * F2-261 — the board signatory, stamped from the authenticated principal.
+     *
+     * <p>This column did not exist until V384. {@code boardApprove} stamped {@code boardApprovedAt}
+     * from the server's clock and recorded no actor of any kind, while both lower tiers of the same
+     * ladder ({@code bcmLeadReviewedBy}, and {@code cfoApproverName} since F2-223) record theirs —
+     * so the attribution quality decreased as the authority increased, and the tier with none was
+     * the board sign-off.
+     *
+     * <p>⚠ {@code NVARCHAR(255)} holding a username, deliberately mirroring its two siblings rather
+     * than being the {@code BIGINT} an id would want: the four-eyes bar in
+     * {@code QuantitativeBiaService.boardApprove} compares all three parties, and they have to be
+     * comparable. A second mechanism beside an existing one is F2-190's defect. Converting all
+     * three to ids together is a coherent slice and is filed; doing one of the three is what
+     * produced the divergence this fixes.
+     */
+    @Column(name = "board_approved_by", length = 255)
+    private String boardApprovedBy;
+
     @Column(name = "board_minutes_ref", length = 255)
     private String boardMinutesRef;
 
