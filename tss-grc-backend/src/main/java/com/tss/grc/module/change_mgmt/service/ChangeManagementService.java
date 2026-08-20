@@ -638,15 +638,18 @@ public class ChangeManagementService {
             throw new DomainAccessDeniedException("A CAB vote must be cast by an identified user.");
         String approver = nullSafeStr(actorName).isBlank() ? ("user#" + actorUserId) : actorName.trim();
 
-        // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their own
-        // change. Now evaluated on the resolved USER ID, which the caller cannot choose.
-        boolean selfById = actorUserId != null
-            && (actorUserId.equals(c.getRequestedById()) || actorUserId.equals(c.getChangeOwnerId()));
-        // Legacy fallback only: changes recorded before requester/owner ids were captured.
-        boolean selfByName = c.getRequestedById() == null && c.getChangeOwnerId() == null
-            && (approver.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()).trim())
-                || approver.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName()).trim()));
-        if (selfById || selfByName)
+        // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their own change.
+        //
+        // ⚠ F2-251 — this was a hand-written copy of ChangeSoD.compareAny, and it keyed its name
+        // fallback on `requestedById == null && changeOwnerId == null`: on the OTHER party's id, not
+        // on the party being compared. CE-15 stamps requested_by_id on every create, so from that
+        // commit onwards the whole name branch was dead — and change_owner_id has no writer anywhere,
+        // so the owner bar was decidable by name ALONE. Probed: the change owner cast a CAB vote on
+        // their own change at 201, and the identical vote answered 409 once requested_by_id was
+        // absent. One predicate now, one party per bar, so no bar can be switched off by another
+        // party carrying an id.
+        if (ChangeSoD.compareAny(new ChangeSoD.Actor(actorUserId, approver), selfReviewBars(c))
+                .refuses())
             throw new IllegalStateException(
                 "Segregation of duty: the change requester/owner cannot cast a CAB vote on their own change");
 
@@ -1019,14 +1022,93 @@ public class ChangeManagementService {
      * {@code /sod-coverage} publishes how much of the population it still cannot check.
      */
     private void assertNotSelfWaiver(ChangeRequest c) {
-        ChangeSoD.Verdict v = ChangeSoD.compareAny(ChangeSoD.actor(), List.of(
-            new ChangeSoD.Party("requestedBy", c.getRequestedById(), c.getRequestedByName()),
-            new ChangeSoD.Party("changeOwner", c.getChangeOwnerId(), c.getChangeOwnerName())));
+        ChangeSoD.Verdict v = ChangeSoD.compareAny(ChangeSoD.actor(), selfReviewBars(c));
         if (v.refuses())
             throw new IllegalStateException(
                 "You raised or own this change, so you may not waive a condition attached to its "
                     + "approval — a condition the requester can forgive is not a condition. Ask "
                     + "another CHANGE:APPROVE holder to waive it, or record it as satisfied.");
+    }
+
+    /**
+     * F2-251 — the people bars a self-review refusal must clear on a change, <b>one party per bar</b>.
+     *
+     * <h2>Why one party per bar, and not one per person</h2>
+     * {@link ChangeSoD#compareAny}'s own javadoc states the rule and says what breaks without it:
+     * <i>"the caller build one party per bar rather than per person — {@code Party(id, null)} and
+     * {@code Party(null, label)} as separate entries, <b>never {@code Party(id, label)}</b>. Merging
+     * them re-engages rule 1 ('the id decides when the party has one') and silently retires the name
+     * comparison … a refusal removed by a change that looks like a tidy-up."</i> Every caller in this
+     * module was building the merged form, or a hand-written equivalent of it.
+     *
+     * <h2>⚠ Why merging is wrong HERE specifically: the label is not a copy of the id</h2>
+     * On this register the two halves are <b>two different facts</b>, which {@link #create}'s CE-15
+     * comment says out loud: the id is who keyed the change in, and {@code requested_by_name} is
+     * <i>"whatever the tenant typed, since a team ('CloudOps') is a legitimate thing to record as the
+     * requesting party even though it is not a person."</i> Measured 2026-08-20, identical in dev and
+     * prod: of 15 requester labels and 15 owner labels on 17 live changes, <b>0 resolve to a platform
+     * user</b> — they are offices and teams ({@code 'CIO Office'}, {@code 'Head of IAM'},
+     * {@code 'Chief People Officer'}, {@code 'AppSec on-call'}). So the label can never be derived from
+     * the id, and <b>both halves have to be compared, because either one alone can be the only thing
+     * naming the party a refusal is about</b>.
+     *
+     * <h2>⚠ The live defect this replaces</h2>
+     * {@code recordApproval} and {@link #requireRatificationSeparation} each carried their own
+     * hand-written copy of the comparison, and each keyed its name fallback on something other than the
+     * party: the CAB vote on <b>both ids being null</b>, the ratification on <b>the actor having no
+     * id</b>. Since CE-15 stamps {@code requested_by_id} on every create and {@code change_owner_id}
+     * has <b>no writer anywhere in the platform</b> (NULL on 17 of 17 rows, both databases), the owner
+     * bar was decidable by name only — and both copies switched the name comparison off. Probed live:
+     * a {@code CHANGE:APPROVE} holder named as {@code change_owner_name} cast a CAB vote on their own
+     * change at <b>HTTP 201</b>, while the identical vote on the identical shape with
+     * {@code requested_by_id} absent answered <b>409</b>. <b>Capturing the raiser's id — CE-15's
+     * improvement — is what switched the owner's bar off.</b>
+     *
+     * <p>The waiver gate did refuse the same person on the same change, because it went through
+     * {@link ChangeSoD}. One of three gates was converted; the two that were not are the two that lie,
+     * which is the outcome {@code ChangeSoD}'s class javadoc predicted in those words.
+     */
+    private static List<ChangeSoD.Party> selfReviewBars(ChangeRequest c) {
+        return List.of(
+            new ChangeSoD.Party("requestedById",   c.getRequestedById(), null),
+            new ChangeSoD.Party("requestedByName", null, c.getRequestedByName()),
+            new ChangeSoD.Party("changeOwnerId",   c.getChangeOwnerId(), null),
+            new ChangeSoD.Party("changeOwnerName", null, c.getChangeOwnerName()));
+    }
+
+    /**
+     * F2-251 — the bars on the party who <em>decided</em> the change, one party per bar.
+     *
+     * <p>Separate from {@link #selfReviewBars} because the refusals differ in substance and in
+     * message: ratifying a change you raised is one conflict, ratifying your own emergency approval is
+     * another, and collapsing them would report the wrong one.
+     */
+    private static List<ChangeSoD.Party> cabDecisionBars(ChangeRequest c) {
+        return List.of(
+            new ChangeSoD.Party("cabDecisionById",   c.getCabDecisionById(), null),
+            new ChangeSoD.Party("cabDecisionByName", null, c.getCabDecisionByName()));
+    }
+
+    /**
+     * F2-251 — the condition owner's bars, and the site the slice would have missed.
+     *
+     * <p>{@code assertNotSelfSatisfaction} built {@code Party(cond.getOwnerId(), cond.getOwnerName())}
+     * — the merged form {@link ChangeSoD#compareAny}'s javadoc bans — so once a condition carried an
+     * owner id, the owner's <b>name</b> stopped being compared and an unlinked owner could satisfy
+     * their own condition. <b>Latent</b>: {@code change_mgmt.change_condition} holds 0 rows in dev and
+     * does not exist in prod yet (~35 migrations behind), so nothing has ever been let through here.
+     *
+     * <p>🔑 It is fixed in the same commit anyway, for two reasons this codebase has paid for
+     * separately: reachability is a fact about today rather than a property of a control (F2-182), and
+     * fixing the instances you noticed is what leaves the remainder looking covered because the
+     * mechanism that covers them is visibly present (F2-215). It was found by the slice's own gate
+     * refuting the slice's own map, not by reading — which is the argument for deriving a population
+     * rather than listing it.
+     */
+    private static List<ChangeSoD.Party> conditionOwnerBars(ChangeCondition cond) {
+        return List.of(
+            new ChangeSoD.Party("conditionOwnerId",   cond.getOwnerId(), null),
+            new ChangeSoD.Party("conditionOwnerName", null, cond.getOwnerName()));
     }
 
     /**
@@ -1061,6 +1143,24 @@ public class ChangeManagementService {
             .filter(c -> c.getRequestedById() == null && c.getChangeOwnerId() == null)
             .filter(c -> notBlank(c.getRequestedByName()) || notBlank(c.getChangeOwnerName())).count();
 
+        // F2-251 — the CAB vote and the ratification bars share the waiver gate's population and its
+        // people, so they share its counts. Reported as their own rows rather than folded into the
+        // waiver's: three refusals over one pair of people is what let two of them drift, and a
+        // report with one row for the three could not have shown which of them was enforced.
+        List<ChangeRequest> ratifiable = all.stream()
+            .filter(c -> RatificationStates.PENDING.equals(c.getRatificationState())
+                      || RatificationStates.RATIFIED.equals(c.getRatificationState())
+                      || RatificationStates.REJECTED.equals(c.getRatificationState())).toList();
+        long ratApproverCheckable = ratifiable.stream()
+            .filter(c -> c.getCabDecisionById() != null).count();
+        long ratApproverLabel = ratifiable.stream()
+            .filter(c -> c.getCabDecisionById() == null && notBlank(c.getCabDecisionByName())).count();
+        long ratRaiserCheckable = ratifiable.stream()
+            .filter(c -> c.getRequestedById() != null || c.getChangeOwnerId() != null).count();
+        long ratRaiserLabel = ratifiable.stream()
+            .filter(c -> c.getRequestedById() == null && c.getChangeOwnerId() == null)
+            .filter(c -> notBlank(c.getRequestedByName()) || notBlank(c.getChangeOwnerName())).count();
+
         // The PIR gate's population is the changes that can still reach a review — one already reviewed
         // cannot be re-gated, and counting it would report coverage the gate will never be asked for.
         List<ChangeRequest> pirPop = all.stream().filter(c -> c.getPirReviewedAt() == null).toList();
@@ -1089,7 +1189,19 @@ public class ChangeManagementService {
             // CommitteePort.recusalCoverage for why computing it here would have overstated it).
             committeePort == null
                 ? new ChangeSoD.Coverage(ChangeSoD.GATE_COMMITTEE_VOTE_NOT_REQUESTER, 0, 0, 0, 0)
-                : committeePort.recusalCoverage("CHANGE"));
+                : committeePort.recusalCoverage("CHANGE"),
+            // F2-251 — the two refusals that were enforced, tested, shipped, and absent from the one
+            // report that would have said whether they could fire. The CAB vote's bar is over the same
+            // people and the same population as the waiver's, which is exactly why its absence here
+            // was invisible: the waiver row looked like it covered them.
+            new ChangeSoD.Coverage(ChangeSoD.GATE_CAB_VOTE_NOT_REQUESTER, waiverPop, waiverCheckable,
+                waiverLabel, waiverPop - waiverCheckable - waiverLabel),
+            new ChangeSoD.Coverage(ChangeSoD.GATE_RATIFIER_NOT_REQUESTER, ratifiable.size(),
+                ratRaiserCheckable, ratRaiserLabel,
+                ratifiable.size() - ratRaiserCheckable - ratRaiserLabel),
+            new ChangeSoD.Coverage(ChangeSoD.GATE_RATIFIER_NOT_APPROVER, ratifiable.size(),
+                ratApproverCheckable, ratApproverLabel,
+                ratifiable.size() - ratApproverCheckable - ratApproverLabel));
     }
 
     private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
@@ -1137,8 +1249,7 @@ public class ChangeManagementService {
      * condition a CAB actually imposes.
      */
     private void assertNotSelfSatisfaction(ChangeCondition cond) {
-        ChangeSoD.Verdict v = ChangeSoD.compare(ChangeSoD.actor(),
-            new ChangeSoD.Party("conditionOwner", cond.getOwnerId(), cond.getOwnerName()));
+        ChangeSoD.Verdict v = ChangeSoD.compareAny(ChangeSoD.actor(), conditionOwnerBars(cond));
         if (v.refuses())
             throw new IllegalStateException(
                 "You are the owner of condition #" + cond.getId() + ", so you may not record it "
@@ -1535,20 +1646,27 @@ public class ChangeManagementService {
     /**
      * The ratifier may not be the emergency approver, the raiser or the change owner.
      *
-     * <p>Evaluated on user ids. The name fallback is for legacy rows whose ids were never
-     * captured — a fallback, never the primary test, exactly as in {@code recordApproval}.
-     * A row with a null {@code cabDecisionById} (everything approved before V345) cannot
-     * be tested on the approver at all; that is stated in the message rather than passed
-     * over, because an SoD gate that silently cannot evaluate is worse than one that says so.
+     * <p>⚠ <b>F2-251 — this was the second hand-written copy of {@link ChangeSoD}'s comparison, and
+     * its name fallback was keyed on {@code actorUserId == null}: on the ACTOR having no id.</b> A
+     * ratification is recorded by an authenticated principal and {@code GrcUserDetails} always carries
+     * an id, so that branch could not fire for any real caller — leaving the change owner, whose id
+     * column has no writer anywhere in the platform, unreachable by this gate on <em>every</em> row,
+     * legacy ones included. Probed live: the owner ratified their own emergency change at HTTP 200.
+     *
+     * <p>Both refusals now go through one party per bar, so an id being present on one party can no
+     * longer retire the name comparison on another. The two bars stay separate because the refusals
+     * say different things: ratifying a change you raised is one conflict, ratifying your own
+     * emergency approval is another, and a merged test would report the wrong one.
+     *
+     * <p>A row with a null {@code cabDecisionById} <em>and</em> a null {@code cabDecisionByName}
+     * (everything approved before V345) still cannot be tested on the approver at all; that is stated
+     * in the message rather than passed over, because an SoD gate that silently cannot evaluate is
+     * worse than one that says so.
      */
     private void requireRatificationSeparation(ChangeRequest c, Long actorUserId, String ratifier) {
-        boolean selfApprover = actorUserId != null && actorUserId.equals(c.getCabDecisionById());
-        boolean selfRaiser   = actorUserId != null
-            && (actorUserId.equals(c.getRequestedById()) || actorUserId.equals(c.getChangeOwnerId()));
-        boolean nameFallback = actorUserId == null && ratifier != null
-            && (ratifier.equalsIgnoreCase(nullSafeStr(c.getCabDecisionByName()))
-             || ratifier.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()))
-             || ratifier.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName())));
+        ChangeSoD.Actor actor = new ChangeSoD.Actor(actorUserId, ratifier);
+        boolean selfApprover = ChangeSoD.compareAny(actor, cabDecisionBars(c)).refuses();
+        boolean selfRaiser   = ChangeSoD.compareAny(actor, selfReviewBars(c)).refuses();
 
         if (selfApprover)
             throw new IllegalStateException(
@@ -1557,7 +1675,7 @@ public class ChangeManagementService {
               + "ratification exists to supply the independent scrutiny the emergency path skipped — "
               + "self-ratification would certify the approver's own decision and the evidence pack "
               + "would claim a second party had reviewed it.");
-        if (selfRaiser || nameFallback)
+        if (selfRaiser)
             throw new IllegalStateException(
                 "Segregation of duties: " + ratifier + " raised or owns change "
               + nullSafeMsg(c.getChangeCode()) + ", so they cannot ratify it. Another CHANGE:APPROVE "

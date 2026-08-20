@@ -288,14 +288,23 @@ class ChangeSoDGateTest {
         assertThat(ChangeSoD.GATES).containsExactly(
             "CONDITION_WAIVER_NOT_SELF", "PIR_REVIEWER_NOT_IMPLEMENTER", "CONDITION_SATISFIER_NOT_OWNER",
             // F2-113 — the fourth gate, enforced in the committee engine over data this module hands it.
-            "COMMITTEE_VOTE_NOT_REQUESTER");
+            "COMMITTEE_VOTE_NOT_REQUESTER",
+            // ⚠ F2-251 — the fifth, sixth and seventh, and the reason they were missing is the
+            // finding. This report exists to answer "which self-review refusals can actually fire?",
+            // and the two refusals in this module that could NOT fire were the two absent from it:
+            // the CAB vote (CM-C2) and the retrospective ratification. Both were enforced, tested and
+            // shipped, and both were outside the one instrument that would have surfaced them —
+            // because its population was this list rather than the refusals themselves.
+            "CAB_VOTE_NOT_REQUESTER", "RATIFIER_NOT_REQUESTER", "RATIFIER_NOT_APPROVER");
 
         // ⚠ The previous form of this loop asserted `svc.contains("ChangeSoD.GATE_")` once per gate —
         // true for all four the moment ANY one of them is referenced, so it could not fail. Named
         // constants, so a gate added to GATES and forgotten in the report is a red build.
         String svc = strip(read(SRC.resolve("service/ChangeManagementService.java")));
         for (String constant : List.of("GATE_SELF_WAIVER", "GATE_PIR_NOT_IMPLEMENTER",
-                                       "GATE_CONDITION_NOT_OWNER", "GATE_COMMITTEE_VOTE_NOT_REQUESTER")) {
+                                       "GATE_CONDITION_NOT_OWNER", "GATE_COMMITTEE_VOTE_NOT_REQUESTER",
+                                       "GATE_CAB_VOTE_NOT_REQUESTER", "GATE_RATIFIER_NOT_REQUESTER",
+                                       "GATE_RATIFIER_NOT_APPROVER")) {
             assertThat(svc)
                 .as("ChangeSoD.%s must appear in the coverage report built by the service — a gate in "
                   + "GATES and absent from /sod-coverage is a control nobody can see the reach of, "
@@ -305,7 +314,7 @@ class ChangeSoDGateTest {
         assertThat(ChangeSoD.GATES)
             .as("one constant per gate, no duplicates")
             .doesNotHaveDuplicates()
-            .hasSize(4);
+            .hasSize(7);
     }
 
     // ── the structural claims ───────────────────────────────────────────────────────────────────

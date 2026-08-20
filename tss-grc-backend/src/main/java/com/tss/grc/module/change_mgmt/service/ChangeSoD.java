@@ -184,9 +184,22 @@ public final class ChangeSoD {
      *
      * @param gate       the rule, by name
      * @param population records the gate applies to
-     * @param checkable  records where the compared party carries a user id — the gate can decide
-     * @param labelOnly  records where it carries only a free-text label, so the gate is UNVERIFIABLE
+     * @param checkable  records where the compared party carries a user id — {@link Strength#BY_ID}
+     * @param labelOnly  records where it carries only a free-text label — {@link Strength#BY_LABEL}
      * @param absent     records where the party is not recorded at all — nothing to compare
+     *
+     * <p>⚠ <b>F2-251 corrected {@code labelOnly}'s description.</b> It read <i>"records where it
+     * carries only a free-text label, <b>so the gate is UNVERIFIABLE</b>"</i>, and that is false:
+     * {@link #compare}'s rule 2 compares a label-only party <em>by name</em> and returns SAME or
+     * DIFFERENT, which is the whole reason a legacy row can still be refused. The two columns are
+     * evidential <em>strength</em>, not can-decide versus cannot.
+     *
+     * <p>🔑 That sentence was not idle. The belief it states — that a label-only party cannot be
+     * decided — is exactly the belief that produced the <i>"legacy fallback only"</i> framing in the
+     * two hand-written copies of this comparison, where the name branch was gated behind another
+     * party's id being absent. <b>A description that answers the question a reader was about to ask
+     * is how a wrong belief propagates into code</b> (F2-184's shape, in an instrument's own
+     * documentation).
      */
     public record Coverage(String gate, long population, long checkable, long labelOnly, long absent) {
         /**
@@ -232,7 +245,32 @@ public final class ChangeSoD {
      */
     public static final String GATE_COMMITTEE_VOTE_NOT_REQUESTER = "COMMITTEE_VOTE_NOT_REQUESTER";
 
+    /**
+     * F2-251 — the CAB vote's own bar (CM-C2), and the reason it was not on this list until now.
+     *
+     * <p>This report exists to answer <i>"which self-review refusals can actually fire?"</i> — the
+     * question F2-112 needed asked. It was answered for four gates, and <b>the two refusals in this
+     * module that could not fire were not among them</b>: the CAB vote and the retrospective
+     * ratification, the two whose comparison was hand-written rather than routed through this class.
+     *
+     * <p>🔑 <b>The instrument is real; its POPULATION was a list somebody wrote.</b> Both gates were
+     * enforced, tested and shipped, and neither appeared in the report built specifically to say
+     * whether such a gate can decide anything — so the one artefact that would have surfaced them
+     * had them outside its scope by construction. A gate list is exactly the kind of narrowing this
+     * codebase has been caught by before (a filename, a three-entry allow-list, an {@code extends}
+     * clause, a field-name list inside a fix); {@code ChangeSodGateCoverageContractTest} now derives
+     * the population from the refusals themselves rather than from this constant, in both directions.
+     */
+    public static final String GATE_CAB_VOTE_NOT_REQUESTER = "CAB_VOTE_NOT_REQUESTER";
+
+    /** F2-251 — the retrospective ratification's bar on the raiser/owner (ADR-017 D-3). */
+    public static final String GATE_RATIFIER_NOT_REQUESTER = "RATIFIER_NOT_REQUESTER";
+
+    /** F2-251 — and its bar on the emergency approver, which is a different conflict. */
+    public static final String GATE_RATIFIER_NOT_APPROVER = "RATIFIER_NOT_APPROVER";
+
     public static final List<String> GATES = List.of(
         GATE_SELF_WAIVER, GATE_PIR_NOT_IMPLEMENTER, GATE_CONDITION_NOT_OWNER,
-        GATE_COMMITTEE_VOTE_NOT_REQUESTER);
+        GATE_COMMITTEE_VOTE_NOT_REQUESTER,
+        GATE_CAB_VOTE_NOT_REQUESTER, GATE_RATIFIER_NOT_REQUESTER, GATE_RATIFIER_NOT_APPROVER);
 }
