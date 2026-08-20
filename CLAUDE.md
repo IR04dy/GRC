@@ -1967,6 +1967,82 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   assigned approver**; and the whole **`ai_governance` schema having zero CHECK constraints** on any
   of the three registers' `status` columns (F2-221's shape, now cheaper for `recertification` since
   this slice touched its only writer — F2-183).
+- ⚠⚠ **A REGISTER THAT DECLARES A PERSON ID BESIDE A DISPLAY NAME AND WRITES ONLY THE ID
+  PUBLISHES A RESPONSE FIELD NOTHING CAN FILL — AND THE LABEL IS USUALLY *NOT* A COPY OF THE ID'S
+  IDENTITY, SO THE FIX THAT WORKED LAST SLICE IS THE WRONG ONE** (F2-257, measured 2026-08-20).
+  Executing F2-256's filing, re-derived first (F2-221): ten event/timeline registers declare
+  `actor_user_id` **and** `actor_name` (from `sys.columns`, dev = prod), every service writes only the
+  id inside a private `timeline(...)` helper, and **nothing in the platform writes the name at all**.
+  ⚠⚠ **For three of the ten the name was the response's ONLY actor field** — `AiLifecycleDtos`,
+  `DataclassDtos` and `OutsourcingDtos` declare `actorName` and no `actorUserId` while the column
+  beside it is populated on 13 of 13, 0 of 0 and 10 of 10 rows — F2-198's `crossBorderTransfer` shape
+  with both halves in one record.
+  🔑 **The pre-fix witness was in the data and needed no probe**: `ai_governance.ai_lifecycle_event`
+  id=1 is the only row that register has ever received from the platform (F2-256's own transition) and
+  the only one of thirteen with an id and no name — the other nine were seeded in one bulk write and
+  all carry a name. **When a register's seeded rows are complete and its API-written rows are not, the
+  gap IS the finding.**
+  🔑🔑 **Ask whether the label is a COPY before reaching for the derive-from-the-parent fix.** The
+  stored names are offices, teams, committees (`'لجنة أخلاقيات الذكاء الاصطناعي — AI Ethics
+  Committee'`), an external regulator (the Digital Government Authority) and **machine actors**
+  (`'System (cert-monitor)'`, `'System (SIEM detection)'`). That is F2-251's case, not F2-249's:
+  deriving the label from the resolved user would **destroy information**, so the fix is to stamp the
+  authenticated principal and leave history alone.
+  ⚠ **`CurrentActor.username()`, never `requireUsername(...)`, in a side-effect writer.** The id half
+  is nullable and comes from the same primitive, so refusing on the name makes the two halves behave
+  differently — and a timeline write that throws aborts the business operation it exists to describe
+  (F2-191). **Both null together** is the invariant, not *never null*; `ob_event`'s six machine-actor
+  rows are why.
+  ⚠ **And not F2-249's `TenantUserDirectory`**: measured, **none of these ten modules contains a
+  single `module.iam` import**, so a directory adds ten edges to a decrease-only graph ratchet that may
+  never be raised. `CurrentActor` is in `common/`, outside that population, and is the precedent F2-248
+  set on `ethics.case_actions`. **Check what a fix costs the module graph before choosing the richer
+  primitive.**
+  ⚠⚠ **F2-256's filing said "nine" and its own javadoc listed TEN.** The tenth, `FraudCaseUpdate`, is
+  outside that census because its clock is a **field initialiser** (F2-215's third filling mechanism) —
+  an *instrument blind spot*, not a judgement on the merits. 🔑 **A member excluded by a blind spot
+  reads exactly like a member that was checked and cleared**, and the prose disagreed with its own list
+  in the reassuring direction.
+  ⚠⚠ **Its consequence claim was wrong too: no screen renders any of these ten actors.** `EthicsPage`
+  is the only surface in the platform that reads an `actorName`, and that is F2-248's register — so the
+  blank reached **API consumers**, not a page. 🔑 **A claim about a consequence is the least-verified
+  part of a filing** (F2-192), and this one was a fact about today rather than a property of the control
+  (F2-182): the field is on the wire, so the next client to declare it renders nothing.
+  ⚠⚠ **A "collect the violations, assert the list empty" invariant is VACUOUS once the tree is fixed,
+  and the mutation harness is the only thing that says so.** My pair invariant read
+  `if (idWritten && !nameWritten) collect;`; forcing the condition false **SURVIVED**, because on a
+  fixed tree there is nothing to collect and **an empty list is what both a correct gate and a dead one
+  produce**. Rewritten as the **positive equality of two measured sets** (`nameWritten` must contain
+  exactly `idWritten`) with a floor under the id side so they cannot match by both being empty —
+  F2-208's assert-the-positive rule, and the same family as F2-256's own M8 one slice earlier.
+  ⚠ **One survivor was a recorded EQUIVALENT mutant**: pointing the name collector at the id half is
+  undetectable on a clean corpus where every register writes both, and its only discriminator is the
+  pre-fix control (F2-206). A fifth mutation was **withdrawn as invalid** — deleting a ban is the
+  delete-an-assertion family, and the mutation that adds a real refusal already proves the ban
+  discriminates.
+  ⚠⚠ **MY FIRST PRE-FIX CONTROL DID NOT RUN AT ALL, AND ITS OUTPUT ACCUSED THE GATE.** The
+  `git checkout master -- <path>` paths were backend-relative against a repo-root `cwd`, so every
+  checkout failed, the gate stayed green and the harness printed *"THE CONTROL DID NOT FIRE — the new
+  legs are vacuous."* 🔑 **A control that cannot restore the pre-fix tree reads exactly like a gate that
+  is vacuous, and both readings end with the author editing the gate rather than the harness.** Print
+  the checkout failures *and* treat a zero-file checkout as an error. Corrected, it fires 4 of 12 legs
+  naming four registers exactly.
+  ⚠⚠ **MY PROBE MUTATED A REAL SEEDED GOVERNANCE ROW.** Leg 3 transitioned `REC-2026-FRD` DUE →
+  IN_REVIEW instead of planting its own victim (F2-206), on a register this programme had measured two
+  slices earlier. Restored field-for-field from prod **including `updated_by`/`updated_at`** — 🔑 a
+  status restored under a row stamp naming the probe is a repair that still records the intrusion — and
+  all five touched tables reconciled against prod afterwards.
+  ⚠ **A `CHARINDEX` cleanup keyed on `[REVIEW-TEST]` cannot see a child row the SERVICE authored.**
+  `sharia.sharia_event`'s note is composed server-side, so the tag never reaches `note_en` and the
+  delete matched 0 rows while the row was still there. **Clean a child by its parent id, not by a tag it
+  never carries** — and re-count the tables afterwards rather than trusting the cleanup's own report.
+  ⚙ **Filed:** `reginspect.reginspect_inspection_update` holds **6 of 20 rows whose `actor_user_id`
+  names a user in another tenant**, identical in dev and prod, all `admin` (org 1) on org-2/org-3 rows
+  at one seed timestamp — seed-origin with a correct writer, F2-242's shape in a SAMA/NCA inspection
+  register, and repair is an **owner decision**; and **`DATACLASS`, `OUTSOURCING`, `REGINSPECT`,
+  `REGREPORTING` and `RRP` have no `WRITE`/`APPROVE` row in `iam.permissions` at all**, so five of the
+  ten registers are reachable only through the PLATFORM_ADMIN code bypass (F2-255's catalogue-gap shape)
+  while `CPTY:APPROVE` exists with **0 holders** (F2-253's attrition).
 - ⚠⚠ **A ROLE NOBODY HOLDS HAS AN ADMINISTRATOR REMEDY; A PERMISSION NOBODY CAN HOLD DOES
   NOT — AND THE GATE BUILT FOR EXACTLY THAT DEFECT EMITTED A REPORT AND ASSERTED NOTHING ABOUT
   IT** (F2-255, measured 2026-08-20). Executing F2-254's filed `module.ai` block, the

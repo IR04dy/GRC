@@ -625,15 +625,20 @@ class UnwritableActorColumnContractTest {
         // strict (F2-214): a register that does not want to record a display name should not declare
         // the column, and one that does has CurrentActor.username() available with no new module
         // edge. There is no correct code for it to fail on.
-        List<String> idWithoutName = new ArrayList<>();
+        // Asserted as the POSITIVE equality of two measured sets, not as the emptiness of their
+        // difference. The mutation harness is the reason: `if (idWritten && !nameWritten)` with the
+        // condition forced false SURVIVED, because on a fixed tree there is nothing left to collect
+        // and an empty list is what both a correct gate and a dead one produce. Two sets that must
+        // match cannot be satisfied by a collector that stops collecting.
         List<String> pairs = new ArrayList<>();
+        List<String> idWritten = new ArrayList<>();
+        List<String> nameWritten = new ArrayList<>();
         for (Class<?> entity : shippedEntities()) {
             Set<String> fields = ownFields(entity);
             if (!fields.contains("actorUserId") || !fields.contains("actorName")) { continue; }
             pairs.add(entity.getSimpleName());
-            if (writtenOn(entity, "actorUserId") && !writtenOn(entity, "actorName")) {
-                idWithoutName.add(entity.getSimpleName() + "#actorName");
-            }
+            if (writtenOn(entity, "actorUserId")) { idWritten.add(entity.getSimpleName()); }
+            if (writtenOn(entity, "actorName")) { nameWritten.add(entity.getSimpleName()); }
         }
         assertThat(pairs)
             .as("""
@@ -644,13 +649,18 @@ class UnwritableActorColumnContractTest {
             .contains("AiLifecycleEvent", "CptyEvent", "DataclassEvent", "FraudCaseUpdate",
                       "ObEvent", "OutsourcingEvent", "RegInspectionUpdate", "RegReportEvent",
                       "RrpEvent", "ShariaEvent");
-        assertThat(idWithoutName)
+        assertThat(idWritten)
+            .as("""
+                anti-vacuity for the equality below: at least the ten measured registers must be \
+                writing the id half, or the two sets match because both are empty.""")
+            .hasSizeGreaterThanOrEqualTo(10);
+        assertThat(nameWritten)
             .as("""
                 a register that records WHICH user acted and never WHAT they are called publishes a \
                 response field nothing can fill. Both halves come from the same primitive, so \
                 writing one and not the other is not a decision anybody made — it is the id write \
                 having been added and the name write never following it.""")
-            .isEmpty();
+            .containsExactlyInAnyOrderElementsOf(idWritten);
     }
 
     @Test
