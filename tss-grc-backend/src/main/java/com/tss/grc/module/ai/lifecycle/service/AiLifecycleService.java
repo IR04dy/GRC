@@ -1,5 +1,6 @@
 package com.tss.grc.module.ai.lifecycle.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ai.lifecycle.dto.AiLifecycleDtos.*;
 import com.tss.grc.module.ai.lifecycle.entity.*;
@@ -209,12 +210,12 @@ public class AiLifecycleService {
         switch (req.toStatus()) {
             case "IN_REVIEW" -> c.setStartedAt(now);
             case "EXPIRED" -> {
-                c.setDecidedAt(now);
+                recordDecision(c, now);
                 if (req.decisionRationaleEn() != null) c.setDecisionRationaleEn(req.decisionRationaleEn());
                 if (req.decisionRationaleAr() != null) c.setDecisionRationaleAr(req.decisionRationaleAr());
             }
             case "RECERTIFIED", "RECERTIFIED_WITH_CONDITIONS", "REVOKED" -> {
-                c.setDecidedAt(now);
+                recordDecision(c, now);
                 if (req.decisionRationaleEn() != null) c.setDecisionRationaleEn(req.decisionRationaleEn());
                 if (req.decisionRationaleAr() != null) c.setDecisionRationaleAr(req.decisionRationaleAr());
                 if (req.conditionsEn() != null) c.setConditionsEn(req.conditionsEn());
@@ -318,6 +319,51 @@ public class AiLifecycleService {
                 .orElseThrow(() -> new EntityNotFoundException("Recertification " + id + " not found"));
     }
 
+    /**
+     * F2-256 — the ONE writer of the {@code (decided_at, approver_user_id)} pair.
+     *
+     * <p>Before this, {@code decidedAt} was stamped from the server's own clock in two switch
+     * branches and {@code approverUserId} was written <b>nowhere in the platform</b> — not from the
+     * request either, since neither {@code CreateRecertificationRequest} nor
+     * {@code TransitionRecertificationRequest} declares the field. So an ISO/IEC 42001
+     * model-recertification decision recorded <i>when</i> it was made and never <i>who</i> made it.
+     * Measured identically in dev and prod when this was written: 4 of 13 rows carried
+     * {@code decided_at}, <b>2 of them with no approver at all</b>, and the 5 rows that do carry one
+     * were written by {@code seed_real_data.py}. Every decision taken through the API from now on
+     * would have joined that bucket.
+     *
+     * <p>🔑 <b>The correct artefact is {@code DataclassService#transitionException}</b>, which has
+     * the identical private {@code currentUserId()} helper and writes
+     * {@code e.setApproverUserId(currentUserId())} beside its own {@code setApprovedAt(now())}. This
+     * service has that same helper three lines below, feeding the timeline event's actor — so the
+     * mechanism was present, used for the event, and not used for the row.
+     *
+     * <p><b>Why both branches, including EXPIRED.</b> Whatever the target state, {@code decidedAt}
+     * asserts <i>a decision was recorded at this moment</i> and the register has exactly one column
+     * for who recorded it. Leaving EXPIRED and REVOKED blank would reproduce the defect on the two
+     * states an assurance reader asks about hardest — a certification allowed to lapse, and one
+     * withdrawn. The per-state nuance is not lost: {@code timeline(...)} writes an event carrying
+     * both the event type and the actor, so the row-level column is the summary of a trail that
+     * already distinguishes them.
+     *
+     * <p><b>Why it refuses rather than storing null.</b> {@code CurrentActor.requireUserId} is
+     * F2-236's primitive and its javadoc states the rule: where a service stamps the clock itself it
+     * has declared that <i>it</i> is the recorder of the act, so a decision it cannot attribute is
+     * not a decision. The route is {@code @PreAuthorize}-guarded, so a principal is always present
+     * in production; refusing makes the hazard ABSENT rather than latent (F2-213) instead of
+     * silently writing the null this method exists to stop.
+     *
+     * <p><b>The assignment reading is deliberately not served here.</b> Two live {@code DUE} rows
+     * carry an approver with no {@code decided_at}, i.e. the seed used the column as <i>who is due
+     * to approve</i>. Nothing in the platform can make that assignment (no request field, no picker),
+     * and adding one is a product decision — filed. Once {@code decidedAt} is stamped the column is
+     * an attribution, so a decision overwrites any prior assignment, which is F2-236's window rule.
+     */
+    private static void recordDecision(Recertification c, LocalDateTime now) {
+        c.setDecidedAt(now);
+        c.setApproverUserId(CurrentActor.requireUserId("a recertification decision"));
+    }
+
     private static void validate(Map<String, Set<String>> allowed, String from, String to, String label) {
         if (!allowed.getOrDefault(from, Set.of()).contains(to)) {
             throw new IllegalStateException(label + " cannot transition " + from + " → " + to);
@@ -352,7 +398,7 @@ public class AiLifecycleService {
     private static Long org() { return TenantContext.requireOrganisationId(); }
 
     private static Long currentUserId() {
-        return com.tss.grc.common.security.CurrentActor.userId();
+        return CurrentActor.userId();
     }
 
     // ────────────────────────────────────────────────────── Mappers

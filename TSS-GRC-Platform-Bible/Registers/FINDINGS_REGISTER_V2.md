@@ -2547,6 +2547,184 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-256 · A decision recorded WHEN and never WHO — and the gate built to find a forged actor cannot see an absent one
+
+| Field | Content |
+|---|---|
+| **ID** | F2-256 *(measured 2026-08-20. Provenance is [[F2-255]]'s own filing. Re-deriving it first ([[F2-221]]) confirmed the site and sharpened it: the filing said *"2 of 13 rows already carry a decision with no decider"* and one of those two was written **through the API**, not by the seed.)* |
+| **Category** | Attribution — a people column with **no writer in any code path**, beside an act clock the server stamps · an instrument family every member of which is keyed on a write EXISTING |
+| **Severity** | **P2.** Every ISO/IEC 42001 model recertification granted, renewed, revoked or allowed to lapse through the API recorded the moment of the decision and not the person who made it. No data loss and no forgery — an absence, which is why nobody found it: a blank decider on a governance row reads as missing data. |
+| **Provenance** | [[F2-255]] filed *"`ai_governance.recertification.approver_user_id` has no writer in any code path while `decided_at` is stamped from the server's clock — 2 of 13 rows already carry a decision with no decider in both databases, and `currentUserId()` sits in the same service feeding the timeline event, so F2-223's split attribution here is *the server owns WHEN and nobody owns WHO*."* All of that holds; the row-origin half is corrected below. |
+| **Current State** | ✔ **FIXED 2026-08-20** (`c0577f6d`). One private `recordDecision()` is the sole writer of the `(decided_at, approver_user_id)` pair and takes the actor from `CurrentActor.requireUserId`. New `UnwritableActorColumnContractTest` (10 legs) measures the population; new `RecertificationDecisionAttributionTest` (6 legs) covers a service that had no test of any kind. Suite **4,337/0/0** (up 16). No migration. |
+| **Problem** | `AiLifecycleService#transitionRecertification` stamped `decidedAt` from `LocalDateTime.now()` in two switch branches and wrote `approverUserId` **nowhere in the platform**. Neither `CreateRecertificationRequest` nor `TransitionRecertificationRequest` declares the field, so the caller could not supply it either — the column was declared, returned on the wire by `RecertificationResponse`, and unwritable. |
+| **Root Cause** | RC-D — a governance record whose attribution has no owner, the third variant after [[F2-223]] (the caller owns it) and [[F2-236]] (it arrives as a parameter). |
+
+🔑🔑 **BOTH HALVES OF `SplitAttributionContractTest`'s PAIR ARE BUILT FROM SETTER CALL SITES, SO A
+COLUMN NOBODY SETS CONTRIBUTES TO NEITHER.** Its derivation is literally:
+
+```java
+Matcher sm = SETTER.matcher(body);
+while (sm.find()) { … clockKeys.add(…) … callerActors.put(…) … }
+```
+
+A field with no setter produces no `find()` hit, so it can never join `callerActors` and can never
+pair with a `clockKey`. **"Nobody owns WHO" is invisible to the instrument built to find "the caller
+owns WHO"** — and the same is true of the three gates beside it: `ParameterBorneActorTest` and
+`PrincipalStampedFieldContractTest` narrow that same population further (a scalar parameter, resolved
+at its call sites), and `ServerStampedFieldContractTest` intersects *fields a guarded route stamps*
+with *fields a write path takes from the request*, sets a never-written field is in neither of.
+**All four are keyed on a write existing.** The invariant is real; the narrowing is none of the ones
+already on the record (a filename, a three-entry allow-list, a module name, an `extends` clause, a
+field-name list inside a fix, a claim shape in a gate) — it is **the existence of a setter call**.
+
+🔑 **THE CORRECT ARTEFACT HAS THE IDENTICAL HELPER, AND THIS SERVICE HAS IT TOO.**
+`DataclassService#transitionException` declares the same `private static Long currentUserId()`
+delegating to `CurrentActor.userId()`, and writes:
+
+```java
+case "APPROVED" -> {
+    e.setApprovedAt(LocalDateTime.now());
+    e.setApproverUserId(currentUserId());   // <- the half AiLifecycleService never wrote
+}
+```
+
+`AiLifecycleService` has that helper **three lines below the switch**, where it feeds
+`timeline(...)`'s `setActorUserId(currentUserId())`. So the mechanism was present, used for the
+event, and not used for the row — [[F2-215]]'s two-of-N, with the two artefacts being sibling
+services rather than sibling methods.
+
+### It was not latent, and the row says so
+
+| id | reference | status | created_at | decided_at | updated_at | updated_by | approver_user_id |
+|---|---|---|---|---|---|---|---|
+| 1 | `REC-2026-CRD` | EXPIRED | 2026-05-26 **03:00:54** | 2026-05-26 **04:33:40.174675** | 04:33:40.**182667** | **1** | **NULL** |
+| 3 | `REC-2025-AML` | RECERTIFIED_WITH_CONDITIONS | 2026-05-26 03:00:54 | 2025-06-10 (back-dated) | = created_at | NULL | NULL |
+
+Byte-identical in dev and prod. Row 1 was seeded in the 03:00:54 batch with rows 2–4 and then
+**decided through the API ninety-three minutes later**: `decided_at` 8 ms before `updated_at`,
+`updated_by` = 1. 🔑 **The framework's row stamp captured the actor while the domain's own
+attribution column stayed empty** — which is exactly why a row stamp can never substitute for an
+attribution ([[F2-226]]'s rule, arriving from the other side). Row 3 is a back-dated seed row. So of
+the two, **one is API-written and one is seed-written**, and F2-255's filing did not distinguish them.
+
+### Evidence — probed live, pre 9/9 and post 9/9, against a planted `[REVIEW-TEST]` victim
+
+| Leg | Pre-fix | Post-fix |
+|---|---|---|
+| victim planted `IN_REVIEW`, no clock, no decider | ✓ | ✓ |
+| `rmanager` (RISK_MANAGER — holds the WRITE guard) on the APPROVE transition | **403** | **403** |
+| `admin` decides `IN_REVIEW → RECERTIFIED` | **200** | **200** |
+| the server stamped WHEN | `decided_at` set | `decided_at` set |
+| the row's decider | **NULL** | **1** (the principal) |
+| the wire's `approverUserId` | **null** | **1** |
+| the timeline event's actor | `actor_user_id = 1` | `actor_user_id = 1` |
+| `model_validation` has a completer column | **no** | **no** — filed |
+| `retraining_event` has an approver column | **no** | **no** — filed |
+
+The pre-fix run was taken against the running listener with the fix stashed and recompiled, because
+the fixed tree alone can never show it ([[F2-244]]). ⚠ The transition guard is
+`hasAnyRole('PLATFORM_ADMIN','CRO','CIO','DPO')` and the last three are held by nobody, so `admin` is
+the only caller who can reach it — **`admin` proves nothing about authorization and does prove the
+column is written**, and the guard itself remains F2-255's separately filed question.
+
+### Both decision branches, including EXPIRED and REVOKED
+
+Whatever the target state, `decidedAt` asserts *a decision was recorded at this moment* and the
+register has exactly one column for who recorded it. Leaving `EXPIRED` and `REVOKED` blank would
+reproduce the defect on a certification allowed to lapse and one withdrawn — the two an assurance
+reader asks about hardest. The per-state nuance is not lost: `timeline(...)` writes an event carrying
+both the event type and the actor, so the row-level column summarises a trail that already
+distinguishes them.
+
+⚠ **It refuses rather than storing null.** `CurrentActor.requireUserId` is [[F2-236]]'s primitive and
+not a second mechanism ([[F2-190]]); a fallback would leave the hazard latent instead of absent
+([[F2-213]]). ⚠ **A decision overwrites a prior ASSIGNMENT**: two live `DUE` rows carry an approver
+with no `decided_at`, i.e. the seed used the column as *who is due to approve*. Once `decidedAt` is
+stamped the column is an attribution ([[F2-236]]'s window rule) — a stale assignment left standing
+beside a real clock would credit the decision to whoever was queued for it. Nothing in the platform
+can make that assignment (no request field, no picker); adding one is a product decision, **filed**.
+
+### The instrument, and four of my own drafts that were wrong — three of them under-reporting
+
+`UnwritableActorColumnContractTest`: 432 entities by reflection, setter call sites by owner type from
+the constant pool via ASM, a server-stamped act clock as the premise, entity-bound types subtracted
+because Jackson writes those by reflection with no `INVOKEVIRTUAL` anywhere. **33 members** — 6
+adjudicated, 27 on a work list with **no verdicts** ([[F2-188]]).
+
+1. **Draft 1 asked whether the FIELD NAME was written anywhere in main sources** — so
+   `Recertification#approverUserId` read as *written*, because `DataclassService` and
+   `RegReportingService` each write a **different** entity's `approverUserId`.
+   🔑 **A field-name fallback silently clears exactly the columns most likely to be spelled the
+   same elsewhere, and it hid the site the gate was written for.** [[F2-187]] recorded that for
+   methods (*"resolve per owner type"*); it recurs one noun across.
+2. **Draft 2 resolved the owner from the SOURCE FILE NAME**, and `Entities.java` declares eleven
+   nested `@Entity` classes — all eleven collapsed into one key called `Entities` whose field set was
+   their union and whose owner name matched no bytecode at all. Eleven phantom rows, each looking
+   exactly like a measured one. 🔑 **A source file is not a type.**
+3. **Draft 3 claimed `getDeclaredFields()` excluded `BaseEntity`'s nine "by construction"** — it
+   excludes *inherited* fields, not *redeclared* ones, and [[F2-215]] measured 259 entities declaring
+   their own `createdBy` (111), `updatedBy` (104), `deletedBy` (56). The census went **62 → 209**,
+   almost entirely row stamps. 🔑 **Moving to reflection fixed one bug and reintroduced the noise
+   the source draft had excluded — a correction is not a monotone improvement, and "by construction"
+   is a claim to check rather than a reason to stop checking.**
+4. ⚠⚠ **The mutation harness then proved the CLOCK half VACUOUS.** It matched the clock setter by
+   name across all sources, so across 432 entities the time-field names collide constantly and the
+   answer was effectively always yes — **the mutation deleting the requirement altogether SURVIVED**.
+   A surviving mutant is a hole only if the mutated code is wrong ([[F2-206]]); here it was, and the
+   wrongness was that the condition could not fail. Resolved per owner from bytecode (a setter call
+   on this entity, from a class that also calls a `java.time` `now()`), which makes it load-bearing.
+
+⚠ **That tightening correctly excluded one member, and the exclusion is asserted rather than
+hidden.** `FraudCaseUpdate#actorName` dropped out because `occurredAt` is a **field initialiser**
+(`= LocalDateTime.now()`), [[F2-215]]'s third filling mechanism, which has no setter call for any
+scan to find. [[F2-225]]/[[F2-226]] measured that population at 82 entities / 87 act-clock fields, so
+it is large and it is **not** measured here — named with `FraudCaseUpdate` as its exemplar in both
+directions, because a hard zero over a population an instrument cannot see is the most reassuring
+possible artefact ([[F2-205]]).
+
+⚠ **My own substantiality check refused my own verdicts on its first run.** Two `ADJUDICATED`
+entries read *"DARK TWICE — see Policy#approverId."* at 35 characters, and the leg demanding a
+consequence-naming reason fired — [[F2-188]]'s rule landing on the slice that wrote it.
+
+### The largest sub-shape, left whole rather than adjudicated nine times
+
+**Nine event registers declare `actorName` beside an `actorUserId` their service DOES write**:
+`AiLifecycleEvent`, `CptyEvent`, `DataclassEvent`, `ObEvent`, `OutsourcingEvent`,
+`RegInspectionUpdate`, `RegReportEvent`, `RrpEvent`, `ShariaEvent`. For the one that was read,
+`AiLifecycleService#timeline` writes `setActorUserId(currentUserId())` and never the name, while
+`toEvent` returns `e.getActorName()` — 🔑 **the id is stored and the NAME is the half the response
+carries**, so every timeline entry renders a blank actor (confirmed live: `actor_user_id = 1`,
+`actor_name = None`). Whether the other eight share that is a question for a reader.
+
+### Verification
+
+Pre-fix live probe **9/9** · post-fix **9/9** twice · gate pre-fix control **2 of 10 legs fire**,
+naming `Recertification#approverUserId` exactly (the other 8 are tree-invariant by design: the noise
+pinning, the positive control, the anti-vacuity floors, the reverse leg, the verdict substantiality,
+the sibling-column assertions, the no-`@Builder` premise and the named blind spot) · mutation harness
+**11 killed / 0 survived / 0 anchor-miss** · full suite **4,337/0/0**.
+
+### Filed
+
+- **`model_validation` has no completer column and `retraining_event` no approver column at all** —
+  both stamp their clock from the server (`completed_at`, `approved_at`), and their only person
+  columns are `validator_user_id` and `owner_user_id`, written from the request at creation, i.e.
+  **assignments** ([[F2-226]]'s classification). `validation_type` admits `EXTERNAL_AUDIT`, so a
+  validator need not be a platform principal at all ([[F2-224]]'s `auditorExternalParty` rule).
+  Adding the columns is a migration and a **product decision**; asserted in the gate so the absence
+  is countable rather than implied ([[F2-215]]'s two-of-N, pre-empted).
+- The **27-member work list** with no verdicts, and the nine-register `actorName` sub-shape within it.
+- **`ai_governance.recertification` cannot record an assigned approver through any route** — two live
+  `DUE` rows hold one from the seed. A picker plus a request field is a product decision.
+- **The `ai_governance` schema has zero CHECK constraints** on any of the three registers' `status`
+  columns, so all three vocabularies are narrowed only by the Java machine ([[F2-221]]'s shape). Now
+  cheaper for `recertification`, whose only writer this slice touched ([[F2-183]]'s rule).
+- F2-255's guard question is unchanged: those three transitions remain
+  `hasAnyRole('PLATFORM_ADMIN','CRO','CIO','DPO')` with all three domain roles held by nobody
+  (`CIO`/`CRO` **ghosts in prod**), so only a platform administrator can reach them.
+
+---
+
 ## F2-255 · A permission nobody can hold, and unlike a role nobody holds there is no administrator remedy
 
 | Field | Content |
