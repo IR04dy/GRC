@@ -362,8 +362,28 @@ class RoleGuardConversionRatchetTest {
      * <b>composed is not converted.</b> All 15 real role names on those six guards are untouched and still
      * authoritative. Read this figure falling as "fewer guards are role-<em>only</em>", never as "fewer
      * guards are role-based".
+     *
+     * <p><b>404 → 397 (F2-253), and this one IS a conversion.</b> {@code SubprocessorController}'s
+     * {@code WRITE_GUARD} — the seven PDPL Article 30 mutations — was
+     * {@code hasAnyRole('DPO','PLATFORM_ADMIN')}, and {@code DPO} is held by <b>no user</b> in dev or
+     * prod, so probed live as {@code compliance} (who holds {@code PRIVACY:WRITE}) all seven answered
+     * <b>403</b> while {@code admin} created at 201. It is now {@code hasPermission('PRIVACY','WRITE')},
+     * which loses no named role and gains {@code GRC_ADMINISTRATOR}.
+     *
+     * <p>⚠ <b>Unlike the three entries above, this figure fell because guards were converted</b> — so
+     * do not read the pattern of this javadoc as "the number drains without work". The distinction is
+     * the whole reason each entry says which kind it was.
+     *
+     * <p>⚠⚠ <b>And the reason this one was invisible for so long is a sibling measurement, not this
+     * one.</b> {@code Appendix/ROLE_GUARD_CENSUS.md} has a bucket for exactly this defect — "admitting
+     * PLATFORM_ADMIN alone, by attrition" — and it reported <b>0</b>, because it tests whether the
+     * other named roles are ABSENT from {@code iam.roles} rather than whether anybody HOLDS them. The
+     * census computes a holder count and used it in one bucket that cannot fire whenever a guard names
+     * the administrator. Measured 2026-08-20: <b>24 pure guards</b> across {@code bcm} (10),
+     * {@code privacy} (7), {@code ai} (3), {@code audit_committee} (3) and {@code rrp} (1) admit nobody
+     * but a platform administrator, identically in dev and prod. The script now prints them as B2b.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 404;
+    private static final int BASELINE_PURE_ROLE_SITES = 397;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

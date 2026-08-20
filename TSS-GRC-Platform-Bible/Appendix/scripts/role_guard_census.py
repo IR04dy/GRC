@@ -26,6 +26,11 @@ import collections
 import os
 import sys
 
+# F2-253: this script prints an arrow and an em-dash, and a Windows console is cp1252 — so every
+# run died in `emit` with UnicodeEncodeError before writing a line. "Nothing runs it" was literally
+# true: it could not run here at all. Same remedy as F2-244's probe.
+sys.stdout.reconfigure(encoding="utf-8")
+
 try:
     import pyodbc
 except ImportError:
@@ -157,6 +162,34 @@ def main():
                 admin_attrition.append((bucket, site, names,
                                         [n for n in names if n not in existing] + dead_authority))
 
+    # ── F2-253: the bucket every other one here could not see ────────────────────────────────────
+    #
+    # Every bucket above is keyed on whether a role name EXISTS. `holders` was computed at the top
+    # and then used in exactly one place — `thin`, which requires EVERY alive name to be unheld.
+    # Almost every guard in this platform names PLATFORM_ADMIN, which is held, so `thin` can never
+    # fire for them and `admin_attrition` cannot either, since it tests for absence. The question
+    # this report exists to answer is "can anybody actually get through", and it was being asked of
+    # existence: `admin_attrition` and `thin` both read 0 while 24 pure guards admitted nobody but
+    # the platform administrator.
+    #
+    # A role that exists and is held by nobody fails EXACTLY like a ghost: hasAnyRole tests for the
+    # granted authority ROLE_X, and an unassigned role grants it to no one. The difference is only
+    # that an administrator can fix it without a jar — which is a remedy, not a defence, and says
+    # nothing about the platform as shipped.
+    admin_by_holders = []
+    for bucket, site, kind, names in pure:
+        if len(names) < 2:
+            continue                                  # naming PLATFORM_ADMIN alone is a decision
+        live_authority = [a for a in raw_by_site.get((bucket, site), [])
+                          if authority_holders.get(a, 0) > 0]
+        if live_authority:
+            continue                                  # the authority leg admits callers (B3)
+        held = [n for n in names if holders.get(n, 0) > 0]
+        if held == ["PLATFORM_ADMIN"]:
+            locked_out = [n for n in names
+                          if n != "PLATFORM_ADMIN" and holders.get(n, 0) == 0]
+            admin_by_holders.append((bucket, site, names, locked_out))
+
     by_module = collections.Counter(b for b, _, _, _ in pure)
 
     out = []
@@ -205,8 +238,16 @@ def main():
          % len(admin_attrition))
     emit("| … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | %d |"
          % len(admin_deliberate))
+    emit("| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** "
+         "(F2-253) | **%d** |" % len(admin_by_holders))
     emit("| Pure guards whose surviving roles are held by no user | %d |" % len(thin))
-    emit("| Pure guards reachable by at least one seeded user | %d |" % len(live))
+    # ⚠ `live` is the `else` of dead/camouflaged/thin, so it counts a guard as reachable when ANY
+    # named role is held — including PLATFORM_ADMIN alone. Read with B2b: `live` minus B2b is the
+    # number reachable by somebody who is not the platform administrator. Labelling it "reachable"
+    # unqualified is what let 24 administrator-only guards sit inside a figure that reads as health.
+    emit("| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — "
+         "admin-only counts as reachable here) | %d |" % len(live))
+    emit("| … of those, reachable by a NON-administrator | %d |" % (len(live) - len(admin_by_holders)))
     emit("| `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | %d |" % len(raw))
     emit()
 
@@ -260,6 +301,30 @@ def main():
                 bucket, site,
                 ", ".join("`%s`" % n for n in names),
                 ", ".join("`%s`" % g for g in ghosts)))
+    emit()
+
+    emit("## B2b. Effectively PLATFORM_ADMIN-only — by HOLDER attrition (F2-253)")
+    emit()
+    emit("Section B2 asks whether a named role **exists**. This one asks whether anybody **holds**")
+    emit("it, which is the question `hasAnyRole` actually puts: it tests for the granted authority")
+    emit("`ROLE_X`, and a role assigned to no user grants it to nobody. A guard naming four roles of")
+    emit("which only `PLATFORM_ADMIN` is held is administrator-only in exactly the way B2 describes —")
+    emit("and B2 reported none of these, because every name in them is present in `iam.roles`.")
+    emit()
+    emit("An administrator can assign the missing role without a new jar, which is what separates")
+    emit("this from section B. That is a remedy, not a defence: as shipped and as seeded, the persona")
+    emit("each of these features was built for cannot use it, and nothing in the platform says so.")
+    emit()
+    if not admin_by_holders:
+        emit("None.")
+    else:
+        emit("| Module | Guard site | Roles named | Named but held by nobody |")
+        emit("|---|---|---|---|")
+        for bucket, site, names, locked in sorted(admin_by_holders):
+            emit("| `%s` | `%s` | %s | %s |" % (
+                bucket, site,
+                ", ".join("`%s`" % n for n in names),
+                ", ".join("`%s`" % n for n in locked)))
     emit()
 
     emit("## B3. Wide despite dead role names — the camouflage sites")
