@@ -33,7 +33,7 @@ import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExpo
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
   cyberApi, ApiError, evidenceApi, departmentsApi,
-  type CyberControlDto, type CyberControlRequest,
+  type CyberControlDto, type CyberControlRequest, type CyberFrameworkDto,
   type CyberSubControlDto, type CyberSubControlRequest,
   type CyberAssessmentDto, type CyberAssessmentRequest,
   type CyberVulnDto, type CyberVulnRequest,
@@ -81,14 +81,24 @@ const INCIDENT_STAGES = [
 ];
 
 // ─── Shared option lists (lifted from v1 forms verbatim) ────────────────────
-const FRAMEWORK_OPTIONS = [
-  { value: '', label: 'Select…' },
-  { value: 'NCA ECC',    label: 'NCA ECC' },
-  { value: 'ISO 27001',  label: 'ISO 27001' },
-  { value: 'PCI DSS',    label: 'PCI DSS' },
-  { value: 'NIST CSF',   label: 'NIST CSF' },
-  { value: 'SAMA CSF',   label: 'SAMA CSF' },
-];
+/*
+ * F2-252 — the hard-coded FRAMEWORK_OPTIONS list is GONE, and what it offered is the finding.
+ *
+ * It listed five frameworks by NAME: NCA ECC, ISO 27001, PCI DSS, NIST CSF, SAMA CSF. The tenant's
+ * real register (`cyber.cyber_frameworks`, measured 2026-08-20, identical in dev and prod) holds
+ * six: NCA ECC, ISO 27001, PCI DSS, NCA CCC, NCA CSCC, NCA OTCC. So only THREE were in both —
+ * `NIST CSF` and `SAMA CSF` name frameworks this register does not have (they exist in the separate
+ * global `compliance.frameworks` catalogue), and `NCA CCC` / `NCA CSCC` / `NCA OTCC`, three
+ * registered frameworks with real controls filed against them, could not be selected at all.
+ * F2-180's shape (a screen offering values the column will not accept) in both directions at once.
+ *
+ * ⚠ The list was also NAME-only, so picking from it sent `frameworkName` and never `frameworkId` —
+ * see `controlToReq` for what that did to the 75 rows that carry a link.
+ *
+ * The picker is now built from the register. `GET /api/v1/cyber/frameworks` is `CYBER:READ`, and
+ * the control form is behind `CYBER:WRITE`, so a caller who can open this form can always open the
+ * picker (F2-250's measure-the-picker rule: an affordance the caller cannot use is its own finding).
+ */
 const CONTROL_TYPE_OPTIONS = [
   { value: '', label: 'Select…' },
   { value: 'PREVENTIVE',   label: 'Preventive' },
@@ -271,13 +281,28 @@ const ACTION_WORKFLOW_OPTIONS = [
 // Note: most fields are wrapped in `getXxxFields(t)` helpers below so labels translate.
 // Only `*_EMPTY` and `*ToReq` mappers stay at module scope.
 const CONTROL_EMPTY: CyberControlRequest = {
-  controlNumber: '', titleEn: '', titleAr: '', frameworkName: '', domain: '', procedureEn: '',
+  controlNumber: '', titleEn: '', titleAr: '', frameworkId: undefined, domain: '', procedureEn: '',
   controlType: '', controlOwner: '', reviewFrequency: '',
   maturityLevel: '', implementationStatus: '', status: 'ACTIVE',
 };
+/**
+ * ⚠⚠ F2-252 — this mapper carried `frameworkName` and NOT `frameworkId`, and `updateControl`
+ * wrote both columns unconditionally. So editing a control's title through this form NULLED its
+ * `framework_id` at HTTP 200, on a column populated on 75 of 75 live rows in dev and prod — while
+ * leaving the label standing, so the register still rendered the framework and only a join could
+ * tell. Proven live, then fixed on both sides: the id is carried here, and the server now treats an
+ * omitted id as "leave the link alone" rather than "clear it".
+ *
+ * 🔑 F2-212's headline: a wire-contract gate proves the TYPES agree and cannot prove the payload
+ * BUILDER sends what the type permits. `CyberControlRequest` has always declared `frameworkId`.
+ *
+ * `frameworkName` is deliberately not sent — the server derives it from the resolved framework, so
+ * a client copy could only ever be a second opinion about the parent's identity (F2-245). An
+ * API caller may still send a bare label with no id for a framework that is not registered.
+ */
 const controlToReq = (c: CyberControlDto): CyberControlRequest => ({
   controlNumber: c.controlNumber, titleEn: c.titleEn, titleAr: c.titleAr,
-  frameworkName: c.frameworkName, domain: c.domain, procedureEn: c.procedureEn,
+  frameworkId: c.frameworkId, domain: c.domain, procedureEn: c.procedureEn,
   controlType: c.controlType, controlOwner: c.controlOwner, reviewFrequency: c.reviewFrequency,
   maturityLevel: c.maturityLevel, implementationStatus: c.implementationStatus, status: c.status,
 });
@@ -452,6 +477,15 @@ export function CyberPage() {
   const [depts, setDepts]       = useState<DepartmentDto[]>([]);
   useEffect(() => { departmentsApi.list().then(setDepts).catch(() => setDepts([])); }, []);
 
+  // F2-252 — the framework picker's options come from the tenant's own register. Same idiom as
+  // `depts` above (F2-190: use the mechanism that is already here). No fallback corpus on failure:
+  // an empty picker that says so is honest, a fabricated one is the defect this programme exists
+  // for. `useApiList` is not used because this endpoint returns a plain list, not a Page.
+  const [cyberFrameworks, setCyberFrameworks] = useState<CyberFrameworkDto[]>([]);
+  useEffect(() => {
+    cyberApi.frameworks().then(setCyberFrameworks).catch(() => setCyberFrameworks([]));
+  }, []);
+
   const controls       = useApiList<CyberControlDto>(()    => cyberApi.controls(0, 200),    CONTROLS);
   const subControls    = useApiList<CyberSubControlDto>(() => cyberApi.subControls(0, 200), SUB_CONTROLS);
   const assessments    = useApiList<CyberAssessmentDto>(() => cyberApi.assessments(0, 200), ASSESSMENTS);
@@ -516,7 +550,20 @@ export function CyberPage() {
   // ── Field defs (built per-render so labels translate via t()) ──
   // Cyber Control: 12-col layout matching v1's wide modal
   const CONTROL_FIELDS: FieldDef[] = [
-    { kind: 'select', key: 'frameworkName', label: t('cyberFldFramework'), options: FRAMEWORK_OPTIONS, span: 6 },
+    // F2-252 — keyed on the ID, with the label DERIVED server-side. When the register is empty the
+    // placeholder says so in both languages rather than looking like a list that failed to open
+    // (house rule 7; F2-246 found a picker promising an affordance it did not have).
+    { kind: 'select', key: 'frameworkId', label: t('cyberFldFramework'), span: 6,
+      options: [
+        { value: '', label: cyberFrameworks.length === 0
+            ? (lang === 'ar' ? 'لا توجد أطر مسجّلة' : 'No frameworks registered')
+            : (lang === 'ar' ? 'اختر…' : 'Select…') },
+        ...cyberFrameworks.map(f => ({
+          value: String(f.id),
+          label: (lang === 'ar' && f.nameAr ? f.nameAr : f.name)
+               + (f.frameworkCode ? ` · ${f.frameworkCode}` : ''),
+        })),
+      ] },
     { kind: 'text',   key: 'domain',        label: t('cyberFldDomain'), maxLength: 100, placeholder: 'e.g. Access Control', span: 6 },
     { kind: 'text',   key: 'controlNumber', label: t('cyberFldCtrlNumber') + ' *', required: true, maxLength: 50, placeholder: 'e.g. AC-1', span: 4 },
     { kind: 'text',   key: 'titleEn',       label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 200, span: 8 },
@@ -651,8 +698,13 @@ export function CyberPage() {
   // ── Submit handlers ──
   async function submitControl(values: CyberControlRequest) {
     try {
-      if (ctrlS.editing) await cyberApi.updateControl(ctrlS.editing.id, values);
-      else await cyberApi.createControl(values);
+      // F2-252 — a `select` carries strings, so coerce the id the same way `submitSub` coerces
+      // `controlId`. An empty selection must send `undefined`, never 0 or '': on the UPDATE path the
+      // server reads an absent id as "leave the link alone", which is what stops an edit destroying
+      // the framework reference. `frameworkName` is not sent — the server derives it.
+      const body = { ...values, frameworkId: values.frameworkId ? Number(values.frameworkId) : undefined };
+      if (ctrlS.editing) await cyberApi.updateControl(ctrlS.editing.id, body);
+      else await cyberApi.createControl(body);
       toast.success(ctrlS.editing ? 'Control updated' : 'Control added'); ctrlS.closeModal(); controls.reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }

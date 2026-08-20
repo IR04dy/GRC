@@ -2169,6 +2169,13 @@ export const pdplDataFlowApi = {
   graph: () => api.get<DataFlowGraph>('/api/v1/privacy/data-flow-graph'),
 };
 
+// ─── Cyber · Frameworks ─────────────────────────────────────────────────────
+/** F2-252 — `cyber.cyber_frameworks`, tenant-owned. See `cyberApi.frameworks` for the ⚠. */
+export interface CyberFrameworkDto {
+  id: number; name: string; nameAr?: string;
+  version?: string; regulator?: string; frameworkCode?: string;
+}
+
 // ─── Cyber · Controls ───────────────────────────────────────────────────────
 export interface CyberControlDto {
   id: number; frameworkId?: number; frameworkName?: string; domain?: string;
@@ -2425,6 +2432,17 @@ export interface CyberDashboardDto {
 
 export const cyberApi = {
   dashboard:      () => api.get<CyberDashboardDto>('/api/v1/cyber/dashboard'),
+  /**
+   * F2-252 — the tenant's real cyber framework register, so the control form can offer a picker
+   * over what exists instead of a hard-coded list.
+   *
+   * ⚠ This is NOT `compliance.frameworks`. There are two disjoint framework registers with
+   * OVERLAPPING id spaces: this one (`cyber.cyber_frameworks`, tenant-owned) and the global
+   * regulator catalogue at `/api/v1/compliance/frameworks`. Id 2 is "ISO 27001" here and
+   * "NCA Cloud Cybersecurity Controls" there, so a control's `frameworkId` resolved against the
+   * wrong register dereferences cleanly and names the wrong framework.
+   */
+  frameworks:     () => api.get<CyberFrameworkDto[]>('/api/v1/cyber/frameworks'),
   controls:       (page = 0, size = 50) => api.get<PageResponse<CyberControlDto>>(`/api/v1/cyber/controls${pageQ(page, size)}`),
   createControl:  (body: CyberControlRequest) => api.post<CyberControlDto>('/api/v1/cyber/controls', body),
   updateControl:  (id: number, body: CyberControlRequest) => api.put<CyberControlDto>(`/api/v1/cyber/controls/${id}`, body),

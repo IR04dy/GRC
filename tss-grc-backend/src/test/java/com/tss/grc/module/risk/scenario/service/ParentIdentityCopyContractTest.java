@@ -293,7 +293,17 @@ class ParentIdentityCopyContractTest {
             "ndi.audit_event :: entity_id + entity_code",
             "BY DESIGN — the NDI audit trail, same reasoning as platform.audit_log: NdiAuditPublisher "
           + "is handed the subject's own code by the service that just changed it, so the stored "
-          + "value is a snapshot of a resolved row rather than a caller's claim about one."
+          + "value is a snapshot of a resolved row rather than a caller's claim about one.",
+
+            "ethics.aml_alerts :: rule_id + rule_name",
+            "BY DESIGN — NOT A MEMBER OF THIS FAMILY, and the name-shaped derivation is what made it "
+          + "look like one. F2-252 read the entity: `rule_id` is `@Column(length = 100) String`, not "
+          + "a numeric soft foreign key, and there is NO rule register anywhere in the platform to "
+          + "resolve it against — the `ethics` schema has no rules table and the `aml` schema holds "
+          + "only sanctions lists and screening records. Both halves are an upstream detection "
+          + "engine's own identifiers, arriving together, exactly like F2-244's `annualPlanId` "
+          + "(`String(64)`, nothing dereferences it). There is no parent, so there is nothing to "
+          + "derive a label from and nothing to verify a reference against."
     ));
 
     /**
@@ -379,6 +389,47 @@ class ParentIdentityCopyContractTest {
           + "emergency change at 200. Per-bar comparison closes both; giving the id a writer is an "
           + "owner decision, since the labels are offices and no user-listing endpoint is reachable "
           + "by CHANGE:WRITE."),
+            // ── F2-252 ─────────────────────────────────────────────────────────────────────────
+            // The one member of this census with a LIVE defect, and it was not the defect the
+            // census is about. ⚠ Its parent is `cyber.cyber_frameworks`, NOT `compliance.frameworks`
+            // — two disjoint registers with OVERLAPPING id spaces, so measuring the pair against the
+            // wrong one reports 75 of 75 rows divergent when the same 75 agree. See the resolver's
+            // javadoc; picking an authoritative register is an owner decision (F2-196).
+            Map.entry(
+            "cyber.cyber_controls :: framework_id + framework_name",
+            "CLOSED by F2-252 — CyberFrameworkReferenceResolver resolves the id IN-TENANT and "
+          + "applyFrameworkReference is the pair's single writer: the label is DERIVED from the "
+          + "resolved framework, a contradicting label is refused, an echo accepted, a bare label "
+          + "still legal, and an omitted id on UPDATE leaves the stored link alone. That last clause "
+          + "is the P1: the form's payload builder carried the label and no id while applyEditable "
+          + "wrote both columns unconditionally, so editing a control NULLED framework_id at 200 on "
+          + "75 of 75 live rows in dev and prod. Probed 8/8 pre-fix and 8/8 post-fix."),
+            // The three change_mgmt actor pairs REFUTED by reading, all already correct. Recorded so
+            // a member that HAS been read is not indistinguishable from one nobody looked at.
+            Map.entry(
+            "change_mgmt.change_approvals :: approver_id + approver_name",
+            "CLOSED by F2-252 (REFUTED — already correct, and it is the module's exemplar) — "
+          + "recordApproval stamps BOTH halves from the authenticated caller and refuses outright "
+          + "when there is neither an id nor a name, so a CAB vote with no identified voter cannot "
+          + "be written (DF-4). The label is not a copy of any iam.users column: all 28 linked rows "
+          + "hold an office title ('Chief Information Security Officer') beside a real user id, "
+          + "because they are seeded — the API path stores the caller's username. F2-251's third "
+          + "kind of member, where deriving the label would destroy information."),
+            Map.entry(
+            "change_mgmt.change_requests :: cab_decision_by_id + cab_decision_by_name",
+            "CLOSED by F2-252 (REFUTED — already correct) — stampDecisionAuthor writes both halves "
+          + "from the authenticated principal on the CAB_APPROVED and EMERGENCY_APPROVED transitions "
+          + "(F2-103 added it). ⚠ Checked for F2-250's shape — 'a fix at a dedicated route is not a "
+          + "fix while an adjacent route writes the same column' — and the adjacent route is safe: "
+          + "PUT /changes/{id} binds the ENTITY, but apply() is a field WHITELIST and neither half "
+          + "is in it, so the pair cannot be re-opened from the wire."),
+            Map.entry(
+            "change_mgmt.change_requests :: ratified_by_id + ratified_by_name",
+            "CLOSED by F2-252 (REFUTED — already correct) — ratify() stamps both halves from the "
+          + "authenticated ratifier, and F2-251 fixed the SoD bars that decide whether that ratifier "
+          + "may act. Same whitelist argument as the cab_decision pair above: apply() does not "
+          + "carry either half, so the entity-bound PUT cannot write a ratification attribution. "
+          + "Verified by reading apply()'s body rather than inferred from the binding."),
             // Bookkeeping F2-250 filed: both were closed by F2-248, which adjudicated a different
             // instrument (MassAssignmentRatchetTest) and so never touched this census. A member
             // listed as unread that HAS been read is indistinguishable from one nobody looked at.

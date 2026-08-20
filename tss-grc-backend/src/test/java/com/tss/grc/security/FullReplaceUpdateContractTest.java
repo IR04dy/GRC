@@ -317,29 +317,141 @@ class FullReplaceUpdateContractTest {
 
     // ── leg 2: the client must be able to send what the server writes ──────────────────────
 
-    /** Fields written from the request inside {@code service#method}. */
+    /**
+     * Fields written from the request inside {@code service#method}, <b>following one hop into a
+     * private helper</b> the method hands a request-derived argument.
+     *
+     * <p>⚠ F2-252 added the hop, and the reason is F2-231's rule arriving here: <b>to a
+     * setter-site scan, a refactor that RELOCATES a write is indistinguishable from a fix that
+     * REMOVED it, and the population shrinks either way — the quiet direction.</b>
+     * {@code CyberControlService} moved its {@code (frameworkId, frameworkName)} writes out of
+     * {@code applyEditable} into {@code applyFrameworkReference}, the pair's single writer, so the
+     * reverse leg below reported both fields as declared-but-never-written — the shape that means
+     * <i>a form input silently became decorative</i>. They are written; they moved. The answer is to
+     * <b>follow the delegation, never to relax the assertion</b> (F2-231) and never to record a
+     * {@code DECLARED_BUT_NOT_WRITTEN} entry that would be false.
+     *
+     * <p>One hop only, and only for a {@code private} helper declared in the same file whose call
+     * passes something that reads the request. Two hops would start resolving arbitrary call graphs
+     * with a regex, which is the mistake F2-187 recorded (measure from bytecode, or stay shallow and
+     * say so).
+     */
     static Set<String> writtenFromRequest(String src, String method) {
+        Set<String> direct = writtenDirectly(src, method);
+        Set<String> all = new LinkedHashSet<>(direct);
+        for (String helper : privateHelpersCalledWithRequest(src, method)) {
+            all.addAll(writtenDirectly(src, helper));
+        }
+        return all;
+    }
+
+    /**
+     * Private helpers {@code method} calls with an argument that reads one of its request-typed
+     * parameters. Returns helper names, never signatures — one hop, same file.
+     */
+    static Set<String> privateHelpersCalledWithRequest(String src, String method) {
         Matcher m = Pattern.compile(
             "(?:public|protected|private)\\s+[\\w<>,\\s\\[\\]]+?\\s+" + Pattern.quote(method)
                 + "\\s*\\(([^)]*)\\)\\s*\\{").matcher(src);
         if (!m.find()) {
             return Set.of();
         }
-        List<String> reqVars = new ArrayList<>();
-        for (String param : m.group(1).split(",")) {
-            String[] parts = param.trim().split("\\s+");
-            if (parts.length >= 2) {
-                reqVars.add(parts[parts.length - 1]);
+        List<String> reqVars = paramNames(m.group(1));
+        String body = bodyAt(src, m.end() - 1);
+        Set<String> helpers = new LinkedHashSet<>();
+        Matcher call = Pattern.compile("(?<![.\\w])(\\w+)\\s*\\(([^;]*?)\\)\\s*;").matcher(body);
+        while (call.find()) {
+            String name = call.group(1);
+            String args = call.group(2);
+            if (name.equals(method) || !Pattern.compile(
+                    "private\\s+[\\w<>,\\s\\[\\]]+?\\s+" + Pattern.quote(name) + "\\s*\\(")
+                    .matcher(src).find()) {
+                continue;
+            }
+            for (String v : reqVars) {
+                if (Pattern.compile("\\b" + Pattern.quote(v) + "\\b").matcher(args).find()) {
+                    helpers.add(name);
+                    break;
+                }
             }
         }
+        return helpers;
+    }
+
+    private static List<String> paramNames(String params) {
+        List<String> names = new ArrayList<>();
+        for (String param : params.split(",")) {
+            String[] parts = param.trim().split("\\s+");
+            if (parts.length >= 2) {
+                names.add(parts[parts.length - 1]);
+            }
+        }
+        return names;
+    }
+
+    /**
+     * Names in {@code body} that carry request data: the method's own parameters, plus any local
+     * assigned from an expression that already mentions one, to a fixed point.
+     *
+     * <p>⚠ F2-252 added this, and F2-231 had already recorded the hole in the sibling gate: <b>a
+     * bare-identifier local aliasing caller data reads as a server stamp.</b> Here it read as
+     * <i>nothing written at all</i>. {@code CyberControlService} does
+     * {@code Long sentId = req.getFrameworkId();} then
+     * {@code var f = frameworks.require(sentId, orgId);} then {@code target.setFrameworkId(f.getId())}
+     * — three steps, none of which mentions {@code req} at the setter, and the field is written from
+     * the request at every one of them. Without the propagation the reverse leg reports the field as
+     * declared-but-never-written, which is the shape that means <i>a form input silently became
+     * decorative</i> — the opposite of what the code does.
+     *
+     * <p>Deliberately within ONE body: this is not a dataflow engine, and F2-182's rule stands that
+     * reachability is not a regex question. What it is, is the smallest widening that stops the gate
+     * being wrong about a resolved-then-derived reference — the shape F2-245 onwards keeps producing.
+     */
+    static Set<String> requestTaintedNames(String params, String body) {
+        Set<String> tainted = new LinkedHashSet<>(paramNames(params));
+        Pattern assign = Pattern.compile(
+            "(?:^|[;{}])\\s*(?:final\\s+)?(?:[\\w<>,.\\[\\]?]+\\s+)?(\\w+)\\s*=\\s*([^;]+);");
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            Matcher a = assign.matcher(body);
+            while (a.find()) {
+                String name = a.group(1);
+                String expr = a.group(2);
+                if (tainted.contains(name)) {
+                    continue;
+                }
+                for (String t : tainted) {
+                    if (Pattern.compile("\\b" + Pattern.quote(t) + "\\b").matcher(expr).find()) {
+                        tainted.add(name);
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return tainted;
+    }
+
+    /** Fields written from the request inside {@code service#method}'s own body. */
+    static Set<String> writtenDirectly(String src, String method) {
+        Matcher m = Pattern.compile(
+            "(?:public|protected|private)\\s+[\\w<>,\\s\\[\\]]+?\\s+" + Pattern.quote(method)
+                + "\\s*\\(([^)]*)\\)\\s*\\{").matcher(src);
+        if (!m.find()) {
+            return Set.of();
+        }
         String body = bodyAt(src, m.end() - 1);
+        // F2-252 — the method's own parameters PLUS locals assigned from them, to a fixed point.
+        Set<String> reqVars = requestTaintedNames(m.group(1), body);
         Set<String> out = new LinkedHashSet<>();
         Matcher s = Pattern.compile("\\.\\s*set([A-Z]\\w*)\\s*\\(([^;]*?)\\)\\s*;").matcher(body);
         while (s.find()) {
             String field = s.group(1);
             String arg = s.group(2);
             for (String v : reqVars) {
-                if (Pattern.compile("\\b" + Pattern.quote(v) + "\\s*[.(]").matcher(arg).find()) {
+                // A tainted BARE identifier counts too (`setX(sentName)`), not only `v.` / `v(`.
+                if (Pattern.compile("\\b" + Pattern.quote(v) + "\\b").matcher(arg).find()) {
                     out.add(Character.toLowerCase(field.charAt(0)) + field.substring(1));
                     break;
                 }
