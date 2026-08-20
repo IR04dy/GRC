@@ -97,7 +97,7 @@ PUBLISHED = {
     # one commit. **A pairing test proves two artefacts agree, not that either is true.** (2) When two
     # measurements of one published number disagree, the tie-break is **what the number is for**, not
     # whichever extractor you happen to be holding.
-    "packages_no_haspermission": 11,
+    "packages_no_haspermission": 10,
     # ⚠ These two drifted apart from MEASURED_BASELINE.md's own cell: F2-180 refreshed the doc to
     # 3,402 / 3,610 and updated only `suite_tests` here, leaving `module_tests` at 3,284 — 118 behind
     # its own published figure. Both are ungated, which is exactly why. 🔑 The same number written in
@@ -111,11 +111,11 @@ PUBLISHED = {
     "zero_test_packages": 7,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 369,          # +V380 (F2-255, AUDIT_LOG:WRITE — cited by
+    "migration_files": 370,          # +V380 (F2-255, AUDIT_LOG:WRITE — cited by
                                      #   POST /audit-log/integrity/seal since F2-31 and created by NO
                                      #   migration, so the seal control admitted the PLATFORM_ADMIN
                                      #   code bypass alone and no administrator could grant it)
-    "migration_head": 381,
+    "migration_head": 382,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against
