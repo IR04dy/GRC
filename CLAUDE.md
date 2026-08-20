@@ -1872,6 +1872,101 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A COLUMN NOBODY SETS CONTRIBUTES TO NEITHER HALF OF A PAIR BUILT FROM SETTER CALL
+  SITES, SO "NOBODY OWNS WHO" IS INVISIBLE TO THE GATE BUILT TO FIND "THE CALLER OWNS WHO"**
+  (F2-256, measured 2026-08-20). Executing F2-255's filing, re-derived first (F2-221):
+  `ai_governance.recertification.approver_user_id` is declared on the entity, returned on the wire by
+  `RecertificationResponse`, and **written by no code path in the platform** — neither
+  `CreateRecertificationRequest` nor `TransitionRecertificationRequest` declares it either, so the
+  caller could not supply it and the server did not resolve it, while `transitionRecertification`
+  stamps `decidedAt` from `LocalDateTime.now()` in the same `switch` branch. Every ISO/IEC 42001
+  model recertification granted, renewed, revoked or allowed to lapse through the API recorded the
+  moment and not the person. 🔑🔑 **`SplitAttributionContractTest`'s `splitsIn` walks
+  `SETTER.matcher(body)` and sorts each hit into a clock half or an actor half — BOTH halves come
+  from setter calls**, so a never-written field produces no hit and can never pair. Same for
+  `ParameterBorneActorTest` and `PrincipalStampedFieldContractTest` (which narrow that population
+  further) and `ServerStampedFieldContractTest` (which intersects two sets a never-written field is
+  in neither of). **All four are keyed on a write EXISTING**, and the narrowing is none of the ones
+  already recorded (a filename, a three-entry allow-list, a module name, an `extends` clause, a
+  field-name list inside a fix, a claim shape in a gate): it is **the existence of a setter call**.
+  ⚠⚠ **NOT LATENT, AND THE ROW IS THE WITNESS.** `REC-2026-CRD` is byte-identical in dev and prod:
+  seeded at **03:00:54** with three siblings, then **decided through the API 93 minutes later** —
+  `decided_at` **8 ms before** `updated_at`, `updated_by = 1`, `approver_user_id` **NULL**.
+  🔑 **The framework's row stamp captured the actor while the domain's own attribution column stayed
+  empty** — F2-226's rule from the other side, and the reason a row stamp can never substitute for an
+  attribution. F2-255 filed *"2 of 13 rows"* without distinguishing that **one is API-written and one
+  is a back-dated seed row**; only reading the timestamps separates them.
+  🔑 **The correct artefact has the IDENTICAL helper and this service has it too.**
+  `DataclassService#transitionException` declares the same `private static Long currentUserId()`
+  delegating to `CurrentActor.userId()` and writes `e.setApproverUserId(currentUserId())` beside its
+  own `setApprovedAt(LocalDateTime.now())`. `AiLifecycleService` has that helper **three lines below
+  the switch**, feeding `timeline(...)`'s `setActorUserId(currentUserId())` — present, used for the
+  event, not used for the row. F2-215's two-of-N, with the two artefacts being sibling **services**.
+  ⚠ **Fix shape:** one private `recordDecision()` as the **sole writer of the `(decided_at,
+  approver_user_id)` pair** (F2-245's rule — the claim that prevents drift is about WHERE the writes
+  live), taking the actor from **`CurrentActor.requireUserId`** (F2-236's primitive, never a second
+  mechanism — F2-190); **both** decision branches routed through it, because leaving `EXPIRED` and
+  `REVOKED` blank reproduces the defect on a certification allowed to lapse and one withdrawn, the two
+  an assurance reader asks about hardest; **refusing** rather than storing null so the hazard is
+  absent rather than latent (F2-213); and **overwriting a prior ASSIGNMENT**, because two live `DUE`
+  rows carry an approver with no `decided_at` and once the clock is stamped the column is an
+  attribution (F2-236's window rule) — a stale assignment left standing would credit the decision to
+  whoever was queued for it.
+  ⚠⚠ **FOUR OF MY OWN DRAFTS OF THE INSTRUMENT WERE WRONG, THREE OF THEM UNDER-REPORTING.**
+  (1) Asking whether the **FIELD NAME** was written anywhere cleared **this very site**, because
+  `DataclassService` and `RegReportingService` each write a *different* entity's `approverUserId` —
+  F2-187's *"resolve per owner type"*, one noun across, and 🔑 **a field-name fallback silently
+  clears exactly the columns most likely to be spelled the same elsewhere.** (2) Resolving the owner
+  from the **source file name** collapsed `Entities.java`'s eleven nested `@Entity` classes into one
+  key whose field set was their union and whose owner matched no bytecode — eleven phantom rows, each
+  looking exactly like a measured one; 🔑 **a source file is not a type.** (3) `getDeclaredFields()`
+  was claimed to exclude `BaseEntity`'s nine *"by construction"*; it excludes **inherited** fields,
+  not **redeclared** ones, and 259 entities declare their own `createdBy`/`updatedBy`/`deletedBy`, so
+  the census went **62 → 209**, almost all row stamps — 🔑 **a correction is not a monotone
+  improvement, and "by construction" is a claim to check rather than a reason to stop checking.**
+  (4) ⚠⚠ **The mutation harness proved the CLOCK half VACUOUS**: it matched the clock setter by name
+  across all sources, and across 432 entities those names collide constantly, so **the mutation
+  deleting the requirement altogether SURVIVED**. A surviving mutant is a hole only if the mutated
+  code is wrong (F2-206) — here it was, and the wrongness was that the condition **could not fail**.
+  Resolved per owner from bytecode (a setter call on this entity, from a class that also calls a
+  `java.time` `now()`), class-scoped rather than method-scoped because the house idiom puts
+  `LocalDateTime now = LocalDateTime.now()` in the caller and the setter in a helper.
+  ⚠ **That tightening excluded exactly one member and the exclusion is ASSERTED, not hidden.**
+  `FraudCaseUpdate#actorName` dropped out because `occurredAt` is a **field initialiser**
+  (F2-215's third filling mechanism, which no setter scan can see; F2-225/F2-226 measured that
+  population at **82 entities / 87 act-clock fields**). Named with an exemplar in both directions,
+  because a hard zero over a population the instrument cannot see is the most reassuring possible
+  artefact (F2-205).
+  ⚠ **The one write mechanism bytecode cannot see is Jackson** — an entity-bound endpoint writes
+  every property by reflection with no `INVOKEVIRTUAL`, so those columns are caller-writable and
+  belong to `MassAssignmentRatchetTest`'s family, not this one. Entity-bound types are subtracted and
+  the subtraction is pinned both ways; without it the gate would publish a caller-writable column as
+  unwritable, which is the opposite finding.
+  ⚠ **My own substantiality leg refused my own verdicts on its first run** — two `ADJUDICATED`
+  entries read *"DARK TWICE — see Policy#approverId."* at 35 characters. F2-188's rule firing on the
+  slice that wrote it. ⚠ **`AiLifecycleService` had no test of any kind**, which is not the same as a
+  path somebody decided was safe (F2-248).
+  ⚠ **The empty-heredoc landmine fired twice in one session**, both times as a pointless
+  `python - <<'PY'` "guard" that hung the shell for the full 2-minute timeout and swallowed the
+  chained commands behind it. It is recorded and I did it anyway — **use the Write/Edit tools.**
+  ⚠ **And `Restarting due to` is NOT the DevTools restart marker in this log** — it appears **0**
+  times over a session in which the app started **three** times. 🔑 **Count
+  `Started GrcApplication` instead**: a grep for a phrase that never appears reads exactly like a
+  process that never restarted, which is how a probe ends up scoring a fix against pre-fix code (or,
+  as here, reporting the pre-fix legs as failures against post-fix code).
+  ⚙ **Filed:** **`model_validation` has NO completer column and `retraining_event` NO approver column
+  at all** — both stamp their clock from the server (`completed_at`, `approved_at`) and their only
+  person columns are `validator_user_id`/`owner_user_id`, written from the request at creation, i.e.
+  **assignments** (F2-226); `validation_type` admits `EXTERNAL_AUDIT`, so a validator need not be a
+  platform principal at all (F2-224's `auditorExternalParty` rule). Adding the columns is a migration
+  and a **product decision**, and the absence is asserted in the gate so it is countable rather than
+  implied — F2-215's two-of-N, pre-empted. Also: the **27-member work list with no verdicts**, whose
+  largest sub-shape is **nine event registers declaring `actorName` beside an `actorUserId` their
+  service DOES write**, so the id is stored and the NAME is the half the response carries and every
+  timeline entry renders a blank actor; `recertification` having **no route that can record an
+  assigned approver**; and the whole **`ai_governance` schema having zero CHECK constraints** on any
+  of the three registers' `status` columns (F2-221's shape, now cheaper for `recertification` since
+  this slice touched its only writer — F2-183).
 - ⚠⚠ **A ROLE NOBODY HOLDS HAS AN ADMINISTRATOR REMEDY; A PERMISSION NOBODY CAN HOLD DOES
   NOT — AND THE GATE BUILT FOR EXACTLY THAT DEFECT EMITTED A REPORT AND ASSERTED NOTHING ABOUT
   IT** (F2-255, measured 2026-08-20). Executing F2-254's filed `module.ai` block, the
