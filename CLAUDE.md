@@ -1872,6 +1872,82 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A ROLE THAT EXISTS AND IS HELD BY NOBODY FAILS EXACTLY LIKE A GHOST, AND EVERY BUCKET
+  IN THE INSTRUMENT WAS KEYED ON EXISTENCE** (F2-253, measured 2026-08-20). `hasAnyRole('X')` tests
+  for the granted authority `ROLE_X`; a role assigned to no user grants it to nobody, and a role
+  guard gets **no `PLATFORM_ADMIN` bypass** (`ModulePermissionEvaluator` is never called). The only
+  difference from a ghost name is that an administrator can assign the role without a jar — **which
+  is a remedy, not a defence, and says nothing about the platform as shipped.**
+  `Appendix/ROLE_GUARD_CENSUS.md` has a bucket for exactly this, *"left admitting PLATFORM_ADMIN
+  alone, by attrition"*, and it read **0**: it tests whether the other named roles are **absent from
+  `iam.roles`**, never whether anybody **holds** them. The script computes `holders` at the top and
+  uses it in one bucket (`thin`) that requires EVERY alive name to be unheld — and almost every guard
+  here names `PLATFORM_ADMIN`, which is held, so `thin` and `admin_attrition` **cannot fire for
+  them**. Measured: **24 pure guards admit nobody but a platform administrator**, identically in dev
+  and prod (`bcm` 10, `privacy` 7, `ai` 3, `audit_committee` 3, `rrp` 1); now **17**, printed as
+  §B2b. 🔑 **The question the report exists to answer was being asked of existence.**
+  ⚠⚠ **The live one was the PDPL Article 30 sub-processor register, and the guard's own javadoc is
+  the finding's witness.** `SubprocessorController.WRITE_GUARD` was
+  `hasAnyRole('DPO','PLATFORM_ADMIN')` with `DPO` held by nobody, so probed live as `compliance` (who
+  holds `PRIVACY:WRITE`) **all seven writes answered 403** — create, update, transition, **approve**,
+  **review**, material-change, event ledger — while `admin` created at 201 and the read guard admitted
+  the same caller at 200, over **8 live sub-processors**. F2-52 had audited *this exact pair*, written
+  eleven lines correcting a ghost on `READ_GUARD` (*"Correcting a ghost widens access and dropping one
+  does not"*) and left `WRITE_GUARD` **one line below** naming a zero-holder role. 🔑 **That rule is
+  about existence and has no vocabulary for the case one line down** — F2-215's two-of-N, in a comment
+  whose entire subject is this question.
+  ⚠ **Measure the audience diff BEFORE converting, never after** (the V362 landmine). Here: converting
+  loses nothing (`DPO` holds `PRIVACY:WRITE` too) and gains `GRC_ADMINISTRATOR`; `VIEWER` and
+  `AUDITOR` hold `PRIVACY:READ` and **not** WRITE, so no reader-only role is admitted — probed, not
+  reasoned. And **the module's own convention settles the target**: `DpiaController`,
+  `ConsentRecordController` and `CyberPdplBridgeController` already guard with
+  `hasPermission('PRIVACY',…)`, DPIA's Article 25 approve/reject included, so `approve`/`review`
+  landing on `PRIVACY:WRITE` follows this module rather than inventing a rule for it.
+  ⚠⚠ **Converting ONE leg of a read/write pair can open a write-without-read hole, and the obvious
+  patch for it is a trap.** `READ_GUARD` names `CISO`, `COMPLIANCE_OFFICER` and `RISK_MANAGER` — all
+  three **HELD**, none holding `PRIVACY:READ` — so converting it drops three live roles (`so_officer`
+  reads at 200 today) and granting them the permission instead widens them from this register to the
+  **whole privacy read surface**, the DSR queue and the breach register. An **owner decision**, filed.
+  🔑🔑 **And the patch I reached for would have been invisible to the ratchet:**
+  `RoleGuardConversionRatchetTest` line 929 is `boolean composed = HAS_PERMISSION.matcher(expr).find()`
+  — **presence, not conjunction** — while the census prints that bucket as *"role leg ANDed onto a
+  permission — already tight"* and the ratchet's javadoc counts it OUT of F2-05's backlog on that
+  basis. Measured: **96 of the 99 are ORs.** Most are correct designs (`permission or admin`;
+  F2-159/F2-161's `roles or record-OWNER`, which is narrower than a module permission), but **~10 still
+  authorise their general population by role name while being labelled tight.** Adding
+  `or hasPermission('PRIVACY','READ')` would have made a **widened** guard read as a tightening and
+  passed every gate. **Filed** — splitting the kind changes a published artefact's schema.
+  ⚠ **A hard zero can be a statement about the PACKAGED platform and false in the DEPLOYED one.**
+  `BASELINE_GHOST_ROLE_NAMES = 0` is asserted against `ROLE_CATALOGUE`, whose own javadoc says it was
+  *"read 2026-08-06 (58 rows), then 2026-08-07 (69)"* — from **dev**. Prod holds exactly **58**, and
+  `CIO` and `CRO` are recited by guards and **absent from `iam.roles` there**. **Run a data-dependent
+  census against BOTH databases**: this script hardcodes `DATABASE=TSS_GRC`, so every figure it has
+  ever published is a statement about dev. Also measured: **30 of the 38 recited names are held by
+  nobody in dev** (28 in prod), and **no** pure guard is closed to everyone — each also names a held
+  role — so the harm is narrowness rather than closure, which is the distinction §B2b exists to make.
+  ⚠ **A script that "nobody runs" may be one that CANNOT run.** This one prints `→` and `—`, a Windows
+  console is cp1252, and every invocation died in `emit` with `UnicodeEncodeError` **before writing a
+  line**. `sys.stdout.reconfigure(encoding="utf-8")`, the F2-244 remedy, one file over.
+  ⚠ **Asserting a PROSE claim needs FLOWED javadoc, and the quote-stripper must not be line-scoped.**
+  A claim wraps, so `contains()` only anchors on whichever fragment the author picked (F2-216); a
+  `"[^"\n]*"` stripper cannot cross the newline inside a wrapped quotation, so the quotation survives
+  and reads as a claim; and stripping quotes over a **whole Java file** pairs a javadoc citation's
+  quote with an unrelated string literal's. **Isolate the comments, flow them, then strip.**
+  ⚠ **A leg scoped to "routes whose guard already equals the target" can only pass.** My first draft
+  checked for a role name only on routes whose guard was already the permission — an empty set on the
+  pre-fix tree. **The pre-fix control is what exposed it** (3 of 5 legs fired on master; this was one
+  of the two that did not), and the other non-firing leg is a deliberate **pin** whose tripwire is in
+  the future — said out loud in the test, because "green on master" is otherwise indistinguishable
+  from a regex that stopped matching.
+  ⚙ **Filed:** the **17** remaining administrator-only guards, a work list with **no verdicts**
+  (F2-188) — and note that two of their unheld roles, `BCM_MANAGER` (F2-161) and `DPO` (F2-209), have
+  each been reported unheld before, **one endpoint at a time**, which is what a population looks like
+  when nothing counts it. `BiaQuantitativeController#cfoApprove` and `#boardApprove` are **distinct
+  approval tiers of one BIA**, so collapsing them onto one permission would retire a four-eyes
+  distinction: this is not a mechanical sweep. Also `SubprocessorService.create` honouring a
+  client-supplied `subprocessorCode` — F2-172(d)'s family on a reference an auditor cites, outside
+  `ClientSuppliedReferenceRatchetTest`'s `setExternalId`/`setRefNumber` key (F2-248's headline that a
+  gate key is a spelling).
 - ⚠⚠ **A SOFT FOREIGN KEY WHOSE ID SPACE IS VALID IN TWO REGISTERS DEREFERENCES CLEANLY
   AGAINST THE WRONG ONE AND LIES** (F2-252, measured 2026-08-20). Executing F2-251's 28-member
   census (re-derived from the shipped gate's own stdout first — F2-221), the ranking said what the
