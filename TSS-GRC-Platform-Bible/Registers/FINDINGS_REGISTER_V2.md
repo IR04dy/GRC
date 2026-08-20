@@ -2552,7 +2552,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 | Field | Value |
 |---|---|
 | **Severity** | P3 — instrument consolidation closing three latent gate defects, two of them queued behind the next two conversions in this programme's own backlog |
-| **Status** | ✔ **CLOSED 2026-08-21** (`8dd0bf73` + `DOCSHA`) |
+| **Status** | ✔ **CLOSED 2026-08-21** (`8dd0bf73` + `8c09a797`) |
 | **Area** | test instruments · `src/test/java/com/tss/grc/support/GuardExpressions` · nine former copies across `security`, `module.bcm`, `module.audit_committee`, `module.rrp`, `module.dataclass`, `module.outsourcing`, `module.data_officer` |
 | **Discovered by** | Executing [[F2-260]]'s filed *"shared role-name extractor"*, re-derived first ([[F2-221]]) |
 
