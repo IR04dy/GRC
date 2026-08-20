@@ -1872,6 +1872,97 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A ROLE NOBODY HOLDS HAS AN ADMINISTRATOR REMEDY; A PERMISSION NOBODY CAN HOLD DOES
+  NOT — AND THE GATE BUILT FOR EXACTLY THAT DEFECT EMITTED A REPORT AND ASSERTED NOTHING ABOUT
+  IT** (F2-255, measured 2026-08-20). Executing F2-254's filed `module.ai` block, the
+  re-derivation (F2-221) killed the filed conversion before any code was read: **`AI:APPROVE`
+  does not exist** — the catalogue holds only `AI:READ`/`WRITE`/`EXPORT` — so my own filing's
+  *"`AI` has its own permission module"* was true and said nothing about the action the guard
+  needed. 🔑 **A fact about the module tells you nothing about the action**, which is F2-254's own
+  headline one level down. Asking the general question instead — *how many guards cite a
+  `(MODULE, ACTION)` pair the catalogue does not define?* — found `AUDIT_LOG:WRITE`, cited by
+  `POST /api/v1/audit-log/integrity/seal`, created by **no migration in the packaged set** and
+  present in **neither database** (dev 140 pairs, prod 114). `ModulePermissionEvaluator`
+  string-matches `MODULE + '_' + ACTION`, so it could only ever answer false and the route reduced
+  to the PLATFORM_ADMIN code bypass. F2-253's 24 attrition guards at least have a remedy — assign
+  the role — and here there is none: nothing can be granted because nothing exists to grant, so
+  closing it takes a jar.
+  ⚠⚠ **THE ROUTE'S OWN JAVADOC IS THE WITNESS, AND THE OBSERVE HALF ONE METHOD ABOVE WAS FINE.**
+  It reads *"It exists so the control can be EXERCISED rather than only observed: a sealing pass
+  whose only trigger is a timer is a control nobody can demonstrate on request, and DF-1 showed
+  what an unobserved scheduled sweep costs."* Built to be demonstrable by whoever is asked, and
+  demanding a permission nobody the request would be put to could hold. `GET /integrity` is
+  `hasPermission('AUDIT_LOG','READ')` — catalogued, 6 roles, **4 with a live holder** in dev and
+  prod. **Two adjacent methods, one permission each, and the one that was catalogued is the one
+  that already worked** (F2-215's two-of-N at the finest range yet). Probed 10/10 pre and post:
+  all four READ holders answer 200 on `/integrity` while only `admin` sealed.
+  ⚠ **A 200 with `sealed:0` is indistinguishable from a 200 that wrote nothing** — both granted
+  personas got exactly that, because `admin` sorted first and had already sealed the five rows.
+  Prove the work separately: 0 unsealed → 3 reads → 1 unsealed → CISO seal → 0 unsealed.
+  ⚠⚠ **THE INSTRUMENT: `PermissionCatalogueUsageTest`'s OWN JAVADOC NAMES THIS DEFECT CLASS AND ITS
+  TWO PRIOR INSTANCES** — F2-23 (`ADMIN:APPROVE`, 59 committee methods) and F2-27 (`AI:EXPORT`),
+  *"both found by hand, months apart"* — **and its two build-time assertions are that its own
+  extraction found ≥ 85 pairs and that no guard names a non-`UPPER_SNAKE` token.** Neither compares
+  a cited pair against the catalogue; that was deferred to `grant_tightness.py`, a two-step manual
+  script. 🔑 **The stated premise — *"the suite has no database"* — is true of WHO HOLDS a
+  permission and false of WHETHER IT EXISTS.** The catalogue is defined by the **migrations**, which
+  live in `src/main/resources` and are read hermetically by a dozen tests here already; bundling
+  both questions under *"tightness"* carried the harder one's constraint to the cheaper one. The
+  script's own header even writes the split down — *"a permission no role holds **(or that the
+  catalogue does not define)**"* — with the half that needs no database inside the parenthesis.
+  **When one half of a check needs an input the build lacks, the other half does not inherit that
+  constraint; naming them as one thing is what makes the cheap half invisible.**
+  ⚠⚠ **AND THE NEW LEG COULD NOT BE A BARE HARD ZERO, WHICH IS ITSELF THE BIGGER FINDING.** `V1`
+  only `CREATE`s `iam.permissions` and `V239`'s header says BCM *"shipped with permission rows"*, so
+  a fresh Flyway install from V1 creates **93** catalogue pairs while the guards cite **128**:
+  **36** core pairs — `RISK:READ`, `RISK:WRITE`, `BCM:READ/WRITE/DELETE`, `COMPLIANCE:READ/WRITE`,
+  `CYBER:READ/WRITE/DELETE`, `PRIVACY:READ/WRITE`, `SCM:READ/WRITE/DELETE`, `ADMIN:READ/WRITE`,
+  `REPORTING:READ/WRITE`, `CHANGE:APPROVE/DELETE`, `SUST:APPROVE`, `TPRM:APPROVE` and eight EXPORT
+  pairs — are created by **no migration at all** and exist in both live databases only because the
+  bootstrap made them. On such an install every guard citing them is closed to all but the platform
+  administrator, and **a missing catalogue row cannot be fixed from the role-admin screen the way a
+  missing grant can**. Same family as the recorded *"225 grants short of dev"*, one table up.
+  Declared as `CREATED_BEFORE_THE_MIGRATION_SET` and enforced **both** ways, so the gap is countable
+  instead of invisible; back-filling it is an **owner decision**.
+  ⚠ **The authority for "does this permission exist in the platform" is the MIGRATION SET, never
+  either database.** Prod shows **27** cited pairs absent from `iam.permissions` across `AML`,
+  `AUTOMATION`, `CONSUMER`, `CPTY`, `ETHICS`, `OPENBANKING`, `SHARIA` — that is the V345–V380
+  deployment gap, which Flyway closes on deploy, **not 27 defects**. One database can be behind and
+  the other ahead via bootstrap; only the migrations say what ships.
+  ⚙ **V380 narrows the READ tier rather than promoting it**, which is the V362 landmine as an
+  assertion: `ORG_ADMIN`/`GRC_ADMINISTRATOR`/`CISO` granted, `AUDITOR` withheld (an examiner watches
+  the demonstration rather than performing the write), `INTERNAL_AUDITOR` withheld (operating the
+  seal would make internal audit the author of the evidence it examines), `IAM_LEAD` withheld, and
+  `PLATFORM_ADMIN` withheld per V272's own *"needs no grants (evaluator bypass)"*. Four self-checks
+  THROW, including **containment** (nobody seals a ledger they cannot read) and **strictness**
+  (`|WRITE| < |READ|`, because containment alone is satisfied by granting the whole tier).
+  ⚠ **The parser's negative controls are the load-bearing half.** Scope the extraction to the
+  **statement**, not the file: `iam.role_permissions` inserts in the same migration carry triples
+  like `('ORG_ADMIN','AUDIT_LOG','READ')` whose first two elements read as a pair, and a file-scoped
+  parse invents `ORG_ADMIN:AUDIT_LOG`. Both 3-argument guard forms must also stay out —
+  `hasPermission(#id,'EXERCISE_RUN','OWNER')` and `hasPermission('AUDIT_COMMITTEE','COMMITTEE',
+  'SEAT')`, whose first argument **is** quoted, so only the closing paren distinguishes it; matching
+  either would report `ML_MODEL:OWNER` or `AUDIT_COMMITTEE:COMMITTEE` as a ghost on correct code.
+  Mutation harness 4/4 killed, and the Java gate agrees with the throwaway Python locator
+  **exactly** (128/93/36) — F2-213's write-the-sweep-as-the-gate rule earning its place rather than
+  being quoted.
+  ⚠ **`iam.permissions.description_en` is `NVARCHAR(300)`** and SQL Server error **2628** names the
+  column and the truncated value but **not the limit** — resolve the width from `sys.columns`, the
+  guessed-name family at a column's *width* rather than its *name*.
+  ⚠⚠ **`BUILD FAILURE` WITH NO `Tests run:` LINE MEANS NOTHING RAN, AND THE CAUSE IS NOT ALWAYS THE
+  JDK.** Here the working directory had drifted to the repo root, where there is no POM; F2-252
+  recorded the JDK-11 version of this and the tell is the same. 🔑 **The absence of that line is the
+  signal, whatever produced it — a stale surefire report on disk then answers an older question.**
+  ⚙ **Filed:** the 36-pair fresh-install catalogue gap; **`module.ai`'s three transitions are still
+  administrator-only** (`CRO`/`CIO`/`DPO` all 0 holders, `CIO`/`CRO` **ghosts in prod**) with **15
+  live rows in each database** on a state that has an outgoing edge — and the guards were never
+  carrying a four-eyes bar, because `WRITE` and `APPROVE` **overlap on `CIO` and `DPO`** and no
+  transition compares the actor against anything, so unlike F2-254's disjoint BIA tiers collapsing
+  them onto `AI:WRITE` (the module's own convention on `AiSuggestionController`) retires nothing;
+  and **`ai_governance.recertification.approver_user_id` has no writer in any code path** while
+  `decided_at` is stamped from the server's clock — 2 of 13 rows already carry a decision with no
+  decider in both databases, and `currentUserId()` sits in the same service feeding the timeline
+  event, so F2-223's split attribution here is *the server owns WHEN and nobody owns WHO*.
 - ⚠⚠ **THAT FINDING HAD ONE INSTANCE AND READ AS BAD LUCK — THERE ARE THREE, AND EACH IS A
   PRIOR SLICE THAT CORRECTED A GHOST IN ONE OF THESE EXPRESSIONS AND LEFT A ZERO-HOLDER ROLE STANDING
   BESIDE IT** (F2-254, measured 2026-08-20). Executing F2-253's filed `module.bcm` block — re-derived
