@@ -2547,6 +2547,186 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-258 · The remedy chosen for these routes in a migration, and the reason it did not move them
+
+| Field | Content |
+|---|---|
+| **ID** | F2-258 *(measured 2026-08-20. Provenance is [[F2-255]]'s filing. Re-deriving it first ([[F2-221]]) changed the answer twice: the filed conversion target `AI:APPROVE` **does not exist**, and the population is **six** routes rather than the three the filing named — the three creates share the defect at one role's distance.)* |
+| **Category** | Authorization — a role guard whose named roles are held by nobody, where the platform's *chosen remedy already shipped* and left the route exactly as closed as it found it |
+| **Severity** | **P2.** Three `POST …/transition` routes on the ISO/IEC 42001 AI model-lifecycle register were reachable by the platform administrator and **nobody else**, and the three creates beside them by one other role. All six are wired to routed pages, so the Move control on `AiLifecycleValidationsPage`, `AiLifecycleRetrainingsPage` and `AiLifecycleRecertificationsPage` answered 403 for every non-administrator, over 16 validations / 11 retraining events / 13 recertifications identical in dev and prod. |
+| **Provenance** | [[F2-255]] filed *"`module.ai`'s three transitions are still administrator-only (`CRO`/`CIO`/`DPO` all 0 holders, `CIO`/`CRO` ghosts in prod) with 15 live rows in each database"*, and reasoned that collapsing them onto `AI:WRITE` retires nothing. |
+| **Current State** | ✔ **FIXED 2026-08-20** (`1d074539`). Six routes converted to one `hasPermission('AI','WRITE')`; the READ tier deliberately left as a role guard; **V381** grants `AI:READ` + `AI:WRITE` to `CIO` and `CRO` so the conversion drops nobody; `AiLifecycleGuardConversionTest` (6 legs) and `BASELINE_PURE_ROLE_SITES` 389 → 383. Probed live 13/13 pre-fix and 13/13 post-fix. |
+| **Problem** | `hasAnyRole` tests for a **granted authority** and gets no `PLATFORM_ADMIN` bypass, so a role assigned to no user admits nobody. `CIO`, `CRO` and `DPO` are held by no user in either database. |
+| **Root Cause** | RC-B — object-level authorisation expressed as a role name rather than as a permission, where the role's holder set is the thing nobody measured. Third recorded instance of [[F2-253]]'s holder-attrition shape being closed, after [[F2-253]] itself and [[F2-254]]. |
+| **Evidence** | `iam.user_roles` / `iam.role_permissions` in **both** databases, the migration set for the catalogue ([[F2-255]]'s rule), live probe 13/13 both modes, pre-fix control firing on 1 of 6 legs naming all six routes, mutation harness 8 killed / 0 survived |
+
+**Finding.** `AiLifecycleController` carried three tiers of role guard:
+
+```
+READ     hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','AUDITOR','CISO','DPO','CIO','CRO')
+WRITE    hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','CIO','DPO')          -- the three creates
+APPROVE  hasAnyRole('PLATFORM_ADMIN','CRO','CIO','DPO')                   -- the three transitions
+```
+
+Measured in dev **and** prod ([[F2-253]]'s rule — the census script hardcodes `DATABASE=TSS_GRC`, so
+every figure it has ever published is a statement about dev): `CIO` **0 holders**, `CRO` **0**, `DPO`
+**0**; `CIO`/`CRO` are additionally absent from prod's `iam.roles` because V373 is among the pending
+migrations. So the APPROVE tier admitted `PLATFORM_ADMIN` alone and the WRITE tier admitted it plus
+`RISK_MANAGER`.
+
+Probed live before the change (13 legs, personas resolved from `iam.role_permissions` rather than
+guessed, against rows the probe planted itself — [[F2-206]]):
+
+| leg | persona | route | pre-fix | post-fix |
+|---|---|---|---|---|
+| T1 | `rmanager` (holds `AI:WRITE`) | validation `IN_PROGRESS → PASSED` | **403** | 200 |
+| T2 | `compliance` (holds `AI:WRITE`) | retraining `PROPOSED → APPROVED` | **403** | 200 |
+| T3 | `rmanager` | recertification `DUE → IN_REVIEW` | **403** | 200 |
+| C1 | `compliance` | create a validation | **403** | 200 |
+| N1 | `auditor` (READ tier, no `AI:WRITE`) | transition | 403 | **403** |
+| N2 | `viewer` (neither) | create | 403 | **403** |
+| A1 | `admin` | transition | 200 | 200 |
+
+**🔑 The platform had already chosen a remedy for these exact routes, and it shipped, and it did not
+move them.** V373 — *"F2-52: seat CIO and CRO, the two executive identities 79 guard sites already
+recite"* — names `AiLifecycleController#transition` in its own header and describes it, before the
+fix, in the words this finding would use: *"the same shape"* as `RrpController#submit`, which it
+calls *"reachable by the platform administrator and nobody else"*. It chose remedy (3), seating,
+over remedy (1), conversion. Seating creates the **role**; it assigns it to **nobody**. Its closing
+line is the tell — *"79 guard sites and 4 attachment role lists are now **satisfiable**"* — which is
+[[F2-253]]'s distinction exactly: satisfiable is not satisfied, and `hasAnyRole` asks for a granted
+authority. Dev has held `CIO` and `CRO` with **0 grants of any module** ever since.
+
+**🔑🔑 And the reason it picked the wrong remedy here is that the measurement it made was about four
+other modules.** V373's reasoning:
+
+> *"Unavailable: DATACLASS, OUTSOURCING, REGREPORTING and RRP have **NO catalogued permissions at
+> all** (measured against `iam.permissions`), so converting means first cataloguing four new
+> modules, which is a V362-scale decision about who may do what and not a name fix."*
+
+True of those four — verified, all four still have no `WRITE`/`APPROVE` row in `iam.permissions`
+today ([[F2-257]] filed that half). **Not true of the fifth**, which it swept in by resemblance one
+sentence earlier (*"`AiLifecycleController#transition` … is the same shape"*), and then justified on
+a **different and circular** ground:
+
+> *"of the five modules involved only AI is catalogued at all, where AiLifecycleController is
+> role-guarded anyway, so any grant would be inert."*
+
+The grant was inert **because the guard was a role guard**, which is the half that could change.
+`AI:READ`/`WRITE`/`EXPORT` have been catalogued since **V313** and `AI:WRITE` is held by **8 live
+roles** in both databases. This is [[F2-215]]'s two-of-N at the level of a *remedy*: the same defect
+shape across five modules, four of which genuinely could not be converted, and the sentence that says
+*"the same shape"* is what stops a reader asking whether the same remedy applies.
+
+**The fix, and the two things it deliberately does not do.**
+
+Six routes now carry one constant, `hasPermission('AI','WRITE')` — the module's own convention, which
+`AiSuggestionController` has used since it was written.
+
+*One constant and not two.* Deciding a validation is a different act from filing one, and this
+controller no longer distinguishes them, so it says so with one name rather than two identical
+strings. Merging retires nothing that existed: the two role sets already overlapped on `CIO` and
+`DPO`, and no transition in `AiLifecycleService` compares the acting principal against the record's
+author — checked, not assumed. A real maker/checker bar needs an `AI:APPROVE` the catalogue does not
+define **plus** an actor comparison, which is a V362-scale access decision. **Filed.**
+
+*The READ tier stays a role guard, and this is the load-bearing measurement.* `AUDITOR` is named on
+it, **is** held, and holds `AI:EXPORT` and **not** `AI:READ` — the only role in either database with
+that shape, and deliberate, since `MlModelController.EXPORT_GUARD` is
+`hasPermission('AI','EXPORT') and hasAnyRole(…,'AUDITOR',…)`. So `hasPermission('AI','READ')` here
+would take the tier from five live roles to four and **drop the examiner**. That is [[F2-253]]'s
+asymmetry — correcting a role guard on the write side widens access and doing it on the read side can
+narrow it, so the two halves are not one sweep — and
+`AiLifecycleGuardConversionTest.theReadTierIsDeliberatelyStillARoleGuard` fails the build if somebody
+finishes it, the same leg [[F2-254]] added for the BCM reads after making the same measurement.
+
+**V381, and why a guard conversion needed a migration.** Of the names the retired lists carried,
+`DPO` already held `AI:WRITE`; `CIO` and `CRO` held **no module permission at all**. Converting
+without a grant would therefore have **narrowed the shipped audience by two roles**, and narrowing a
+shipped default is a policy change rather than a fix. V381 grants `AI:READ` + `AI:WRITE` to both, as
+**declared literals** with five self-checks that `THROW` (the repo's grant landmine: the
+`INSERT … SELECT … JOIN … WHERE NOT EXISTS` idiom grants nothing when either side is catalogued later
+and cannot tell *already granted* from *nothing matched*). Live effect today: **none** — both roles
+are held by nobody, so nothing about who can act changes; what changes is what a tenant administrator
+gets when they assign one, which before this was 79 role guards and no permission-driven screen at
+all. The one measured widening is stated rather than left as a side effect (the V362 landmine):
+`AI:WRITE` also opens **7** `AiSuggestionController` routes these two were not named on.
+
+**Instrument.** `AiLifecycleGuardConversionTest`, six legs, **reflective over `@PreAuthorize`** rather
+than a source scan — the annotation takes a compile-time constant, so reflection sees the resolved
+expression and cannot be fooled by a constant being renamed or moved ([[F2-187]]). It asserts the
+write tier by **claim** (a permission guard citing `AI`/`WRITE`) rather than by banning the word
+`hasAnyRole`, because [[F2-254]] had two pre-existing gates fail on a *correct* conversion for exactly
+that reason and a gate that fails on correct code trains the next reader to edit the assertion
+([[F2-214]]). It also resolves `AI:WRITE` from the **migration set**, never a database ([[F2-255]]),
+and requires V381's four triples to still be literals.
+
+⚠ **Two of my own gate legs were wrong, and the mutation harness found both.**
+
+1. `contains("THROW 51381")` **SURVIVED** the mutation that removed check 0 — V381 carries **five**
+   THROWs, so deleting the one that matters left four satisfying the assertion.
+   [[F2-194]]'s substring-satisfied-by-something-else, in a gate written after quoting it. Replaced by
+   a **count** plus check 0's own message anchor.
+2. The mutation making the guard reader skip unguarded methods **SURVIVED**, and the mutated code was
+   not wrong on this corpus — every route is guarded, so it returns the identical map ([[F2-206]]).
+   That is an equivalent mutant, and the fix is a **synthetic fixture**: a nested controller with a
+   mapped, unguarded method, asserted to be *reported* rather than skipped ([[F2-195]]). 🔑 **A reader
+   that omits what it cannot explain shrinks its own population, and a smaller population reads
+   exactly like a cleaner tree.**
+
+After both: **8 killed / 0 survived / 0 anchor-miss**, and the pre-fix control fires naming all six
+routes exactly.
+
+⚠ **A third of my own errors were in the harness, not the gate.** The escape-collapse landmine fired
+**twice in one slice** through inline `py -c` inside Bash — once producing `\(\s*` in a Java string
+(a loud `javac` error) and once a raw newline inside a Python string literal (a `SyntaxError` that a
+`sed` filter then swallowed, so the harness appeared to produce no output at all). The recorded rule
+is to use the Write/Edit tools for any file content carrying escapes; it applies to inline `py -c`
+exactly as it does to a heredoc.
+
+⚠ **And one assertion of mine was wrong about the codebase rather than the reverse:**
+`contains("'AI', 'WRITE'")` failed because V313 writes `('AI','WRITE',` with no space. An assertion
+that depends on a formatting choice fails on a correct tree the day somebody reformats the file, so it
+is now a whitespace-tolerant parse.
+
+⚙ **Also corrected, in passing:** `RoleGuardConversionRatchetTest`'s javadoc stated
+*"`BASELINE_PURE_ROLE_SITES` is 404"* while the constant read 389 — the prose-versus-constant drift
+CLAUDE.md warns about, in the file that owns the constant. And the ceiling is lowered to **383** in
+the same commit as the conversion, re-derived from this build rather than subtracted, because
+[[F2-207]] recorded what happens when a sweep lands and its ceiling stays: a tolerated guard becomes
+indistinguishable from a reviewed one.
+
+**Filed.**
+
+- **The four-eyes question this conversion makes askable.** Creating an AI model validation and
+  deciding it are now one permission. They already were, in effect — the role sets overlapped and no
+  transition compares the actor — but a real separation is now a small, well-defined change:
+  catalogue `AI:APPROVE`, guard the three transitions with it, and compare the deciding principal
+  against `validator_user_id` / `owner_user_id` / the creator. Whether an ISO/IEC 42001 recertification
+  *should* require a second person is an **owner decision**, and [[F2-256]] already filed that
+  `model_validation` has no completer column and `retraining_event` no approver column at all.
+- **§B2b is now 6, and it is a work list with no verdicts** ([[F2-188]]): `module.audit_committee` 3
+  (`BOARD_SECRETARY`, 0 holders — a committee-seat question, so [[F2-177]]'s
+  `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` may be the right mechanism rather than a
+  module permission), `module.bcm` 2 (the two BIA approval tiers [[F2-254]] measured and left, blocked
+  on a migration — `bcm.bia_quantitative` has no `board_approved_by` column), `module.rrp` 1
+  (`RrpController#submit`, the SAMA recovery-and-resolution filing V373's own header calls the sharp
+  case — blocked on `RRP` having no catalogued permissions, i.e. [[F2-257]]'s filed catalogue gap).
+- **`AiLifecycleService`'s three creates honour a client-supplied `reference`** — `@NotBlank String
+  reference` on all three request records, `setReference(req.reference())` in all three creates, on the
+  register an ISO/IEC 42001 assurance reader cites. F2-172(d)'s family in the
+  `SubprocessorService.create` shape [[F2-253]] filed: the field is *mandatory*, so there is no
+  null-coalesce and it sits outside `ClientSuppliedReferenceRatchetTest`'s
+  `setExternalId`/`setRefNumber` key. No UNIQUE index on any of the three `reference` columns, so a
+  duplicate is storable.
+- **`role_guard_census.py` still hardcodes `DATABASE=TSS_GRC`**, so §B2b and every holder figure it
+  publishes is a statement about **dev**. [[F2-253]] filed this; it cost a re-measurement here (prod
+  has `CIO`/`CRO` absent rather than unheld, because V373 is pending). One parameter.
+- **`ai_governance` still has zero CHECK constraints** on all three registers' `status` columns
+  ([[F2-256]]'s filing). Now cheaper for the three that this slice's converted routes write, but the
+  vocabularies are declared only in `VAL_ALLOWED`/`RET_ALLOWED`/`REC_ALLOWED` and
+  `StateMachineColumnMirrorTest` would be the instrument.
+
 ## F2-257 · Ten timeline registers recorded WHICH user acted and never WHAT they are called
 
 | Field | Content |

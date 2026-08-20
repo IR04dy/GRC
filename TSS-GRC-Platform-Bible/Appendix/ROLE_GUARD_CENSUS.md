@@ -23,8 +23,8 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 483 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **389** |
+| Guard sites with a role leg | 477 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **383** |
 | … composed (role leg ANDed onto a permission — already tight) | 94 |
 | Module packages holding pure role guards | 29 |
 | Distinct role names recited by any role guard | 38 |
@@ -33,10 +33,10 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
-| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **9** |
+| Pure guards **effectively PLATFORM_ADMIN-only — every other named role is HELD BY NOBODY** (F2-253) | **6** |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 389 |
-| … of those, reachable by a NON-administrator | 380 |
+| Pure guards reachable by at least one seeded user (⚠ **includes** the B2b rows — admin-only counts as reachable here) | 383 |
+| … of those, reachable by a NON-administrator | 377 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
@@ -75,9 +75,6 @@ each of these features was built for cannot use it, and nothing in the platform 
 
 | Module | Guard site | Roles named | Named but held by nobody |
 |---|---|---|---|
-| `module.ai` | `AiLifecycleController#transition` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
-| `module.ai` | `AiLifecycleController#transitionRec` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
-| `module.ai` | `AiLifecycleController#transitionRetraining` | `PLATFORM_ADMIN`, `CRO`, `CIO`, `DPO` | `CRO`, `CIO`, `DPO` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `BOARD_SECRETARY`, `PLATFORM_ADMIN` | `BOARD_SECRETARY` |
@@ -123,10 +120,10 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.cyber` | 31 |  |
 | `module.risk` | 28 |  |
 | `module.compliance` | 26 |  |
-| `module.ai` | 20 |  |
 | `module.outsourcing` | 17 |  |
 | `module.regreporting` | 17 |  |
 | `module.rrp` | 17 |  |
+| `module.ai` | 14 |  |
 | `module.dataclass` | 13 |  |
 | `module.workflow` | 11 |  |
 | `module.ccm` | 10 |  |

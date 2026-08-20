@@ -401,8 +401,17 @@ class RoleGuardConversionRatchetTest {
      * {@code board-approve} are distinct tiers of one BIA, and the four-eyes bar that would make one
      * shared permission safe needs an approver identity the table does not have (F2-152). Do not
      * "finish the sweep" without reading it.
+     *
+     * <p>⬜ <b>F2-258: 389 → 383.</b> {@code AiLifecycleController}'s three creates and three
+     * transitions moved to {@code hasPermission('AI','WRITE')}, so this figure falls by exactly six
+     * and the role-leg total by six (483 → 477). The number is re-derived from this build rather
+     * than subtracted from the line above, because a ceiling lowered by arithmetic is a ceiling
+     * nobody measured. The READ tier of that controller is deliberately still a role guard and
+     * {@code AiLifecycleGuardConversionTest} fails the build if somebody converts it: {@code AUDITOR}
+     * is named there, is held, and holds {@code AI:EXPORT} but not {@code AI:READ}, so the
+     * conversion that widens the write side would narrow the read side.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 389;
+    private static final int BASELINE_PURE_ROLE_SITES = 383;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -797,7 +806,10 @@ class RoleGuardConversionRatchetTest {
      * short — would be a permanently false leg in exactly the way a ghost role name was, so the
      * committee-type vocabulary is pinned there at a hard zero too.
      *
-     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 404: that many endpoints still
+     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 383 as this is written
+     * — it read "404" here for months while the constant said 389, which is the prose-versus-constant
+     * drift CLAUDE.md warns about, in the file that owns the constant. Read the field, not this
+     * sentence: that many endpoints still
      * authorise by role name with no permission leg, so F2-05's conversion backlog is untouched. This
      * number counts names that <em>cannot match</em>, not guards that should be permissions. Two names also
      * remain on the attachment surface ({@link RoleNameSurfaceRatchetTest}), both measured as extractor
