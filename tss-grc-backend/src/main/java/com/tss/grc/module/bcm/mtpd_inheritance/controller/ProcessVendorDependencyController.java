@@ -52,21 +52,32 @@ public class ProcessVendorDependencyController {
         return service.getDependency(id);
     }
 
+    // F2-254: was hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') and BCM_MANAGER is held by NO user
+    // in dev or prod - a role guard never reaches ModulePermissionEvaluator, so it never reaches
+    // the PLATFORM_ADMIN bypass either; this passed only because it happened to NAME the
+    // administrator. Audience diff measured first: both names hold BCM:WRITE, so nobody is dropped
+    // and GRC_ADMINISTRATOR + RISK_MANAGER are admitted. AUDITOR and VIEWER hold READ+EXPORT only.
+    // The READ guards here keep their role lists: CISO is named on them and holds only BCM:EXPORT.
     @PostMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public DependencyResponse create(@RequestBody @Valid DependencyCreateRequest req) {
         return service.createDependency(req);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public DependencyResponse update(@PathVariable Long id,
                                       @RequestBody @Valid DependencyUpdateRequest req) {
         return service.updateDependency(id, req);
     }
 
+    // F2-254: DELETE rather than WRITE, per this module's own convention (BcmController and
+    // CrisisCommsTemplateController both use hasPermission('BCM','DELETE') on delete verbs).
+    // It is also the narrower audience, so it cannot over-widen: RISK_MANAGER holds WRITE and
+    // not DELETE, and stays refused here - asserted, because collapsing the two would be the
+    // silent half of this conversion.
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.deleteDependency(id);
         return ResponseEntity.noContent().build();

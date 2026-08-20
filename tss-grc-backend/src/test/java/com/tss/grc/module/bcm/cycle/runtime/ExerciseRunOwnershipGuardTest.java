@@ -128,13 +128,29 @@ class ExerciseRunOwnershipGuardTest {
             Offenders: %s""".formatted(overreach)).isEmpty();
     }
 
+    /**
+     * An ownership check that REPLACED the oversight leg would read as a tightening and would lock the
+     * people accountable for an exercise out of it — F2-53's direction.
+     *
+     * <p><b>F2-254 — this leg's DETECTOR was {@code !guard.contains("hasAnyRole(")} while its CLAIM is
+     * that an oversight leg EXISTS.</b> Those are different assertions, and the difference surfaced the
+     * moment the oversight leg stopped being spelled with role names: {@code #dispatch},
+     * {@code #customInject} and {@code #transition} were
+     * {@code hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')},
+     * and {@code BCM_MANAGER} is held by <b>no user</b> in dev or prod — so the "oversight" the old
+     * detector was checking for admitted the platform administrator and nobody else, while
+     * {@code hasPermission('BCM','WRITE')} admits three live roles. The gate failed on the change that
+     * made its own claim <em>more</em> true. Keyed on the shape instead: an oversight leg is any
+     * {@code hasAnyRole(...)} or any <b>module-level</b> {@code hasPermission('MODULE','ACTION')}, which
+     * the 3-argument ownership form can never satisfy because its first argument is {@code #id} and not
+     * a quoted literal. Deleting the oversight leg entirely still fails, which is the claim.
+     */
     @Test
-    void everyOwnershipLegSitsBesideTheOversightRoles() {
-        // An ownership check that REPLACED the role list would read as a tightening and would lock the
-        // BCM manager, CISO and auditors out of an exercise they are accountable for — F2-53's direction.
+    void everyOwnershipLegSitsBesideAnOversightLeg() {
         List<String> lonely = new ArrayList<>();
         runtimeGuards().forEach((site, guard) -> {
-            if (guard.contains("EXERCISE_RUN") && !guard.contains("hasAnyRole(")) {
+            boolean oversight = guard.contains("hasAnyRole(") || MODULE_PERMISSION.matcher(guard).find();
+            if (guard.contains("EXERCISE_RUN") && !oversight) {
                 lonely.add(site + " -> " + guard);
             }
         });
@@ -142,4 +158,25 @@ class ExerciseRunOwnershipGuardTest {
             "the ownership leg is always an additional `or`, never a replacement. Offenders: %s", lonely)
             .isEmpty();
     }
+
+    /**
+     * The narrowing above is load-bearing: {@code MODULE_PERMISSION} must NOT match the ownership form,
+     * or every owner-only guard would certify itself as its own oversight. Asserted rather than assumed,
+     * because a pattern that matched both would make the leg above vacuous and still pass.
+     */
+    @Test
+    void theOversightPatternCannotBeSatisfiedByTheOwnershipLegItself() {
+        assertThat(MODULE_PERMISSION.matcher("hasPermission(#id, 'EXERCISE_RUN', 'OWNER')").find())
+            .as("the 3-arg ownership form must not read as a module-level permission").isFalse();
+        assertThat(MODULE_PERMISSION.matcher("hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')").find())
+            .as("nor the observer console's parameter spelling").isFalse();
+        assertThat(MODULE_PERMISSION.matcher("hasPermission('BCM','WRITE')").find())
+            .as("a module-level permission is oversight").isTrue();
+        assertThat(MODULE_PERMISSION.matcher("hasPermission('BCM', 'WRITE')").find())
+            .as("and so is the spaced spelling this codebase also uses").isTrue();
+    }
+
+    /** A module-level check: first argument is a quoted literal, never a {@code #param}. */
+    private static final java.util.regex.Pattern MODULE_PERMISSION =
+            java.util.regex.Pattern.compile("hasPermission\\(\\s*'");
 }

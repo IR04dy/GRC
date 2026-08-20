@@ -88,6 +88,31 @@ public class BiaQuantitativeController {
      * {@code boardMinutesRef} and <b>no approver at all</b>, while {@code cfoApprove} records a
      * caller-supplied {@code approverName}. Filed as F2-152 — a board approval with no signer, and a
      * CFO approval whose signer is whatever the request says.
+     *
+     * <h3>F2-254 — this guard is STILL administrator-only, and that is deliberate</h3>
+     * {@code EXECUTIVE_REVIEWER} is a row in {@code iam.roles} in both databases and is held by
+     * <b>no user</b> in either, so this expression admits {@code PLATFORM_ADMIN} and nobody else —
+     * which is the same outcome F2-52 was written to fix. Measured, not reasoned: the one live
+     * quantitative BIA in dev <em>and</em> prod is still parked at {@code CFO_APPROVED} with
+     * {@code board_approved_at} NULL, exactly where the paragraph above found it.
+     *
+     * <p>🔑 <b>The paragraph above chose this role because it "already holds {@code BCM:APPROVE}",
+     * which is a fact about GRANTS. Whether a guard admits anybody is a fact about
+     * {@code iam.user_roles}.</b> A role's grant list tells you what the platform trusts it with;
+     * only its holders tell you whether it is anybody. Three separate slices have now corrected a
+     * ghost inside one of these expressions and left a zero-holder role standing beside it — F2-52
+     * here and on {@code SubprocessorController}, and F2-161 on {@code ExerciseRuntimeController
+     * #start}, whose comment removed {@code FACILITATOR} for "admitting nobody" and kept
+     * {@code BCM_MANAGER}, which admits nobody.
+     *
+     * <p>⬜ <b>Not converted, because the blocker above is real and now measured.</b>
+     * {@code hasPermission('BCM','APPROVE')} would land {@code cfo-approve} and
+     * {@code board-approve} on one permission and let one principal take both tiers — and the
+     * four-eyes bar that would make that safe is <b>not buildable today</b>:
+     * {@code sys.columns} says {@code bcm.bia_quantitative} has {@code cfo_approver_name} (a
+     * caller-supplied string) and <b>no {@code board_approved_by} column at all</b>, so there is
+     * no identity for either tier to compare. Fixing F2-152 is the prerequisite, and choosing who
+     * holds a financial versus a board approval is an owner decision plus a migration. Filed.
      */
     private static final String BOARD_APPROVE_GUARD =
             "hasAnyRole('EXECUTIVE_REVIEWER','PLATFORM_ADMIN')";
@@ -136,6 +161,11 @@ public class BiaQuantitativeController {
     }
 
     @PostMapping("/{externalId}/cfo-approve")
+    // F2-254: STILL administrator-only and deliberately so - CFO is held by no user in either
+    // database, and it holds only BCM:EXPORT, so it is not even a role the platform trusts with
+    // a BCM approval. See BOARD_APPROVE_GUARD above: converting both tiers onto BCM:APPROVE
+    // collapses a three-stage escalation, and the bar that would replace it needs an approver
+    // identity this table does not have. Filed, not swept.
     @PreAuthorize("hasAnyRole('CFO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse cfoApprove(@PathVariable UUID externalId,
                                               @RequestBody @Valid CfoApprovalRequest req) {
@@ -149,8 +179,15 @@ public class BiaQuantitativeController {
         return service.boardApprove(externalId, req.minutesRef());
     }
 
+    // F2-254: was hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') and BCM_MANAGER is held by NO user
+    // in dev or prod, so this admitted the platform administrator and nobody else. Audience diff
+    // measured before converting (the V362 landmine): both names hold BCM:DELETE, so nobody is
+    // dropped and GRC_ADMINISTRATOR is admitted. AUDITOR and VIEWER hold BCM:READ+EXPORT and NOT
+    // DELETE, and RISK_MANAGER holds WRITE and not DELETE - probed, so no reader-only role and no
+    // write-only role slips in. The READ guards on this controller keep their role lists: CISO is
+    // named there and holds only BCM:EXPORT, so converting them would drop a live role.
     @DeleteMapping("/{externalId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','DELETE')")
     public ResponseEntity<BiaQuantitativeResponse> archive(@PathVariable UUID externalId) {
         return ResponseEntity.ok(service.archive(externalId));
     }

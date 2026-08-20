@@ -382,8 +382,27 @@ class RoleGuardConversionRatchetTest {
      * the administrator. Measured 2026-08-20: <b>24 pure guards</b> across {@code bcm} (10),
      * {@code privacy} (7), {@code ai} (3), {@code audit_committee} (3) and {@code rrp} (1) admit nobody
      * but a platform administrator, identically in dev and prod. The script now prints them as B2b.
+     *
+     * <p><b>397 → 389 (F2-254), also a conversion — the {@code bcm} block of that B2b list.</b> Eight
+     * pure guards on six controllers ({@code BcpBinderController#archive},
+     * {@code BiaQuantitativeController#archive}, {@code ExerciseRuntimeController#start},
+     * {@code ExerciseScenarioLibraryController#instantiate}, {@code MtpdInheritanceController#publish},
+     * {@code ProcessVendorDependencyController#create}/{@code #update}/{@code #delete}) were
+     * {@code hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')} with {@code BCM_MANAGER} held by no user in
+     * either database. Probed live as {@code compliance}: all eight answered <b>403</b> while
+     * {@code admin} reached the handler. They are now {@code hasPermission('BCM','WRITE')} or
+     * {@code ...'DELETE'} per this module's own convention. Three more — the composed siblings on
+     * {@code ExerciseRuntimeController} — had the same dead role leg ORed with F2-161's ownership
+     * clause; converting the role leg took the total role-leg count 496 → 485 while this figure moved
+     * by the eight pure ones, which is why both numbers are asserted rather than one.
+     *
+     * <p>⬜ <b>Two of the ten are deliberately NOT converted and the javadoc on
+     * {@code BiaQuantitativeController.BOARD_APPROVE_GUARD} says why</b> — {@code cfo-approve} and
+     * {@code board-approve} are distinct tiers of one BIA, and the four-eyes bar that would make one
+     * shared permission safe needs an approver identity the table does not have (F2-152). Do not
+     * "finish the sweep" without reading it.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 397;
+    private static final int BASELINE_PURE_ROLE_SITES = 389;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
