@@ -246,10 +246,35 @@ class ChangeConditionRegisterTest {
         int sod = src.indexOf("private void assertNotSelfWaiver");
         String sodBody = src.substring(sod, src.indexOf("\n    }", sod));
         assertThat(sodBody)
-            .as("DF-4/F2-24: resolve on the user id first, falling back to the name only for legacy "
-              + "rows — a name-only comparison is what let a requester approve their own change")
-            .contains("getRequestedById")
-            .contains("getChangeOwnerId");
+            .as("DF-4/F2-24: the refusal must go through ChangeSoD, which resolves on the user id "
+              + "where the party has one and on the name where it does not")
+            .contains("ChangeSoD.compareAny")
+            .contains("selfReviewBars(c)");
+
+        // ⚠ F2-251 — this leg used to assert `getRequestedById` / `getChangeOwnerId` inside
+        // assertNotSelfWaiver's own body. The refactor that fixed the two gates which were NOT using
+        // ChangeSoD moved those reads into one shared `selfReviewBars`, so the assertion has to
+        // FOLLOW THE DELEGATION rather than be relaxed — relaxing it always passes (F2-206/F2-231),
+        // and a name-keyed lookup pointed at the caller reads a CALL for a DECLARATION (F2-244).
+        int bars = src.indexOf("private static List<ChangeSoD.Party> selfReviewBars");
+        assertThat(bars).as("selfReviewBars must exist for the delegation to be followable")
+            .isGreaterThan(0);
+        String barsBody = src.substring(bars, src.indexOf("\n    }", bars));
+        assertThat(barsBody).contains("getRequestedById").contains("getChangeOwnerId")
+            .contains("getRequestedByName").contains("getChangeOwnerName");
+
+        // The load-bearing claim, and the one this slice exists for: ONE PARTY PER BAR. A merged
+        // `Party(id, label)` re-engages ChangeSoD's rule 1 and silently retires the name comparison
+        // for a party whose id is present — which is how capturing requested_by_id switched the
+        // OWNER's bar off in the two hand-written copies of this comparison.
+        assertThat(barsBody)
+            .as("a merged Party(id, label) retires the name bar — ChangeSoD.compareAny's javadoc "
+              + "says never to build one, and every caller in this module was building one")
+            .doesNotContain("getRequestedById(), c.getRequestedByName()")
+            .doesNotContain("getChangeOwnerId(), c.getChangeOwnerName()");
+        assertThat(barsBody.split("new ChangeSoD\\.Party\\(", -1).length - 1)
+            .as("four parties: an id bar and a name bar for each of the two people")
+            .isEqualTo(4);
     }
 
     // ── The schema's own guarantees ─────────────────────────────────────────────────────────────

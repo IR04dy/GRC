@@ -350,6 +350,50 @@ class ParentIdentityCopyContractTest {
             // name. Two symptoms, and which one you get depends on where the label came from:
             // caller free text (ethics) stored a CLAIM, the acting principal (bcm) stored an
             // honest string nothing could join. Both are the absence of the resolvable half.
+            // ⚠ F2-251 — a THIRD kind of member, and the census's own framing is what disguised it.
+            // This census is "a parent id AND A COPY OF THAT PARENT'S IDENTITY", and on these two
+            // pairs the label is NOT a copy: measured 2026-08-20, identical in dev and prod, 0 of 34
+            // requester/owner labels resolve to any platform user — they are offices and teams
+            // ('CIO Office', 'Head of IAM', 'Chief People Officer'). create()'s CE-15 comment says so
+            // outright: the id is who keyed the change in, the name is "whatever the tenant typed,
+            // since a team ('CloudOps') is a legitimate thing to record as the requesting party".
+            // So deriving one from the other would DESTROY information, and the defect was in the
+            // READERS: three of the module's five self-review refusals treated "this party has an id"
+            // as "the other party's label is irrelevant".
+            Map.entry(
+            "change_mgmt.change_requests :: requested_by_id + requested_by_name",
+            "CLOSED by F2-251 (BY DESIGN as a pair, defect in the readers) — the two halves are two "
+          + "different facts and may legitimately name different parties, which is exactly why BOTH "
+          + "have to be compared. selfReviewBars now builds one Party PER BAR (an id bar and a name "
+          + "bar per person), so no bar can be switched off by another party carrying an id. Nothing "
+          + "derives either half and the PUT may still store a label that differs from the stamped "
+          + "id, verified live and asserted in both probe modes."),
+            Map.entry(
+            "change_mgmt.change_requests :: change_owner_id + change_owner_name",
+            "CLOSED by F2-251 (reader fixed; the missing id filed) — change_owner_id has NO WRITER "
+          + "anywhere in the platform, NULL on 17 of 17 live changes in both databases, so the owner "
+          + "is nameable only by label. Two gates keyed their name fallback on something other than "
+          + "the party (the CAB vote on BOTH ids being null, the ratification on the ACTOR having no "
+          + "id), so once CE-15 began stamping requested_by_id the owner's only bar was dead: probed "
+          + "live, the owner cast a CAB vote on their own change at 201 and ratified their own "
+          + "emergency change at 200. Per-bar comparison closes both; giving the id a writer is an "
+          + "owner decision, since the labels are offices and no user-listing endpoint is reachable "
+          + "by CHANGE:WRITE."),
+            // Bookkeeping F2-250 filed: both were closed by F2-248, which adjudicated a different
+            // instrument (MassAssignmentRatchetTest) and so never touched this census. A member
+            // listed as unread that HAS been read is indistinguishable from one nobody looked at.
+            Map.entry(
+            "change_mgmt.change_comments :: author_id + author_name",
+            "CLOSED by F2-248 — addComment binds ChangeCommentRequest(body) instead of the entity, so "
+          + "the actor fields are ABSENT from the wire rather than validated, and the service stamps "
+          + "both halves from ChangeSoD.actor(). Recorded here by F2-251 because F2-248 adjudicated "
+          + "MassAssignmentRatchetTest and this census still read NEEDS-READING for it."),
+            Map.entry(
+            "ethics.case_actions :: actor_id + actor_name",
+            "CLOSED by F2-248 — CaseActionRequest replaced the entity binding and EthicsCaseService "
+          + "stamps both halves from CurrentActor.requireUsername/requireUserId, refusing rather than "
+          + "recording a blank. Recorded here by F2-251 for the same bookkeeping reason as the "
+          + "change-comment pair above."),
             Map.entry(
             "ethics.aml_alerts :: subject_id + subject_name",
             "CLOSED by F2-250 — the alert's SUBJECT, the pair this register declares beside the one "
