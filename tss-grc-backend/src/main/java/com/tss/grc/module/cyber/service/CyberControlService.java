@@ -24,6 +24,7 @@ import java.util.List;
 public class CyberControlService {
 
     private final CyberControlRepository controlRepo;
+    private final CyberFrameworkReferenceResolver frameworks;
 
     // PERF-PG-004: hard cap for the unpaginated "/all" dropdown dumps.
     private static final int DROPDOWN_CAP = 500;
@@ -54,7 +55,79 @@ public class CyberControlService {
         c.setId(null);
         c.setOrganisationId(orgId);
         c.setIsDeleted(false);
+        // F2-252 — resolve the framework reference and DERIVE its label. The tenant comes from the
+        // caller's argument, never from `c` (which is only stamped one line above; F2-246 shipped
+        // that bug and every linked create 404'd).
+        applyFrameworkReference(c, c, orgId, true);
         return controlRepo.save(c);
+    }
+
+    /**
+     * F2-252 — the single writer of the {@code (framework_id, framework_name)} pair.
+     *
+     * <h2>The rule</h2>
+     * {@code framework_name} is <b>derived</b> whenever {@code framework_id} resolves. It is the
+     * caller's own string only when there is no id — a bare label stays legal, because the schema
+     * says so (both columns nullable) and live rows are made that way, so requiring an id would
+     * refuse requests that work today (F2-182).
+     *
+     * <h2>⚠ Why an omitted id on UPDATE must not clear the column</h2>
+     * The route binds the ENTITY, so Jackson cannot tell {@code "frameworkId": null} from an absent
+     * key. {@code applyEditable} wrote the field unconditionally, and {@code CyberPage}'s payload
+     * builders — {@code CONTROL_EMPTY} and {@code controlToReq} — carry {@code frameworkName} and
+     * <b>no {@code frameworkId}</b>. So editing any control through the platform's own screen NULLED
+     * its framework link at HTTP 200, on a column populated on <b>75 of 75</b> live rows in dev and
+     * prod, while leaving the label standing — so the row still <em>read</em> correctly on the
+     * register and only a join could tell. F2-212's headline: a wire-contract gate proves the types
+     * agree and cannot prove the payload builder sends what the type permits, and on a full-replace
+     * verb that gap is silent data destruction.
+     *
+     * <h2>⚠ Why a label CHANGE on a linked row is refused rather than honoured</h2>
+     * Relinking by name would need a name→framework lookup, and this pair's whole hazard is that
+     * two registers share an id space and near-identical names ("NCA ECC" here, "NCA Essential
+     * Cybersecurity Controls" there). A caller that wants a different framework sends its id. An
+     * ECHO of the stored label is accepted, so a form that round-trips the row keeps working
+     * (F2-231/F2-234).
+     */
+    private void applyFrameworkReference(CyberControl target, CyberControl req, Long orgId,
+                                         boolean isCreate) {
+        Long sentId = req.getFrameworkId();
+        String sentName = trimToNull(req.getFrameworkName());
+
+        if (sentId != null) {
+            var f = frameworks.require(sentId, orgId);
+            if (sentName != null && !sentName.equalsIgnoreCase(f.getName()))
+                throw new IllegalArgumentException(
+                    "frameworkName '" + sentName + "' does not name framework " + sentId
+                        + " ('" + f.getName() + "') — the label is derived from the framework, so "
+                        + "send the id alone, or send the framework's real name");
+            target.setFrameworkId(f.getId());
+            target.setFrameworkName(f.getName());
+            return;
+        }
+
+        Long storedId = isCreate ? null : target.getFrameworkId();
+        if (storedId == null) {
+            // Unlinked: the label is the caller's to state, and to clear.
+            target.setFrameworkId(null);
+            target.setFrameworkName(sentName);
+            return;
+        }
+
+        // Linked, and the caller named no id. Keep BOTH halves — see the javadoc above.
+        String derived = frameworks.labelFor(storedId, orgId);
+        String current = derived != null ? derived : target.getFrameworkName();
+        if (sentName != null && !sentName.equalsIgnoreCase(trimToNull(current) == null ? "" : current))
+            throw new IllegalArgumentException(
+                "frameworkName '" + sentName + "' contradicts this control's linked framework "
+                    + storedId + " ('" + current + "') — send frameworkId to change the link");
+        target.setFrameworkName(current);
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 
     @Transactional
@@ -70,8 +143,10 @@ public class CyberControlService {
      * out why four siblings are one shape and this one another.
      */
     private void applyEditable(CyberControl existing, CyberControl req) {
-        existing.setFrameworkId(req.getFrameworkId());
-        existing.setFrameworkName(req.getFrameworkName());
+        // ⚠ F2-252 — frameworkId/frameworkName are NOT copied here. They are the one pair on this
+        // entity where an omitted key must mean "leave the link alone" rather than "clear it", so
+        // they go through applyFrameworkReference, which is their single writer. Copying them here
+        // is how editing a control's title nulled its framework_id on 75 of 75 live rows.
         existing.setDomain(req.getDomain());
         existing.setControlNumber(req.getControlNumber());
         existing.setTitleEn(req.getTitleEn());
@@ -83,6 +158,10 @@ public class CyberControlService {
         existing.setMaturityLevel(req.getMaturityLevel());
         existing.setImplementationStatus(req.getImplementationStatus());
         existing.setStatus(req.getStatus());
+        // Last, so it reads the row's own stored link rather than a half-applied one. The tenant is
+        // the LOADED row's here — not the caller's claim — which is what makes it safe on this path
+        // (contrast saveControl, where the row has only just been stamped; see F2-246).
+        applyFrameworkReference(existing, req, existing.getOrganisationId(), false);
     }
 
     public CyberControl updateControl(Long id, CyberControl req) {
