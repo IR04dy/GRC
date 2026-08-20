@@ -1872,6 +1872,104 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A FILING THAT NAMES ITS MEMBERS BY MODULE INHERITS THE MODULE LIST OF THE SLICE THAT FILED
+  IT, AND A MODULE CAN HOST A DIFFERENT QUESTION'S EXTRACTOR** (F2-262, measured 2026-08-21).
+  Executing F2-260's filed *"shared role-name extractor: 5 hand-rolled copies, 3 already bitten"*,
+  the re-derivation (F2-221) refuted the membership before any code was read. The three modules it
+  named — `sharia`, `openbanking`, `cpty` — hold `hasPermission('MODULE','ACTION')` **pair**
+  extractors, a different question, so **they were never members of this population**; and the one
+  copy that still carried the defect (`CrisisRoomGuardTest`) **was not in the list at all**.
+  Re-derived: **9 members, 3 mechanisms, 6 spellings, 5 slices already bitten** — F2-145(e) twice
+  (`sharia`, `openbanking`), then F2-254, F2-259, F2-260, **one per converting slice**. 🔑 **Three
+  of five named members wrong, against this programme's usual ~2-in-10 — and every error was in the
+  reassuring direction: two modules recorded as already fixed and one as latent, none of which was
+  ever in the population.**
+  ⚠⚠ **THE RULE THIS SLICE IMPLEMENTS WAS ALREADY WRITTEN DOWN IN THE TREE, IN THE FILE THAT COINED
+  IT.** `ObLifecycleTest`'s javadoc, explaining why its own conversion produced a legible failure,
+  says *"a regex that matches nothing satisfies every downstream assertion forever, so the
+  anti-vacuity check belongs in the **helper**, where every caller inherits it."* Correct, and for
+  four more slices there was no helper for it to belong to. F2-195's shape: the codebase can hold
+  the correct rule, in prose, beside the place it was not applied.
+  ⚠⚠ **ONE DEFECT, THREE MECHANISMS, AND THE THIRD FAILS IN THE OPPOSITE DIRECTION FROM THE OTHER
+  TWO.** Mechanisms 1 and 2 (reflective and source-text quoted-token scans) report `MODULE` and
+  `ACTION` as **ghost roles** on a converted guard — the false-accusation shape F2-254, F2-259 and
+  F2-260 each repaired. Mechanism 3 (`DataclassLifecycleTest`, `OutsourcingLifecycleTest`) asserts
+  `m.find()` on a pattern that requires the initialiser to **BE** a `hasAnyRole` string, so a
+  conversion **hard-fails the build** with *"guard constant READ must be a hasAnyRole string"*.
+  🔑 **Both are a gate failing on correct code (F2-214); only one looks like a bug report.** And it
+  was not hypothetical: `DATACLASS` and `OUTSOURCING` are two of the four modules F2-257 filed as
+  having no catalogued permissions, **i.e. two of the next conversions in this programme's own
+  backlog. The fourth failure was scheduled, not possible.**
+  ⚠ **Six spellings, each narrower than the widest on at least one axis, every divergence LATENT
+  today** — measured against **1,721** guard expressions in `src/main`: no whitespace tolerance (0
+  sites write `hasAnyRole (`); `hasAnyRole\(` only, blind to the singular `hasRole(` (**67** sites,
+  0 in that copy's own subject); inner `'([A-Z_]+)'`, blind to a name with a digit (all **38**
+  recited names are upper snake case); no `hasAuthority('ROLE_X')` handling (**2** authority sites,
+  **0** naming a role); no scoping at all (**1,392** guards contain a `hasPermission(`); and no
+  comment stripping. 🔑 **What made them harmless was nine independent regexes happening to agree,
+  and nobody was maintaining that** (F2-177). The helper takes the **widest correct** reading of
+  every axis, so consolidating can only ever *add* a name — which is why the verification is that
+  `RoleGuardConversionRatchetTest`'s published census does not move: **363 pure role sites and 38
+  role names, identical before and after. A helper that changed them would be changing findings
+  rather than sharing code.**
+  ⚠⚠ **THE HARD ZERO CANNOT SEE THE ONE MEMBER THAT STILL HAD THE LIVE DEFECT, AND SAYING SO IS THE
+  POINT.** The ban is on *hand-rolled role-call regexes*; run against master it finds **8** of the
+  **9**. `CrisisRoomGuardTest` is invisible to it **by construction** — it had no scoping at all, so
+  there was no role-call regex to ban — and it was precisely the copy that would have reported `BCM`
+  and `READ` as ghost roles the moment anybody converted `CRISIS_ROOM_GUARD`, a conversion its own
+  fourth test is written to adjudicate. 🔑 **A ban on hand-rolled extractors cannot see the copy
+  that never wrote one.** The complement is `everyFormerCopyCallsTheHelper`, which names all nine;
+  neither leg is sufficient and the pair is the contract, because a hard zero over a population the
+  instrument cannot see is the most reassuring possible artefact (F2-205).
+  ⚠⚠ **MY OWN GATE REFUTED MY OWN CENSUS ON ITS FIRST RUN, THREE WAYS, AND ALL THREE WERE THE
+  INSTRUMENT.** (a) It found a **ninth** member, `DataOfficerLifecycleTest`, after my hand-written
+  scan had settled on eight — 🔑 **a detector scoped to the shapes you have already seen returns a
+  SMALLER population, which reads exactly like a complete sweep** (F2-198). (b) The reverse
+  exclusion leg reported my own gate file as *not* declaring a role-call regex, i.e. an exclusion
+  for something never in the population — F2-199's rule, and the direction nobody writes first.
+  (c) The detector could not see mechanism 3 at all, because it read only the **first** string
+  literal after `Pattern.compile(`.
+  ⚠⚠ **THAT THIRD ONE IS THE REUSABLE INSTRUMENT BUG: A CONCATENATED REGEX DEFEATS A DETECTOR
+  ANCHORED ON THE FIRST LITERAL, AND THE TWO COPIES OF ONE MECHANISM DIFFER IN WHETHER IT BITES.**
+  `Outsourcing` interpolates its constant **second** (`compile(constant + "…hasAnyRole…")`), so its
+  first literal already carries the token; `Dataclass` interpolates it **third**
+  (`compile("String " + constant + "…hasAnyRole…")`), so its first literal is just `"String "`. A
+  first-literal detector therefore finds one twin and misses the other — **1 of 2, measured** —
+  reporting a smaller population, which reads exactly like a partial sweep. Concatenate **every**
+  literal in the statement. ⚠ Bound the window to the enclosing statement, **not** a paren-balanced
+  walk: a Java regex literal contains real `(` and `)` characters, so counting parens over raw
+  source miscounts. Overshooting over-reports, which fails loudly — the safe direction.
+  ⚠⚠ **AND THE DISCRIMINATOR IS `has` **AND** `Role`, NEVER `Role` ALONE — BECAUSE THIS PLATFORM HAS
+  TWO ROLE-NAME SURFACES AND THE OTHER ONE IS THE ONE NO `@PreAuthorize` SCAN SEES.** My first draft
+  keyed on the token `Role` and fired on `RoleNameSurfaceRatchetTest`, whose
+  `ParentGuard\.(?:roles|permOrRoles)\s*\(` contains `Roles` — that is `AttachmentAccessPolicy`'s
+  **Java role lists**, the second surface whose drift F2-52 and F2-177 each had to find by hand. It
+  asks a different question about a different artefact and keeps its own extractor. 🔑 **A detector
+  keyed on a token cannot tell one surface from the other, and the surface it would have swallowed
+  is the one the register warns is invisible to every guard scan.**
+  ⚙ **The primitive is `com.tss.grc.support.GuardExpressions`** — `rolesRecitedBy` /
+  `rawAuthoritiesIn` / `hasRoleLeg` / `isPureRoleGuard` / `guardConstant` /
+  `rolesRecitedByConstant` / `stripComments`. `hasRoleLeg` exists so a caller that only needs to
+  **classify** a guard never has to declare its own regex, which is what makes the hard zero
+  exemption-free: there is always a correct alternative, so it cannot fail on correct code.
+  ⚠ **A `hasPermission('MODULE','ACTION')` pair extractor is deliberately NOT in it.** Seven test
+  classes hand-roll one and it answers a different question; shipping an unused method would be an
+  inert construct answering the question a reader was about to ask (F2-184), and an unused helper
+  should not ship (F2-201). Filed as the same argument, one slice over.
+  ⚠ **Two source-text properties every caller now inherits, which between zero and one of the four
+  copies had:** an absent constant **throws** rather than returning empty, and the extraction is
+  **tolerant** of what the initialiser contains. And comment stripping — the hazard is live in this
+  tree, since `RrpController`'s javadoc says *"`APPROVE_GUARD` was `hasAnyRole('PLATFORM_ADMIN',
+  'CRO','CFO')`"*, one rewording away from a scan reading the retired guard as the live one
+  (F2-193's epitaph-as-corpse). One of the four stripped comments, **inline at a single call site**,
+  which is the divergence rather than the fix.
+  ⚠ **`mvn` is a `.cmd` shim on Windows: `subprocess` with `shell=False` cannot resolve it and dies
+  with `WinError 2`.** `shell=True` is worse — that is cmd.exe, where a bash-style `VAR=x mvn`
+  prefix is a syntax error and the run prints **nothing at all** (recorded). Resolve the launcher
+  path and pass the environment as a parameter.
+  ⚠ **And the empty-heredoc landmine fired again, on a `python - <<'X'` with nothing in it**: it
+  hung the shell for the full 120-second timeout and swallowed the command chained behind it. It is
+  recorded in this file and I did it anyway. **Use the Write/Edit tools.**
 - ⚠⚠ **THE ATTRIBUTION QUALITY DECREASED AS THE AUTHORITY INCREASED, AND THE TIER WITH NONE WAS
   THE BOARD SIGN-OFF** (F2-261, measured 2026-08-21). Executing F2-260's filing of §B2b's last two
   rows, re-derived first (F2-221). One ladder, three stages, three different mechanisms:

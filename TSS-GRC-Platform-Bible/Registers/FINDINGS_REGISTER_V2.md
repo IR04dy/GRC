@@ -2547,6 +2547,130 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-262 · A filing that names its members by module inherits that slice's module list
+
+| Field | Value |
+|---|---|
+| **Severity** | P3 — instrument consolidation closing three latent gate defects, two of them queued behind the next two conversions in this programme's own backlog |
+| **Status** | ✔ **CLOSED 2026-08-21** (`8dd0bf73` + `DOCSHA`) |
+| **Area** | test instruments · `src/test/java/com/tss/grc/support/GuardExpressions` · nine former copies across `security`, `module.bcm`, `module.audit_committee`, `module.rrp`, `module.dataclass`, `module.outsourcing`, `module.data_officer` |
+| **Discovered by** | Executing [[F2-260]]'s filed *"shared role-name extractor"*, re-derived first ([[F2-221]]) |
+
+### What was filed, and what was true
+
+[[F2-260]] filed: *"**5** hand-rolled copies across the test tree — `sharia` and `openbanking` were
+quietly updated when F2-145(e) converted them, and `cpty` is still latent."*
+
+Re-derived before a line was read:
+
+| | filed | measured |
+|---|---|---|
+| members | 5 | **9** |
+| mechanisms | 1 (implied) | **3** |
+| spellings | 1 (implied) | **6** |
+| slices already bitten | 3 | **5** |
+| named members that were real | — | **2 of 5** |
+
+🔑 **The three modules it named hold `hasPermission('MODULE','ACTION')` *pair* extractors — a
+different question — so they were never members of this population; and the one copy that still
+carried the defect (`CrisisRoomGuardTest`) was not in the list at all.** Every error ran in the
+reassuring direction: two recorded as already fixed, one as latent, none ever in scope.
+**A filing that names its members by MODULE inherits the module list of the slice that filed it.**
+
+### One defect, three mechanisms, failing in opposite directions
+
+| | mechanism | on a converted guard |
+|---|---|---|
+| 1 | reflective quoted-token scan, scoped | reports `MODULE`/`ACTION` as **ghost roles** |
+| 2 | source-text quoted-token scan, scoped | same |
+| 3 | source-text, requires the initialiser to **BE** a `hasAnyRole` string, splits on comma | **hard-fails the build**: *"guard constant READ must be a hasAnyRole string"* |
+
+Both are a gate failing on correct code ([[F2-214]]); **only one looks like a bug report.** And
+mechanism 3's two copies are `DataclassLifecycleTest` and `OutsourcingLifecycleTest` — `DATACLASS`
+and `OUTSOURCING` being two of the four modules [[F2-257]] filed as having no catalogued
+permissions, **i.e. the next two conversions in this programme's own backlog. The fourth failure
+was scheduled, not possible.**
+
+### Six spellings, every divergence latent, measured against 1,721 guard expressions
+
+| axis | narrowest spelling could not see | live sites |
+|---|---|---|
+| whitespace before the paren | `hasAnyRole (` | **0** |
+| singular form | `hasRole(` | **67** (0 in that copy's own subject) |
+| inner token `'([A-Z_]+)'` | a name with a digit | **0** of 38 recited names |
+| `hasAuthority('ROLE_X')` | a role said longhand | **2** authority sites, **0** naming a role |
+| no scoping at all | every `hasPermission(` argument | **1,392** guards |
+| no comment stripping | a javadoc quoting a retired guard | live shape in `RrpController` |
+
+🔑 **What made them harmless was nine independent regexes happening to agree, and nobody was
+maintaining that** ([[F2-177]]). The helper takes the **widest correct** reading of every axis, so
+consolidating can only ever *add* a name — which is why the verification is that
+`RoleGuardConversionRatchetTest`'s census does not move: **363 pure role sites and 38 role names,
+identical before and after.** A helper that changed them would be changing findings, not sharing code.
+
+### The rule was already written down, in the file that coined it
+
+`ObLifecycleTest`'s javadoc, explaining why its own conversion produced a legible failure:
+
+> *"a regex that matches nothing satisfies every downstream assertion forever, so the anti-vacuity
+> check belongs in the **helper**, where every caller inherits it."*
+
+Correct, and for four more slices there was no helper for it to belong to — [[F2-195]]'s shape.
+
+### The hard zero cannot see the member that had the live defect
+
+The ban is on *hand-rolled role-call regexes*; run against master it finds **8** of the **9**.
+`CrisisRoomGuardTest` is invisible to it **by construction** (no scoping ⇒ no regex to ban) and was
+precisely the copy that would have reported `BCM` and `READ` as ghost roles on the conversion its own
+fourth test is written to adjudicate. 🔑 **A ban on hand-rolled extractors cannot see the copy that
+never wrote one.** The complement, `everyFormerCopyCallsTheHelper`, names all nine; the pair is the
+contract, because a hard zero over a population the instrument cannot see is the most reassuring
+possible artefact ([[F2-205]]).
+
+### My own gate refuted my own census, three ways, on its first run
+
+1. It found a **ninth** member (`DataOfficerLifecycleTest`) — **a detector scoped to the shapes you
+   have already seen returns a SMALLER population, which reads exactly like a complete sweep**
+   ([[F2-198]]).
+2. The reverse exclusion leg reported my own gate file as *not* declaring a role-call regex — an
+   exclusion for something never in the population ([[F2-199]]), the direction nobody writes first.
+3. The detector could not see mechanism 3 at all: it read only the **first** string literal after
+   `Pattern.compile(`.
+
+⚠⚠ **(3) is the reusable instrument bug.** `Outsourcing` interpolates its constant **second**, so its
+first literal already carries the token; `Dataclass` interpolates it **third**, so its first literal
+is `"String "`. A first-literal detector finds one twin and misses the other — **1 of 2, measured**.
+Concatenate every literal in the statement, and bound the window to the enclosing statement rather
+than paren-balancing (a Java regex literal contains real parens).
+
+⚠⚠ **And the discriminator is `has` AND `Role`, never `Role` alone.** Keyed on the token alone it
+fired on `RoleNameSurfaceRatchetTest`, whose `ParentGuard\.(?:roles|permOrRoles)\s*\(` contains
+`Roles` — `AttachmentAccessPolicy`'s **Java** role lists, the second surface whose drift [[F2-52]] and
+[[F2-177]] each had to find by hand, and the one CLAUDE.md warns no `@PreAuthorize` scan sees. It
+asks a different question and keeps its own extractor.
+
+### Verification
+
+- **Pre-fix control** against `git show master:` — **6 of 6 legs discriminate**, including that the
+  bare copy's `namesIn("hasPermission('BCM','READ')")` returned `[BCM, READ]`.
+- **Census unmoved**: 363 / 38 / 457 / 94 / 28, identical before and after.
+- **Mutation harness**: see the plan entry.
+- **No live probe, and that is stated rather than skipped**: this slice changes **no main source and
+  no runtime behaviour** — nine test classes and one new test-support class. House rule 4's live
+  probe has nothing to observe; the pre-fix control is what stands in its place.
+
+### Filed
+
+- **The `hasPermission('MODULE','ACTION')` pair extractor: 7 hand-rolled copies** in at least two
+  spellings (`'([A-Z_]+)'` vs `'([^']*)'`). Same argument, one slice over. Deliberately **not**
+  shipped as an unused method on the helper ([[F2-184]], [[F2-201]]).
+- **Two test-support packages for one purpose** — `com.tss.grc.support` (`MigrationVocabularies`,
+  `GuardExpressions`) and `com.tss.grc.testsupport` (`StateMachineContract`). [[F2-190]]'s shape one
+  level up; consolidating them is a rename across the test tree.
+- **`sharia` and `openbanking` no longer ask the role question at all** — both replaced their role
+  extractor with a permission extractor when their module converted. Legitimate per module, and it
+  means the ghost-role check silently left those two modules when they were converted.
+
 ## F2-261 · The attribution quality decreased as the authority increased
 
 | Field | Content |
