@@ -1958,6 +1958,31 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   the copy is made **checkable** instead. ⚠ If you reword that line, fix the pattern — do not
   delete the assertion, because an unparsed line reports a clean tree (F2-69), and that is precisely
   how it went 54 behind.
+  ⚠⚠ **A `spring-boot:run` DEV BACKEND DID NOT DIE WHEN THE SUITE REWROTE `target/classes` UNDER
+  IT — IT WENT RUNAWAY, AND THE SYMPTOM PRESENTED AS *"the test suite is hung"*.** The recorded
+  landmine above says `mvn clean` kills a running dev backend and still reports `BUILD SUCCESS`.
+  This is its third mode: DevTools entered a **restart loop leaking threads**, measured at **2,267%
+  of one core — 22.7 of 24 logical processors — with the thread count GROWING 175 → 214 over two
+  minutes**, which starved the suite so a normally ~11-minute run passed 32 minutes with no output.
+  🔑 **It answered `/actuator/health` 200 throughout, so a health check cannot distinguish a
+  working app from one consuming 90% of the machine.** The signature to look for is not latency but
+  a **growing thread count at saturated CPU**; a healthy dev backend on this box is **12% of one
+  core / 98 threads** (measured on the replacement immediately after). Kill it and relaunch — with
+  its own `-Djava.io.tmpdir`, per the ownership landmine above.
+  ⚠⚠ **AND THE PORT CHECK LIED IN THE OPPOSITE DIRECTION FROM THE RECORDED ONE.** F2-203/F2-252
+  record that `netstat` shows LISTENING through a window where every request is refused. Here
+  `Get-NetTCPConnection -LocalPort 8084 -State Listen` returned **nothing** while the app was mid
+  restart — and I wrote *"it is no longer listening"* out loud before a guard 40 seconds later
+  found it serving 8084. 🔑 **A not-listening reading is not proof the app is down when
+  DevTools is cycling, just as a listening reading is not proof it is up.** Neither direction of a
+  port check is evidence; only a request is.
+  ⚙ **Three of my own kill-guards fired and every one was right to.** *"Still listening on
+  35729"* — the DevTools **LiveReload** port, not the API, so the guard's claim needed narrowing to
+  the shape it meant. *"Serving 8084"* — which is what a dev backend DOES, so that refusal was the
+  guard asking the wrong question. The question worth guarding is **"is this the prod jar or somebody
+  else's process?"**: match the session id in `-Djava.io.tmpdir` (F2-216's rule — identify a
+  process by its ARGUMENTS, never a log timestamp) and refuse on ports **8090/8091**. The prod jar
+  was verified up before and after.
   ⚙ **Filed:** the **93**-site census in `target/caller-named-references.txt` as a work list with no
   verdicts — sharpest unread members are kind 3 (`subprocessorCode`, PDPL Art. 30; `kriCode`;
   `bowtieCode`; `arrangementCode`, SAMA outsourcing; `noticeCode`). Also
