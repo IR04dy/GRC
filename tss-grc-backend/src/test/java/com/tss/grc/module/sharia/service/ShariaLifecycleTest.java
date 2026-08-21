@@ -39,6 +39,7 @@ import com.tss.grc.module.sharia.repository.ShariaNonComplianceEventRepository;
 import com.tss.grc.module.sharia.repository.ShariaProductApprovalRepository;
 import com.tss.grc.module.sharia.repository.ShariaResolutionRepository;
 import com.tss.grc.module.sharia.repository.ShariaScholarRepository;
+import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.testsupport.StateMachineContract;
 
 import org.junit.jupiter.api.AfterEach;
@@ -469,16 +470,17 @@ class ShariaLifecycleTest {
     }
 
     /**
-     * {@code MODULE:ACTION} named by a guard constant. The {@code m.find()} assertion is the whole
-     * reason F2-145(e)'s conversion surfaced as a named failure in this class rather than as a stack
-     * trace — <b>a pattern that matches nothing passes forever</b>, so a stale extractor has to say so.
+     * {@code MODULE:ACTION} named by a guard constant. The anti-vacuity check is the whole reason
+     * F2-145(e)'s conversion surfaced as a named failure in this class rather than as a stack trace —
+     * <b>a pattern that matches nothing passes forever</b>, so a stale extractor has to say so.
+     *
+     * <p>⚠⚠ <b>F2-263: and this copy's own pattern would have failed on correct code.</b> It required the
+     * initialiser to <em>be</em> a bare {@code "hasPermission('X','Y')"} literal, so adding an ownership
+     * or admin-override leg to a Sharia guard — the documented direction of travel — would have refused
+     * the build. The twin in {@code module/openbanking} was byte-identical, which is what made both look
+     * reviewed. Now shared; {@link GuardExpressions#permissionPairOfConstant} carries the reasoning.
      */
     private static String permissionIn(String src, String constant) {
-        Matcher m = Pattern.compile(
-            constant + "\\s*=\\s*\\n?\\s*\"hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)\"",
-            Pattern.DOTALL).matcher(src);
-        assertThat(m.find()).as("guard constant %s must be a hasPermission string — a pattern that "
-            + "matches nothing passes forever", constant).isTrue();
-        return m.group(1) + ":" + m.group(2);
+        return GuardExpressions.permissionPairOfConstant(src, constant);
     }
 }

@@ -116,6 +116,31 @@ public final class GuardExpressions {
      */
     private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
 
+    /**
+     * A two-argument {@code hasPermission('MODULE','ACTION')} call.
+     *
+     * <p>The trailing {@code \)} is the whole of the three-argument exclusion, and it is the only
+     * thing that separates this from a guard about a <em>relation</em>. This platform has two
+     * three-argument forms and each is refused for its own reason:
+     *
+     * <ul>
+     *   <li>{@code hasPermission(#id,'EXERCISE_RUN','OWNER')} — entity ownership (F2-159/F2-161).
+     *       Refused at {@code \(\s*'} because the first argument is not quoted.</li>
+     *   <li>{@code hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')} — a committee seat
+     *       (F2-177). Its first argument <b>is</b> quoted, so only the closing paren tells them
+     *       apart; matching it would publish {@code AUDIT_COMMITTEE:COMMITTEE} as a catalogued
+     *       permission pair, which F2-255 recorded as a false ghost on correct code.</li>
+     * </ul>
+     *
+     * <p>{@code [^']*} and not {@code [A-Z_]+}, for the reason on {@link #QUOTED}: an extractor
+     * that cannot see a token reports a <em>smaller</em> population, which reads exactly like a
+     * clean tree. Judging whether a token is well-formed is a separate question, and
+     * {@code PermissionCatalogueUsageTest} owns it — a narrow extractor answers it by silently
+     * dropping the evidence.
+     */
+    private static final Pattern PERMISSION_PAIR =
+        Pattern.compile("hasPermission\\s*\\(\\s*'([^']*)'\\s*,\\s*'([^']*)'\\s*\\)");
+
     /** The granted-authority prefix Spring Security gives a role. */
     private static final String ROLE_PREFIX = "ROLE_";
 
@@ -199,6 +224,43 @@ public final class GuardExpressions {
     }
 
     /**
+     * The {@code MODULE:ACTION} pairs a guard expression cites, in the order written.
+     *
+     * <p>F2-262 shipped this class for the role question and deliberately left the pair question
+     * out, because a helper method with no caller is an inert construct that answers the question a
+     * reader was about to ask (F2-184, F2-201). It has eleven callers, in ten files and four
+     * spellings, and F2-263 measured them: over the whole guard corpus all four return the
+     * <b>identical 131 pairs</b>, and no guard in the tree splits a {@code hasPermission} call
+     * across a Java string concatenation. So every divergence between them is latent — which is
+     * F2-177's shape exactly: <b>what made nine independent regexes harmless was that they happened
+     * to agree, and nobody was maintaining that.</b>
+     *
+     * <p>The four spellings and what each could not see, measured against 1,314 guard expressions
+     * carrying a two-argument call:
+     *
+     * <ul>
+     *   <li>{@code hasPermission\(\s*'([A-Z_]+)'…} — no tolerance for {@code hasPermission (}
+     *       (0 sites write it) and blind to a token carrying a digit (0 tokens do).</li>
+     *   <li>{@code hasPermission\('([A-Z_]+)'…\)} — <b>no whitespace tolerance after the opening
+     *       paren or before the closing one.</b> Five copies. A formatter run is all it takes.</li>
+     *   <li>{@code hasPermission\(\s*'([^']*)'…} — the widest, and the one this method takes.</li>
+     *   <li>{@code CONST\s*=\s*\n?\s*"hasPermission\('…'\)"} — see
+     *       {@link #permissionPairOfConstant}, which is where the sharp edge was.</li>
+     * </ul>
+     */
+    public static Set<String> permissionPairsIn(String expr) {
+        Set<String> out = new LinkedHashSet<>();
+        if (expr == null) {
+            return out;
+        }
+        Matcher m = PERMISSION_PAIR.matcher(expr);
+        while (m.find()) {
+            out.add(m.group(1) + ":" + m.group(2));
+        }
+        return out;
+    }
+
+    /**
      * A <em>pure</em> role guard: it recites a role and consults no permission.
      *
      * <p>⚠ Note this is presence-based on the permission side, exactly as
@@ -267,6 +329,59 @@ public final class GuardExpressions {
      */
     public static Set<String> rolesRecitedByConstant(String javaSource, String constantName) {
         return rolesRecitedBy(guardConstant(javaSource, constantName));
+    }
+
+    /** The {@code MODULE:ACTION} pairs a named guard constant cites. */
+    public static Set<String> permissionPairsInConstant(String javaSource, String constantName) {
+        return permissionPairsIn(guardConstant(javaSource, constantName));
+    }
+
+    /**
+     * The one {@code MODULE:ACTION} a guard constant resolves to.
+     *
+     * <p>⚠⚠ <b>This is the method F2-263 exists for, and the file that coined the rule it breaks is
+     * one of the two that had it.</b> {@code ObLifecycleTest.permissionIn} and its {@code sharia}
+     * twin compiled {@code CONST\s*=\s*\n?\s*"hasPermission\('([A-Z_]+)'\s*,\s*'([A-Z_]+)'\)"} and
+     * asserted {@code m.find()} — so the constant's initialiser had to <b>be</b> a bare
+     * {@code hasPermission} literal, the closing {@code \)"} requiring the string to end right after
+     * the pair. Give either guard a second leg and {@code find()} answers false and the build fails
+     * with <i>"guard constant X must be a hasPermission string"</i>: <b>a gate refusing correct
+     * code</b> (F2-214), blaming the guard rather than the test.
+     *
+     * <p>That is F2-262's mechanism 3, mirrored. There the pattern required a {@code hasAnyRole}
+     * literal and broke when a module <em>converted</em>; here it requires a bare permission literal
+     * and breaks when a guard <em>gains a leg</em> — and gaining a leg is the documented direction of
+     * travel for this platform's guards (F2-159/F2-161 ownership, F2-177 seats, admin overrides).
+     * Not hypothetical: <b>12 of the 94 guard constants carrying a permission are already composed</b>
+     * — every one of them {@code "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')"},
+     * written with the <em>singular</em> {@code hasRole} that F2-262 recorded as invisible to a
+     * {@code hasAnyRole\(}-only spelling. The shape exists; it is simply not in those two modules yet.
+     *
+     * <p>🔑 And the reason the two copies survived F2-262: they had <b>already replaced</b> their role
+     * extractor with a permission one when their modules converted, so they were not members of the
+     * role-name population at all. F2-262 read this very javadoc, quoted its rule as its headline
+     * lesson — <i>"a regex that matches nothing satisfies every downstream assertion forever, so the
+     * anti-vacuity check belongs in the helper"</i> — and did not convert the method the rule is
+     * written on, because it asks a different question. <b>The anti-vacuity check they built to be
+     * safe is the same {@code find()} that makes them fail on correct code.</b>
+     *
+     * <p>Tolerant, therefore: it extracts the pair from whatever the constant holds and refuses only
+     * when there is no single pair to name — so a composed guard reports its pair, a converted-away
+     * guard reports drift, and neither refuses to parse.
+     *
+     * @throws AssertionError if the constant is absent, cites no pair, or cites more than one
+     */
+    public static String permissionPairOfConstant(String javaSource, String constantName) {
+        Set<String> pairs = permissionPairsInConstant(javaSource, constantName);
+        if (pairs.size() != 1) {
+            throw new AssertionError(
+                "guard constant " + constantName + " must cite exactly one MODULE:ACTION pair; it "
+                + "cites " + pairs.size() + " " + pairs + ". A composed guard (a permission ORed "
+                + "with a role or an ownership leg) is fine and still resolves here — this failure "
+                + "means the constant names no permission at all, or names several and the caller "
+                + "asked for 'the' one.");
+        }
+        return pairs.iterator().next();
     }
 
     /**

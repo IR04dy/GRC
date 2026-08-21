@@ -2,6 +2,7 @@ package com.tss.grc.module.cpty;
 
 import com.tss.grc.module.cpty.controller.CptyController;
 import org.junit.jupiter.api.DisplayName;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -14,8 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -130,9 +129,10 @@ class CptyControllerGuardTest {
     @DisplayName("the guards name only CPTY, and only actions the catalogue holds after V369")
     void theGuardsNameOnlyCataloguedPermissions() throws IOException {
         String code = stripComments(Files.readString(SOURCE, StandardCharsets.UTF_8));
-        Matcher m = Pattern.compile("hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)").matcher(code);
-        var pairs = new TreeSet<String>();
-        while (m.find()) pairs.add(m.group(1) + ":" + m.group(2));
+        // F2-263 — shared extractor. This copy's own spelling had no whitespace tolerance after
+        // the opening paren or before the closing one, so a formatter run would have shrunk the
+        // population and left the assertion below passing over less than it names.
+        var pairs = new TreeSet<>(GuardExpressions.permissionPairsIn(code));
 
         assertThat(pairs)
                 .as("a guard citing a module or action outside the catalogue can never be satisfied by a "

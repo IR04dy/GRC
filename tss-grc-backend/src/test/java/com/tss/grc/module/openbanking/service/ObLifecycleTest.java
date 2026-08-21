@@ -32,6 +32,7 @@ import com.tss.grc.module.openbanking.repository.ObEventRepository;
 import com.tss.grc.module.openbanking.repository.ObIncidentRepository;
 import com.tss.grc.module.openbanking.repository.ObTppRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.testsupport.StateMachineContract;
 
 import org.junit.jupiter.api.AfterEach;
@@ -403,17 +404,21 @@ class ObLifecycleTest {
 
     /**
      * The {@code MODULE:ACTION} a guard constant resolves to. Replaces {@code rolesIn}, which parsed the
-     * {@code hasAnyRole} name list this module no longer has. ⚠ The {@code m.find()} assertion is why the
+     * {@code hasAnyRole} name list this module no longer has. ⚠ The anti-vacuity check is why the
      * conversion produced a readable failure instead of an {@code IllegalStateException} from
      * {@code m.group(1)} — a regex that matches nothing satisfies every downstream assertion forever, so
      * the anti-vacuity check belongs in the <em>helper</em>, where every caller inherits it.
+     *
+     * <p>⚠⚠ <b>F2-263: that rule was right and this method was the counter-example to it for four
+     * slices.</b> It compiled its own pattern requiring the initialiser to <em>be</em> a bare
+     * {@code "hasPermission('X','Y')"} literal — the closing {@code \)"} demanding the string end right
+     * after the pair — so giving either OB guard a second leg would have failed the build saying <i>the
+     * constant must be a hasPermission string</i>: a gate refusing correct code, blaming the guard. 12 of
+     * the platform's 94 permission-bearing guard constants are already that composed shape. Delegating to
+     * {@link GuardExpressions#permissionPairOfConstant} keeps the anti-vacuity property and drops the
+     * requirement that produced it — see that method's javadoc for why the two are separable.
      */
     private static String permissionIn(String src, String constant) {
-        Matcher m = Pattern.compile(
-            constant + "\\s*=\\s*\\n?\\s*\"hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)\"",
-            Pattern.DOTALL).matcher(src);
-        assertThat(m.find()).as("guard constant %s must be a hasPermission string — a pattern that "
-            + "matches nothing passes forever", constant).isTrue();
-        return m.group(1) + ":" + m.group(2);
+        return GuardExpressions.permissionPairOfConstant(src, constant);
     }
 }
