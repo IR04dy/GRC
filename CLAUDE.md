@@ -124,10 +124,10 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V384 packaged; next free V385** (372 files; ⚠ this line said "V1→V295 / next free
+— **V1→V385 packaged; next free V386** (373 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
-`Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
+`Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
 ⚠ **A grant migration must DECLARE its (role, module, action) triples as literals.** The house idiom
 `INSERT … SELECT … JOIN iam.roles JOIN iam.permissions WHERE NOT EXISTS` grants **nothing** when
 either side is catalogued later in the chain, and `NOT EXISTS` cannot tell *already granted* from
@@ -1872,6 +1872,99 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A GATE THAT CORRECTLY REFUSES TO *BAN* A SHAPE LEAVES IT UNCOUNTED, AND SIX SLICES THEN
+  CLOSED IT ONE INSTANCE AT A TIME** (F2-266, measured 2026-08-22).
+  `ClientSuppliedReferenceRatchetTest` keys on `\bset(?:ExternalId|RefNumber)\s*\(`, and the first
+  framing — that this is F2-248's *a gate key is a spelling* — was **refuted by reading**. The
+  class's own javadoc records the narrowing as a **decision**, with the right reason: *"Deliberately
+  not `setCode` or `setSlug`: those are frequently the caller's to choose … banning them would make
+  this gate fail on correct code, which trains the next reader to edit the assertion instead of the
+  code."* 🔑🔑 **That is correct and it is not the whole job: a narrowing settles what may be
+  BANNED and says nothing about what should be COUNTED.** Nobody counted it, so the family closed
+  one instance per slice — F2-250 (`aml_alerts.alert_code`), F2-253 (`subprocessorCode`), F2-258
+  (three `AiLifecycleService` creates), F2-259 (`snapshotCode`, read → safe), F2-260
+  (`regulatorAckReference`, read → CORRECT), F2-264 (`CreateAssetRequest.reference`). **Six filings
+  and six survivors is what a population looks like when nothing counts it** (F2-208).
+  ⚠ **Measured by the gate, in Java, over the same tree: 93 create-path sites write a business
+  reference from the request, across 59 distinct setter names.** My Python locator said 91 —
+  **third consecutive slice in which the throwaway under-counts the shipped gate** (F2-213's rule:
+  write the sweep as the gate).
+  🔑 **WHY THE BAN'S ZERO READS AS COMPLETE: 118 tables declare `external_id` — server-minted and
+  covered by the ban — BESIDE a caller-named `*_code`.** The covering mechanism is visibly present
+  on the same row, so a reader has no reason to ask which of the row's **two** references it covers.
+  F2-215's two-of-N at its most literal, and `ethics.aml_alerts` is exactly that shape.
+  ⚠⚠ **THREE KINDS LIVE IN THAT POPULATION AND ONLY ONE IS A DEFECT, so the census carries NO
+  VERDICTS** (F2-188 measured what happens otherwise: five claims, five false). **(1)
+  Authority-issued** — `regulatorAckReference`, `samaLicenceRef`, `samaNonObjectionRef`,
+  `lawEnforcementReference`, `strReference` — **correct** to be caller-supplied, because F2-209's
+  rule is that a reference only an outside authority can issue is *received and recorded, or
+  absent*, and **the server may not mint it either**. **(2) Names another record** —
+  `linkedAssetRef`, `ropaCode`, `retentionRuleRef`, `contractRef` — F2-242/F2-252's question (does
+  it resolve, and to what?), not minting. **(3) The record's own identifier** — `alertCode`,
+  `subprocessorCode`, `bowtieCode`, `kriCode` — the only F2-172(d) bucket. **Classify before you
+  touch one.**
+  ⚠⚠ **TWO SCOPING ERRORS OF MINE, BOTH IN THE OVER-REPORTING DIRECTION.** The first pass put
+  `\w*Id$` in the reference shape and swallowed every foreign key (`setVendorId`, `setRiskId`,
+  `setApproverId`, `setWorkflowId`), reporting **135** — that is F2-242's family, a different
+  question, and **a scan scoped wider than its claim reports a population it never measured.** And
+  `ObService#recordApiCall` writes `setStatusCode` from the request, which is an **HTTP status on an
+  API-call log, not a reference** — it is now the gate's must-not-match negative control, because
+  that is precisely how a `*Code` pattern over-reports.
+  ⚙ **The member closed end-to-end, and the check that decided it was structural.**
+  `ethics.aml_alerts.alert_code` is the reference an FIU submission cites; before this it was
+  caller-named with no minter anywhere and **no unique index**, so a duplicate of a real code was
+  storable (F2-250 probed it). **Verified as the platform's own reference rather than an upstream AML
+  engine's by the SCHEMA, not by the format**: the table has no `source_system`, no `ingested_at`,
+  one caller (`AmlAlertController`, a plain `@PostMapping`, no ingest route), and it declares
+  `external_id` beside `alert_code`. 🔑 **The stored `AML-2025-000n` codes are seed rows and prove
+  nothing about intent** — getting this backwards would have meant minting a value an outside system
+  owns, which is the distinction F2-260 established matters.
+  ⚙ **`common/reference/ReferenceCodeMint` was EXTRACTED FROM `IntakeService`, which now delegates**
+  — so the second register calls the primitive instead of copying it (F2-190). Entropy, not a
+  sequence: a per-tenant sequence needs a read-then-write so two concurrent creates race, and F2-48
+  already had to fix a collision in a generator whose suffix was effectively constant.
+  ⚠ **The intake output shape is unchanged and asserted.** An intake tracking code is quoted to the
+  public on the whistleblowing and breach-report portals, so a code somebody is holding has to keep
+  resolving — extracting a shared primitive must not change either caller's output.
+  ⚠⚠ **V385 IS A *FILTERED* UNIQUE INDEX AND THAT IS NOT A STYLE CHOICE: SQL SERVER TREATS NULLS AS
+  EQUAL FOR UNIQUENESS.** `alert_code` is nullable, so a plain `UNIQUE` would permit at most **one**
+  code-less alert — refusing a state the column's own nullability allows. `WHERE alert_code IS NOT
+  NULL` is what makes the index a statement about codes rather than about absence. Keyed on
+  `(organisation_id, alert_code)`, because a global unique index would let one tenant's reference
+  block another's — a multi-tenancy defect dressed as strictness. Measured in **both** databases
+  first (10 rows, 10 distinct, 0 duplicate groups), so no `WITH NOCHECK` and nothing to reconcile.
+  ⚠⚠ **MY FIRST INDEX PROBE PRINTED *"duplicate REFUSED as intended"* WHEN THE INSERT HAD FAILED ON
+  `description` BEING NOT NULL.** `except pyodbc.IntegrityError` cannot tell one refusal from
+  another. 🔑 **A refusal thrown for the wrong reason is indistinguishable from the right one in a
+  pass/fail line** (F2-261). Build the INSERT column list from `sys.columns` — every NOT NULL column
+  with no default, excluding identity and `timestamp` — and **assert the error message names the
+  index**. The corrected probe also proves a *fresh* code is accepted and that **two** NULL-coded
+  rows are accepted, so the filter is demonstrated rather than described.
+  ⚠ **And the gate would not compile because `argumentAt` ALREADY EXISTED in the class** — I
+  hand-rolled a helper the file already had, which is F2-190 catching the very slice whose own
+  primitive is an extraction. Check the class's existing helpers before adding one, and adapt to
+  their contract (the survivor returns `""`, mine returned `null`).
+  ⚠⚠ **AND THE SUITE WENT GREEN OVER A THIRD STALE COPY, WHICH IS F2-265's FINDING IN THE FILE
+  THAT RECORDS F2-265.** Adding V385 means editing three artefacts — `MEASURED_BASELINE.md`,
+  `baseline_census.py`'s `PUBLISHED` dict, and **this file's** migration line.
+  `MeasuredBaselineFreshnessTest` failed on the first two and not the third: **no test in the tree
+  reads `CLAUDE.md` at all** (every hit is a comment mentioning it), so the sentence *"`baseline_census.py`
+  prints it and `MeasuredBaselineFreshnessTest` gates it"* was true of the FIGURE and false of THAT
+  LINE — one paragraph after a warning that this very line had gone stale by 54 versions.
+  🔑 **Proved, not argued: updating only the other two leaves the suite green with this file
+  reading V384 / 372 files.** Closed by `claudeMdMigrationLineMatchesTheTree`, which parses head,
+  next-free and count out of the line and compares all three against the tree; the figure is kept
+  rather than deleted, because a reader of the house rules needs the next free version to hand, so
+  the copy is made **checkable** instead. ⚠ If you reword that line, fix the pattern — do not
+  delete the assertion, because an unparsed line reports a clean tree (F2-69), and that is precisely
+  how it went 54 behind.
+  ⚙ **Filed:** the **93**-site census in `target/caller-named-references.txt` as a work list with no
+  verdicts — sharpest unread members are kind 3 (`subprocessorCode`, PDPL Art. 30; `kriCode`;
+  `bowtieCode`; `arrangementCode`, SAMA outsourcing; `noticeCode`). Also
+  `ethics.aml_alerts.sla_due_at` still has **no server computation anywhere**, so the deadline is
+  the caller's (F2-202's rule), unchanged by this slice; and **225 of 383** reference-shaped text
+  columns in dev carry no unique index — most legitimately, being kinds 1 and 2, so that is a
+  starting point for reading and **not** a defect count.
 - ⚠⚠ **A COUNT IN PROSE IS A COPY OF A MEASUREMENT, AND AN INSTRUCTION NOT TO COPY IT IS NOT AN
   ENFORCEMENT — THE CELL THAT SAYS *"re-derive it, never edit it by hand"* HAS DRIFTED THROUGH FOUR
   RE-DERIVATIONS** (F2-265, measured 2026-08-22). §0's doc-map cell in

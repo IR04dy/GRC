@@ -554,4 +554,59 @@ class MeasuredBaselineFreshnessTest {
         assertThat(m.find()).as("§7-B has no `| Applied head | … V<n>` row").isTrue();
         return Integer.parseInt(m.group(1));
     }
+
+    /**
+     * F2-266 — {@code CLAUDE.md}'s migration line said it was gated, and it was not.
+     *
+     * <p>The line reads <i>"V1→V385 packaged; next free V386 (373 files; … read the directory, not
+     * this line: `ls .../sqlserver | tail -3`. `Appendix/scripts/baseline_census.py` prints it and
+     * `MeasuredBaselineFreshnessTest` gates it)"</i>. The <b>figure</b> was gated — in
+     * {@code MEASURED_BASELINE.md} and in the census script's {@code PUBLISHED} dict, both asserted
+     * above. <b>This line was not.</b> F2-266 proved it by hand: adding {@code V385} and updating
+     * only the other two artefacts leaves this suite green with {@code CLAUDE.md} still reading
+     * {@code V384} and {@code 372 files}.
+     *
+     * <p>🔑 That is F2-265's finding — <b>a count in prose is a copy of a measurement, and an
+     * instruction not to let it rot is not an enforcement</b> — inside the very file that records
+     * F2-265, one paragraph after a warning that this exact line went stale by 54 versions. The
+     * cheap fix is not to delete the figure (a reader of the house rules needs the next free
+     * version to hand) but to make the copy checkable.
+     *
+     * <p>Anti-vacuity: the line must be FOUND. A pattern that stops matching would otherwise
+     * report a clean tree, which is the failure mode this whole class exists for.
+     */
+    @Test
+    void claudeMdMigrationLineMatchesTheTree() {
+        Path claude = Path.of("..", "CLAUDE.md");
+        Assumptions.assumeTrue(Files.isRegularFile(claude), "CLAUDE.md not reachable");
+        String text = read(claude);
+
+        Matcher m = Pattern.compile(
+            "V1\u2192V(\\d+) packaged; next free V(\\d+)\\*\\*\\s*\\((\\d+) files")
+            .matcher(text);
+        assertThat(m.find())
+            .as("CLAUDE.md's migration line was not found in the shape this leg parses "
+                + "('V1\u2192V<head> packaged; next free V<next>** (<n> files'). If the line was "
+                + "reworded, update this pattern — do NOT delete the assertion, because an "
+                + "unparsed line reports a clean tree (F2-69), which is exactly how this figure "
+                + "went stale by 54 versions before.")
+            .isTrue();
+
+        List<Integer> versions = migrationVersions();
+        int head = versions.stream().mapToInt(Integer::intValue).max().orElseThrow();
+
+        assertThat(Integer.parseInt(m.group(1)))
+            .as("CLAUDE.md says the packaged head is V%s; the tree's highest version is V%d.",
+                m.group(1), head)
+            .isEqualTo(head);
+        assertThat(Integer.parseInt(m.group(2)))
+            .as("CLAUDE.md says the next free version is V%s; it is V%d. Reusing a taken version "
+                + "is a Flyway checksum failure on the deployed server, which is what that line "
+                + "itself warns about.", m.group(2), head + 1)
+            .isEqualTo(head + 1);
+        assertThat(Integer.parseInt(m.group(3)))
+            .as("CLAUDE.md says there are %s migration files; there are %d.",
+                m.group(3), versions.size())
+            .isEqualTo(versions.size());
+    }
 }

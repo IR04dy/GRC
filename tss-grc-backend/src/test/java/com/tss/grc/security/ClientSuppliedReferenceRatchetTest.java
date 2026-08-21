@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -76,6 +77,66 @@ class ClientSuppliedReferenceRatchetTest {
      * code, which trains the next reader to edit the assertion instead of the code.
      */
     private static final Pattern REFERENCE_SETTER = Pattern.compile("\\bset(?:ExternalId|RefNumber)\\s*\\(");
+
+    /**
+     * F2-266 — the wider shape, <b>counted rather than banned</b>.
+     *
+     * <p>The narrowing above is a recorded decision and it is right: {@code *Code} and
+     * {@code *Ref} are <em>often</em> the caller's, so banning them would fail on correct
+     * code (F2-214). What nobody did was <b>count</b> them — so six slices each filed one
+     * instance by hand (F2-250 {@code aml_alerts.alert_code}, probed: a duplicate of a real
+     * code was accepted; F2-253 {@code subprocessorCode}; F2-258 three
+     * {@code AiLifecycleService} creates; F2-259 {@code snapshotCode}, read and found
+     * collision-safe; F2-260 {@code regulatorAckReference}, read and found CORRECT; F2-264
+     * {@code CreateAssetRequest.reference}). <b>That is what a population looks like when
+     * nothing counts it</b> (F2-208).
+     *
+     * <p>🔑 <b>Why the zero above reads as complete:</b> 118 tables declare
+     * {@code external_id} — server-minted and covered by the ban — <em>beside</em> a
+     * caller-named {@code *_code}. The covering mechanism is visibly present on the same
+     * row, so a reader has no reason to ask which of the row's TWO references it covers.
+     * F2-215's two-of-N at its most literal.
+     *
+     * <p><b>Three kinds, and only one is a defect</b> — which is why this leg records no
+     * verdicts (F2-188 measured what happens when a slice writes reasons for sites it has
+     * not read: five claims, five false):
+     * <ol>
+     *   <li><b>Authority-issued</b> — {@code regulatorAckReference},
+     *       {@code samaLicenceRef}, {@code samaNonObjectionRef},
+     *       {@code lawEnforcementReference}, {@code strReference}. Correct to be
+     *       caller-supplied: F2-209's rule is that a reference only an outside authority can
+     *       issue is <em>received and recorded, or absent</em> — the server may not mint it
+     *       either.</li>
+     *   <li><b>Names another record</b> — {@code linkedAssetRef}, {@code ropaCode},
+     *       {@code retentionRuleRef}, {@code contractRef}. That is F2-242/F2-252's question
+     *       (does the reference resolve, and to what?), not minting.</li>
+     *   <li><b>The record's OWN identifier</b> — {@code alertCode},
+     *       {@code subprocessorCode}, {@code bowtieCode}, {@code kriCode}. This is
+     *       F2-172(d)'s family and the only defect bucket.</li>
+     * </ol>
+     *
+     * <p>⚠ {@code Status} is excluded by name and that exclusion is the negative control:
+     * {@code ObService#recordApiCall} writes {@code setStatusCode} from the request and that
+     * is an <b>HTTP status on an API-call log</b>, not a reference. A first draft of this
+     * scan counted it, which is how a {@code *Code} pattern over-reports.
+     */
+    private static final Pattern BUSINESS_REFERENCE_SETTER = Pattern.compile(
+        "\\bset(?!Status)(?:[A-Z]\\w*)?(?:Code|Reference|Ref|ExternalId|RefNumber)\\s*\\(");
+
+    /** Create-ish entry points. A reference is chosen when a record is born. */
+    private static final Pattern CREATE_ISH = Pattern.compile(
+        "\\b(?:public|protected|private)\\s+[\\w<>,.\\[\\]?]+\\s+"
+        + "(create\\w*|submit\\w*|start\\w*|open\\w*|record\\w*|register\\w*"
+        + "|import\\w*|add\\w*)\\s*\\(");
+
+    /** Where the census lands, so no document has to restate it (F2-265). */
+    private static final Path CENSUS = Path.of("target", "caller-named-references.txt");
+
+    /**
+     * Decrease-only. Measured on this tree by the leg below; a fix lowers it, and a new
+     * caller-named reference has to be a deliberate raise with a reason.
+     */
+    private static final int BASELINE_CALLER_NAMED_REFERENCES = 93;
 
     /** A method header, used only to attribute a call site to its enclosing method. */
     private static final Pattern METHOD_HEADER = Pattern.compile(
@@ -302,4 +363,133 @@ class ClientSuppliedReferenceRatchetTest {
         }
         return arg.toString().trim().replaceAll("\\s+", " ");
     }
+
+
+    @Test
+    @DisplayName("F2-266: the business-reference shape is COUNTED, since it cannot be banned")
+    void theBusinessReferenceShapeIsCountedEvenThoughItCannotBeBanned() throws IOException {
+        List<String> sites = new ArrayList<>();
+        for (Path f : javaSources()) {
+            if (!f.getFileName().toString().endsWith("Service.java")) { continue; }
+            String src = stripComments(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher cm = CREATE_ISH.matcher(src);
+            while (cm.find()) {
+                String body = balancedBody(src, cm.end());
+                if (body == null) { continue; }
+                Matcher sm = BUSINESS_REFERENCE_SETTER.matcher(body);
+                while (sm.find()) {
+                    String arg = argumentAt(body, sm.end());
+                    if (arg.isEmpty()
+                        || !Pattern.compile("\\b(?:req|request|in|dto|body|cmd)\\b\\s*\\.")
+                                   .matcher(arg).find()) {
+                        continue;
+                    }
+                    sites.add(f.getFileName().toString().replace(".java", "") + "#" + cm.group(1)
+                              + " :: " + sm.group().replace("(", "").trim());
+                }
+            }
+        }
+        List<String> sorted = sites.stream().distinct().sorted().toList();
+
+        List<String> out = new ArrayList<>();
+        out.add("# Caller-named business references on create paths - GENERATED by");
+        out.add("# ClientSuppliedReferenceRatchetTest. Do not hand-edit, and do not copy the count");
+        out.add("# into prose (F2-265). NO VERDICTS here on purpose: three kinds live in this");
+        out.add("# population and only one is a defect - see BUSINESS_REFERENCE_SETTER's javadoc.");
+        out.add("sites=" + sorted.size());
+        out.add("");
+        out.addAll(sorted);
+        Files.writeString(CENSUS, String.join(System.lineSeparator(), out),
+                          StandardCharsets.UTF_8);
+
+        assertThat(sorted.size())
+            .as("%d create-path sites write a business reference from the request; the measured "
+                + "ceiling is %d. This is a CENSUS, not a ban: the narrow ban above is a recorded "
+                + "decision and banning the wider shape would fail on correct code (F2-214), so "
+                + "what this leg exists for is that nobody was COUNTING it - six slices each filed "
+                + "one instance by hand. If you closed one, lower the number in the same commit; "
+                + "if you added one, say in the commit message which of the three kinds it is. "
+                + "Full list: %s", sorted.size(), BASELINE_CALLER_NAMED_REFERENCES, CENSUS)
+            .isLessThanOrEqualTo(BASELINE_CALLER_NAMED_REFERENCES);
+
+        assertThat(sorted)
+            .as("an HTTP status is not a business reference. ObService#recordApiCall writes "
+                + "setStatusCode from the request, and a first draft of this scan counted it - "
+                + "which is exactly how a '*Code' pattern over-reports. The (?!Status) in "
+                + "BUSINESS_REFERENCE_SETTER is that exclusion; if this fires, it was removed.")
+            .noneMatch(site -> site.endsWith(":: setStatusCode"));
+    }
+
+    @Test
+    @DisplayName("F2-266: the FIU alert code is minted by the server, not named by the caller")
+    void theAmlAlertCodeIsMintedRatherThanNamed() throws IOException {
+        Path svc = javaSources().stream()
+            .filter(p -> p.getFileName().toString().equals("AmlAlertService.java"))
+            .findFirst().orElseThrow(() ->
+                new AssertionError("AmlAlertService.java not found - this pin has lost its subject"));
+        String src = stripComments(Files.readString(svc, StandardCharsets.UTF_8));
+
+        assertThat(src)
+            .as("the create path must MINT the code through the shared primitive. F2-250 probed "
+                + "that a duplicate of a real AML-2025-0001 was accepted, and this is the "
+                + "reference an FIU submission cites.")
+            .containsPattern("ReferenceCodeMint\\s*\\.\\s*mint\\s*\\(");
+
+        assertThat(src)
+            .as("nothing may write alertCode from the request. The editable-field list used to "
+                + "carry `if (s.getAlertCode() != null) t.setAlertCode(s.getAlertCode());`, which "
+                + "is the whole defect.")
+            .doesNotContainPattern("setAlertCode\\s*\\(\\s*s\\s*\\.")
+            .doesNotContainPattern("setAlertCode\\s*\\(\\s*req\\s*\\.");
+    }
+
+    @Test
+    @DisplayName("F2-266: there is ONE reference minter, not a second hand-rolled generator")
+    void thereIsExactlyOneReferenceMinter() throws IOException {
+        List<String> withAlphabet = new ArrayList<>();
+        for (Path f : javaSources()) {
+            String src = Files.readString(f, StandardCharsets.UTF_8);
+            if (src.contains("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")) {
+                withAlphabet.add(f.getFileName().toString());
+            }
+        }
+        assertThat(withAlphabet)
+            .as("the no-I/O/0/1 alphabet is the fingerprint of a reference generator. It must "
+                + "appear in exactly one class: F2-190's rule, and this primitive was EXTRACTED "
+                + "from IntakeService precisely so the second register could call it instead of "
+                + "copying it. Found in: %s", withAlphabet)
+            .containsExactly("ReferenceCodeMint.java");
+    }
+
+    // ── helpers for the F2-266 legs ──────────────────────────────────────────────────────────
+
+    /** ONE left-to-right alternation: two sequential passes corrupt a file (F2-198/F2-211). */
+    private static final Pattern COMMENTS =
+        Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+
+    private static String stripComments(String src) {
+        return COMMENTS.matcher(src).replaceAll("");
+    }
+
+    private static List<Path> javaSources() throws IOException {
+        try (var walk = Files.walk(MAIN)) {
+            return walk.filter(p -> p.toString().endsWith(".java")).toList();
+        }
+    }
+
+    /** The brace-balanced body starting at the first '{' at or after {@code from}. */
+    private static String balancedBody(String src, int from) {
+        int i = src.indexOf('{', from);
+        if (i < 0) { return null; }
+        int depth = 0;
+        for (int j = i; j < src.length(); j++) {
+            char c = src.charAt(j);
+            if (c == '{') { depth++; } else if (c == '}') {
+                depth--;
+                if (depth == 0) { return src.substring(i, j); }
+            }
+        }
+        return null;
+    }
+
 }
