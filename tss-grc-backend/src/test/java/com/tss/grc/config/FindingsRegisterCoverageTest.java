@@ -7,9 +7,11 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
@@ -42,10 +44,21 @@ import org.junit.jupiter.api.Test;
  * this test replaces actually did. A ratchet cannot detect its own blindness, because the direction
  * a broken scan fails in is always the reassuring one.
  *
- * <p><b>Why a ratchet and not zero.</b> 31 specs are owed today. Demanding zero would block every
- * unrelated change on documentation debt accumulated over months, and the corrected rule in the
- * doc-map is narrower than that: <i>a spec is owed before a finding is WORKED</i>. So the count may
- * only fall. The register outlives the plan and is what an external auditor is handed, which is why
+ * <p><b>F2-265 — and this gate now publishes its own measurement.</b> Four documents used to
+ * restate these counts in prose. A count in prose is a <b>copy</b> of a measurement, and the
+ * doc-map cell that carried them says <i>"re-derive it, never edit it by hand"</i> — an
+ * instruction with no enforcement, which drifted through <b>four</b> re-derivations, each of
+ * which added a warning rather than an enforcement. {@link #REPORT} is the authority now, and
+ * {@link #theDocMapCellPointsAtTheGateRatherThanRestatingIt()} refuses a restatement.
+ *
+ * <p><b>Why a ratchet and not zero.</b> Demanding zero would block every unrelated change on
+ * documentation debt accumulated over months, and the corrected rule in the doc-map is narrower
+ * than that: <i>a spec is owed before a finding is WORKED</i>. So the count may only fall.
+ * ⚠ <b>This paragraph used to open <i>"31 specs are owed today"</i> while
+ * {@link #BASELINE_SPECS_OWED} three paragraphs below read 29</b> — the constant's own javadoc
+ * narrates the walk down to 29 and this sentence was not part of it. F2-265: house rule 3's
+ * named hazard (<i>read the constant, never a prose summary of it</i>) inside the file that owns
+ * the constant, so the number is stated in exactly one place now. The register outlives the plan and is what an external auditor is handed, which is why
  * it is worth a gate at all.
  */
 class FindingsRegisterCoverageTest {
@@ -101,6 +114,65 @@ class FindingsRegisterCoverageTest {
      */
     private static final int BASELINE_SPECS_OWED = 29;
 
+    /**
+     * Where the measurement lives, so no document has to restate it.
+     *
+     * <p>The convention is this tree's own — {@code target/permission-usage.txt},
+     * {@code target/mass-assignment-risk.txt}, {@code target/server-stamped-fields.txt}. It exists
+     * because F2-265 measured what a copied count does: the plan's doc-map cell reported
+     * <b>94 referenced / 57 specs / 40 owed</b> against a measured <b>264 / 235 / 29</b>, and the
+     * list of owed ids it published — the list a reader consults to obey the cell's own rule
+     * <i>"write one before scheduling any of them"</i> — <b>omitted 22 of the 29 and named one
+     * that was already paid</b>.
+     */
+    private static final Path REPORT = Path.of("target", "findings-register-coverage.txt");
+
+    /**
+     * The doc-map cell that owns the rule, anchored on its own rule sentence.
+     *
+     * <p>Deliberately the <i>rule</i> rather than a heading — a cell that stops saying this has
+     * stopped being the cell this gate is about.
+     *
+     * <p>⚠⚠ <b>Resolved against {@link #unquoted(String)} text, and the omission broke this gate
+     * on its own plan row.</b> I quote-stripped {@link #COVERAGE_COUNT} and not the anchor, so the
+     * moment F2-265's own plan entry quoted this rule sentence two lines matched and the uniqueness
+     * assertion failed. <b>A detector that cannot tell a quotation from a claim is defeated by this
+     * register's own correction convention</b> (F2-193) — and it applies to every part of the
+     * detector, not just the part whose claim is about counts.
+     */
+    private static final String DOC_MAP_ANCHOR = "never edit it by hand";
+
+    /**
+     * A coverage count restated in prose.
+     *
+     * <p>Scoped to the shape of the claim rather than to digits (F2-192): the cell legitimately
+     * carries id ranges, dates and narrative numbers, and a blanket ban would fail on correct
+     * prose — the one failure a gate must never have (F2-214). Pinned in both directions by
+     * {@link #theRestatementDetectorIsPinnedInBothDirections()}.
+     *
+     * <p>⚠ {@code referenc(?:es|ed)} covers both stems on purpose. The pre-fix cell carried
+     * {@code referenced **74+**} as history, and a pattern keyed on the present tense alone would
+     * have missed it — passing for a reason unrelated to its claim.
+     */
+    private static final Pattern COVERAGE_COUNT = Pattern.compile(
+            "referenc(?:es|ed)\\s+\\*\\*\\d+\\+?\\*\\*"
+            + "|carries\\s+\\*\\*\\d+\\*\\*"
+            + "|\\*\\*\\d+\\s+(?:are\\s+)?owed\\*\\*"
+            + "|leaving\\s+\\*\\*\\d+\\*\\*");
+
+    /** A plan row's ID cell — exactly a bolded finding id, so a mention cannot match. */
+    private static final Pattern ID_CELL = Pattern.compile("^\\*\\*F2-(\\d{2,3})[a-z]?\\*\\*$");
+
+    /**
+     * Verdict markers, as Unicode escapes rather than raw characters (F2-235: an escape is the
+     * only form that survives every tool between an author and a file).
+     */
+    private static final List<String> CLOSED_MARKERS =
+            List.of("\u2705", "\u2714", "\u274c");
+
+    private static final List<String> OPEN_MARKERS =
+            List.of("\u2b1c", "\ud83d\udd34");
+
     /** Floors, so a collapsed scan cannot read as a clean one (F2-69). */
     private static final int MIN_REFERENCED = 120;
     private static final int MIN_SPECCED = 100;
@@ -127,7 +199,79 @@ class FindingsRegisterCoverageTest {
                 "plan / register not reachable from " + PLAN.toAbsolutePath());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────────────
+    /** Strip double-quoted spans, so a correction that quotes what it replaces is not a claim. */
+    private static String unquoted(String text) {
+        return text.replaceAll("\"[^\"]*\"", "\"\"");
+    }
+
+    /** Split a markdown row on pipes, ignoring pipes inside inline code spans. */
+    private static List<String> rowCells(String line) {
+        List<String> cells = new ArrayList<>();
+        StringBuilder buf = new StringBuilder();
+        boolean inCode = false;
+        for (char c : line.toCharArray()) {
+            if (c == '`') {
+                inCode = !inCode;
+            }
+            if (c == '|' && !inCode) {
+                cells.add(buf.toString().trim());
+                buf.setLength(0);
+            } else {
+                buf.append(c);
+            }
+        }
+        cells.add(buf.toString().trim());
+        return cells;
+    }
+
+    /**
+     * A HINT at whether an owed finding is closed, read off its own plan row.
+     *
+     * <p><b>Nothing is gated on this and it is not a verdict.</b> F2-265's first attempt classified
+     * by scanning for a marker anywhere on the line, and reported F2-68 and F2-70 as partial when
+     * both read {@code DONE} — the lines here run past 6,000 characters and carry many markers, so
+     * the lookup could not fail loudly and produced a name instead (F2-252). It is published
+     * because the owed count alone cannot tell retrospective documentation from live work, and it
+     * is a hint because a plan-status parser is not something this gate can keep correct — making
+     * it load-bearing would build the authoritative-looking-but-unverified artefact F2-265 is
+     * about.
+     */
+    private static String closureHint(String plan, int id) {
+        for (String line : plan.split("\n")) {
+            if (!line.startsWith("|")) {
+                continue;
+            }
+            List<String> cells = rowCells(line);
+            if (cells.size() < 4) {
+                continue;
+            }
+            Matcher m = ID_CELL.matcher(cells.get(1));
+            if (!m.matches() || Integer.parseInt(m.group(1)) != id) {
+                continue;
+            }
+            String verdict = "";
+            for (int i = cells.size() - 1; i >= 2; i--) {
+                if (!cells.get(i).isEmpty()) {
+                    verdict = cells.get(i);
+                    break;
+                }
+            }
+            for (String marker : CLOSED_MARKERS) {
+                if (verdict.startsWith(marker)) {
+                    return "hint:closed";
+                }
+            }
+            for (String marker : OPEN_MARKERS) {
+                if (verdict.startsWith(marker)) {
+                    return "hint:OPEN";
+                }
+            }
+            return "hint:no-status-marker (read the row)";
+        }
+        return "hint:no-own-row (named only inside another finding's cell)";
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("the register heading pattern still matches — or every count below is vacuous")
@@ -208,6 +352,125 @@ class FindingsRegisterCoverageTest {
                     + "owes a row or the spec belongs to a closed programme — both are worth knowing, "
                     + "because a finding recorded in only one of the two documents is a finding that "
                     + "one audience cannot see.", orphans.size(), orphans)
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("the measurement is published, so no document has to restate it")
+    void publishesTheMeasurementSoNoDocumentRestatesIt() throws IOException {
+        assumeDocs();
+        String plan = read(PLAN);
+        Set<Integer> referenced = ids(REFERENCED, plan);
+        Set<Integer> specced = ids(SPECCED, read(REGISTER));
+        List<Integer> owed = referenced.stream().filter(id -> !specced.contains(id)).toList();
+        List<Integer> orphans = specced.stream().filter(id -> !referenced.contains(id)).toList();
+
+        // ⚠ Delete first. F2-265's mutation harness replaced the write below with a
+        // branch that never fires, and this leg PASSED on the PREVIOUS run's file, which
+        // still carried the right numbers -- the stale-artefact-answers-an-older-question
+        // shape, one artefact over from the stale surefire report this repo records.
+        Files.deleteIfExists(REPORT);
+
+        List<String> out = new ArrayList<>();
+        out.add("# Findings-register coverage - GENERATED by FindingsRegisterCoverageTest.");
+        out.add("# Do not hand-edit, and do not copy these numbers into prose. F2-265: a count in");
+        out.add("# prose is a copy of a measurement, and the plan cell that carried these said");
+        out.add("# \"re-derive it, never edit it by hand\" through four drifts, each of which added a");
+        out.add("# warning rather than an enforcement.");
+        out.add("");
+        out.add("plan_references_distinct_ids=" + referenced.size());
+        out.add("register_specs=" + specced.size());
+        out.add("specs_owed=" + owed.size() + "  (ceiling " + BASELINE_SPECS_OWED
+                + ", decrease-only)");
+        out.add("orphan_specs=" + orphans.size());
+        out.add("");
+        out.add("# Specs owed. Column 2 is a HINT read off the finding's own plan row; NOTHING is");
+        out.add("# gated on it and it is not a verdict - see closureHint().");
+        for (int id : owed) {
+            out.add(String.format("F2-%-4d %s", id, closureHint(plan, id)));
+        }
+        String body = String.join(System.lineSeparator(), out);
+        Files.writeString(REPORT, body, StandardCharsets.UTF_8);
+
+        assertThat(REPORT).as("the report must exist for the doc-map cell to point at").exists();
+        assertThat(read(REPORT))
+                .as("the report on disk must be the one this run produced, not a leftover "
+                    + "from an earlier one that happens to carry the same numbers")
+                .isEqualTo(body)
+                .contains("specs_owed=" + owed.size())
+                .contains("register_specs=" + specced.size());
+    }
+
+    @Test
+    @DisplayName("the doc-map cell points at the measurement instead of restating it")
+    void theDocMapCellPointsAtTheGateRatherThanRestatingIt() {
+        assumeDocs();
+        List<String> found = read(PLAN).lines()
+                .filter(l -> unquoted(l).contains(DOC_MAP_ANCHOR))
+                .toList();
+        assertThat(found)
+                .as("expected exactly one plan cell carrying the rule '%s'. Zero means the anchor "
+                    + "moved and every assertion below is vacuous; more than one means the rule is "
+                    + "stated twice, which is the defect this gate is about.", DOC_MAP_ANCHOR)
+                .hasSize(1);
+        String cell = found.get(0);
+
+        assertThat(cell)
+                .as("the doc-map cell must name the gate that owns this measurement. Deleting the "
+                    + "counts without naming their source leaves a reader nowhere to look, which "
+                    + "is how the counts got written into prose in the first place.")
+                .contains("FindingsRegisterCoverageTest");
+        assertThat(cell)
+                .as("the doc-map cell must name the published artefact, so 're-derive it' is an "
+                    + "instruction a reader can follow rather than one they have to invent.")
+                .contains(REPORT.toString().replace('\\', '/'));
+
+        List<String> restated = COVERAGE_COUNT.matcher(unquoted(cell)).results()
+                .map(MatchResult::group).toList();
+        assertThat(restated)
+                .as("the doc-map cell restates %d coverage count(s) the gate owns: %s. Every one is "
+                    + "a copy of a measurement that moves on almost every commit - the pre-fix cell "
+                    + "read 94/57/40 against a measured 264/235/29. State the rule and point at %s; "
+                    + "if you are recording what a figure USED to be, put it in double quotes, "
+                    + "which is this register's own correction convention.",
+                        restated.size(), restated, REPORT)
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("the restatement detector fires on the text it retired, and not on a quotation")
+    void theRestatementDetectorIsPinnedInBothDirections() {
+        String retired = "Current, and every figure here is script output: plan references **94** "
+                + "distinct ids, the register carries **57** specs, **40 are owed**.";
+        assertThat(COVERAGE_COUNT.matcher(unquoted(retired)).results().count())
+                .as("the detector must fire on the literal pre-fix sentence; a gate that passes on "
+                    + "a green tree is indistinguishable from one whose pattern stopped matching")
+                .isEqualTo(3L);
+
+        String history = "The plan then referenced **74+** distinct ids, not 62.";
+        assertThat(COVERAGE_COUNT.matcher(unquoted(history)).results().count())
+                .as("both stems: the pre-fix cell carried this as unquoted history, and a "
+                    + "present-tense-only pattern would have missed it")
+                .isEqualTo(1L);
+
+        String quoted = "CORRECTED: this cell used to read *\"plan references **94** distinct ids, "
+                + "the register carries **57** specs, **40 are owed**\"* - every figure stale.";
+        assertThat(COVERAGE_COUNT.matcher(unquoted(quoted)).results().count())
+                .as("a correction QUOTES the sentence it replaces (F2-193), so a detector that "
+                    + "cannot tell a quotation from a claim would force every correction to "
+                    + "paraphrase away its own evidence")
+                .isZero();
+
+        String clean = "Re-derive with FindingsRegisterCoverageTest, which writes "
+                + "target/findings-register-coverage.txt. Round 3 covers 12 findings.";
+        assertThat(unquoted("a row quoting *\"" + DOC_MAP_ANCHOR + "\"* is not the cell"))
+                .as("the anchor must be resolved against quote-stripped text: F2-265's own plan\n"
+                    + "entry quotes this rule sentence, and without stripping, two lines match and\n"
+                    + "the uniqueness assertion fails on a correct tree")
+                .doesNotContain(DOC_MAP_ANCHOR);
+        assertThat(COVERAGE_COUNT.matcher(unquoted(clean)).results().count())
+                .as("must not fire on prose carrying no coverage count - a gate that fails on "
+                    + "correct code trains the next reader to edit the assertion (F2-214)")
                 .isZero();
     }
 }
