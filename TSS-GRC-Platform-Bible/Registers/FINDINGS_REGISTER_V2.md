@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Status** | 🟢 CLOSED 2026-08-22 (`394fb9cd`) |
 | **Severity** | P3 — no runtime defect; the artefact an auditor is handed, and the list that gates scheduling |
 | **Found by** | ranking the next slice after [[F2-264]] — three consecutive candidates in the guard/instrument seam had landed on latent-or-refuted findings, so the question was changed |
 | **Fix** | `FindingsRegisterCoverageTest` publishes `target/findings-register-coverage.txt`; `theDocMapCellPointsAtTheGateRatherThanRestatingIt` refuses a restated count |
