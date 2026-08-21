@@ -4,6 +4,7 @@ import com.tss.grc.module.ethics.coi.controller.CoiController;
 import com.tss.grc.module.ethics.whistleblower.controller.WhistleblowerCaseController;
 import com.tss.grc.module.ethics.whistleblower.controller.WhistleblowerRetaliationController;
 import org.junit.jupiter.api.DisplayName;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -17,8 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -253,8 +252,9 @@ class EthicsGuardConversionTest {
         var pairs = new TreeSet<String>();
         for (Path source : SOURCES) {
             String code = stripComments(Files.readString(source, StandardCharsets.UTF_8));
-            Matcher m = Pattern.compile("hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)").matcher(code);
-            while (m.find()) pairs.add(m.group(1) + ":" + m.group(2));
+            // F2-263 — shared extractor; see GuardExpressions#permissionPairsIn for the four
+            // spellings this replaces and what each of them could not see.
+            pairs.addAll(GuardExpressions.permissionPairsIn(code));
         }
         assertThat(pairs)
                 .as("a guard citing a module or action outside the catalogue can never be satisfied by a "

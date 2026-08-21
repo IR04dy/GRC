@@ -1872,6 +1872,94 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **AN ANTI-VACUITY CHECK CAN BE THE SAME EXPRESSION THAT MAKES A GATE FAIL ON CORRECT
+  CODE, AND THE FILE THAT COINED THAT RULE IS WHERE IT HAPPENED** (F2-263, measured 2026-08-21).
+  Executing F2-262's own top filing, re-derived first (F2-221): it named **7** hand-rolled
+  `hasPermission('MODULE','ACTION')` pair extractors; the population is **11 regexes in 10 files
+  across 4 spellings**, and all four return the **identical 131 pairs** over 1,314 guard
+  expressions with **no** guard splitting a call across a concatenation — so every divergence is
+  latent and the argument is F2-177's. ⚠⚠ **The sharp edge is not the duplication.**
+  `ObLifecycleTest.permissionIn` and its `sharia` twin compiled
+  `CONST\s*=\s*\n?\s*"hasPermission\('([A-Z_]+)'\s*,\s*'([A-Z_]+)'\)"` and asserted `m.find()`, so
+  the closing `\)"` required the constant's initialiser to **END right after the pair**. Give
+  either guard a second leg and the build fails with *"guard constant X must be a hasPermission
+  string"* — **a gate refusing correct code** (F2-214), blaming the guard rather than the test.
+  F2-262's mechanism 3 **mirrored**: there the pattern broke when a module *converted*, here when a
+  guard *gains a leg*, which is the documented direction of travel (F2-159/F2-161 ownership,
+  F2-177 seats, admin overrides). Measured rather than hypothesised: **12 of the platform's 94
+  permission-bearing guard constants are already that composed shape**, every one
+  `"hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')"` — the **singular** `hasRole`
+  F2-262 recorded as invisible to a `hasAnyRole\(`-only spelling at 67 sites.
+  🔑🔑 **WHY THEY SURVIVED F2-262: they had ALREADY replaced their role extractor with a permission
+  one when their modules converted, so they were never members of the role-name population — and
+  F2-262 read this very javadoc, quoted its rule as its headline lesson (*"a regex that matches
+  nothing satisfies every downstream assertion forever, so the anti-vacuity check belongs in the
+  HELPER, where every caller inherits it"*), and did not convert the method the rule is written
+  on.** The `find()` they built to be safe is the same `find()` that makes them fail on correct
+  code. F2-195's shape at its sharpest: the tree held the correct rule, in prose, on the line that
+  broke it. **When you quote a file's own lesson, read the method under it.**
+  ⚠⚠ **REFUTED BEFORE ANY CODE WAS WRITTEN, and one of them was a complete, plausible,
+  non-existent finding.** **585 of 2,203** `@PreAuthorize` sites name a CONSTANT rather than an
+  inline string, which reads exactly like the blind spot a source-text extractor would have — and
+  resolving the constants adds **ZERO** pairs to any of the seven source-scanned subjects, because
+  the constants sit in the **same file** a whole-file scan already reads. 🔑 **A divergence
+  hypothesis that survives reading can still be zero when measured.** Also refuted: two of F2-262's
+  other three filings — *"`sharia` and `openbanking` no longer ask the role question"* is true and
+  **harmless**, since `RoleGuardConversionRatchetTest` scans every controller reflectively and their
+  remaining `hasAnyRole` hits are **comments describing the retired guards** (F2-193's
+  epitaph-as-corpse).
+  ⚠⚠ **THE TRAILING `\)` IS THE WHOLE THREE-ARGUMENT EXCLUSION, AND THE TWO FORMS ARE REFUSED FOR
+  DIFFERENT REASONS.** `hasPermission(#externalId,'ML_MODEL','OWNER')` is refused at the opening
+  quote; `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')`'s first argument **is** quoted, so
+  **only the closing paren separates it from a pair** — and matching it publishes
+  `AUDIT_COMMITTEE:COMMITTEE` as a catalogued permission, which F2-255 recorded as a false ghost on
+  correct code. Use `GuardExpressions.permissionPairsIn` / `permissionPairsInConstant` /
+  `permissionPairOfConstant`; do not hand-roll a twelfth (F2-190).
+  ⚠⚠ **AN ESCAPED `\(` COUNTS AS A CAPTURE GROUP, AND THAT INVERTED MY CLASSIFIER COMPLETELY.**
+  Every one of the four real spellings opens `hasPermission\(`, so counting bare `(` scored them at
+  **3**, and the only neighbour the classifier admitted was `ChangeDocumentationFreshnessTest`'s
+  one-group pattern at 2 — **the gate reported the four members as clean and the one non-member as
+  an offender.** 🔑 **And my own reconnaissance scan had PRINTED `groups=3` beside each spelling; I
+  read past it because the number was not the answer I was looking for.** `(?<!\\)\((?!\?)` is the
+  fix. Nth instance in this lineage of a detector satisfied by something other than its claim, and
+  the first where the evidence was already in my own output.
+  ⚠ **TWO PAIR REGEXES FOR ONE QUESTION WAS A DESIGN AND STILL NEEDED ONLY ONE PATTERN.**
+  `PermissionCatalogueUsageTest` held a strict `[A-Z_]+` extractor and a loose `[^']*` one for its
+  well-formedness leg — extract widest, then judge — which is correct reasoning and did not require
+  two regexes: the helper already takes the widest reading, so the judgement became one
+  `WELL_FORMED_PAIR` over the joined pair. **Not tidiness: with two, the extraction silently
+  dropped a malformed pair from `target/permission-usage.txt` while only the other leg could see
+  it.** Judging the joined string is equivalent to judging the halves — a token carrying a colon
+  fails the pattern too — which is asserted rather than argued.
+  ⚠ **`GuardExpressions.stripComments` IS THE REGEX FORM AND IT IS NOT A DROP-IN REPLACEMENT
+  EVERYWHERE.** `MeasuredBaselineFreshnessTest`'s javadoc records that the equivalent alternation
+  **throws `StackOverflowError`** on this codebase's larger files (Java's engine recurses per
+  iteration of `[\s\S]*?`; the Python census can use the regex, the JVM cannot), so that class keeps
+  its own character scanner and **only its extraction moved**. Nine callers use the helper's stripper
+  today on sources small enough not to hit it — which is exactly where the four spellings were.
+  ⚠⚠ **BOTH FIRST-ROUND MUTATION SURVIVORS WERE REAL UNTESTED CLAUSES, NOT EQUIVALENT MUTANTS.**
+  Removing `permissionPairOfConstant`'s size check left it throwing out of an iterator — **the
+  anti-vacuity property the whole consolidation rests on** — and the class-stripping clause was
+  never exercised, because no spelling in the tree happens to put a comma inside a character class
+  (`[\w<>,.\[\]]` does appear elsewhere in the tree). 🔑 **On a clean corpus a clause with no
+  counter-example scores exactly like a correct one**; both were closed by assertion rather than
+  recorded as equivalent. 12/12 killed after.
+  ⚠ **A "collect the violations, assert the list empty" leg is vacuous once the tree is clean**, so
+  the malformed-guard leg gained a synthetic self-test: widening `WELL_FORMED_PAIR` to `.*` had left
+  every assertion above it green (F2-257's rule).
+  ⚙ **The verification for a consolidation is that the published census does not move**: 131 pairs /
+  1,784 guard sites / 74 composed / 363 pure role sites / 38 role names, measured identical on
+  master and after. **A helper that changed them would be changing findings rather than sharing
+  code.** And label a leg whose tripwire is in the FUTURE as a PIN rather than counting its green as
+  a discriminating pass — the 3-arg exclusion leg pins a property master already had (F2-225).
+  ⚙ **Filed:** **two test-support packages for one purpose** — `com.tss.grc.support`
+  (`MigrationVocabularies`, `GuardExpressions`, 20 importers) and `com.tss.grc.testsupport`
+  (`StateMachineContract`, 8 importers), F2-190's shape one level up, now visible because four files
+  import from both on adjacent lines; a character-scanner variant of the helper's stripper; and
+  `PermissionCatalogueUsageTest`'s well-formedness leg **rejecting a token carrying a digit**
+  (`ISO27001:READ`) although `ModulePermissionEvaluator` would match `ISO27001_READ` — latent at 0
+  such tokens, and whether upper-snake-only is a house convention or an over-narrow check is an
+  **owner decision**, not a side effect of an extractor change.
 - ⚠⚠ **A FILING THAT NAMES ITS MEMBERS BY MODULE INHERITS THE MODULE LIST OF THE SLICE THAT FILED
   IT, AND A MODULE CAN HOST A DIFFERENT QUESTION'S EXTRACTOR** (F2-262, measured 2026-08-21).
   Executing F2-260's filed *"shared role-name extractor: 5 hand-rolled copies, 3 already bitten"*,

@@ -1,6 +1,7 @@
 package com.tss.grc.config;
 
 import org.junit.jupiter.api.Assumptions;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -87,8 +88,11 @@ class MeasuredBaselineFreshnessTest {
     private static final Pattern ENTITY = Pattern.compile("@Entity(?![A-Za-z0-9_])");
     private static final Pattern TABLE_ANNOTATION = Pattern.compile("@Table\\s*\\(([^)]*)\\)", Pattern.DOTALL);
     private static final Pattern SCHEMA_ATTR = Pattern.compile("schema\\s*=\\s*\"([^\"]+)\"");
-    private static final Pattern HAS_PERMISSION_PAIR =
-        Pattern.compile("hasPermission\\(\\s*'([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)");
+    // F2-263 — the pair extractor moved to GuardExpressions#permissionPairsIn (eleven copies,
+    // four spellings). ⚠ Only the EXTRACTION moved: this class keeps its own character-scanner
+    // stripComments, because the javadoc there records that the equivalent regex alternation
+    // throws StackOverflowError on this codebase's larger files — the helper's stripper is the
+    // regex form, so it is not a drop-in replacement here.
     private static final Pattern HAS_PERMISSION_BARE = Pattern.compile("hasPermission\\(");
     private static final Pattern MIGRATION_VERSION = Pattern.compile("^V(\\d+)__.+\\.sql$");
     private static final Pattern ROUTE = Pattern.compile("<Route[^>]*path=");
@@ -374,8 +378,9 @@ class MeasuredBaselineFreshnessTest {
     void permissionModuleCensusMatches() {
         Set<String> modules = new TreeSet<>();
         for (Path p : javaFiles(MAIN_JAVA)) {
-            Matcher m = HAS_PERMISSION_PAIR.matcher(stripComments(read(p)));
-            while (m.find()) modules.add(m.group(1));
+            for (String pair : GuardExpressions.permissionPairsIn(stripComments(read(p)))) {
+                modules.add(pair.substring(0, pair.indexOf(':')));
+            }
         }
         assertThat(modules).as("anti-vacuity: no hasPermission guards found").hasSizeGreaterThan(20);
         assertThat(modules.size())

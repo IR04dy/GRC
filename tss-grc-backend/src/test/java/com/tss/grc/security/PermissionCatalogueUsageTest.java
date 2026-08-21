@@ -1,5 +1,6 @@
 package com.tss.grc.security;
 
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
@@ -50,9 +51,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PermissionCatalogueUsageTest {
 
-    /** {@code hasPermission('MODULE','ACTION')} in any whitespace variant used in the codebase. */
-    private static final Pattern HAS_PERMISSION =
-        Pattern.compile("hasPermission\\(\\s*'([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)");
+    /**
+     * The well-formed shape of a joined {@code MODULE:ACTION} pair.
+     *
+     * <p>F2-263 — this class used to hold <b>two</b> pair regexes: a strict {@code [A-Z_]+} one
+     * for extraction and a loose {@code [^']*} one for the well-formedness leg below. The
+     * contrast was the design (extract widest, then judge), and it did not need two patterns:
+     * {@link GuardExpressions#permissionPairsIn} already takes the widest reading, so the
+     * judgement moves here and both legs now consult <b>one</b> population. That matters beyond
+     * tidiness — with two, the extraction silently dropped a malformed pair from
+     * {@code target/permission-usage.txt} while only the other leg could see it.
+     *
+     * <p>Judging the joined string is equivalent to judging the halves: a token containing a
+     * colon fails this pattern too, so nothing escapes by being split differently.
+     */
+    private static final Pattern WELL_FORMED_PAIR = Pattern.compile("[A-Z][A-Z_]*:[A-Z][A-Z_]*");
 
     /** Where the report script picks up the code-side half: the distinct pairs. */
     private static final Path OUT = Path.of("target", "permission-usage.txt");
@@ -152,7 +165,6 @@ class PermissionCatalogueUsageTest {
         List<String> malformed = new ArrayList<>();
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
-        Pattern loose = Pattern.compile("hasPermission\\(\\s*'([^']*)'\\s*,\\s*'([^']*)'\\s*\\)");
         for (var bd : scanner.findCandidateComponents("com.tss.grc")) {
             Class<?> c;
             try {
@@ -165,13 +177,10 @@ class PermissionCatalogueUsageTest {
                 if (pa == null) {
                     continue;
                 }
-                Matcher mt = loose.matcher(pa.value());
-                while (mt.find()) {
-                    String mod = mt.group(1);
-                    String act = mt.group(2);
-                    if (!mod.matches("[A-Z][A-Z_]*") || !act.matches("[A-Z][A-Z_]*")) {
+                for (String pair : GuardExpressions.permissionPairsIn(pa.value())) {
+                    if (!WELL_FORMED_PAIR.matcher(pair).matches()) {
                         malformed.add(c.getSimpleName() + "#" + m.getName()
-                            + " -> hasPermission('" + mod + "','" + act + "')");
+                            + " -> hasPermission " + pair);
                     }
                 }
             }
@@ -182,6 +191,20 @@ class PermissionCatalogueUsageTest {
                 + "so a module or action that is not UPPER_SNAKE can never be granted — the "
                 + "guard is permanently closed and PLATFORM_ADMIN's code bypass hides it.")
             .isEmpty();
+
+        // F2-263 — a synthetic self-test, because the assertion above is a "collect the violations,
+        // assert the list empty" shape and on a clean tree an empty list is what BOTH a working
+        // detector and a dead one produce. Widening WELL_FORMED_PAIR to .* would leave every
+        // assertion above green; these four cases are what makes that a failure instead.
+        assertThat(WELL_FORMED_PAIR.matcher("RISK:READ").matches()).isTrue();
+        assertThat(WELL_FORMED_PAIR.matcher("risk:read").matches())
+            .as("a lower-case pair can never match the granted authority").isFalse();
+        assertThat(WELL_FORMED_PAIR.matcher("RIS:K:READ").matches())
+            .as("judging the JOINED pair is equivalent to judging the halves only if a token "
+                + "carrying a colon still fails — that is the claim this pattern rests on")
+            .isFalse();
+        assertThat(WELL_FORMED_PAIR.matcher("REG-CHANGE:READ").matches())
+            .as("hyphens are the other shape ModulePermissionEvaluator cannot match").isFalse();
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════════════
@@ -481,13 +504,12 @@ class PermissionCatalogueUsageTest {
         if (pa == null) {
             return;
         }
-        boolean andsARole = pa.value().contains("hasAnyRole") || pa.value().contains("hasRole");
-        Matcher m = HAS_PERMISSION.matcher(pa.value());
-        while (m.find()) {
-            pairs.add(m.group(1) + ":" + m.group(2));
-            sites.add(cls + "#" + member + " " + m.group(1) + ":" + m.group(2));
+        boolean andsARole = GuardExpressions.hasRoleLeg(pa.value());
+        for (String pair : GuardExpressions.permissionPairsIn(pa.value())) {
+            pairs.add(pair);
+            sites.add(cls + "#" + member + " " + pair);
             if (andsARole) {
-                composed.add(cls + "#" + member + " " + m.group(1) + ":" + m.group(2));
+                composed.add(cls + "#" + member + " " + pair);
             }
         }
     }

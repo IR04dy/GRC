@@ -2,6 +2,7 @@ package com.tss.grc.module.intake.spi;
 
 import com.tss.grc.module.intake.service.IntakeKindRouting;
 import com.tss.grc.module.intake.dto.TriageDecisionRequest;
+import com.tss.grc.support.GuardExpressions;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AssignableTypeFilter;
@@ -179,7 +180,8 @@ class IntakePromotionContractTest {
      * matched a javadoc phrase as a class declaration. An annotation value cannot contain prose.
      */
     private static Set<String> permissionVocabulary() {
-        Pattern p = Pattern.compile("hasPermission\\(\\s*'([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)");
+        // F2-263 — shared extractor. The reflection above stays; what moved is only the parse,
+        // which is the half eleven files had each written for themselves.
         Set<String> out = new TreeSet<>();
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AssignableTypeFilter(Object.class));
@@ -194,8 +196,7 @@ class IntakePromotionContractTest {
                     if (a != null) exprs.add(a.value());
                 }
                 for (String e : exprs) {
-                    Matcher m = p.matcher(e);
-                    while (m.find()) out.add(m.group(1) + ":" + m.group(2));
+                    out.addAll(GuardExpressions.permissionPairsIn(e));
                 }
             } catch (Throwable ignored) {
                 // unloadable classes carry no live guard either

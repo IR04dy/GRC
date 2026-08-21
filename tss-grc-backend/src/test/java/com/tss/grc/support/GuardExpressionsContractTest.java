@@ -47,11 +47,17 @@ class GuardExpressionsContractTest {
     private static final Path TEST_ROOT = Path.of("src", "test", "java", "com", "tss", "grc");
 
     /**
-     * The only two sources permitted to write a role-call regex. Not an exemption map — an exemption
-     * map is a list somebody remembered, and F2-198's whole lineage is about a population narrowed
-     * by one. These two are structural: the declaration site, and the file that must quote it.
+     * The only two sources permitted to write a guard regex — of either question. Not an exemption
+     * map: an exemption map is a list somebody remembered, and F2-198's whole lineage is about a
+     * population narrowed by one. These two are structural: the declaration site, and the file that
+     * must quote it.
+     *
+     * <p>F2-263 added the permission-pair ban and read it off <b>this</b> set rather than declaring a
+     * second one naming the same two files. Two lists that must agree, with nobody maintaining the
+     * agreement, is the defect this whole class exists to remove (F2-177) — committing it inside the
+     * class would be one level up from the eleven extractors it replaced.
      */
-    private static final Set<String> MAY_DECLARE_A_ROLE_CALL_REGEX =
+    private static final Set<String> MAY_DECLARE_A_GUARD_REGEX =
         Set.of("GuardExpressions.java", "GuardExpressionsContractTest.java");
 
     /** Where a {@code Pattern.compile(...)} call begins. */
@@ -75,6 +81,36 @@ class GuardExpressionsContractTest {
      * that in the direction that matters.
      */
     private static final Pattern ROLE_CALL_REGEX = Pattern.compile("(?s)has.*Role|Role.*has");
+
+    /**
+     * A regex that describes a SpEL <b>permission-pair</b> extraction: it mentions
+     * {@code hasPermission} and captures <b>both</b> arguments.
+     *
+     * <p>Recognised by shape, never by name, and the two clauses are what keep four legitimate
+     * neighbours out of the population:
+     *
+     * <ul>
+     *   <li><b>Two capture groups.</b> Excludes {@code hasPermission\(} (a presence count),
+     *       {@code hasPermission\(\s*'} (a prefix test), and
+     *       {@code hasPermission\(\s*'[A-Z_]+'\s*,\s*'EXPORT'\s*\)} (a specific action, no
+     *       capture) — as well as {@code ChangeDocumentationFreshnessTest}'s
+     *       {@code hasPermission\('CHANGE'…'([A-Z_]+)'\)}, which hard-codes the module and so asks
+     *       the narrower question "which CHANGE actions".</li>
+     *   <li><b>Exactly one separator comma.</b> This is the whole three-argument exclusion.
+     *       {@code CommitteeSeatGuardTest} extracts {@code (type, relation)} out of
+     *       {@code hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')} — <em>two</em> capture groups,
+     *       and a different question about a different mechanism (F2-177's committee seat, whose
+     *       {@code targetId} is a committee TYPE rather than a permission module). Counting the
+     *       comma is what tells them apart; a name-based exclusion would let the next one escape by
+     *       being spelled differently (F2-192).</li>
+     * </ul>
+     *
+     * <p>Both clauses are pinned in both directions by
+     * {@link #thePairClassifierIsPinnedInBothDirections} — a narrowing that is too wide silently
+     * re-tiers the tree, and one that is too narrow silently shrinks the population, which reads
+     * exactly like a complete sweep.
+     */
+    private static final Pattern PERMISSION_PAIR_REGEX = Pattern.compile("hasPermission");
 
     /** Java comments, one left-to-right alternation (see {@link GuardExpressions#stripComments}). */
     private static final Pattern COMMENTS = Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
@@ -351,7 +387,7 @@ class GuardExpressionsContractTest {
 
         for (Path p : testSources()) {
             String name = p.getFileName().toString();
-            if (MAY_DECLARE_A_ROLE_CALL_REGEX.contains(name)) {
+            if (MAY_DECLARE_A_GUARD_REGEX.contains(name)) {
                 continue;
             }
             scanned++;
@@ -503,7 +539,7 @@ class GuardExpressionsContractTest {
         // Forward: each exclusion is load-bearing — the file really does declare a role-call regex,
         // so removing it from the set would make the hard zero fail on correct code.
         Map<String, Boolean> declares = new TreeMap<>();
-        for (String name : MAY_DECLARE_A_ROLE_CALL_REGEX) {
+        for (String name : MAY_DECLARE_A_GUARD_REGEX) {
             Path p = TEST_ROOT.resolve(Path.of("support", name));
             assertThat(Files.exists(p)).as("%s is excluded from the ban and does not exist", name)
                 .isTrue();
@@ -518,13 +554,329 @@ class GuardExpressionsContractTest {
 
         // Reverse: both live in support/, so a third file cannot be added by name alone without
         // also appearing here.
-        assertThat(MAY_DECLARE_A_ROLE_CALL_REGEX).hasSize(2);
+        assertThat(MAY_DECLARE_A_GUARD_REGEX).hasSize(2);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    //  5. F2-263 — the same argument, one question over: the permission-pair extractor
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * The eleven files that hand-rolled a {@code (MODULE, ACTION)} extractor, in four spellings.
+     *
+     * <p>F2-262 filed this population at <b>seven</b>. Re-derived (F2-221) with the concatenation
+     * walk above it is <b>eleven regexes in ten files</b>, and over the whole guard corpus all four
+     * spellings return the <b>identical 131 pairs</b> — so, exactly as with the role question, every
+     * divergence between them was latent and what made them harmless was that they happened to agree
+     * (F2-177).
+     */
+    @Test
+    @DisplayName("no test source hand-rolls a permission-pair extractor")
+    void thereIsExactlyOnePermissionPairExtractorInTheTestTree() {
+        Map<String, List<String>> offenders = new TreeMap<>();
+        int scanned = 0;
+
+        for (Path p : testSources()) {
+            String name = p.getFileName().toString();
+            if (MAY_DECLARE_A_GUARD_REGEX.contains(name)) {
+                continue;
+            }
+            scanned++;
+            List<String> hits = permissionPairRegexesIn(COMMENTS.matcher(read(p)).replaceAll(" "));
+            if (!hits.isEmpty()) {
+                offenders.put(name, hits);
+            }
+        }
+
+        assertThat(scanned).as("the test-source walk resolved nothing — TEST_ROOT is wrong")
+            .isGreaterThanOrEqualTo(400);
+
+        assertThat(offenders).as("""
+            %s declares its own permission-pair regex. GuardExpressions#permissionPairsIn answers \
+            this, and #permissionPairOfConstant answers it for a named guard constant. The four \
+            spellings this replaced diverged on whitespace tolerance and token shape and agreed on \
+            the answer, which is not a property anybody was maintaining.""".formatted(offenders))
+            .isEmpty();
+    }
+
+    /**
+     * A composed guard constant resolves to its pair instead of refusing to parse.
+     *
+     * <p>⚠⚠ <b>This is the leg F2-263 exists for.</b> {@code ObLifecycleTest.permissionIn} and its
+     * {@code sharia} twin required the constant's initialiser to <em>be</em> a bare
+     * {@code "hasPermission('X','Y')"} literal, so a guard that gained a second leg failed the build
+     * saying <i>the constant must be a hasPermission string</i> — a gate refusing correct code
+     * (F2-214), blaming the guard. <b>12 of the platform's 94 permission-bearing guard constants are
+     * already that composed shape</b>, every one of them
+     * {@code "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')"}.
+     *
+     * <p>And note which {@code hasRole} that is: the <em>singular</em> form, which F2-262 measured as
+     * invisible to a {@code hasAnyRole\(}-only spelling at 67 sites. The composed shape carries both
+     * of this class's questions at once.
+     */
+    @Test
+    @DisplayName("a composed guard constant still resolves — the shape 12 NDI controllers already use")
+    void aComposedGuardConstantResolvesRatherThanRefusingToParse() {
+        String composed =
+            "class X { private static final String APPROVE = "
+            + "\"hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')\"; }";
+
+        assertThat(GuardExpressions.permissionPairOfConstant(composed, "APPROVE"))
+            .as("the pre-F2-263 pattern required the string to END after the pair, so this shape "
+                + "failed the build with 'must be a hasPermission string'")
+            .isEqualTo("NDI:APPROVE");
+
+        // Both questions, one constant: the role leg is still visible, and it is the singular form.
+        assertThat(GuardExpressions.rolesRecitedByConstant(composed, "APPROVE"))
+            .containsExactly("PLATFORM_ADMIN");
+
+        // An ownership leg is the other documented direction of travel (F2-159/F2-161).
+        String owned = "class X { static final String W = "
+            + "\"hasAnyRole('BCM_MANAGER') or hasPermission(#id,'EXERCISE_RUN','OWNER') \"\n"
+            + "    + \"or hasPermission('BCM','WRITE')\"; }";
+        assertThat(GuardExpressions.permissionPairsInConstant(owned, "W"))
+            .as("the three-argument ownership relation is not a permission pair, and the two-argument "
+                + "leg beside it is")
+            .containsExactly("BCM:WRITE");
+
+        // ⚠ The anti-vacuity half, added because the mutation harness proved it untested: removing
+        // the size check left `pairs.iterator().next()` throwing NoSuchElementException, and no test
+        // reached that branch — on a clean tree every constant asked about cites exactly one pair.
+        // This is the property the whole consolidation rests on, so it cannot be the untested one.
+        String noPair = "class X { static final String G = \"hasAnyRole('PLATFORM_ADMIN')\"; }";
+        assertThatThrownBy(() -> GuardExpressions.permissionPairOfConstant(noPair, "G"))
+            .as("a constant that has been converted AWAY from a permission must report drift, "
+                + "legibly — not throw out of an iterator")
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("exactly one MODULE:ACTION pair")
+            .hasMessageContaining("cites 0");
+
+        String twoPairs = "class X { static final String G = "
+            + "\"hasPermission('A','READ') or hasPermission('B','WRITE')\"; }";
+        assertThatThrownBy(() -> GuardExpressions.permissionPairOfConstant(twoPairs, "G"))
+            .as("a caller asking for THE pair of a constant citing two must be told, not handed "
+                + "whichever came first")
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("cites 2");
+    }
+
+    /**
+     * The three-argument relations are excluded, and the reason each is excluded differs.
+     *
+     * <p>F2-255 recorded that matching either of them publishes a false ghost on correct code:
+     * {@code ML_MODEL:OWNER} or {@code AUDIT_COMMITTEE:COMMITTEE} would be reported as a catalogued
+     * permission pair the catalogue does not define. {@code #externalId} is refused at the opening
+     * quote; the committee form's first argument <b>is</b> quoted, so only the closing paren tells
+     * them apart — which is why this leg asserts both rather than one exemplar.
+     */
+    @Test
+    @DisplayName("neither three-argument relation is read as a permission pair")
+    void theThreeArgumentRelationsAreNotPermissionPairs() {
+        assertThat(GuardExpressions.permissionPairsIn(
+            "hasPermission(#externalId, 'ML_MODEL', 'OWNER')")).isEmpty();
+        assertThat(GuardExpressions.permissionPairsIn(
+            "hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')")).isEmpty();
+        assertThat(GuardExpressions.permissionPairsIn(
+            "hasPermission('AUDIT_COMMITTEE', 'COMMITTEE', 'SEAT')")).isEmpty();
+
+        // …and the two-argument reading is not lost when a relation sits in the same expression.
+        assertThat(GuardExpressions.permissionPairsIn(
+            "hasPermission('AI','WRITE') or hasPermission(#externalId,'ML_MODEL','OWNER')"))
+            .containsExactly("AI:WRITE");
+    }
+
+    /**
+     * Every axis on which the four replaced spellings were narrower than the widest correct reading.
+     *
+     * <p>Each divergence is latent today — 0 sites write {@code hasPermission (}, 0 tokens carry a
+     * digit, and no guard splits a call across a concatenation — which is the same position the role
+     * question was in, and the same argument: what made four regexes harmless was that they agreed.
+     */
+    @Test
+    @DisplayName("the widest correct reading: whitespace anywhere, tokens of any shape")
+    void theSharedExtractorTakesTheWidestCorrectReading() {
+        // The five-copy spelling had no tolerance after the opening paren or before the closing one.
+        assertThat(GuardExpressions.permissionPairsIn("hasPermission( 'RISK' , 'READ' )"))
+            .containsExactly("RISK:READ");
+        // Nor before the paren itself.
+        assertThat(GuardExpressions.permissionPairsIn("hasPermission ('RISK','READ')"))
+            .containsExactly("RISK:READ");
+        // [A-Z_]+ cannot see a digit; the widest reading can, and judging the shape is a separate
+        // question that PermissionCatalogueUsageTest owns.
+        assertThat(GuardExpressions.permissionPairsIn("hasPermission('ISO27001','READ')"))
+            .containsExactly("ISO27001:READ");
+        // Several legs, in written order, deduplicated.
+        assertThat(GuardExpressions.permissionPairsIn(
+            "hasPermission('A','READ') or hasPermission('B','WRITE') or hasPermission('A','READ')"))
+            .containsExactly("A:READ", "B:WRITE");
+        assertThat(GuardExpressions.permissionPairsIn(null)).isEmpty();
+        assertThat(GuardExpressions.permissionPairsIn("hasAnyRole('X')")).isEmpty();
+    }
+
+    /**
+     * The pair classifier fires on all four replaced spellings and on none of the five neighbours.
+     *
+     * <p>Pinned in <b>both</b> directions: a narrowing that is too wide silently re-tiers the tree,
+     * and one that is too narrow silently shrinks the population — and a smaller population reads
+     * exactly like a complete sweep (F2-198). The must-not-fire half is the one nobody writes first
+     * (F2-199), and it is where the three-argument committee extractor sits.
+     */
+    @Test
+    @DisplayName("the pair classifier: four must fire, five must not")
+    void thePairClassifierIsPinnedInBothDirections() {
+        Map<String, Boolean> fires = new TreeMap<>();
+        // ── the four replaced spellings ──
+        fires.put("A tolerant", isPermissionPairRegex(
+            "hasPermission\\(\\s*'([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)"));
+        fires.put("B tight", isPermissionPairRegex(
+            "hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)"));
+        fires.put("C constant-initialiser", isPermissionPairRegex(
+            "\\s*=\\s*\\n?\\s*\"hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)\""));
+        fires.put("D loose", isPermissionPairRegex(
+            "hasPermission\\(\\s*'([^']*)'\\s*,\\s*'([^']*)'\\s*\\)"));
+        // ── the five legitimate neighbours, each asking a narrower or different question ──
+        fires.put("bare presence (MeasuredBaseline)", isPermissionPairRegex("hasPermission\\("));
+        fires.put("prefix test (ExerciseRunOwnership)", isPermissionPairRegex(
+            "hasPermission\\(\\s*'"));
+        fires.put("fixed action (ExportAuthorizationRatchet)", isPermissionPairRegex(
+            "hasPermission\\(\\s*'[A-Z_]+'\\s*,\\s*'EXPORT'\\s*\\)"));
+        fires.put("fixed module (ChangeDocumentationFreshness)", isPermissionPairRegex(
+            "hasPermission\\('CHANGE'\\s*,\\s*'([A-Z_]+)'\\)"));
+        fires.put("three-arg seat (CommitteeSeatGuard)", isPermissionPairRegex(
+            "hasPermission\\(\\s*['\"]([^'\"]+)['\"]\\s*,\\s*['\"]COMMITTEE['\"]"
+            + "\\s*,\\s*['\"]([^'\"]+)['\"]\\s*\\)"));
+        // ⚠ The class-stripping clause, asserted directly because the mutation harness showed it was
+        // never exercised: no spelling in the tree happens to put a comma inside a character class,
+        // so deleting the strip changed no answer here — while `[\w<>,.\[\]]` does appear in this
+        // tree, and a pair extractor written with one would silently stop being counted.
+        fires.put("pair spelling with a comma inside a character class", isPermissionPairRegex(
+            "hasPermission\\(\\s*'([A-Z_,]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)"));
+
+        assertThat(fires).as("""
+            the pair classifier disagreed with its own specification: %s. The four spellings above \
+            were the measured population; the five below are live regexes in this tree that ask a \
+            different question, and the committee one has two capture groups — only the comma count \
+            separates it.""".formatted(fires)).containsOnly(
+                Map.entry("A tolerant", true),
+                Map.entry("B tight", true),
+                Map.entry("C constant-initialiser", true),
+                Map.entry("D loose", true),
+                Map.entry("bare presence (MeasuredBaseline)", false),
+                Map.entry("prefix test (ExerciseRunOwnership)", false),
+                Map.entry("fixed action (ExportAuthorizationRatchet)", false),
+                Map.entry("fixed module (ChangeDocumentationFreshness)", false),
+                Map.entry("three-arg seat (CommitteeSeatGuard)", false),
+                Map.entry("pair spelling with a comma inside a character class", true));
+    }
+
+    /**
+     * The ten former pair copies now call the helper — named, not counted (F2-241).
+     *
+     * <p>Two of them are the reason this slice happened at all, and they are the two F2-262 could not
+     * see: {@code ObLifecycleTest} and {@code ShariaLifecycleTest} had <b>already replaced</b> their
+     * role extractor with a permission one when their modules converted, so they were never members
+     * of the role-name population. F2-262 read {@code ObLifecycleTest}'s javadoc, quoted its rule as
+     * its headline lesson, and did not convert the method the rule is written on.
+     */
+    @Test
+    @DisplayName("all ten former pair copies now call the shared helper")
+    void everyFormerPairCopyCallsTheHelper() {
+        Map<String, Path> expected = new TreeMap<>();
+        expected.put("MeasuredBaselineFreshnessTest", TEST_ROOT.resolve(
+            Path.of("config", "MeasuredBaselineFreshnessTest.java")));
+        expected.put("SanctionsScreeningControllerGuardTest", TEST_ROOT.resolve(
+            Path.of("module", "aml", "SanctionsScreeningControllerGuardTest.java")));
+        expected.put("CptyControllerGuardTest", TEST_ROOT.resolve(
+            Path.of("module", "cpty", "CptyControllerGuardTest.java")));
+        expected.put("EthicsGuardConversionTest", TEST_ROOT.resolve(
+            Path.of("module", "ethics", "EthicsGuardConversionTest.java")));
+        expected.put("IntakePromotionContractTest", TEST_ROOT.resolve(
+            Path.of("module", "intake", "spi", "IntakePromotionContractTest.java")));
+        expected.put("ObControllerGuardTest", TEST_ROOT.resolve(
+            Path.of("module", "openbanking", "ObControllerGuardTest.java")));
+        expected.put("ShariaControllerGuardTest", TEST_ROOT.resolve(
+            Path.of("module", "sharia", "ShariaControllerGuardTest.java")));
+        expected.put("PermissionCatalogueUsageTest", TEST_ROOT.resolve(
+            Path.of("security", "PermissionCatalogueUsageTest.java")));
+        // The two that carried the fail-on-correct-code shape.
+        expected.put("ObLifecycleTest", TEST_ROOT.resolve(
+            Path.of("module", "openbanking", "service", "ObLifecycleTest.java")));
+        expected.put("ShariaLifecycleTest", TEST_ROOT.resolve(
+            Path.of("module", "sharia", "service", "ShariaLifecycleTest.java")));
+
+        Map<String, String> notCalling = new TreeMap<>();
+        expected.forEach((name, path) -> {
+            if (!Files.exists(path)) {
+                notCalling.put(name, "source no longer at " + path);
+                return;
+            }
+            String code = COMMENTS.matcher(read(path)).replaceAll(" ");
+            // The call SHAPE, never the token: a bare contains() is satisfied by the import alone,
+            // which is how F2-194's and F2-205's gates were defeated.
+            if (!Pattern.compile("GuardExpressions\\s*\\.\\s*\\w+\\s*\\(").matcher(code).find()) {
+                notCalling.put(name, "imports or mentions GuardExpressions but never calls it");
+            }
+        });
+
+        assertThat(notCalling).as("""
+            %s was one of the ten hand-rolled pair copies and no longer calls the shared helper. \
+            Either it grew its own extractor back, or it stopped asking the question — and the \
+            second is fine only if this list is updated to say so.""".formatted(notCalling))
+            .isEmpty();
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────
 
+    /** Every {@code Pattern.compile(...)} in this source whose regex describes a SpEL role call. */
+    private static List<String> roleCallRegexesIn(String source) {
+        return compiledRegexesIn(source).stream()
+            .filter(r -> ROLE_CALL_REGEX.matcher(r).find())
+            .toList();
+    }
+
     /**
-     * Every {@code Pattern.compile(...)} in this source whose regex describes a SpEL role call.
+     * Every {@code Pattern.compile(...)} in this source whose regex extracts a
+     * {@code (MODULE, ACTION)} pair — see {@link #PERMISSION_PAIR_REGEX} for the two clauses.
+     *
+     * <p>F2-263 shares {@link #compiledRegexesIn} with the role question rather than writing a
+     * second walker. That is not tidiness: the first draft of the role walker read only the FIRST
+     * string literal after the paren and so could not see mechanism 3 at all, and a fresh copy for
+     * the pair question would have had a fresh chance to repeat it — in the gate built to close it.
+     */
+    private static List<String> permissionPairRegexesIn(String source) {
+        return compiledRegexesIn(source).stream()
+            .filter(GuardExpressionsContractTest::isPermissionPairRegex)
+            .toList();
+    }
+
+    /**
+     * Two capture groups and exactly one separator comma.
+     *
+     * <p>⚠ <b>An ESCAPED paren is not a capture group, and the first draft of this method counted it
+     * — inverting the classifier completely.</b> Every one of the four real spellings opens with
+     * {@code hasPermission\\(}, so counting bare {@code (} scored them at <b>3</b> and the only
+     * neighbour it admitted was {@code ChangeDocumentationFreshnessTest}'s one-group pattern, at 2.
+     * The gate reported the four members as clean and the one non-member as an offender. 🔑 And my own
+     * reconnaissance scan had <em>printed</em> {@code groups=3} beside each spelling; I read past it
+     * because the number was not the answer I was looking for. {@code (?<!\\\\)} is the fix.
+     *
+     * <p>Commas inside a character class are not separators — {@code [\\w<>,.\\[\\]]} appears in this
+     * tree — so classes are removed before counting. That clause is the entire three-argument
+     * exclusion: {@code CommitteeSeatGuardTest} has two capture groups too.
+     */
+    private static boolean isPermissionPairRegex(String regex) {
+        if (!PERMISSION_PAIR_REGEX.matcher(regex).find()) {
+            return false;
+        }
+        long groups = Pattern.compile("(?<!\\\\)\\((?!\\?)").matcher(regex).results().count();
+        String outsideClasses = regex.replaceAll("\\[[^\\]]*\\]", "");
+        long commas = outsideClasses.chars().filter(ch -> ch == ',').count();
+        return groups == 2 && commas == 1;
+    }
+
+    /**
+     * Every regex a {@code Pattern.compile(...)} statement builds, with all of its concatenated
+     * literals joined.
      *
      * <p>⚠⚠ <b>Its first draft read only the FIRST string literal after the paren, and the gate's own
      * positive-control leg caught that on its first run: it could not see mechanism 3 at all.</b>
@@ -532,16 +884,15 @@ class GuardExpressionsContractTest {
      * in the <em>third</em> concatenated literal, so a detector anchored on the first one reports the
      * two copies that carried it as absent. 🔑 <b>A concatenated regex defeats a detector anchored on
      * the first literal, and it UNDER-reports</b> — the same direction, and the same shape, as the
-     * eight extractors this class exists to replace. Every literal in the statement is concatenated
-     * before the test now.
+     * extractors this class exists to replace.
      *
      * <p>The window is the enclosing statement (to the next {@code ;}), not a paren-balanced walk:
      * a Java regex literal contains real {@code (} and {@code )} characters, so counting parens over
      * raw source miscounts. Overshooting a statement over-reports, which fails loudly — the safe
      * direction to be wrong in (F2-205).
      */
-    private static List<String> roleCallRegexesIn(String source) {
-        List<String> hits = new java.util.ArrayList<>();
+    private static List<String> compiledRegexesIn(String source) {
+        List<String> out = new java.util.ArrayList<>();
         Matcher call = COMPILE_CALL.matcher(source);
         while (call.find()) {
             int end = source.indexOf(';', call.end());
@@ -551,11 +902,9 @@ class GuardExpressionsContractTest {
             while (lit.find()) {
                 regex.append(lit.group(1));
             }
-            if (ROLE_CALL_REGEX.matcher(regex).find()) {
-                hits.add(regex.toString().trim());
-            }
+            out.add(regex.toString().trim());
         }
-        return hits;
+        return out;
     }
 
     private static List<Path> testSources() {
