@@ -2547,6 +2547,163 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-265 · The cell that says "re-derive it, never edit by hand" drifted through four re-derivations, because an instruction is not an enforcement
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Severity** | P3 — no runtime defect; the artefact an auditor is handed, and the list that gates scheduling |
+| **Found by** | ranking the next slice after [[F2-264]] — three consecutive candidates in the guard/instrument seam had landed on latent-or-refuted findings, so the question was changed |
+| **Fix** | `FindingsRegisterCoverageTest` publishes `target/findings-register-coverage.txt`; `theDocMapCellPointsAtTheGateRatherThanRestatingIt` refuses a restated count |
+| **Verified** | 10/10 mutations killed · pre-fix control fires on `master` · two holes in my own gate found by the harness · suite green |
+
+### The measurement
+
+§0's doc-map cell in `UNIFIED_IMPLEMENTATION_PLAN.md` states the rule for this register's coverage
+and publishes the figures behind it. Re-derived with **the gate's own patterns** (`F2-(\d{2,3})`
+over the plan, `^## F2-(\d{2,3})` over the register — never a hand-written variant, because my own
+scan has already been refuted once in this programme for treating sub-slice ids as distinct where
+the gate parses them to an `Integer` and rolls them up):
+
+| | cell claimed | measured 2026-08-22 |
+|---|---|---|
+| plan references | **94** distinct ids | **264** |
+| register specs | **57** | **235** |
+| specs owed | **40** | **29** |
+| orphan specs | — | **0** |
+
+Every figure wrong, and the owed one **overstates** the debt — the pessimistic direction, which is
+the less likely of the two to be reported, because *"we owe 40 specs"* invites no question while a
+suspiciously low number does ([[F2-210]]).
+
+### The consequence: the list that gates scheduling omitted 76% of what it gates
+
+The cell does not merely report a count. It states a **rule** — *"Write one before scheduling any of
+them"* — and publishes the list a reader consults to obey it:
+
+> *"`F2-55` `F2-56` `F2-57` `F2-58` `F2-59` `F2-60` `F2-62` `F2-63`"*
+
+Measured against the real owed set: that list **omits 22 of the 29** and **names `F2-57`, which
+already has a spec**. So a slice scheduling `F2-74` would consult this cell, not find it, and
+proceed believing the rule satisfied.
+
+🔑 **That failure is not hypothetical — the cell records it happening.** Its own 2026-07-31 entry
+says *"**F2-61, which an ordering pass scheduled straight into the live queue without a spec**,
+breaking the rule stated in this very cell"*, from the same cause: a stale owed list.
+
+### The shape
+
+🔑🔑 **A count in prose is a COPY of a measurement, and an instruction not to copy it is not an
+enforcement.** The cell has been re-derived **four** times — 2026-07-29, 2026-07-31, 2026-08-01 and
+now — and **every one of them added a warning rather than making the figure checkable**:
+
+- 2026-07-29: *"⚠ This line is itself a recurring drift site — **re-derive it, never edit it by hand.**"*
+- 2026-07-31: *"**A line that warns 're-derive, never edit by hand' was neither re-derived nor edited: it was left alone while the thing it counts grew by twelve.**"*
+- 2026-08-01: *"Current, and every figure here is script output"* — and *"Re-derive with the script in the commit message of this change; do not hand-edit the counts."*
+
+The 2026-08-01 generation is the sharpest: it names a script, and the script is **in a commit
+message**, so *"re-derive it"* was an instruction whose subject a reader could not reach. It also
+asserts its own freshness (*"Current"*), which is the one property prose cannot hold.
+
+This is [[F2-52]]'s `AttachmentAccessPolicy` shape at the level of a document: an instruction with no
+enforcement, ignored by every author who read it. Nothing in the tree could contradict it, because
+the gate that owns this measurement (`FindingsRegisterCoverageTest`, [[F2-79]]) ratchets the owed
+**count** and asserts its own **instrument**, and had no opinion about a document restating either.
+
+### And the gate's own javadoc disagreed with its own constant
+
+`FindingsRegisterCoverageTest`'s class javadoc opened *"Why a ratchet and not zero. **31 specs are
+owed today.**"* while `BASELINE_SPECS_OWED` three paragraphs below read **29** — and that constant's
+own javadoc narrates the walk 33 → 31 → 30 → 29, so the class-level sentence was left behind by the
+paragraphs beneath it. House rule 3's named hazard (*"read the constant, never a prose summary of
+it"*) **inside the file that owns the constant**, which is [[F2-258]]'s shape.
+
+### The fix, and why it is not "re-derive the numbers a fifth time"
+
+A fifth hand re-derivation would drift a fifth time. So:
+
+1. **The measurement is published.** `target/findings-register-coverage.txt`, this tree's own
+   convention (`target/permission-usage.txt`, `target/mass-assignment-risk.txt`,
+   `target/server-stamped-fields.txt`), written on every `mvn test` with the three figures, the
+   owed list, and a per-id closure **hint**.
+2. **The cell states the rule and points at the artefact.** The figures and the stale list are
+   gone. ⚠ Deleting them *without* the pointer would have left a reader nowhere to look, which is
+   how they came to be written into prose in the first place — so the gate asserts the pointer as
+   well as the absence.
+3. **The restatement is refused.** `theDocMapCellPointsAtTheGateRatherThanRestatingIt` requires
+   exactly one cell carrying the rule, requires it to name the gate and the artefact, and requires
+   `COVERAGE_COUNT` to find nothing in it.
+4. **The retired figures survive as quotations.** This register's convention is that a correction
+   quotes the sentence it replaces, which is exactly why the detector strips double-quoted spans
+   first ([[F2-193]]) — and it is pinned in both directions, because a detector that cannot tell a
+   quotation from a claim forces every correction to paraphrase away its own evidence.
+5. **The class javadoc no longer states a count its own constant owns.**
+
+⚠ `COVERAGE_COUNT` matches **`referenc(?:es|ed)`**, both stems. The pre-fix cell carried
+`referenced **74+**` as unquoted history, and a present-tense-only pattern would have missed it —
+passing for a reason unrelated to its claim. Measured: **4 unquoted hits** on the pre-fix cell.
+
+### What was deliberately NOT built, and why that is the finding arriving from the inside
+
+The obvious next step is a second decrease-only figure for *owed **and** open* — the number the rule
+actually wants, since a spec for a closed finding is retrospective documentation while a spec for an
+open one gates the work. It was measured and **rejected**, and the reason is this finding's own
+lesson:
+
+🔑 **Two independent parsers of the plan's status markers disagreed on four ids.** Mine classified by
+the first marker found across every row mentioning the id; the gate's hint takes the row's last
+non-empty cell. Reading the four settled them — `F2-35`'s trailing cell is an **owner** and
+`F2-53`'s a **migration** column (both are `✅ CLOSED` one cell earlier), `F2-65` ends
+*"⬜ (b) still not to be swept"*, and `F2-68` leads `🔁` over four `DONE` sub-items.
+
+🔑 **My own draft of the corrected sentence claimed "22 of the 29 are closed or refuted and 6 are
+open", and it was wrong in both operands. What caught it was the two parsers disagreeing — not
+either of them being checked.** A ratchet built on that parser would have been an
+authoritative-looking artefact nobody could keep true, which is precisely what [[F2-188]] measured
+at five claims, five false. So the classification ships as a **hint, gated on nothing**, with the
+row named as the adjudicator, and the cell gives **no total** — a total here would be a fifth figure
+with the same lifespan as the four this slice retired.
+
+### The debt itself, unchanged
+
+**29 specs owed**, of which `F2-32`, `F2-34`, `F2-36`, `F2-37`, `F2-74` and `F2-85` are open (one
+scheduled into a later round), `F2-65` is half-closed with its remaining half a recorded decision,
+`F2-55` was refuted, and the rest are closed — retrospective documentation, real debt because the
+register outlives the plan, and not a gate. ⚠ Writing all 29 in one batch is [[F2-188]]'s failure
+mode: 29 paraphrases of plan rows would be 29 fluent unverified artefacts. Pay them where a slice
+touches the finding.
+
+### Two holes in my own gate, both found by running it
+
+⚠⚠ **The gate's ANCHOR was not quote-aware, and its own plan entry broke it.** I quote-stripped
+`COVERAGE_COUNT` and not the resolution of the cell itself — so the moment this finding's plan
+bullet quoted the rule sentence, **two** lines matched and the uniqueness assertion failed on a
+correct tree. 🔑 **The quotation problem is a property of the whole detector, not of the part
+whose claim happens to be about counts** — and the same defect then appeared a third time in the
+mutation harness's own locator, which found two cells for the identical reason. Three copies of one
+omission in one slice, each written after quoting [[F2-193]].
+
+⚠⚠ **The publish leg was satisfied by the PREVIOUS run's artefact.** The mutation replacing the
+write with a branch that never fires **SURVIVED**, because `target/findings-register-coverage.txt`
+was still on disk from the run before and still carried the right numbers. This tree's recurring
+*an artefact on disk answers an older question* — one artefact over from the stale surefire report
+landmine. Closed by deleting the file first and asserting the content on disk **equals the string
+this run wrote**, which also catches a partial write.
+
+### Verification
+
+The three new legs passed on their first run, which is also what a rotted regex looks like — so
+the pre-fix control ran them against `git show master:UNIFIED_IMPLEMENTATION_PLAN.md`, where the
+restatement leg fires. (`theRegisterDoesNotInventFindings` fires there too, and that is expected
+noise rather than a second finding: master's plan does not reference `F2-265` while the working
+register carries its spec.) **10 mutations, 10 killed, 0 survived, 0 anchor-miss** — after two
+rounds in which the harness's own anchors were the fault, which is why an anchor miss is a distinct
+non-zero outcome here ([[F2-212]]).
+
+The ratchet then did its own job unprompted: filing this finding took the owed count to **30** and
+**failed the build** until this spec was written, which is the pay-as-you-go mechanism its javadoc
+describes, on its third occurrence.
+
 ## F2-264 · "MODULE has no catalogued permission" has two opposite consequences, and three slices carried the conflation forward
 
 | | |

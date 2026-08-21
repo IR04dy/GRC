@@ -1872,6 +1872,87 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A COUNT IN PROSE IS A COPY OF A MEASUREMENT, AND AN INSTRUCTION NOT TO COPY IT IS NOT AN
+  ENFORCEMENT — THE CELL THAT SAYS *"re-derive it, never edit it by hand"* HAS DRIFTED THROUGH FOUR
+  RE-DERIVATIONS** (F2-265, measured 2026-08-22). §0's doc-map cell in
+  `UNIFIED_IMPLEMENTATION_PLAN.md` states the rule for findings-register coverage and publishes the
+  figures behind it. Re-derived with **the gate's own patterns** (`F2-(\d{2,3})` over the plan,
+  `^## F2-(\d{2,3})` over the register — never a hand-written variant, because my own scan has
+  already been refuted once here for treating sub-slice ids as distinct where the gate parses them
+  to an `Integer` and rolls them up): the cell claimed *"plan references **94** distinct ids, the
+  register carries **57** specs, **40 are owed**"* against a measured **264 / 235 / 29**.
+  ⚠ The owed figure **overstates** the debt — F2-210's pessimistic direction, which is the less
+  likely of the two to be reported, because *"we owe 40 specs"* invites no question while a
+  suspiciously low number does.
+  🔑🔑 **THE CONSEQUENCE IS THE LIST, NOT THE COUNT.** The cell states a rule — *"Write one before
+  scheduling any of them"* — and published the list a reader consults to obey it: eight ids that
+  **omit 22 of the 29 and name `F2-57`, which is already paid**, i.e. 76% incomplete. **Not
+  hypothetical: the cell records it failing once already**, its own 2026-07-31 entry reading
+  *"F2-61, which an ordering pass scheduled straight into the live queue without a spec, breaking
+  the rule stated in this very cell"* — from this same cause.
+  ⚠⚠ **All four re-derivations added a WARNING rather than making the figure checkable** (2026-07-29,
+  07-31, 08-01, now). The 08-01 generation is the sharpest: it asserts its own freshness
+  (*"Current, and every figure here is script output"*) — the one property prose cannot hold — and
+  its instruction was *"Re-derive with the script in the commit message of this change"*, so the
+  subject of *"re-derive it"* was somewhere a reader cannot reach. **F2-52's `AttachmentAccessPolicy`
+  shape at the level of a document**: an instruction with no enforcement, ignored by every author who
+  read it. `FindingsRegisterCoverageTest` (F2-79) ratchets the owed **count** and asserts its own
+  **instrument**, and had no opinion about a document restating either — so nothing in the tree could
+  contradict the cell.
+  ⚠ **And the gate's own class javadoc opened *"31 specs are owed today"* while
+  `BASELINE_SPECS_OWED` three paragraphs below read 29** — that constant's javadoc narrates the walk
+  33→31→30→29 and the class-level sentence was left behind by the paragraphs beneath it. House rule
+  3's named hazard (*read the constant, never a prose summary of it*) **inside the file that owns the
+  constant**, which is F2-258's shape.
+  ⚙ **Fixed by PUBLISHING rather than re-deriving a fifth time.**
+  `target/findings-register-coverage.txt` (this tree's own convention — `permission-usage.txt`,
+  `mass-assignment-risk.txt`, `server-stamped-fields.txt`, `entity-initialiser-checks.txt`) carries
+  the three figures, the owed list and a per-id closure hint; the cell states the rule and **points
+  at** the gate and the artefact; `theDocMapCellPointsAtTheGateRatherThanRestatingIt` requires
+  exactly one such cell, requires both pointers, and refuses any restated coverage count.
+  ⚠ **Deleting the figures WITHOUT the pointer would leave a reader nowhere to look — which is how
+  they came to be in prose at all — so the pointer is asserted, not assumed.** F2-197's
+  *deleting-the-numbers-asserts-health* inverted: here the deletion is only honest with a
+  destination.
+  ⚠⚠ **THE QUOTATION PROBLEM IS A PROPERTY OF THE WHOLE DETECTOR, NOT OF THE PART WHOSE CLAIM IS
+  ABOUT COUNTS — AND I COMMITTED IT THREE TIMES IN ONE SLICE, EACH TIME AFTER QUOTING F2-193.** The
+  correction convention here is that a claim's replacement **quotes** the sentence it replaces, so
+  `COVERAGE_COUNT` strips double-quoted spans. I did **not** strip them when resolving *which line
+  is the cell* — so the moment this finding's own plan bullet quoted the rule sentence, **two lines
+  matched and the uniqueness assertion failed on a correct tree**; then the mutation harness's own
+  locator found two cells for the identical reason. 🔑 **Every part of a detector that touches prose
+  needs the stripping, including the part that only decides where to look.**
+  ⚠⚠ **A PUBLISH ASSERTION IS SATISFIED BY THE PREVIOUS RUN'S FILE.** The mutation replacing the
+  write with a branch that never fires **SURVIVED**, because the artefact was still on disk from the
+  run before and still carried the right numbers — this tree's recurring *an artefact on disk answers
+  an older question*, one artefact over from the stale surefire report. **Delete the file first, and
+  assert the content on disk equals the string this run wrote** (which also catches a partial write).
+  ⚠⚠ **AN OWED-AND-OPEN RATCHET — THE NUMBER THE RULE ACTUALLY WANTS — WAS MEASURED AND REJECTED,
+  AND THE REASON IS THIS FINDING ARRIVING FROM THE INSIDE.** A spec for a closed finding is
+  retrospective documentation; a spec for an open one gates the work, so *owed and open* is the
+  actionable figure. Two independent parsers of the plan's own status markers **disagreed on four
+  ids**: mine keyed on the first marker anywhere in the row, the gate's hint on the row's last
+  non-empty cell — which for `F2-35` is an **owner** and for `F2-53` a **migration** column, both
+  `✅ CLOSED` one cell earlier, while `F2-65` ends *"⬜ (b) still not to be swept"* and `F2-68` leads
+  `🔁` over four `DONE` sub-items. 🔑 **My own draft of the corrected sentence claimed "22 of the 29
+  are closed or refuted and 6 are open" and was wrong in BOTH operands — and what caught it was the
+  two parsers disagreeing, not either of them being checked.** A ratchet on that parser would have
+  been an authoritative-looking artefact nobody could keep true (F2-188), so the classification ships
+  as a **hint gated on nothing**, the row is named as the adjudicator, and the cell gives **no
+  total** — a total would be a fifth figure with the same lifespan as the four retired here.
+  ⚠ **The escape-collapse landmine fired again through an inline `py -c`, and this time it left RAW
+  CONTROL BYTES in a script**: a Windows path's `\a` and `\b` became 0x07 and 0x08, so the line read
+  `D:\Sourcespache-maven-3.9.15in\mvn.cmd` in every listing — F2-235's defect, self-inflicted, in a
+  file I had just been told to write with the Write tool. **The `Edit` tool then could not match the
+  line at all**, because the string on disk is not the string that is displayed. Replace by line
+  number (`sed -i '24s|.*|…|'`) and verify with `grep -cP '[\x00-\x08\x0b\x0c\x0e-\x1f]'`.
+  ⚙ **Filed:** the debt is unchanged at **29 owed** — `F2-32`, `F2-34`, `F2-36`, `F2-37`, `F2-74`,
+  `F2-85` open (one scheduled into a later round), `F2-65` half-closed with its remaining half a
+  recorded decision, `F2-55` refuted, the rest retrospective documentation. **Writing all 29 in one
+  batch is F2-188's failure mode** (29 paraphrases of plan rows would be 29 fluent unverified
+  artefacts); pay them where a slice touches the finding. Also: `UNIFIED_IMPLEMENTATION_PLAN.md`
+  holds **46 `- [x]` and 0 `- [ ]`**, so it is a log rather than a checklist — the live backlog is
+  §0's tracker plus the filed items, which is worth knowing before reading it as a work queue.
 - ⚠⚠ **"MODULE HAS NO CATALOGUED PERMISSION" HAS TWO OPPOSITE CONSEQUENCES, AND A FILING THAT
   CONFLATED THEM WAS CARRIED FORWARD AS THE NEXT WORK BY THREE SLICES** (F2-264, measured
   2026-08-21). F2-257 filed `DATACLASS`, `OUTSOURCING`, `REGINSPECT`, `REGREPORTING` and `RRP` as
