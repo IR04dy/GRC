@@ -1,6 +1,7 @@
 package com.tss.grc.security;
 
 import com.tss.grc.support.GuardExpressions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
@@ -12,8 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -497,6 +500,113 @@ class PermissionCatalogueUsageTest {
             }
         }
         return pairs;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // F2-264 — "MODULE has no catalogued permission" has TWO consequences and they are opposites.
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Module packages whose guards cite <b>no</b> {@code (MODULE, ACTION)} pair at all.
+     *
+     * <p>For these the catalogue is <b>inert at run time</b>: {@code hasAnyRole} never reaches
+     * {@code ModulePermissionEvaluator}, so a module with no row in {@code iam.permissions} costs
+     * nothing — the guards are satisfiable by whoever holds the recited role. They are F2-05's
+     * conversion backlog, not a lockout.
+     *
+     * <p>⚠⚠ <b>F2-257 filed four of them as *reachable only through the PLATFORM_ADMIN code
+     * bypass*, and F2-258, F2-259 and F2-260 each carried that forward as the next work.</b>
+     * Probed live 2026-08-21, all four, read tier and write tier: 4–5 non-admin personas answer 200
+     * on every read, and on the writes {@code compliance} (COMPLIANCE_OFFICER) or {@code rmanager}
+     * (RISK_MANAGER) answered <b>200/201</b> while an off-tier persona answered <b>403</b>. Nothing
+     * was administrator-only. 🔑 <b>The filing's sentence was true about the CATALOGUE and read as
+     * a claim about REACHABILITY, and those coincide only when the guard is a permission guard.</b>
+     *
+     * <p>⚠ <b>And the list was half the population.</b> F2-257 named {@code dataclass},
+     * {@code outsourcing}, {@code reginspect}, {@code regreporting}; the derivation finds
+     * <b>eight</b>, adding {@code auth}, {@code ccm}, {@code governance} and {@code opres} — the
+     * same shape, never named, and F2-198's narrowing one more time.
+     *
+     * <p>Asserted <b>exactly</b> rather than as a ceiling (F2-204): a decrease-only count cannot
+     * express "the population was undercounted", and raising it would be indistinguishable from
+     * tolerating a regression. Converting a module to {@code hasPermission} removes it from this set
+     * and the assertion must be edited in the same commit, which is the point.
+     */
+    private static final Set<String> GUARDS_CITE_NO_PERMISSION_PAIR = Set.of(
+        // 3 isAuthenticated() self-service routes + 1 role guard. Mixed, and correctly so.
+        "auth",
+        "ccm", "dataclass", "governance", "opres", "outsourcing", "reginspect", "regreporting");
+
+    @Test
+    @DisplayName("the catalogue gap has two kinds, and only one of them is a lockout")
+    void theCatalogueGapHasTwoKindsAndOnlyOneIsALockout() throws Exception {
+        Map<String, Set<String>> pairsByModulePackage = new TreeMap<>();
+
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        for (var bd : scanner.findCandidateComponents("com.tss.grc.module")) {
+            Class<?> c;
+            try {
+                c = Class.forName(bd.getBeanClassName());
+            } catch (Throwable t) {
+                continue;
+            }
+            String pkg = c.getPackageName();
+            int at = pkg.indexOf(".module.");
+            if (at < 0) {
+                continue;
+            }
+            String module = pkg.substring(at + ".module.".length()).split("\\.")[0];
+            Set<String> pairs = pairsByModulePackage.computeIfAbsent(module, k -> new TreeSet<>());
+            addPairs(c.getAnnotation(PreAuthorize.class), pairs);
+            for (Method m : c.getDeclaredMethods()) {
+                addPairs(m.getAnnotation(PreAuthorize.class), pairs);
+            }
+        }
+
+        // Anti-vacuity: a walk that resolves nothing would make every assertion below pass.
+        assertThat(pairsByModulePackage).as("the controller scan resolved no module packages")
+            .hasSizeGreaterThanOrEqualTo(40);
+
+        Set<String> citeNoPair = pairsByModulePackage.entrySet().stream()
+            .filter(e -> e.getValue().isEmpty())
+            .map(Map.Entry::getKey)
+            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+
+        System.out.println("[F2-264] guarded module packages = " + pairsByModulePackage.size()
+            + " · citing no permission pair = " + citeNoPair.size() + " -> " + citeNoPair);
+
+        assertThat(citeNoPair).as("""
+            The set of module packages whose guards cite no (MODULE, ACTION) pair has changed. For \
+            these the permission catalogue is INERT — hasAnyRole never reaches \
+            ModulePermissionEvaluator, so an uncatalogued module costs nothing at run time and the \
+            guards are satisfiable by whoever holds the recited role. That is the OPPOSITE of a \
+            guard citing an uncatalogued pair, which can only ever answer false and has no \
+            administrator remedy (noGuardCitesAPermissionNothingCreates, above, holds that at zero).
+            F2-257 conflated the two and three slices carried the conflation forward.
+            If a module left this set, it was converted to hasPermission — delete its entry here. If \
+            one joined it, a permission guard became a role guard, which is F2-05 in reverse.
+            got: %s""".formatted(citeNoPair)).isEqualTo(new TreeSet<>(GUARDS_CITE_NO_PERMISSION_PAIR));
+
+        // The two kinds are disjoint BY CONSTRUCTION, and saying so is the leg's whole point: a
+        // module citing no pair cannot cite an uncatalogued one.
+        Set<String> catalogued = cataloguedByMigrations();
+        Set<String> ungrantableModules = citedPairs().stream()
+            .filter(p -> !catalogued.contains(p))
+            .filter(p -> !CREATED_BEFORE_THE_MIGRATION_SET.contains(p))
+            .map(p -> p.substring(0, p.indexOf(':')))
+            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+        assertThat(ungrantableModules).as("""
+            A module cannot be in both kinds at once, so if this is ever non-empty the two \
+            populations must still not intersect — otherwise a reader would have one module \
+            described as inert and as a lockout at the same time.""")
+            .doesNotContainAnyElementsOf(GUARDS_CITE_NO_PERMISSION_PAIR);
+    }
+
+    private static void addPairs(PreAuthorize pa, Set<String> into) {
+        if (pa != null) {
+            into.addAll(GuardExpressions.permissionPairsIn(pa.value()));
+        }
     }
 
     private static void collect(PreAuthorize pa, String cls, String member,
