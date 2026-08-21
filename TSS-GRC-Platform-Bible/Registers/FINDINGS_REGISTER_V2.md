@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Status** | 🟢 CLOSED 2026-08-22 (`e180fae8`) |
 | **Severity** | P2 — the reference an FIU submission cites was caller-named, with no minter and no unique index; a duplicate of a real code was storable |
 | **Found by** | ranking the next slice after [[F2-265]]: three consecutive candidates in the guard/instrument seam had come back latent-or-refuted, so the question was changed to *"which filed-one-at-a-time family has nobody counted?"* |
 | **Fix** | `common/reference/ReferenceCodeMint` · `AmlAlertService` mints `alertCode` · `V385` filtered UNIQUE index · the `alertCode` form input deleted · `ClientSuppliedReferenceRatchetTest` +3 legs |
