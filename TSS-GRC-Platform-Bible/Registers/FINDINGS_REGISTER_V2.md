@@ -2547,6 +2547,125 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-264 · "MODULE has no catalogued permission" has two opposite consequences, and three slices carried the conflation forward
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-21 (`3bc6c2ac`) |
+| **Severity** | P3 — a filing's severity claim, refuted; no runtime defect |
+| **Found by** | ranking [[F2-257]]'s filed catalogue gap as the next slice, re-derived first ([[F2-221]]) |
+| **Fix** | `PermissionCatalogueUsageTest.theCatalogueGapHasTwoKindsAndOnlyOneIsALockout` |
+| **Verified** | probed live 4/4 modules, read **and** write tier · 3 discriminating controls · suite 4,388/0/0 |
+
+### The claim, and what it is actually about
+
+[[F2-257]] filed:
+
+> *"`DATACLASS`, `OUTSOURCING`, `REGINSPECT`, `REGREPORTING` and `RRP` have no `WRITE`/`APPROVE` row
+> in `iam.permissions` at all, so five of the ten registers are reachable only through the
+> PLATFORM_ADMIN code bypass."*
+
+[[F2-258]], [[F2-259]] and [[F2-260]] each named it as the remaining work. [[F2-260]] closed the
+`RRP` member and it **was** a real lockout — with *no administrator remedy*, because nothing could
+be granted since nothing existed to grant.
+
+The other four are not. Probed live, `admin` as a control column only:
+
+| module | write route | admitted persona | off-tier persona |
+|---|---|---|---|
+| DATACLASS | `POST /dataclass/assets` | `compliance` **200** | `rmanager` **403** |
+| REGINSPECT | `POST /reginspect/inspections` | `rmanager` **201** | `auditor` **403** |
+| REGREPORTING | `POST /regreporting/obligations` | `compliance` **201** | `auditor` **403** |
+| OUTSOURCING | `POST /outsourcing/arrangements` | `rmanager` **200** | `auditor` **403** |
+
+On the read tiers, **4–5 of 7 personas** answer 200 in every module. Nothing is
+administrator-only, and the guard discriminates in every case.
+
+🔑🔑 **The sentence was true about the CATALOGUE and reads as a claim about REACHABILITY, and the
+two coincide only when the guard is a PERMISSION guard.** All 57 of these routes are `hasAnyRole`,
+which never reaches `ModulePermissionEvaluator` — so an uncatalogued module costs **nothing at run
+time** and an administrator can already satisfy the guard. That is [[F2-05]]'s conversion backlog,
+not a lockout, and [[F2-253]] is explicit that the distinction is the one that matters: *"a role
+nobody holds has an administrator remedy — a remedy, not a defence"*, while a permission nobody can
+hold has none.
+
+### And the list was half the population
+
+Derived from the tree rather than recalled: **57 module packages carry at least one
+`@PreAuthorize`, and EIGHT cite no `(MODULE, ACTION)` pair at all** —
+
+`auth` · `ccm` · **`dataclass`** · `governance` · `opres` · **`outsourcing`** · **`reginspect`** ·
+**`regreporting`**
+
+Four were named; **`auth`, `ccm`, `governance` and `opres` are the same shape and were never
+mentioned.** [[F2-198]]'s narrowing one more time, in a filing rather than in an instrument.
+
+⚠ `auth` is mixed and correctly so — 3 `isAuthenticated()` self-service routes plus one role guard.
+The other seven are **83 role-guarded routes** with no permission leg anywhere.
+
+### 🔑 Why no instrument could see it
+
+`PermissionCatalogueUsageTest` extracts the pairs guards **cite**, and asserts a hard zero over
+those the catalogue does not define ([[F2-255]]). **A module citing no pair is outside that
+population by construction** — so the gate was green over all eight, correctly, while saying nothing
+about them. That is why the claim sat unchecked through four slices, and it is the gate-shaped half
+of this finding.
+
+`theCatalogueGapHasTwoKindsAndOnlyOneIsALockout` derives the classification **by reflection** over
+`@PreAuthorize` — the class javadoc's own rule, *"because a source regex has twice under-counted a
+security surface in this codebase"* — and asserts the eight **exactly** rather than as a ceiling
+([[F2-204]]): a decrease-only count cannot express *the population was undercounted*, and raising it
+would be indistinguishable from tolerating a regression. Converting a module to `hasPermission`
+removes it from the set and the assertion must be edited in the same commit, which is the point.
+
+### Refuted while ranking, and each refutation is why this is a correction and not a conversion
+
+* **No examiner reaches any write.** All four are cleanly tiered read/write/approve, and
+  `AUDITOR`/`INTERNAL_AUDITOR` appear only on reads. [[F2-259]] recorded both directions of this
+  question and warned they look identical in a summary — converting can *drop* the examiner whose
+  independence is the point, or *admit* a reader to a write. Neither is present here.
+* **Every tier has a live non-admin holder in BOTH databases.** Prod differs only in `CIO` and `CRO`
+  being **absent** from `iam.roles` rather than merely unheld, since V373 is pending there — the
+  F2-253 distinction between the two databases, re-confirmed rather than assumed.
+* **The fatal kind is at zero.** No guard anywhere cites a pair whose module the catalogue does not
+  define, which is what [[F2-255]]'s leg asserts and what [[F2-260]]'s V383 achieved for `RRP`.
+
+### Controls, and the one that does not count
+
+4 mutations, 4 killed — **and M4's kill is an artefact, recorded as one.** AssertJ's
+`containsAnyElementsOf` fails on an empty actual, so the inverted disjointness leg died on
+*emptiness* rather than on the property it is named for. 🔑 **An assertion protected by a different
+part of itself than the part it is named after** ([[F2-262]]'s `\b` lesson): that leg is a **pin**
+whose tripwire is a future regression, not a discriminating detector today, and saying so is
+cheaper than discovering it later. The three that matter all discriminate — the extractor stopping
+(57 instead of 8), the module segment taken from the wrong end (sub-packages stop collapsing), and
+the scan resolving nothing (exact-equality passes over an empty set).
+
+### My own errors, both caught by running things
+
+⚠ **Two probe payloads were missing mandatory fields, and the resulting 400 arrived identically for
+the admitted and the refused persona.** `@Valid` fires **before** `@PreAuthorize` (recorded
+landmine), so an incomplete body cannot distinguish them — and that pair of identical 400s reads
+exactly like a lockout if you do not know the ordering. It is the same false signal the filing being
+refuted asserts, arriving from my own harness.
+
+⚠ A cleanup column guessed again: `outsourcing.outsourcing_arrangement` has `service_title_en`, not
+`title_en`, so that delete matched nothing. Resolved from `sys.columns`, and the cleanup now
+re-counts across **every** text column of all four schemas rather than trusting its own report —
+**0** tagged rows remaining.
+
+### Filed
+
+* **`module/auth`, `ccm`, `governance`, `opres`** join the F2-05 conversion backlog with the four
+  already named. Each is the same two-step [[F2-260]] performed (catalogue the tiers in a migration,
+  convert the guards), and none is urgent, because none is a lockout — which is the whole finding.
+* **`CreateAssetRequest.reference` is `@NotBlank` and caller-supplied**, so a `dataclass` data-asset
+  reference is named by the client. [[F2-172]](d)'s family in [[F2-258]]'s *mandatory* shape — no
+  null-coalesce, so outside `ClientSuppliedReferenceRatchetTest`'s key. Unmeasured for uniqueness.
+* **`RegInspectController`'s `WRITE_GUARD` and `TRANSITION_GUARD` recite identical role lists** —
+  two constants, one audience. Duplication rather than a defect ([[F2-177]]'s shape), and it becomes
+  a real question the moment one of them is converted.
+
 ## F2-263 · The file that coined "a regex matching nothing passes forever" required its guard constant to BE a bare `hasPermission` string
 
 | | |
@@ -3611,8 +3730,15 @@ control 4 of 12 · mutation harness **4 killed / 1 recorded equivalent / 1 withd
   `admin` to the officer each tenant meant — **owner decision**.
 - ⚠⚠ **Five of the ten registers have no `WRITE` or `APPROVE` row in `iam.permissions` at all** —
   `DATACLASS`, `OUTSOURCING`, `REGINSPECT`, `REGREPORTING`, `RRP`. That is [[F2-255]]'s catalogue-gap
-  shape, so those five registers are reachable only through the PLATFORM_ADMIN code bypass and no
-  tenant administrator can grant access to them. `CPTY:APPROVE` exists with **0 holders**
+  shape, so no tenant administrator can grant those permissions. ⚠⚠ **CORRECTED by [[F2-264]]: the
+  consequence this cell drew — *"those five registers are reachable only through the PLATFORM_ADMIN
+  code bypass and no tenant administrator can grant access to them"* — is FALSE for four of the five,
+  and [[F2-258]], [[F2-259]] and [[F2-260]] each carried it forward as the next work.** Only `RRP` was
+  a lockout, and it was the one with **no administrator remedy at all**. The other four are guarded by
+  `hasAnyRole`, which never reaches `ModulePermissionEvaluator`, so the empty catalogue costs nothing at
+  run time — probed live, a non-admin holder writes at **200/201** and an off-tier persona is **403**.
+  🔑 **A statement about the CATALOGUE reads as a statement about REACHABILITY, and they coincide only
+  for a permission guard.** `CPTY:APPROVE` exists with **0 holders**
   ([[F2-253]]'s attrition shape). Both are **owner decisions** with a per-tenant impact question.
 - The **24** remaining `WORK_LIST` members, still with no verdicts ([[F2-188]]).
 - The columns now hold **two vocabularies** — seeded office/committee labels and platform usernames —

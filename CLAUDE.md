@@ -1872,6 +1872,71 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **"MODULE HAS NO CATALOGUED PERMISSION" HAS TWO OPPOSITE CONSEQUENCES, AND A FILING THAT
+  CONFLATED THEM WAS CARRIED FORWARD AS THE NEXT WORK BY THREE SLICES** (F2-264, measured
+  2026-08-21). F2-257 filed `DATACLASS`, `OUTSOURCING`, `REGINSPECT`, `REGREPORTING` and `RRP` as
+  having no `WRITE`/`APPROVE` row in `iam.permissions`, *"so five of the ten registers are reachable
+  only through the PLATFORM_ADMIN code bypass"*; F2-258, F2-259 and F2-260 each named it as the
+  remaining work, and F2-260 closed the `RRP` member, which **was** a real lockout. The other four
+  are not — probed live, read tier **and** write tier: `compliance` **200** on `/dataclass/assets`,
+  `rmanager` **201** on `/reginspect/inspections`, `compliance` **201** on
+  `/regreporting/obligations`, `rmanager` **200** on `/outsourcing/arrangements`, with an off-tier
+  persona **403** every time and 4–5 of 7 personas at 200 on every read.
+  🔑🔑 **The sentence was true about the CATALOGUE and reads as a claim about REACHABILITY, and the
+  two coincide only when the guard is a PERMISSION guard.** All 57 of these routes are `hasAnyRole`,
+  which never reaches `ModulePermissionEvaluator`, so an uncatalogued module **costs nothing at run
+  time** and whoever holds the recited role can already act. That is F2-05's conversion backlog, not
+  a lockout — and F2-253 is explicit that this is the distinction that matters: a role nobody holds
+  has an administrator remedy, a permission nobody can hold has none. **`RRP` was sharp because it
+  was the one with no remedy at all; the other four never needed one.**
+  ⚠ **And the list was half the population.** Derived from the tree: **57 module packages carry at
+  least one `@PreAuthorize`, and EIGHT cite no `(MODULE, ACTION)` pair** — `auth`, `ccm`,
+  `dataclass`, `governance`, `opres`, `outsourcing`, `reginspect`, `regreporting`. Four were named;
+  `auth`, `ccm`, `governance` and `opres` are the same shape and were never mentioned. F2-198's
+  narrowing in a **filing** rather than in an instrument. (`auth` is mixed and correctly so: 3
+  `isAuthenticated()` self-service routes plus one role guard.)
+  🔑 **WHY NO INSTRUMENT COULD SEE IT: `PermissionCatalogueUsageTest` extracts the pairs guards
+  CITE, so a module citing none is outside its population BY CONSTRUCTION.** Its hard zero was green
+  over all eight, correctly, while saying nothing about them — which is how the claim survived four
+  slices. `theCatalogueGapHasTwoKindsAndOnlyOneIsALockout` derives the classification **by
+  reflection** (that class's own javadoc rule — *"a source regex has twice under-counted a security
+  surface in this codebase"*) and asserts the eight **exactly** rather than as a ceiling, because a
+  decrease-only count cannot express *the population was undercounted* (F2-204).
+  ⚠⚠ **A 400 SAYS NOTHING ABOUT AUTHORIZATION, AND TWO IDENTICAL 400s READ EXACTLY LIKE A
+  LOCKOUT.** `@Valid` fires **before** `@PreAuthorize` (the recorded landmine), so my first two
+  probe payloads — missing one mandatory field each — returned the same 400 to the admitted persona
+  and to the refused one. 🔑 **That is the very signal the filing being refuted asserts, arriving
+  from my own harness.** Resolve every mandatory field from the DTO before reading a write probe's
+  result, and treat a non-403 refusal as "the probe is wrong" until proved otherwise.
+  ⚠ **Refuted while ranking, and each refutation is why this was a correction rather than a
+  conversion:** no examiner persona reaches any write in any of the four (the tiers are cleanly
+  read/write/approve and `AUDITOR`/`INTERNAL_AUDITOR` appear only on reads — F2-259 warned that both
+  directions of that question look identical in a summary); every tier has a live non-admin holder
+  in **both** databases, prod differing only in `CIO`/`CRO` being *absent* rather than unheld since
+  V373 is pending there; and the fatal kind — a guard citing a pair the catalogue does not define —
+  is at **zero**.
+  ⚠ **A mutation can be killed by something other than the property it is named for, and that is
+  not a pass.** Four controls, four killed, but the inverted-disjointness one died because AssertJ's
+  `containsAnyElementsOf` fails on an **empty actual** — the intersection claim itself is untested,
+  so that leg is a **pin** whose tripwire is a future regression. F2-262's `\b` lesson: an assertion
+  protected by a different part of itself than the part it is named after. The three that matter do
+  discriminate (the extractor stopping → 57 instead of 8; the module segment taken from the wrong
+  end → sub-packages stop collapsing; the scan resolving nothing → exact-equality over an empty set).
+  ⚠⚠ **AND THE BACKTICK LANDMINE FIRED AGAIN, THROUGH AN INLINE `py -c`, EATING EXACTLY ONE
+  IDENTIFIER.** Bash expanded `` `RRP` `` as command substitution before Python saw the string, so
+  the correction shipped reading *"Only  was a lockout"* — and **the sentence still reads like
+  prose**, which is F2-227's rule and the reason it has to be checked rather than assumed. The
+  escaped `` \` `` forms in the same string survived, so **one** token of six was lost. **Use the
+  Write/Edit tools for any file content carrying backticks, and verify the identifiers survived the
+  write, not just that the write happened.**
+  ⚙ **Filed:** `auth`, `ccm`, `governance` and `opres` join the F2-05 backlog beside the four already
+  named — none urgent, because none is a lockout, which is the whole finding;
+  `CreateAssetRequest.reference` is `@NotBlank` and **caller-supplied**, so a `dataclass` data-asset
+  reference is named by the client (F2-172(d)'s family in F2-258's *mandatory* shape — no
+  null-coalesce, so outside `ClientSuppliedReferenceRatchetTest`'s key, and unmeasured for
+  uniqueness); and `RegInspectController`'s `WRITE_GUARD` and `TRANSITION_GUARD` recite **identical**
+  role lists, which is duplication rather than a defect (F2-177's shape) and becomes a real question
+  the moment one of them is converted.
 - ⚠⚠ **AN ANTI-VACUITY CHECK CAN BE THE SAME EXPRESSION THAT MAKES A GATE FAIL ON CORRECT
   CODE, AND THE FILE THAT COINED THAT RULE IS WHERE IT HAPPENED** (F2-263, measured 2026-08-21).
   Executing F2-262's own top filing, re-derived first (F2-221): it named **7** hand-rolled
@@ -2619,8 +2684,15 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   at one seed timestamp — seed-origin with a correct writer, F2-242's shape in a SAMA/NCA inspection
   register, and repair is an **owner decision**; and **`DATACLASS`, `OUTSOURCING`, `REGINSPECT`,
   `REGREPORTING` and `RRP` have no `WRITE`/`APPROVE` row in `iam.permissions` at all**, so five of the
-  ten registers are reachable only through the PLATFORM_ADMIN code bypass (F2-255's catalogue-gap shape)
-  while `CPTY:APPROVE` exists with **0 holders** (F2-253's attrition).
+  ten registers cannot have that permission GRANTED — ⚠⚠ **and F2-264 refuted the consequence this
+  sentence went on to draw.** It read *"so five of the ten registers are reachable only through the
+  PLATFORM_ADMIN code bypass"*, and F2-258, F2-259 and F2-260 each carried that forward as the next
+  work. Probed live, read tier and write tier: only `RRP` was a lockout (closed by F2-260, and it had
+  **no** administrator remedy). The other four answer **200/201** for a non-admin holder and **403**
+  off-tier, because **all 57 of their routes are `hasAnyRole`, which never reaches
+  `ModulePermissionEvaluator`** — so an uncatalogued module costs nothing at run time. 🔑 **The claim
+  was true about the CATALOGUE and reads as a claim about REACHABILITY, and the two coincide only when
+  the guard is a PERMISSION guard.** `CPTY:APPROVE` exists with **0 holders** (F2-253's attrition).
 - ⚠⚠ **A ROLE NOBODY HOLDS HAS AN ADMINISTRATOR REMEDY; A PERMISSION NOBODY CAN HOLD DOES
   NOT — AND THE GATE BUILT FOR EXACTLY THAT DEFECT EMITTED A REPORT AND ASSERTED NOTHING ABOUT
   IT** (F2-255, measured 2026-08-20). Executing F2-254's filed `module.ai` block, the
