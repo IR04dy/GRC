@@ -3,6 +3,7 @@ package com.tss.grc.module.intake.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.exception.DomainAccessDeniedException;
+import com.tss.grc.common.reference.ReferenceCodeMint;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.intake.dto.IntakePublicStatusDto;
@@ -25,7 +26,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -107,7 +107,6 @@ public class IntakeService implements SystemIntakePort {
     private final PromotionRegistry promotions;
     private final PermissionEvaluator permissions;
     private final ObjectMapper json;
-    private static final SecureRandom RNG = new SecureRandom();
 
     @Transactional
     public IntakeRecordDto submit(IntakeSubmissionRequest req) {
@@ -410,15 +409,16 @@ public class IntakeService implements SystemIntakePort {
     }
 
     /** Generate the public reference code — format "XX-XXXX-YYYY". */
+    /**
+     * F2-266 — delegates to {@link ReferenceCodeMint}, which was extracted FROM this
+     * method so a second register could mint a reference without hand-rolling a second
+     * generator (F2-190).
+     *
+     * <p>⚠ The output shape is unchanged and must stay so: an intake tracking code is
+     * quoted to the public on the whistleblowing and breach-report portals, so a code
+     * somebody is holding has to keep resolving.
+     */
     private String generateReferenceCode(IntakeKindRouting.Routing routing) {
-        return routing.codePrefix() + "-" + segment() + "-" + segment();
-    }
-
-    private String segment() {
-        // 4 chars from base-36 alphabet.
-        StringBuilder sb = new StringBuilder(4);
-        String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";  // no I/O/0/1
-        for (int i = 0; i < 4; i++) sb.append(alphabet.charAt(RNG.nextInt(alphabet.length())));
-        return sb.toString();
+        return ReferenceCodeMint.mint(routing.codePrefix());
     }
 }

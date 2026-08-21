@@ -721,8 +721,13 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
+  // F2-266 — no `alertCode` input. It is the reference an FIU submission cites, so the server
+  // mints it (F2-172(d)); before this the form offered a free-text box placeholdered
+  // 'AML-2025-0042', which is a placeholder teaching an operator to invent somebody else's
+  // reference (the shape F2-236 and F2-245 each had to remove). The code is still RENDERED — see
+  // the table column below and the edit modal's title — because reading it is the whole point;
+  // what is gone is the ability to choose it.
   const FIELDS: FieldDef[] = [
-    { kind: 'text',     key: 'alertCode',      label: t('amlFldCode'), span: 4, placeholder: 'AML-2025-0042' },
     { kind: 'select',   key: 'alertType',      label: t('amlFldType') + ' *', required: true, options: AML_ALERT_TYPE_OPTIONS, span: 4 },
     { kind: 'select',   key: 'severity',       label: t('amlFldSeverity'), options: SEVERITY_OPTIONS, span: 4 },
     { kind: 'text',     key: 'titleEn',        label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },

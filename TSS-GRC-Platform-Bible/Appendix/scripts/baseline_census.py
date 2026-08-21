@@ -111,11 +111,14 @@ PUBLISHED = {
     "zero_test_packages": 7,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 372,          # +V380 (F2-255, AUDIT_LOG:WRITE — cited by
-                                     #   POST /audit-log/integrity/seal since F2-31 and created by NO
-                                     #   migration, so the seal control admitted the PLATFORM_ADMIN
-                                     #   code bypass alone and no administrator could grant it)
-    "migration_head": 384,
+    "migration_files": 373,          # +V385 (F2-266, uq_aml_alert_code — a FILTERED unique
+                                     #   index on (organisation_id, alert_code). Filtered because the
+                                     #   column is nullable and SQL Server treats NULLs as EQUAL for
+                                     #   uniqueness, so a plain unique index would permit at most one
+                                     #   code-less alert. Ships with the writer that makes it safe
+                                     #   (F2-183): AmlAlertService now mints the code.
+                                     #   Previously +V380 (F2-255, AUDIT_LOG:WRITE).
+    "migration_head": 385,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against

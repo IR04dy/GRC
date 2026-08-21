@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.reference.ReferenceCodeMint;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ServerOwnedState;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -73,6 +75,11 @@ public class AmlAlertService {
         a.setStatus(ServerOwnedState.requireInitial(req.getStatus(), INITIAL_STATUS,
             "an AML alert", "POST /{id}/transition"));
         requireEcho("analystName", req.getAnalystName(), a.getAnalystName(), ASSIGN_ROUTE);
+        // F2-266 — the reference an FIU submission cites is the server's to issue
+        // (F2-172(d)). Refused rather than silently dropped: a caller who sends one has to
+        // learn the value is not theirs, and the minted code is on the response.
+        requireEcho("alertCode", req.getAlertCode(), null, MINTED_BY_SERVER);
+        a.setAlertCode(ReferenceCodeMint.mint("AML-" + LocalDate.now().getYear()));
         if (a.getCurrency() == null) a.setCurrency("SAR");
         return repo.save(a);
     }
@@ -108,6 +115,7 @@ public class AmlAlertService {
         applySubject(a, req);
         // An ECHO is accepted and a CHANGE is refused (F2-231/F2-234), so a form that round-trips
         // the whole row keeps working and an update cannot re-open what another route closed.
+        requireEcho("alertCode", req.getAlertCode(), a.getAlertCode(), MINTED_BY_SERVER);
         requireEcho("status", req.getStatus(), a.getStatus(), TRANSITION_ROUTE);
         requireEcho("analystName", req.getAnalystName(), a.getAnalystName(), ASSIGN_ROUTE);
         return repo.save(a);
@@ -241,6 +249,17 @@ public class AmlAlertService {
 
     private static final String ASSIGN_ROUTE =
         "POST /{id}/assign, which resolves the analyst in this tenant and derives the label";
+    /**
+     * F2-266 — {@code alertCode} has no owning ROUTE, because the server mints it.
+     *
+     * <p>{@link #requireEcho} takes a route name so its diagnostic can send the caller
+     * somewhere; here the answer is "nowhere, it is not yours", so the string names the
+     * mint instead of a path. A diagnostic that cites a route which does not own the field
+     * is worse than none (F2-243 shipped one that named a path that did not exist).
+     */
+    private static final String MINTED_BY_SERVER =
+        "the server, which mints it when the alert is created";
+
     private static final String TRANSITION_ROUTE =
         "POST /{id}/transition, which checks the state machine and records the decision";
 
@@ -264,7 +283,6 @@ public class AmlAlertService {
      * </ul>
      */
     private void applyEditable(AmlAlert t, AmlAlert s) {
-        if (s.getAlertCode()           != null) t.setAlertCode(s.getAlertCode());
         if (s.getAlertType()           != null) t.setAlertType(s.getAlertType());
         if (s.getSeverity()            != null) t.setSeverity(s.getSeverity());
         if (s.getRuleId()              != null) t.setRuleId(s.getRuleId());
