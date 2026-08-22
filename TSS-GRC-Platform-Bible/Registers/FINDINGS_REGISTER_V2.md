@@ -13339,7 +13339,7 @@ population read as a finding rather than as a clean tree.**
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Status** | 🟢 CLOSED 2026-08-22 (`d86b3fcc`) |
 | **Severity** | **P2** — one live 500 on `POST /api/v1/cyber/controls`, opened by V390 one slice earlier and reachable by any tenant with a framework name over 100 characters; plus four registers rendering a governance label English-only on an Arabic-primary UI (house rule 7), the largest being all **154** cyber controls |
 | **Found by** | executing [[F2-276]]'s filed EN_ONLY work list and reading its members against the OTHER families on this register |
 | **Fix** | `V391` (widen the copy to its source + four Arabic halves, backfilled BY DERIVATION) · both halves derived at all five writers · `labelsFor`/`labelArFor` on the three directories · two new legs in `ParentIdentityCopyContractTest` · four wire types and four render sites |
