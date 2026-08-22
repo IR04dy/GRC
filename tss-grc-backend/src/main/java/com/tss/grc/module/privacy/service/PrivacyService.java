@@ -471,6 +471,13 @@ public class PrivacyService {
         // (F2-215's two-of-N, inside a single method).
         existing.setPurposeAr(req.getPurposeAr());
         existing.setLegalBasis(req.getLegalBasis());
+        // F2-278 — `PrivacyRopaRequest` has ALWAYS declared `dataCategoriesJson` and this
+        // whitelist omitted it, so the PDPL Article 31 register's categories-of-personal-data
+        // field was collected by the wizard, stored on create, and then discarded on every
+        // edit (F2-214's shape: accepted with HTTP 200 and silently dropped). Populated on
+        // 2 of 11 live rows in dev and prod. Nothing declared it as a decision, which is why
+        // the reverse direction of the coverage gate is the leg that found it.
+        existing.setDataCategoriesJson(req.getDataCategoriesJson());
         existing.setRetentionPeriodMonths(req.getRetentionPeriodMonths());
         existing.setCrossBorderTransfer(req.getCrossBorderTransfer());
         existing.setStatus(req.getStatus());

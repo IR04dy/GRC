@@ -13547,3 +13547,174 @@ own (class, method) pair — which is exactly why that pair is self-verifying.
 - `SignaturesPage.tsx` collects a **required** `signerName` for the *other* signature register
   (`DigitalSignatureDtos`), which the server may or may not honour. Not read; a different register,
   and [[F2-225]]'s shape if it turns out the server ignores it.
+
+## F2-278 · A coverage leg ran over twelve hand-listed sites beside a leg measuring 83, and deriving it found a regression the previous slice had introduced
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`b277c5ed`) |
+| **Severity** | **P2** — an unconditional write of a field the wire cannot carry on the PDPL Article 31 ROPA register, **created by [[F2-272]] one slice earlier**; a mandatory categories-of-personal-data field discarded on every edit of that same register; and two Arabic labels frozen on **8 of 11 live rows in both databases** on a screen an operator edits (house rule 7) |
+| **Found by** | re-deriving [[F2-277]]'s own top filing — and **refuting it by measurement** before writing any code |
+| **Fix** | `FullReplaceUpdateContractTest`: population DERIVED (30) instead of hand-listed (12) · service resolved by IMPORT · helper following made TRANSITIVE · the coverage claim split into **RESET** (hard zero) and **FROZEN** (named map, both directions) · `purposeAr` declared on `PrivacyRopaRequest` · `dataCategoriesJson` added to `updateRopa`'s whitelist · `nameAr`/`descriptionAr` declared, collected and rendered for report schedules |
+| **Verified** | probe **16/16** as `compliance` against planted rows · pre-fix control: **3 of 3** tree-dependent legs fire, naming exactly `purposeAr` and `nameAr`/`descriptionAr` · harness **5 killed / 0 survived / 0 anchor-miss** (a 6th withdrawn as invalid) · backend **4425/0/0** · frontend 75 files / 814 tests, `tsc` clean |
+
+### The filed item was refuted, and the refutation is the result
+
+[[F2-277]] filed this as its sharpest unread item: *"`FullReplaceUpdateContractTest` lacks
+[[F2-233]]'s store-read taint narrowing that its sibling `ServerStampedFieldContractTest` has."*
+Measured first ([[F2-221]]), it is **false in both halves**.
+
+The narrowing that exists is `loadsARow`, whose vocabulary is `get|mustGet|find*|load*|fetch*` —
+so it cannot see `frameworks.require(...)` or `labelsFor(...)`, the shapes [[F2-277]] actually hit.
+🔑 **[[F2-217]]'s headline about the filing that quoted it: a census keyed on a list of names
+measures the list.** And porting it — in either the sibling's exact form or a resolver-aware
+widening — changes **nothing**: 0 fields lost at any of the 12 sites. The reason is one line
+`CyberControlService:116`, `target.setFrameworkName(sentName)` — the **bare-label branch
+[[F2-246]] requires to stay legal**, which writes the caller's own value verbatim, so the field is
+genuinely written from the request whatever the resolver does.
+
+So the narrowing would have been a pure weakening of a security gate with no measured benefit.
+🔑 **The right answer to a filed change to a gate is sometimes "measure it and do not make it" —
+and the measurement is what separates that from not doing the work.**
+
+### The population was a hand-written list of twelve, beside a leg measuring 83
+
+Asking the general question instead — *what IS this leg's population?* — found the real finding.
+`SITES` is **twelve hand-listed** sites. `theEntityBoundPutPopulationIsMeasured`, a leg **in the
+same class**, measures **83 entity-bound PUT handlers** decrease-only. `SITES`'s own comment read
+*"Adding a row is how a new full-replace update gets covered"* — an instruction with no
+enforcement, which is [[F2-52]]'s `AttachmentAccessPolicy` shape and [[F2-265]]'s (an instruction
+not to copy a figure is not an enforcement).
+
+🔑 **A reader who finds a hard-zero coverage leg beside a measured 83 reads the zero as covering
+the 83.** Derived, the joinable population is **30** — an entity-bound PUT whose path also has an
+`api.put` with a named payload type. The other 52 have no typed frontend client at all, so the
+coverage question has nothing to compare and they are *counted* rather than claimed.
+
+### Why it was a list: the leg's claim was narrower than its detector
+
+The coverage leg's harm sentence is *"the field arrives null on every call and is written null"* —
+and that is **FALSE when the write is null-guarded**, because an omitted field then keeps its
+stored value. One question was doing the work of two, and switching to a derived population
+without splitting it fails on `PolicyManagementService#update`: **eleven undeclarable fields,
+every one guarded**, i.e. a gate failing on correct code, the one failure a gate must never have
+([[F2-214]]).
+
+🔑🔑 **That is why the population was hand-written: the leg's claim was narrower than its
+detector, and nobody wrote that down, so the list read as laziness rather than as a necessary
+narrowing.** The discriminator already existed in the same file —
+`unguardedWritesFromRequest`, leg 4's detector — and the two legs had never met ([[F2-190]]).
+
+- **RESET** — unconditional write of a field the only client cannot declare. **Hard zero, no
+  exemption map**: the fix is always available (declare it, stop writing it, or guard it).
+- **FROZEN** — the same write GUARDED. A named map keyed `endpoint :: field`, enforced both ways.
+  The reasons repeat where the finding is genuinely per-site: `CyberPolicyRequest` is a narrow
+  ten-field form against a service that writes about twenty columns *and is reached by a second
+  route with no typed client at all*, so eleven near-identical per-field reasons would be eleven
+  fluent unverified claims ([[F2-188]]) where the fact is one.
+
+### Three narrowings, and the third was hiding a field
+
+**(a) One helper hop where the chain is two.** `CyberControlService`'s chain is
+`updateControl → applyEditable → applyFrameworkReference`. Resolving the population from the
+controllers (which name `updateControl`) therefore lost `frameworkId`, `frameworkName` and
+`frameworkNameAr` — and lost them **into the REVERSE leg**, where three real writes read as
+*three fields the client sends and the server ignores*, i.e. as three inert form inputs.
+🔑 **A hand-written population can encode a detector's limit as a naming convention — `SITES`
+names helper methods, and that is WHY — and then the limit is invisible, because the list looks
+like a choice.**
+
+**(b) The service resolved by FILENAME.** There are two `AuditEngagementService.java`
+(`module/audit_eng` and `module/compliance`) and the `audit_eng` twin has no `update` method, so
+`findFirst()` on the file name picked the wrong one and the site read as **"parsed nothing"** — the
+quiet direction, indistinguishable from a clean site. [[F2-276]] found exactly this with a
+`LinkedHashMap` keyed on an entity's simple name silently overwriting one of a pair; [[F2-222]]
+measured **15** such duplicate simple names and filed it as latent because *"no key collapses two
+registers today"*. 🔑 **A derived population is where that stops being latent.** Resolving by
+import surfaced a genuine frozen field the filename bug had hidden —
+`audit-engagements :: findingsCount`, a caller-supplied aggregate whose *sibling register derives
+the same field from its linked finding ids* ([[F2-197]]'s "a computed count is not a measured one",
+across two registers for one concept).
+
+**(c) The 52 backend-only sites**, honestly counted rather than claimed.
+
+### The defect I introduced one slice earlier
+
+`PrivacyService#updateRopa` writes `existing.setPurposeAr(req.getPurposeAr())`
+**unconditionally**, and `PrivacyRopaRequest` did not declare `purposeAr` — so a `PUT` sending
+exactly the shape the type declares nulls the Arabic purpose of a PDPL Article 31 processing
+activity. **That is the defect [[F2-214]] fixed for `crossBorderTransfer` in the same method,
+whose explanatory comment sits eight lines above.**
+
+[[F2-272]] created it: that slice added `setPurposeAr` to the whitelist so V388's new column would
+stop being permanently uneditable, and left the wire unable to carry it. 🔑🔑 **Its own comment
+reads *"F2-214's shape, not F2-213's reset"* — true of the code it replaced and false of the code
+it wrote. Fixing "this field can never be changed" by making the write unconditional converts an
+ignored field into a destroyed one, for exactly the callers that cannot send it.**
+
+⚠ Latent, and worth saying rather than implying otherwise: `purpose_ar` is populated on **0 of 11**
+live rows in dev, the **column is ABSENT in prod** (V388 is one of the 47 pending migrations), and
+`updateRopa` has **no caller** — `apiClientMethodReachability` records it as
+*"HOLE: a RoPA record can be created and never corrected"*. 🔑 **That entry adjudicates the CLIENT
+and says nothing about the ENDPOINT, so it reads as an invitation to build the edit screen that
+would fire the erasure** — [[F2-214]]'s own words, about this very endpoint.
+
+### Two more, found by the reverse direction over the derived population
+
+**`updateRopa` never wrote `dataCategoriesJson`**, which `PrivacyRopaRequest` has *always*
+declared. So the register's categories-of-personal-data field — collected by `RopaWizard`, stored
+on create — was **discarded on every edit** with HTTP 200 ([[F2-214]]'s shape). Populated on 2 of
+11 live rows in both databases. Nothing recorded it as a decision, which is why the leg that found
+it is the reverse one, *the direction nobody writes first* ([[F2-199]]).
+
+**`ReportScheduleService#update` writes `nameAr` and `descriptionAr` from the request** (guarded,
+so nothing was destroyed) and `ReportScheduleDto` declared neither — so the Arabic name and
+description of a scheduled regulatory report were **frozen**: settable only by a seed or a direct
+API call, never editable from `ReportSchedulesPage`, which **is** the screen that edits this
+register and calls `update` from its edit form. Populated on **8 of 11 live rows in BOTH
+databases**. [[F2-275]]'s shape — *an Arabic column that EXISTS is not one that can be WRITTEN* —
+with [[F2-198]]'s for the read half, since the handler returns the entity so the wire always
+carried them.
+
+### The instrument landmine: a control script that restores a backup with its original timestamp
+
+The probe reported **14/16** with the two failures being exactly the server-behaviour legs, which
+is the stale-listener signature — and it reproduced identically after a **full backend restart**.
+It was not a stale listener. `shutil.copy2` preserves mtime, so the pre-fix control's
+revert → compile → `shutil.move` restore left `target/classes` **newer** than the restored source,
+Maven's incremental compiler treated the stale class as up to date, and **the fix sat correct on
+disk, uncompiled, indefinitely**. `javap` on the compiled method was what settled it (0 occurrences
+of the new call).
+
+🔑 **A fix that is correct on disk and never compiled is indistinguishable from a wrong fix, and it
+survives a restart — which is what rules out the diagnosis a probe failure normally suggests.**
+Same mechanism as the recorded *"46 `NoSuchMethodError` while `test-compile` said nothing to
+compile"*, in the other direction. The control script now restores content and stamps a fresh
+mtime; `touch` + `mvn -o compile` + `javap` is the three-step check.
+
+⚠ And the harness's own bookkeeping: one mutation was **killed by `javac`**, not by an assertion —
+it weakened `.hasSize(30)` to `.isLessThanOrEqualTo(30)`, which does not compile on a `ListAssert`.
+🔑 **A mutation killed by a compile error is not a kill.** It was **withdrawn as invalid** rather
+than repaired, because you can always relax an assertion, so mutating the CHECK proves nothing
+([[F2-206]]/[[F2-235]]).
+
+### Filed
+
+- **`/api/v1/bcm/bia/{} :: linkedRiskId`** — `BcmBiaRequest` declares it and
+  `BcmService#updateBia`'s seven-field whitelist omits it, so a BIA's linked risk is settable on
+  create (the endpoint binds `BiaRecord`) and frozen thereafter. Populated on **0 of 10** live rows
+  in both databases, so latent. [[F2-275]]'s shape; filed rather than fixed inside a slice about the
+  instrument.
+- **`audit-engagements :: findingsCount`** — the aggregate whose sibling register derives it.
+  Deriving it here changes what an IIA engagement reports: an **owner decision**.
+- **The eleven frozen policy fields**, including `summaryAr` (house rule 7). Widening
+  `CyberPolicyRequest` is a product decision about the policy register, and the second route
+  (`/api/policy/documents/{}`) has no typed client at all, so the honest first step is deciding
+  whether that route should have one.
+- **The 52 backend-only entity-bound PUTs** — no typed frontend client, so the coverage question
+  cannot be asked of them at all. That is [[F2-213]]'s structural root restated: **83 entity-bound
+  PUT handlers**, where a purpose-built request record per endpoint would make resets, refusals and
+  mass assignment alike unrepresentable.
+- **`FullReplaceUpdateContractTest` still lacks [[F2-233]]'s store-read narrowing** — correctly, and
+  now with a measurement behind it rather than a filing. Do not port it: it changes nothing today
+  and weakens the taint analysis. Recorded so the next reader does not re-open it.

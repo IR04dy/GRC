@@ -337,12 +337,54 @@ class FullReplaceUpdateContractTest {
      * say so).
      */
     static Set<String> writtenFromRequest(String src, String method) {
-        Set<String> direct = writtenDirectly(src, method);
-        Set<String> all = new LinkedHashSet<>(direct);
-        for (String helper : privateHelpersCalledWithRequest(src, method)) {
+        Set<String> all = new LinkedHashSet<>(writtenDirectly(src, method));
+        for (String helper : helperClosure(src, method)) {
             all.addAll(writtenDirectly(src, helper));
         }
         return all;
+    }
+
+    /** As {@link #writtenFromRequest}, but only the writes with no null guard on the accessor. */
+    static Set<String> unguardedWritesInClosure(String src, String method) {
+        Set<String> all = new LinkedHashSet<>(unguardedWritesFromRequest(src, method));
+        for (String helper : helperClosure(src, method)) {
+            all.addAll(unguardedWritesFromRequest(src, helper));
+        }
+        return all;
+    }
+
+    /**
+     * Every private helper reachable from {@code method} by passing the request along, to a fixed
+     * point within the same file.
+     *
+     * <p>⚠⚠ F2-278 — the single hop below is <b>why {@code SITES} named helper methods rather than
+     * the methods its own controllers call</b>, and nothing said so. {@code CyberControlService}'s
+     * chain is {@code updateControl → applyEditable → applyFrameworkReference}: two hops. Resolving
+     * the population from the controllers (which name {@code updateControl}) therefore lost
+     * {@code frameworkId}, {@code frameworkName} and {@code frameworkNameAr} — and lost them into
+     * the REVERSE leg, where they read as <i>three fields the client sends and the server ignores</i>,
+     * i.e. as three inert form inputs. 🔑 <b>A hand-written population can encode a detector's limit
+     * as a naming convention, and then the limit is invisible because the list looks like a
+     * choice.</b>
+     *
+     * <p>Bounded by the fixed point rather than by a depth number: a cycle terminates because the
+     * set only ever grows, and a helper that adds nothing is free.
+     */
+    static Set<String> helperClosure(String src, String method) {
+        Set<String> closure = new LinkedHashSet<>();
+        Set<String> frontier = new LinkedHashSet<>(List.of(method));
+        while (!frontier.isEmpty()) {
+            Set<String> next = new LinkedHashSet<>();
+            for (String m : frontier) {
+                for (String helper : privateHelpersCalledWithRequest(src, m)) {
+                    if (closure.add(helper)) {
+                        next.add(helper);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        return closure;
     }
 
     /**
@@ -648,6 +690,454 @@ class FullReplaceUpdateContractTest {
                 stopped resolving them and the structural leg above is greener than the tree.""")
             .isLessThanOrEqualTo(ENTITY_BOUND_PUT_HANDLERS)
             .isGreaterThan(60);
+    }
+
+    // ── leg 3b: the same question over a DERIVED population ───────────────────────────────
+
+    /**
+     * ⚠⚠ F2-278 — {@link #SITES} is <b>twelve hand-listed sites</b>, and
+     * {@link #theEntityBoundPutPopulationIsMeasured} — a leg in this same class — measures
+     * <b>83 entity-bound PUT handlers</b>. Its own comment said <i>"Adding a row is how a new
+     * full-replace update gets covered"</i>: an instruction with no enforcement, which is F2-52's
+     * {@code AttachmentAccessPolicy} shape and F2-265's (an instruction not to copy a figure is not
+     * an enforcement). A reader who finds a hard-zero coverage leg beside a measured 83 reads the
+     * zero as covering the 83.
+     *
+     * <p>Derived, the joinable population is <b>30</b> — an entity-bound PUT handler whose path also
+     * has an {@code api.put} with a named payload type. The other 52 have no typed frontend client
+     * at all, so the coverage question has nothing to compare and they are counted rather than
+     * claimed.
+     */
+    private record Derived(String path, Path service, String serviceName, String method,
+                           String feType) { }
+
+    /**
+     * Every entity-bound PUT handler joined to the frontend type its own client sends.
+     *
+     * <p>⚠⚠ Resolves the service source by the controller's <b>import</b> and never by filename.
+     * There are two {@code AuditEngagementService.java} ({@code module/audit_eng} and
+     * {@code module/compliance}) and the {@code audit_eng} one has no {@code update} method, so a
+     * {@code findFirst()} on the file name picked the wrong twin and the site read as
+     * <i>"parsed nothing"</i> — the quiet direction, and indistinguishable from a clean site.
+     * F2-276 found exactly this with a {@code LinkedHashMap} keyed on an entity's simple name
+     * silently overwriting one of a pair; F2-222 measured 15 such duplicate simple names and filed
+     * it as latent because <i>"no key collapses two registers today"</i>. A derived population is
+     * where it stops being latent. Ambiguity that survives both the import and the longest shared
+     * package prefix <b>throws</b>, because a silently wrong pick is the failure mode.
+     */
+    static List<Derived> derivedSites() {
+        Set<String> entities = entitySimpleNames();
+        List<Path> sources = javaSources();
+        String api = stripComments(read(FE_API));
+        Map<String, String> fePayloadType = fePutPayloadTypes(api);
+
+        List<Derived> out = new ArrayList<>();
+        for (Path p : sources) {
+            if (!p.getFileName().toString().endsWith("Controller.java")) {
+                continue;
+            }
+            String src = stripComments(read(p));
+            Map<String, String> serviceFields = new LinkedHashMap<>();
+            Matcher f = Pattern.compile(
+                "private\\s+final\\s+([A-Z]\\w*Service)\\s+(\\w+)\\s*;").matcher(src);
+            while (f.find()) {
+                serviceFields.put(f.group(2), f.group(1));
+            }
+            Matcher base = Pattern.compile("@RequestMapping\\s*\\(\\s*\"([^\"]*)\"").matcher(src);
+            String prefix = base.find() ? base.group(1) : "";
+
+            Matcher m = Pattern.compile("@PutMapping\\s*\\(([^)]*)\\)([\\s\\S]{0,1500}?)\\)\\s*\\{")
+                .matcher(src);
+            while (m.find()) {
+                Matcher b = Pattern.compile(
+                    "@RequestBody\\s+(?:@Valid\\s+)?([A-Z]\\w*)|@Valid\\s+@RequestBody\\s+([A-Z]\\w*)")
+                    .matcher(m.group(2));
+                if (!b.find()) {
+                    continue;
+                }
+                String bound = b.group(1) != null ? b.group(1) : b.group(2);
+                if (!entities.contains(bound)) {
+                    continue;
+                }
+                Matcher sub = Pattern.compile("\"([^\"]*)\"").matcher(m.group(1));
+                String path = normalisePath(prefix + (sub.find() ? sub.group(1) : ""));
+                String feType = fePayloadType.get(path);
+                if (feType == null) {
+                    continue;
+                }
+                String handlerBody = bodyAt(src, m.end() - 1);
+                Matcher call = Pattern.compile("(\\w+)\\s*\\.\\s*(\\w+)\\s*\\(").matcher(handlerBody);
+                while (call.find()) {
+                    String svcName = serviceFields.get(call.group(1));
+                    if (svcName == null) {
+                        continue;
+                    }
+                    Path svc = resolveServiceSource(p, src, svcName, sources);
+                    out.add(new Derived(path, svc, svcName, call.group(2), feType));
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Normalised path -> the frontend type its {@code api.put} payload parameter declares. */
+    static Map<String, String> fePutPayloadTypes(String api) {
+        Map<String, String> out = new LinkedHashMap<>();
+        Matcher m = Pattern.compile(
+            "api\\.put\\s*(?:<[^>]*>)?\\s*\\(\\s*[`'\"]([^`'\"]+)[`'\"]\\s*,\\s*(\\w+)\\s*[,)]")
+            .matcher(api);
+        while (m.find()) {
+            String before = api.substring(Math.max(0, m.start() - 600), m.start());
+            Matcher t = Pattern.compile(
+                Pattern.quote(m.group(2)) + "\\s*:\\s*(?:Partial\\s*<\\s*)?([A-Z]\\w*)")
+                .matcher(before);
+            String type = null;
+            while (t.find()) {
+                type = t.group(1);       // the nearest declaration before the call
+            }
+            if (type != null) {
+                out.put(normalisePath(m.group(1)), type);
+            }
+        }
+        return out;
+    }
+
+    /** See {@link #derivedSites()} — import first, then longest shared package prefix, then throw. */
+    private static Path resolveServiceSource(Path controller, String controllerSrc,
+                                             String simpleName, List<Path> sources) {
+        List<Path> candidates = sources.stream()
+            .filter(p -> p.getFileName().toString().equals(simpleName + ".java"))
+            .toList();
+        if (candidates.isEmpty()) {
+            throw new AssertionError("no source for service " + simpleName);
+        }
+        if (candidates.size() == 1) {
+            return candidates.get(0);
+        }
+        Matcher imp = Pattern.compile(
+            "import\\s+([\\w.]*\\." + Pattern.quote(simpleName) + ")\\s*;").matcher(controllerSrc);
+        if (imp.find()) {
+            String rel = imp.group(1).replace('.', '/') + ".java";
+            for (Path p : candidates) {
+                if (p.toString().replace('\\', '/').endsWith(rel)) {
+                    return p;
+                }
+            }
+        }
+        String home = controller.getParent().toString().replace('\\', '/');
+        Path best = null;
+        int bestShared = -1;
+        int ties = 0;
+        for (Path p : candidates) {
+            String dir = p.getParent().toString().replace('\\', '/');
+            int shared = 0;
+            while (shared < Math.min(home.length(), dir.length())
+                    && home.charAt(shared) == dir.charAt(shared)) {
+                shared++;
+            }
+            if (shared > bestShared) {
+                bestShared = shared;
+                best = p;
+                ties = 1;
+            } else if (shared == bestShared) {
+                ties++;
+            }
+        }
+        if (ties > 1) {
+            throw new AssertionError(
+                "ambiguous service simple name " + simpleName + " for controller " + controller
+                + " — resolve it by import rather than letting a walk order decide (F2-222)");
+        }
+        return best;
+    }
+
+    /**
+     * ⚠⚠ F2-278 — the coverage leg's harm sentence is <b>"the field arrives null on every call and
+     * is written null"</b>, and that is FALSE when the write is null-guarded: an omitted field then
+     * keeps its stored value. So one question was doing the work of two, and switching it to a
+     * derived population without splitting it would have failed on
+     * {@code PolicyManagementService#update} — <b>eleven undeclarable fields, every one guarded</b>,
+     * i.e. a gate failing on correct code, the one failure a gate must never have (F2-214).
+     *
+     * <p>🔑 <b>That is why the population was a hand-written list: the leg's claim was narrower than
+     * its detector, and nobody wrote that down, so the list read as laziness rather than as a
+     * necessary narrowing.</b> The discriminator already existed in this file —
+     * {@link #unguardedWritesFromRequest}, leg 4's detector — and the two legs never met.
+     *
+     * <p>RESET is the hard zero and has no exemption map: an unconditional write of a field the
+     * only client cannot put on the wire destroys a stored value on every edit, and the fix is
+     * always available (declare it, or stop writing it). FROZEN is the milder half and is recorded.
+     */
+    @Test
+    @DisplayName("no derived update NULLS a column its own client cannot send (hard zero)")
+    void noUpdateResetsAnUndeclarableField() {
+        String api = stripComments(read(FE_API));
+        Map<String, Set<String>> reset = new LinkedHashMap<>();
+        for (Derived d : derivedSites()) {
+            String src = stripComments(read(d.service()));
+            Set<String> declared = feKeys(api, d.feType());
+            if (declared.isEmpty()) {
+                continue;                       // an unresolvable type is the census leg's problem
+            }
+            Set<String> offending = new LinkedHashSet<>(unguardedWritesInClosure(src, d.method()));
+            offending.removeAll(declared);
+            if (!offending.isEmpty()) {
+                reset.put(d.path() + " :: " + d.serviceName() + "#" + d.method(), offending);
+            }
+        }
+        assertThat(reset)
+            .as("""
+                These updates write a column UNCONDITIONALLY from a request type that cannot \
+                declare it, so the value arrives null and is written null on every edit — a \
+                stored value destroyed by an edit that never mentioned it. Either declare the \
+                field on the request type (F2-214's fix for crossBorderTransfer on this very \
+                method) or stop writing it. A null guard is the other honest answer and moves \
+                the field to FROZEN_FIELDS, which is a recorded decision rather than a reset.""")
+            .isEmpty();
+    }
+
+    /**
+     * The milder half: a write the client cannot reach, but guarded, so the stored value survives.
+     *
+     * <p>Keyed {@code endpoint :: field} so a twelfth frozen field on a recorded site still fails,
+     * and the reasons repeat where the finding is genuinely per-site — {@code CyberPolicyRequest}
+     * is a narrow ten-field form against a service that writes about twenty columns, so eleven
+     * near-identical per-field reasons would be eleven fluent unverified claims (F2-188) where the
+     * fact is one: <b>this form is narrower than this service's write set</b>. F2-185b's rule cuts
+     * the other way for RESET, which is per field and has no map at all.
+     */
+    private static final Map<String, String> FROZEN_FIELDS = new LinkedHashMap<>() {{
+        // ⚠ This entry exists BECAUSE of the import-based resolution above, and it is the proof
+        // that "parsed nothing" was hiding something: with the service picked by filename the
+        // audit_eng twin won, that class has no `update` method, and the site read as clean.
+        put("/api/v1/compliance/audit-engagements/{} :: findingsCount",
+            "An aggregate the caller supplies, guarded, and AuditEngagementRequest cannot send — "
+            + "so nothing sets it today. Its sibling register derives the same field from the "
+            + "linked finding ids (audit_eng/AuditEngagementService:122) and this twin does not, "
+            + "which is F2-197's 'a computed count is not a measured one' across two registers "
+            + "for one concept. Deriving it here would change what an IIA engagement reports, so "
+            + "it is filed rather than taken inside a slice about the instrument.");
+        String narrowPolicyForm =
+            "PolicyManagementService#update is reached by TWO routes — /api/v1/cyber/policies/{} "
+            + "with this narrow ten-field form, and /api/policy/documents/{} with no typed "
+            + "frontend client at all — so 'the client cannot send it' is a fact about this form "
+            + "and not about the column. Guarded, so nothing is destroyed. Widening the form is a "
+            + "product decision about the policy register, filed rather than taken here.";
+        for (String field : List.of("notes", "retiredReason", "summaryAr", "bodyUrl", "contentMd",
+                "applicabilityScope", "approverName", "approverEmail", "expiryDate",
+                "relatedFramework", "relatedControls")) {
+            put("/api/v1/cyber/policies/{} :: " + field, narrowPolicyForm);
+        }
+    }};
+
+    @Test
+    @DisplayName("a guarded write the client cannot reach is recorded, not silent")
+    void everyFrozenFieldIsAccountedFor() {
+        String api = stripComments(read(FE_API));
+        Set<String> frozen = new LinkedHashSet<>();
+        for (Derived d : derivedSites()) {
+            String src = stripComments(read(d.service()));
+            Set<String> declared = feKeys(api, d.feType());
+            if (declared.isEmpty()) {
+                continue;
+            }
+            Set<String> undeclarable = new LinkedHashSet<>(writtenFromRequest(src, d.method()));
+            undeclarable.removeAll(declared);
+            undeclarable.removeAll(unguardedWritesInClosure(src, d.method()));
+            for (String field : undeclarable) {
+                frozen.add(d.path() + " :: " + field);
+            }
+        }
+        assertThat(frozen)
+            .as("""
+                A field this service writes from the request that its own client cannot put on \
+                the wire. Guarded, so the stored value survives — but it can only be set by a \
+                seed or a direct API call, never corrected from the screen that edits the \
+                register (F2-275). Say which, in FROZEN_FIELDS, with a reason; a fixed one must \
+                lose its entry in the same commit.""")
+            .containsExactlyInAnyOrderElementsOf(FROZEN_FIELDS.keySet());
+        assertThat(FROZEN_FIELDS.values())
+            .as("a reason must actually give one — a bare label is not an explanation")
+            .allSatisfy(r -> assertThat(r).hasSizeGreaterThan(40));
+    }
+
+    /**
+     * The reverse direction over the derived population, restricted to <b>inbound-only</b> request
+     * types.
+     *
+     * <p>⚠ A round-trip {@code *Dto} MUST declare the fields it RETURNS, so "declared but not
+     * written" is the normal case for one and says nothing — F2-248 recorded exactly this when its
+     * own census conflated inbound-only types with round-trip ones and would have shipped a zero
+     * that failed on correct code. Ten of the thirty derived sites send a {@code *Dto}; asking this
+     * question of them would demand roughly sixty reasons for a contract that does not exist.
+     */
+    private static final Map<String, String> DERIVED_IGNORED_FIELDS = new LinkedHashMap<>() {{
+        put("/api/v1/bcm/bia/{} :: linkedRiskId",
+            "BcmBiaRequest declares it and BcmService#updateBia's seven-field whitelist omits it, "
+            + "so a BIA's linked risk is settable on create (the endpoint binds BiaRecord) and "
+            + "frozen thereafter. Populated on 0 of 10 live rows in dev and prod, so latent — "
+            + "F2-275's shape, filed rather than fixed inside a slice about the instrument.");
+        put("/api/v1/bcm/legacy-plans/{} :: status",
+            "BY DESIGN. F2-234 made this route accept an ECHO of the stored status and refuse a "
+            + "CHANGE, because bcm.bcm_plans has no CHECK on status and every transition guard is "
+            + "an equality test, so a PUT-driven DRAFT -> APPROVED skipped the machine entirely. "
+            + "The field is on the wire so a form that round-trips the row keeps working.");
+        put("/api/v1/cyber/policies/{} :: policyCode",
+            "BY DESIGN. The document-control code an auditor cites; CH-10 fixes it at creation and "
+            + "PolicyManagementService writes it only when superseding a document into a new "
+            + "version. Populated on 41 of 41 live rows in dev and 37 of 37 in prod.");
+        put("/api/v1/privacy/dsrs/{} :: receivedAt",
+            "When the request arrived. Stamped once at creation; a later edit must not restyle "
+            + "the start of the PDPL Article 23 clock.");
+    }};
+
+    @Test
+    @DisplayName("over the derived population, an ignored inbound field is recorded")
+    void everyIgnoredFieldOnAnInboundTypeIsAccountedFor() {
+        String api = stripComments(read(FE_API));
+        Set<String> ignored = new LinkedHashSet<>();
+        for (Derived d : derivedSites()) {
+            if (!d.feType().endsWith("Request")) {
+                continue;
+            }
+            String src = stripComments(read(d.service()));
+            Set<String> written = writtenFromRequest(src, d.method());
+            if (written.isEmpty()) {
+                continue;
+            }
+            for (String key : feKeys(api, d.feType())) {
+                if (!written.contains(key)) {
+                    ignored.add(d.path() + " :: " + key);
+                }
+            }
+        }
+        assertThat(ignored)
+            .as("""
+                A field an inbound-only request type declares that the server never writes: \
+                either a form input that silently does nothing, or a deliberate immutable. Say \
+                which, in DERIVED_IGNORED_FIELDS, with a reason.""")
+            .containsExactlyInAnyOrderElementsOf(DERIVED_IGNORED_FIELDS.keySet());
+        assertThat(DERIVED_IGNORED_FIELDS.values())
+            .allSatisfy(r -> assertThat(r).hasSizeGreaterThan(40));
+    }
+
+    @Test
+    @DisplayName("the derived population is measured, and it covers every hand-listed site")
+    void theDerivedPopulationSubsumesTheHandListedOne() {
+        List<Derived> derived = derivedSites();
+        Set<String> paths = new LinkedHashSet<>();
+        derived.forEach(d -> paths.add(d.path()));
+
+        assertThat(derived)
+            .as("""
+                Entity-bound PUT handlers joined to a frontend api.put with a named payload type. \
+                Asserted EXACTLY, not as a ceiling: a decrease-only count cannot express "the \
+                population was undercounted", which is the finding this leg exists to close \
+                (F2-204). If a new typed client appears, or the resolver stops resolving, this \
+                number moves and the reason has to be said out loud.""")
+            .hasSize(30);
+
+        assertThat(derived.stream().filter(d -> d.feType().endsWith("Request")).count())
+            .as("inbound-only request types among the derived sites — the reverse leg's population")
+            .isEqualTo(20L);
+
+        // Anti-rot: every endpoint a human had enumerated must still be found by the derivation.
+        for (Site s : SITES) {
+            String path = normalisePath(s.endpoint().replaceAll("^\\w+\\s+", ""));
+            assertThat(paths)
+                .as("the derivation lost a site the hand-written list had: %s. A derived "
+                    + "population that silently shrinks reads exactly like a clean tree", path)
+                .contains(path);
+        }
+    }
+
+    @Test
+    @DisplayName("the derived-population detectors are not vacuous (positive control)")
+    void theDerivedDetectorsAreNotVacuous() {
+        // A RESET: unconditional write, field absent from the client type.
+        String resetting = """
+            public class Sample {
+                public Ropa updateRopa(Long id, Ropa req) {
+                    Ropa existing = getRopa(id);
+                    existing.setPurposeEn(req.getPurposeEn());
+                    existing.setPurposeAr(req.getPurposeAr());
+                    return repo.save(existing);
+                }
+            }
+            """;
+        String api = "export interface RopaRequest { purposeEn?: string; }";
+        Set<String> unguarded = unguardedWritesInClosure(resetting, "updateRopa");
+        assertThat(unguarded).contains("purposeEn", "purposeAr");
+        Set<String> offending = new LinkedHashSet<>(unguarded);
+        offending.removeAll(feKeys(api, "RopaRequest"));
+        assertThat(offending)
+            .as("the RESET detector no longer sees an unconditional write of an undeclarable field")
+            .containsExactly("purposeAr");
+
+        // The same shape GUARDED is frozen, never a reset — the distinction the split rests on.
+        String guarded = """
+            public class Sample {
+                public Sched update(Long id, Sched req) {
+                    Sched t = get(id);
+                    if (req.getName()   != null) t.setName(req.getName());
+                    if (req.getNameAr() != null) t.setNameAr(req.getNameAr());
+                    return repo.save(t);
+                }
+            }
+            """;
+        assertThat(unguardedWritesInClosure(guarded, "update"))
+            .as("a null-guarded write must never read as a reset — this is the whole split")
+            .isEmpty();
+        assertThat(writtenFromRequest(guarded, "update")).contains("name", "nameAr");
+
+        // The transitive hop: two levels of helper, which one hop cannot reach.
+        String twoHops = """
+            public class Sample {
+                public Ctl updateControl(Long id, Ctl req) {
+                    Ctl existing = get(id);
+                    applyEditable(existing, req);
+                    return repo.save(existing);
+                }
+                private void applyEditable(Ctl target, Ctl req) {
+                    target.setTitleEn(req.getTitleEn());
+                    applyFrameworkReference(target, req);
+                }
+                private void applyFrameworkReference(Ctl target, Ctl req) {
+                    target.setFrameworkName(req.getFrameworkName());
+                }
+            }
+            """;
+        assertThat(helperClosure(twoHops, "updateControl"))
+            .containsExactlyInAnyOrder("applyEditable", "applyFrameworkReference");
+        assertThat(writtenFromRequest(twoHops, "updateControl"))
+            .as("a single helper hop loses the second level, and it loses it into the REVERSE leg")
+            .contains("titleEn", "frameworkName");
+        assertThat(privateHelpersCalledWithRequest(twoHops, "updateControl"))
+            .as("the single hop reaches only the first level — the limit the closure removes")
+            .containsExactly("applyEditable");
+
+        // ⚠ A RESET two helpers deep. Without this the mutation that drops the closure from
+        // unguardedWritesInClosure is invisible: on a clean corpus the reset set is empty either
+        // way, so the leg above passes and the harness reports a survivor as a gate hole.
+        String deepReset = """
+            public class Sample {
+                public Ctl updateControl(Long id, Ctl req) {
+                    Ctl existing = get(id);
+                    applyEditable(existing, req);
+                    return repo.save(existing);
+                }
+                private void applyEditable(Ctl target, Ctl req) {
+                    applyFrameworkReference(target, req);
+                }
+                private void applyFrameworkReference(Ctl target, Ctl req) {
+                    target.setFrameworkNameAr(req.getFrameworkNameAr());
+                }
+            }
+            """;
+        assertThat(unguardedWritesInClosure(deepReset, "updateControl"))
+            .as("an unguarded write two helpers down is still a reset")
+            .containsExactly("frameworkNameAr");
     }
 
     // ── leg 4: a client typed to send a subset needs a server that tolerates one ───────────

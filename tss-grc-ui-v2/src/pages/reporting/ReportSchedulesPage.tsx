@@ -103,6 +103,11 @@ export function ReportSchedulesPage() {
   const FIELDS: FieldDef[] = [
     { kind: 'text',     key: 'name',          label: t('rsFldName') + ' *', required: true, span: 8 },
     { kind: 'select',   key: 'isActive',      label: t('rsFldActive'), options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Paused' }], span: 4 },
+    // F2-278 — `ReportScheduleService#update` has always written name_ar/description_ar from the
+    // request and `ReportScheduleDto` declared neither, so both were frozen: populated on 8 of 11
+    // live rows in dev and prod by the seed, and uneditable from the one screen that edits this
+    // register. Arabic is the platform's primary language (house rule 7).
+    { kind: 'text',     key: 'nameAr',        label: t('rsFldNameAr'), span: 12 },
     { kind: 'select',   key: 'reportType',    label: t('rsFldReportType') + ' *', required: true, options: REPORT_TYPE_OPTIONS, span: 4 },
     { kind: 'select',   key: 'format',        label: t('rsFldFormat'), options: FORMAT_OPTIONS, span: 4 },
     { kind: 'select',   key: 'language',      label: t('rsFldLanguage'), options: LANGUAGE_OPTIONS, span: 4 },
@@ -112,6 +117,7 @@ export function ReportSchedulesPage() {
     { kind: 'textarea', key: 'recipients',    label: t('rsFldRecipients') + ' *', rows: 2, span: 12 },
     { kind: 'textarea', key: 'ccRecipients',  label: t('rsFldCc'), rows: 1, span: 12 },
     { kind: 'textarea', key: 'description',   label: t('rsFldDescription'), rows: 2, span: 12 },
+    { kind: 'textarea', key: 'descriptionAr', label: t('rsFldDescriptionAr'), rows: 2, span: 12 },
   ];
 
   function reqFromDto(s: ReportScheduleDto): Partial<ReportScheduleDto> {
@@ -152,8 +158,15 @@ export function ReportSchedulesPage() {
   const cols: Column<ReportScheduleDto>[] = [
     { header: t('rsFldName'), cell: s => (
       <div>
-        <div style={{ fontWeight: 600 }}>{s.name}</div>
-        {s.description && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.description}</div>}
+        {/* F2-278 — prefer the Arabic label when reading in Arabic, falling back to the English
+            one rather than to a blank cell: `name` is NOT NULL and `name_ar` is nullable (3 of 11
+            live rows have none), so an unconditional Arabic read would empty those rows. */}
+        <div style={{ fontWeight: 600 }}>{lang === 'ar' && s.nameAr ? s.nameAr : s.name}</div>
+        {(lang === 'ar' && s.descriptionAr ? s.descriptionAr : s.description) && (
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            {lang === 'ar' && s.descriptionAr ? s.descriptionAr : s.description}
+          </div>
+        )}
       </div>
     ) },
     { header: t('rsFldReportType'), cell: s => <Badge tone="primary">{s.reportType.replace(/_/g, ' ')}</Badge>, width: '160px' },

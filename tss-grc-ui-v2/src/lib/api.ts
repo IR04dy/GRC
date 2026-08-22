@@ -1327,6 +1327,20 @@ export interface ReportScheduleDto {
   id: number; organisationId?: number;
   externalId?: string;
   name: string; description?: string;
+  /**
+   * F2-278 — `ReportScheduleService#update` writes both of these from the request (guarded, so
+   * nothing was destroyed) and this type declared neither, so the Arabic name and description of
+   * a scheduled regulatory report were **frozen**: settable only by a seed or a direct API call,
+   * and never editable from `ReportSchedulesPage`, which is the screen that edits this register.
+   * F2-275's shape — an Arabic column that EXISTS is not one that can be WRITTEN — and F2-198's
+   * for the read half: the wire has always carried them because the handler returns the entity.
+   *
+   * ⚠ Not latent: populated on 8 of 11 live rows in BOTH databases, so eight schedules already
+   * hold an Arabic label that no screen could show or correct (house rule 7, on the primary
+   * language). Both are `nvarchar(255)`/`nvarchar(MAX)` and nullable, mirroring their English
+   * siblings.
+   */
+  nameAr?: string; descriptionAr?: string;
   reportType: string;        // RISK_REGISTER | FINDINGS_AGING | KRI_DASHBOARD
   format: string;            // PDF | XLSX
   language: string;          // en | ar
@@ -2805,6 +2819,30 @@ export interface PrivacyBreachRequest {
 export interface PrivacyRopaRequest {
   activityNameEn: string; activityNameAr?: string;
   purposeEn?: string;
+  /**
+   * F2-278 — `PrivacyService.updateRopa` writes this UNCONDITIONALLY and this type did not
+   * declare it, so a `PUT /ropa/{id}` would send null and null the Arabic purpose on every
+   * edit. Exactly the defect F2-214 fixed for `crossBorderTransfer` eight lines below, in the
+   * same method.
+   *
+   * ⚠ F2-272 created it: that slice added `setPurposeAr` to the whitelist so V388's column
+   * would stop being permanently uneditable, and left the wire unable to carry it — turning
+   * "silently discarded" into "nulled on every edit" for every caller that cannot send the
+   * field, which is every caller. Its own comment reads "F2-214's shape, not F2-213's reset":
+   * true of the code it replaced and false of the code it wrote.
+   *
+   * ⚠ Latent, and say so rather than implying otherwise: `purpose_ar` is populated on 0 of 11
+   * live rows in dev and the column is ABSENT in prod (V388 is one of the 47 pending
+   * migrations), and `updateRopa` has no caller — `apiClientMethodReachability` records it as
+   * "HOLE: a RoPA record can be created and never corrected". That entry adjudicates the
+   * CLIENT and says nothing about the ENDPOINT, so it reads as an invitation to build the
+   * edit screen that would fire the erasure (F2-214's own words, about this very endpoint).
+   *
+   * ⚙ Declared and NOT collected by `RopaWizard`, which is the treatment `activityNameAr`
+   * above already has: giving the wizard Arabic inputs is a product change, filed by F2-210
+   * and F2-272, and is deliberately not smuggled into a wire fix.
+   */
+  purposeAr?: string;
   legalBasis?: string;
   retentionPeriodMonths?: number;
   dataCategoriesJson?: string;
