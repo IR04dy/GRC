@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Status** | 🟢 CLOSED 2026-08-22 (`73c424dc`) |
 | **Severity** | **P2** — a PDPL Article 20 breach record could not be described in Arabic, on a platform whose primary language is Arabic |
 | **Found by** | changing the question after [[F2-270]] recorded the reference-minting seam as worked out |
 | **Fix** | `V387` adds `title_ar` + `description_ar` · the entity, the writer, the wire and the console follow · `BilingualInvariantRatchetTest` counts EN_ONLY and its **ceiling moves to the sum** |
