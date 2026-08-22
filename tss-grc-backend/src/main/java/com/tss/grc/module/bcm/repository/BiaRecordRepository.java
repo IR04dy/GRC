@@ -25,6 +25,22 @@ import java.util.Optional;
  * it resolved from its own tenant's processes — tenant-correct by that route, so re-scoping
  * them is defence in depth rather than a defect, and out of this slice. All five finders now
  * inherit the entity's {@code @Where(is_deleted = 0)}.
+ *
+ * <p>⚠⚠ <b>F2-282 — the paragraph above names those three callers and asks only the TENANT
+ * question of them.</b> A process can carry several BIA records (two of the ten live processes
+ * do), so each of the three also had to choose WHICH one states that process's recovery
+ * objectives — and all three chose with a hand-rolled loop, disagreeing on both the ordering
+ * and the null handling. That is F2-215's two-of-N inside a comment: a reader who finds the
+ * callers enumerated and one question answered about them does not then ask what the other
+ * question is. The selection now lives in
+ * {@link com.tss.grc.module.bcm.service.BiaObjectives#authoritativeByProcess}.
+ *
+ * <p>⚠ That predicate is deliberately <b>not</b> a {@code default} method here. It was, for one
+ * draft, and it broke two existing {@code MtpdInheritanceServiceTest} cases: <b>a Mockito mock
+ * does not execute default methods</b>, so the mocked repository answered nothing, the stubbed
+ * {@code findByProcessIdIn} went unused and the resolved MTPD silently became empty. A decision
+ * placed on a mockable interface is a decision every test that mocks that interface silently
+ * loses. Keep queries here and decisions in a pure function.
  */
 public interface BiaRecordRepository extends JpaRepository<BiaRecord, Long> {
 
@@ -38,4 +54,5 @@ public interface BiaRecordRepository extends JpaRepository<BiaRecord, Long> {
     Page<BiaRecord> findByProcessId(Long processId, Pageable pageable);
 
     List<BiaRecord> findByProcessIdIn(List<Long> processIds);
+
 }
