@@ -104,6 +104,14 @@ public class DependencyCascadeService {
                 Long consumer = d.getProcessId();
                 if (depthByProcess.containsKey(consumer)) continue;     // already visited
                 if (Objects.equals(consumer, failedProcessId)) continue; // self-loop guard
+                // F2-283: a process this tenant's register does not return must not
+                // CONDUCT the cascade. The row was already dropped from the output
+                // below (`if (p == null) continue`), but it was enqueued first, so a
+                // soft-deleted process still propagated reach to the live consumers
+                // behind it — and its own depth then set theirs. Measured: 0 edges
+                // name a deleted process today, so this was latent; reachability is
+                // a fact about today, not a property of a control (F2-182).
+                if (!processById.containsKey(consumer)) continue;
                 depthByProcess.put(consumer, curDepth + 1);
                 queue.add(consumer);
             }
@@ -189,14 +197,36 @@ public class DependencyCascadeService {
         return 0.25;
     }
 
+    /**
+     * Ranks a process criticality for the display tiebreak.
+     *
+     * <p>F2-283 added {@code SOVEREIGN}. It is the platform's own top tier —
+     * {@code BcmBiaAssessmentService} computes it from the impact matrix and emits
+     * {@code BIA_CRITICALITY_SOVEREIGN} for it — and
+     * {@code bcm.critical_processes.criticality} has <b>no CHECK constraint</b>, so
+     * nothing stops it being stored here. Ranked by the old {@code default -> 0} it
+     * sorted <em>below LOW</em>, putting the most critical process last in its tie
+     * group. Latent (the column holds only CRITICAL/HIGH/MEDIUM today) and closed
+     * anyway, because what made it harmless was the data rather than the code.
+     *
+     * <p>⚠ An unrecognised token still ranks 0 and that is deliberate, not an
+     * oversight: this is a tiebreak within one breach-and-depth group, so
+     * "unclassified sorts after classified" is the honest ordering — inventing a
+     * rank for a word the platform does not define would be worse. It matters
+     * because unrecognised criticality words DO exist in this schema:
+     * {@code bcm.bia_records.criticality} stores {@code TIER_2}/{@code TIER_3}
+     * beside {@code CRITICAL}/{@code HIGH}/{@code MEDIUM} (F2-279 measured it), and
+     * neither column is constrained.
+     */
     private static int criticalityRank(String s) {
         if (s == null) return 0;
         return switch (s.toUpperCase(Locale.ROOT)) {
-            case "CRITICAL" -> 4;
-            case "HIGH"     -> 3;
-            case "MEDIUM"   -> 2;
-            case "LOW"      -> 1;
-            default         -> 0;
+            case "SOVEREIGN" -> 5;
+            case "CRITICAL"  -> 4;
+            case "HIGH"      -> 3;
+            case "MEDIUM"    -> 2;
+            case "LOW"       -> 1;
+            default          -> 0;
         };
     }
 
