@@ -2651,6 +2651,12 @@ export interface PrivacyDsrRequest {
 // here and 6 more on DpiaDto; the entity says 4 and 0.
 export interface PrivacyBreachDto {
   id: number; titleEn: string; descriptionEn?: string;
+  /**
+   * F2-271 (V387) — the Arabic pair. Declared because the wire now carries it: F2-211's rule is
+   * that the wire nominates and `sys.columns` adjudicates, and declaring a field the entity does
+   * not have is exactly the defect that slice measured on this same register.
+   */
+  titleAr?: string; descriptionAr?: string;
   breachType?: string; status?: string;
   /** The affected-subject count the server actually keeps (17/17 non-null). */
   dataSubjectsAffectedCount?: number;
@@ -2731,12 +2737,20 @@ export interface PrivacyRopaDto {
  *
  * `pdpcNotifiedAt` is deliberately absent: it is stamped by `notifyDataOffice` and is the
  * evidence the data office was told, not a form field (F2-213's `completedAt` rule).
- * There is no `severity` and no `titleAr` column on `privacy.data_breaches` — do not
- * re-add either here; the second is filed as a real gap against house rule 7.
+ * There is no `severity` column on `privacy.data_breaches` — do not re-add that one here.
+ *
+ * ⚠ This block used to read "and no `titleAr` column … the second is filed as a real gap against
+ * house rule 7". **F2-271 closed that gap (V387).** `title_ar` and `description_ar` exist now,
+ * nullable and width-mirrored against their English siblings, so both are declared below. They are
+ * optional because nothing can invent Arabic governance text for the 17 rows that predate the
+ * column (F2-30's reason for its own ratchet), not because they are decoration.
  */
 export interface PrivacyBreachRequest {
   titleEn: string;
+  /** F2-271 (V387). Optional — see the note above on why it is not mandatory. */
+  titleAr?: string;
   descriptionEn?: string;
+  descriptionAr?: string;
   /** NOT NULL on privacy.data_breaches. Omitting it is a 400 that names no field. */
   breachType: string;
   discoveredAt?: string;

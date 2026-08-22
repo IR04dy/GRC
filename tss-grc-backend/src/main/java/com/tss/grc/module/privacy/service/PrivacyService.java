@@ -110,7 +110,12 @@ public class PrivacyService {
     public DataBreach updateBreach(Long id, DataBreach req) {
         DataBreach existing = getBreach(id);
         existing.setTitleEn(req.getTitleEn());
+        // F2-271 — the Arabic pair is editable exactly like its English sibling. Adding a
+        // column that no write path fills would be an inert column (F2-198's shape), which
+        // is why V387 and these two lines are one commit.
+        existing.setTitleAr(req.getTitleAr());
         existing.setDescriptionEn(req.getDescriptionEn());
+        existing.setDescriptionAr(req.getDescriptionAr());
         existing.setBreachType(req.getBreachType());
         existing.setDiscoveredAt(req.getDiscoveredAt());
         existing.setDataSubjectsAffectedCount(req.getDataSubjectsAffectedCount());

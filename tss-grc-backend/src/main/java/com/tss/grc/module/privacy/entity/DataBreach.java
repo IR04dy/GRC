@@ -24,8 +24,28 @@ public class DataBreach {
     @Column(name = "title_en", nullable = false, length = 255)
     private String titleEn;
 
+    /**
+     * F2-271 (V387) — Arabic title. House rule 7: a user-visible record carries {@code *_en}
+     * AND {@code *_ar}, and Arabic is the PRIMARY language, so a PDPL Article 20 breach that
+     * could only be titled in English was the worse half of that rule — the column did not
+     * exist, so the Arabic could not be recorded at all.
+     *
+     * <p>⚠ Deliberately NOT {@code @NotBlank}, and the reason is F2-30's: bean validation
+     * fires on UPDATE as well as insert, so requiring Arabic would make every breach that
+     * predates V387 uneditable until somebody supplies it — and nothing can invent Arabic
+     * governance text. Its existence is what makes the pair VISIBLE to
+     * {@code BilingualInvariantRatchetTest}, which is the mechanism by which the constraint
+     * can be added later once the rows carry Arabic.
+     */
+    @Column(name = "title_ar", length = 255)
+    private String titleAr;
+
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)")
     private String descriptionEn;
+
+    /** F2-271 (V387) — Arabic description; see {@link #titleAr} for why it is not mandatory. */
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;
 
     @Column(name = "breach_type", nullable = false, length = 100)
     private String breachType;

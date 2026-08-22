@@ -176,11 +176,16 @@ export function PdplBreachConsole({ breaches, onRecorded }: {
           <div style={{ fontSize: 12, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {t('pdplActiveBreach')} · #{breach.id}
           </div>
+          {/* F2-271 — prefer Arabic when the UI is Arabic, which is the PRIMARY language here
+              (house rule 7). Falls back to English rather than showing nothing, because V387
+              deliberately did not backfill: an empty Arabic title is an honest "not recorded" and
+              a machine-translated one would be a fabricated governance record. The `?? titleEn`
+              is therefore a real fallback, not a `|| N`-style invented figure (F2-195). */}
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-1)', marginTop: 4 }}>
-            {breach.titleEn}
+            {lang === 'ar' ? (breach.titleAr ?? breach.titleEn) : breach.titleEn}
           </div>
           <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
-            {breach.descriptionEn}
+            {lang === 'ar' ? (breach.descriptionAr ?? breach.descriptionEn) : breach.descriptionEn}
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <Badge tone={SEVERITY_TONE[severity]}

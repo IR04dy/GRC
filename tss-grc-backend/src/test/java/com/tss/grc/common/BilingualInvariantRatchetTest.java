@@ -5,11 +5,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -93,8 +98,22 @@ class BilingualInvariantRatchetTest {
      * not evidence of absence. F2-140 found the same shape in the schema ratchets — a table with no
      * JPA entity was invisible to a control asserting that every mapped table has DDL. <b>Mapping a
      * column made this number worse and the codebase better.</b>
+     *
+     * <p>⚠⚠ <b>F2-271 — that last sentence is the whole argument for retiring this constant, and it
+     * was written here before the constant was retired.</b> A decrease-only ceiling on a number that
+     * <i>gets worse when the codebase gets better</i> fails on the commit that improves things, and
+     * this one's failure message then said <i>"Add &#64;NotBlank to the *_ar field — do not raise
+     * the baseline"</i> — which on a populated column is what this very class warns makes every
+     * existing record uneditable. So the instrument had <b>documented why its number was the wrong
+     * number and stayed keyed on it</b>: the codebase holding the correct rule in prose beside the
+     * place it was not applied (F2-195's shape).
+     *
+     * <p>The ceiling is now {@link #BASELINE_ARABIC_NOT_GUARANTEED}, the SUM of the asymmetric pairs
+     * and the {@link #scanEnOnly() EN_ONLY} bucket this class used to {@code continue} past. This
+     * constant is deleted rather than kept as a measurement, because an unused ceiling whose value
+     * is stale (158, against a measured 159) answers the question a reader was about to ask
+     * (F2-184).
      */
-    private static final int BASELINE_ASYMMETRIC_PAIRS = 158;
 
     /**
      * The 35 pairs whose columns already hold blank Arabic, with the row counts measured
@@ -151,20 +170,62 @@ class BilingualInvariantRatchetTest {
         Map.entry("RootCauseAnalysis.problemStatementAr", "1/12"),
         Map.entry("TcfdClimateScenario.titleAr", "1/8"));
 
+    /**
+     * F2-271 — the ceiling moved from the asymmetric pairs to <b>the sum</b>, because the old
+     * question punished fixing the worse defect.
+     *
+     * <p>Closing an {@link #scanEnOnly() EN_ONLY} field means adding a NULLABLE Arabic sibling —
+     * nullable because nothing can invent Arabic governance text for the rows that predate the
+     * column, which is this class's own reason for being a ratchet. That makes the pair
+     * <b>visible</b> to {@link #scanAsymmetricPairs()}, so {@code en_only} falls by one and
+     * {@code asymmetric} rises by one. Measured on V387: <b>47 → 45</b> and <b>158 → 159</b>.
+     *
+     * <p>🔑 So a decrease-only ceiling on the asymmetric pairs alone <b>fails on the very commit
+     * that fixes the worse half of house rule 7</b>, and its failure message read <i>"Add
+     * &#64;NotBlank to the *_ar field — do not raise the baseline"</i>, which on a populated column
+     * is precisely what this class warns makes every existing record uneditable. <b>The instrument
+     * told you to break editing rather than let its count move.</b> F2-204's rule arriving from the
+     * inside: when a decrease-only number has to go up, ask whether its QUESTION was wrong, and
+     * re-scope rather than raise.
+     *
+     * <p>The sum cannot be gamed in either direction — it counts <i>fields where Arabic is not
+     * guaranteed</i>:
+     * <ul>
+     *   <li>a new English-only column: {@code en_only} +1 → <b>fails</b>;</li>
+     *   <li>a new mandatory-EN / optional-AR pair: {@code asymmetric} +1 → <b>fails</b>;</li>
+     *   <li>adding a nullable Arabic sibling to a mandatory English one: −1 and +1 →
+     *       <b>unchanged</b>, which is right, because the defect MOVED rather than went away;</li>
+     *   <li>adding a symmetric pair, or annotating an Arabic column whose rows already hold
+     *       Arabic: → <b>falls</b>.</li>
+     * </ul>
+     *
+     * <p>Both components are still printed and asserted individually as measurements, so a reader
+     * can see which half moved. What is a <em>ceiling</em> is the sum.
+     */
     @Test
-    void theBilingualAsymmetryOnlyEverShrinks() {
+    void arabicIsNotGuaranteedOnFewerFieldsThanBefore() {
         List<String> asymmetric = scanAsymmetricPairs();
+        List<String> enOnly = scanEnOnly();
         Collections.sort(asymmetric);
-        System.out.println("[F2-30 bilingual ratchet] asymmetric *_en/*_ar pairs = " + asymmetric.size());
-        asymmetric.forEach(s -> System.out.println("  - " + s));
+        System.out.println("[F2-30/F2-271 bilingual ratchet] asymmetric pairs = " + asymmetric.size()
+            + ", EN_ONLY = " + enOnly.size() + ", sum = " + (asymmetric.size() + enOnly.size()));
+        asymmetric.forEach(s -> System.out.println("  asym    - " + s));
+        enOnly.forEach(s -> System.out.println("  EN_ONLY - " + s));
 
-        assertThat(asymmetric.size())
-            .as("An entity has a mandatory *_en field beside an optional *_ar field, which "
-                + "breaks CLAUDE.md house rule 7 (Arabic names are backend-mandatory). Add "
-                + "@NotBlank to the *_ar field — do not raise the baseline. Check the column's "
-                + "blank-row count first: on a populated column the constraint also blocks "
-                + "edits to existing records. Offenders are printed above.")
-            .isLessThanOrEqualTo(BASELINE_ASYMMETRIC_PAIRS);
+        assertThat(asymmetric.size() + enOnly.size())
+            .as("%d entity fields do not guarantee Arabic (%d asymmetric pairs + %d EN_ONLY), "
+                + "against a ceiling of %d. CLAUDE.md house rule 7: a user-visible record carries "
+                + "*_en AND *_ar, and Arabic is the PRIMARY language. Do not raise this. The "
+                + "ceiling is the SUM and not the pair count on purpose (F2-271): adding a nullable "
+                + "Arabic sibling moves a field from EN_ONLY into the pair bucket, so a ceiling on "
+                + "pairs alone FAILS on the commit that fixes the worse half of the rule, and its "
+                + "old message told you to annotate a populated column - which blocks edits to "
+                + "every existing row. To make this number FALL, add a symmetric pair or annotate "
+                + "an Arabic column whose rows already hold Arabic; check the blank-row count "
+                + "first. Offenders are printed above.",
+                asymmetric.size() + enOnly.size(), asymmetric.size(), enOnly.size(),
+                BASELINE_ARABIC_NOT_GUARANTEED)
+            .isLessThanOrEqualTo(BASELINE_ARABIC_NOT_GUARANTEED);
     }
 
     /**
@@ -185,7 +246,7 @@ class BilingualInvariantRatchetTest {
         assertThat(stale)
             .as("These fields are listed as blocked by blank Arabic data but are no longer "
                 + "asymmetric — either the constraint landed (remove them from DATA_BLOCKED and "
-                + "lower BASELINE_ASYMMETRIC_PAIRS) or the field was renamed or removed.")
+                + "lower BASELINE_ARABIC_NOT_GUARANTEED) or the field was renamed or removed.")
             .isEmpty();
     }
 
@@ -225,6 +286,52 @@ class BilingualInvariantRatchetTest {
                 }
             }
         }
+        return out;
+    }
+
+    /**
+     * F2-271 — the bucket {@link #scanAsymmetricPairs()} names in a comment and skips.
+     *
+     * <p>That method pairs each {@code *En} field with its {@code *Ar} sibling and, when the
+     * sibling does not exist, does {@code continue;   // EN_ONLY — needs a migration, not an
+     * annotation}. Correct, and it means **a field with no Arabic sibling at all is outside this
+     * class's population by construction** — the narrowing is the <b>existence of the sibling</b>,
+     * which is F2-198's shape at a new depth.
+     *
+     * <p>🔑 <b>EN_ONLY is the WORSE half of house rule 7.</b> An asymmetric pair lets Arabic be
+     * supplied and merely fails to require it; a missing column means the Arabic <b>cannot be
+     * recorded at all</b>, on a platform whose primary language is Arabic. And it needs a
+     * migration, so it can never be closed by the annotation sweep the ratchet above measures.
+     *
+     * <p>⚠ This class already knew. Its {@link #ASYMMETRIC_PAIRS} javadoc records a
+     * <i>regression</i> where {@code Notification.messageAr} was added and the asymmetry count
+     * went UP, because *"the column became visible to this scan"* — i.e. an EN_ONLY field becoming
+     * a pair. **The blind spot was understood, named, and never counted**, and five slices then
+     * filed individual members by hand: F2-208 (`capa.tasks.progress_notes_*`), F2-209
+     * (`privacy.data_breaches` has no `title_ar` or `description_ar`, on a PDPL statutory record),
+     * F2-249 (`ethics.aml_alerts.analyst_name`), F2-251 (three `change_mgmt` people columns) and
+     * F2-252 (`cyber.cyber_controls.framework_name`, where the sibling register carries `name_ar`).
+     *
+     * <p>Reported with the physical location because the fix is a migration and the first thing
+     * anyone needs is the table — the same reason {@link #scanAsymmetricPairs()} prints it.
+     */
+    static List<String> scanEnOnly() {
+        List<String> out = new ArrayList<>();
+        for (Class<?> c : entities()) {
+            for (Field en : c.getDeclaredFields()) {
+                if (!en.getName().endsWith("En")) {
+                    continue;
+                }
+                String arName = en.getName().substring(0, en.getName().length() - 2) + "Ar";
+                try {
+                    c.getDeclaredField(arName);
+                } catch (NoSuchFieldException e) {
+                    out.add(c.getSimpleName() + "." + en.getName() + " -> "
+                            + physicalLocation(c, en));
+                }
+            }
+        }
+        Collections.sort(out);
         return out;
     }
 
@@ -284,5 +391,86 @@ class BilingualInvariantRatchetTest {
             }
         }
         return out;
+    }
+
+
+    /**
+     * EN_ONLY fields — a {@code *_en} column with no Arabic sibling anywhere on the entity.
+     *
+     * <p>Measured by {@link #scanEnOnly()} on this tree. <b>Decrease-only and with NO verdicts</b>
+     * (F2-188): closing one is a migration plus a writer, and which of these is user-visible
+     * governance text as against an internal label is a reading job, not something this number can
+     * decide. Two shapes are certainly in here and want opposite treatment — a PDPL breach's
+     * {@code title_en} must have Arabic beside it (house rule 7), while an internal
+     * {@code source_system_en}-style label may legitimately be English-only.
+     */
+    /**
+     * F2-271 — <b>the ceiling</b>: asymmetric pairs + EN_ONLY, i.e. every entity field where Arabic
+     * is not guaranteed. <b>204</b> measured on this tree (159 + 45) after V387 closed
+     * {@code privacy.data_breaches}. Decrease-only; see
+     * {@link #arabicIsNotGuaranteedOnFewerFieldsThanBefore()} for why the ceiling is the sum rather
+     * than either component.
+     */
+    private static final int BASELINE_ARABIC_NOT_GUARANTEED = 204;
+
+    /** Measured, not a ceiling — the sum above is the ceiling. */
+    private static final int BASELINE_EN_ONLY = 45;
+
+    @Test
+    @DisplayName("F2-271: EN_ONLY fields are counted — the bucket the pair scan names and skips")
+    void theEnOnlyBucketOnlyEverShrinks() throws IOException {
+        List<String> enOnly = scanEnOnly();
+
+        Path report = Path.of("target", "bilingual-en-only.txt");
+        List<String> out = new ArrayList<>();
+        out.add("# EN_ONLY: a *_en entity field with NO Arabic sibling - GENERATED by");
+        out.add("# BilingualInvariantRatchetTest. Do not hand-edit, do not copy the count into");
+        out.add("# prose (F2-265). NO VERDICTS: closing one is a migration plus a writer, and");
+        out.add("# whether a given label is user-visible governance text is a reading job.");
+        out.add("en_only=" + enOnly.size());
+        out.add("asymmetric_pairs=" + scanAsymmetricPairs().size());
+        out.add("all_pairs=" + scanAllPairs().size());
+        out.add("");
+        out.addAll(enOnly);
+        Files.deleteIfExists(report);
+        String body = String.join(System.lineSeparator(), out);
+        Files.writeString(report, body, StandardCharsets.UTF_8);
+        assertThat(Files.readString(report, StandardCharsets.UTF_8))
+            .as("the report must be the one this run produced, not a leftover").isEqualTo(body);
+
+        assertThat(enOnly.size())
+            .as("%d entity fields end 'En' with NO Arabic sibling; the measured ceiling is %d. "
+                + "House rule 7 says a user-visible record carries *_en AND *_ar, and Arabic is "
+                + "the PRIMARY language - so this is the worse half of the rule: an asymmetric "
+                + "pair merely fails to require Arabic, while a missing column means Arabic "
+                + "cannot be recorded at all. Closing one needs a MIGRATION, which is why the "
+                + "annotation ratchet above can never reach it. Full list: %s",
+                enOnly.size(), BASELINE_EN_ONLY, report)
+            .isLessThanOrEqualTo(BASELINE_EN_ONLY);
+    }
+
+    @Test
+    @DisplayName("F2-271: EN_ONLY and the asymmetric pairs are disjoint by construction")
+    void enOnlyAndAsymmetricPairsAreDisjoint() {
+        // A field cannot be both: EN_ONLY means the Ar sibling does not exist, and an asymmetric
+        // pair means it does. Asserted rather than assumed, because if this ever overlaps then one
+        // of the two scans has stopped resolving the sibling and BOTH counts become meaningless -
+        // and the failure would look like a population shrinking (F2-69).
+        List<String> enOnlyFields = scanEnOnly().stream()
+            .map(l -> l.substring(0, l.indexOf(" -> "))).toList();
+        List<String> pairFields = scanAsymmetricPairs().stream()
+            .map(l -> l.substring(0, l.indexOf(" -> "))).toList();
+        for (String f : enOnlyFields) {
+            String asAr = f.substring(0, f.length() - 2) + "Ar";
+            assertThat(pairFields)
+                .as("%s is reported EN_ONLY, but %s is also reported as an asymmetric pair - the "
+                    + "two scans disagree about whether the sibling exists", f, asAr)
+                .doesNotContain(asAr);
+        }
+        assertThat(enOnlyFields.size() + scanAllPairs().size())
+            .as("anti-vacuity: every *En field must land in exactly one of the two buckets, so "
+                + "their sum is the whole bilingual surface. A collapsed scan shows up here as a "
+                + "small total rather than as a clean zero.")
+            .isGreaterThan(400);
     }
 }
