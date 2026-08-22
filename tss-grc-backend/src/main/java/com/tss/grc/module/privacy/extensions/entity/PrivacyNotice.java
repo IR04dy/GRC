@@ -57,6 +57,16 @@ public class PrivacyNotice {
     @Column(name = "archived_by")    private Long archivedBy;
     @Column(name = "archive_reason_en", length = 500) private String archiveReasonEn;
 
+    /**
+     * F2-272 (V388) — house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every row that predates V388 uneditable, and nothing can invent Arabic governance text (F2-30's reason).
+     *
+     * <p>This table was the sharpest member of F2-271's EN_ONLY list: it already carried
+     * {@code title_ar}, {@code purpose_ar}, {@code retention_period_ar} and {@code body_ar},
+     * and had no Arabic for the reason a notice was archived. Four Arabic columns and one
+     * gap.
+     */
+    @Column(name = "archive_reason_ar", length = 500) private String archiveReasonAr;
+
     @Column(name = "supersedes_id") private Long supersedesId;
 
     @Column(name = "external_id", length = 64) private String externalId;

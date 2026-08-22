@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V387 packaged; next free V388** (375 files; ⚠ this line said "V1→V295 / next free
+— **V1→V388 packaged; next free V389** (376 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V384 are pending** the
-next jar — 40 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V388 are pending** the
+next jar — 44 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V384 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V388 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1942,6 +1942,13 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   internal label that may legitimately be English-only (`Permission.descriptionEn`,
   `WorkflowState.descriptionEn`) — deciding which is which is a reading job the number must not
   pre-empt.
+  ⚠⚠ **AND THE RE-SCOPED CEILING WAS ONLY PROVED BY THE NEXT REAL FIX, WHICH IS WHY THE RE-SCOPING WAS NOT COSMETIC** (F2-272, measured 2026-08-22). Executing that filed 45-member list, `privacy` held five and each was READ rather than batched: four to close and one to **exclude**. The gate then printed `asymmetric = 159 (unchanged), EN_ONLY 45 → 41, sum 204 → 200` — all four English siblings are nullable, so the new pairs are **symmetric** and never enter the asymmetry bucket, and the sum fell by exactly the number of members closed. 🔑 **Had the ceiling still been on the asymmetry count it would have been unmoved by four genuine closures, which reads identically to having done nothing.**
+  🔑🔑 **THE MEMBERS' SHAPE IS THE REUSABLE PART: each of the four tables was already bilingual for every OTHER text column and monolingual for exactly one** — F2-215's two-of-N **inside a single table**, four times in one module. `privacy_notices` already carried `title_ar`, `purpose_ar`, `retention_period_ar` and `body_ar` and had no Arabic for the reason a notice was archived. **Four Arabic columns are precisely what stops a reader asking about the fifth.**
+  ⚠⚠ **AND ONE MEMBER OF A BILINGUAL WORK LIST BELONGED TO ANOTHER FAMILY ENTIRELY, WHERE ADDING THE COLUMN WOULD HAVE MADE THINGS WORSE.** `CrossBorderTransfer.ropaTitleEn` is a **label stored beside `ropa_code`** and written from the request — F2-245's parent-identity-copy shape, where a description travelling beside an id can describe the wrong row — and the ROPA it names already carries `activity_name_en` **and** `activity_name_ar`. So the fix is to **derive** the label from the resolved parent, which yields both languages free; adding `ropa_title_ar` would have created a **third** place one ROPA's name is spelled. 🔑 **Read every member of a work list against the OTHER families you know about before closing it the way the list is named.**
+  ⚠ **A fixture that gains a new record component must be given a REAL value, not `null`.** `PdplExtensionsServiceTest` constructs `DisposalCreate` positionally; a null Arabic argument would let the assertion below it pass whether or not the writer copies the field (F2-179's rule that a fixture satisfying a condition twice cannot tell you which half is load-bearing).
+  ⚠⚠ **AND THE COLUMN WOULD HAVE SHIPPED INERT ON *UPDATE*, WHICH NO GATE CAUGHT.** Both ROPA routes bind the entity, so `purpose_ar` is fillable on create — but `PrivacyService#updateRopa` copies a **seven-field whitelist** onto the loaded row (F2-213's family) and `purposeAr` was not in it, so the Arabic purpose would have been **settable once at creation and permanently UNEDITABLE thereafter** — an edit accepted with **HTTP 200** and silently discarded. ⚠⚠ **I first wrote “wiped on every subsequent edit” and the live probe refuted it: a whitelist is copied onto the row it LOADED, so an uncopied field keeps its stored value rather than being nulled** (F2-214's *field the server discards*, not F2-213's reset). 🔑 **The leg that asks whether a value SURVIVES a round-trip PUT passes on the defective tree; only the leg that asks whether a PUT can CHANGE it discriminates** — 2/7 pre-fix, 7/7 after. When the update path is a whitelist, survival is free and writability is the whole question. 🔑 **The line immediately above it is `existing.setActivityNameAr(...)`** — the whitelist already carried *an* Arabic field, so F2-215's two-of-N landed a **third** time in one slice: across four tables, inside one table, and inside a single method. **A reader who finds an Arabic setter in a whitelist does not ask which other Arabic setters are absent.** ⚠ Add a bilingual column and then grep every writer of its English sibling: create paths, whitelist updates AND version-copy paths (`supersede` here carries every Arabic field in pairs and correctly omits the archive reason).
+  ⚠ `RequestSizeCapMirrorTest` (F2-185b) failed the build on the new `@Size(500)` until the cap named its destination in the same commit, and the reason that makes it safe is that **the migration asserts the two columns' widths match** — a width-mirroring migration and a cap-mirroring gate are the same claim checked from two ends, and neither is sufficient alone.
+  ⚙ **Filed:** the **41** remaining EN_ONLY fields, same two shapes and still no verdicts; and `ropaTitleEn` as an F2-245 derivation rather than a column.
 - ⚠⚠ **A FOUR-CLICK FLOW ENDED BY DISPLAYING A FABRICATED NATIONAL CYBERSECURITY AUTHORITY
   ACKNOWLEDGEMENT** (F2-269, measured 2026-08-22). `cyberLifecycle.transitionFiling` minted
   `NCA-ACK-<year>-<Math.random()>` on the `ACCEPTED` transition and `CyberLifecyclePage` rendered it

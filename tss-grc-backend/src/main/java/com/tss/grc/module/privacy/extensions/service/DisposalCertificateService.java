@@ -60,6 +60,9 @@ public class DisposalCertificateService {
         d.setRecordsCountEst(body.recordsCountEst());
         d.setDisposalMethod(body.disposalMethod());
         d.setMethodDetailsEn(body.methodDetailsEn());
+        // F2-272 - V388's column and this line are one commit: a column no write path fills
+        // is an inert column (F2-198's shape).
+        d.setMethodDetailsAr(body.methodDetailsAr());
         d.setScheduledDate(body.scheduledDate() != null ? body.scheduledDate() : LocalDateTime.now());
         d.setOwnerRole(body.ownerRole());
         d.setOwnerName(body.ownerName());

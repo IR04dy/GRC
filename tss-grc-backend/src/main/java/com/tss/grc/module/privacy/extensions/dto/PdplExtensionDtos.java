@@ -84,7 +84,7 @@ public final class PdplExtensionDtos {
             String retentionRuleRef,
             String scopeDescriptionEn, String scopeDescriptionAr,
             Long recordsCountEst,
-            String disposalMethod, String methodDetailsEn,
+            String disposalMethod, String methodDetailsEn, String methodDetailsAr,
             String status,
             LocalDateTime scheduledDate,
             LocalDateTime executedAt, Long executedBy, String executorName,
@@ -100,7 +100,7 @@ public final class PdplExtensionDtos {
                     d.getRetentionRuleRef(),
                     d.getScopeDescriptionEn(), d.getScopeDescriptionAr(),
                     d.getRecordsCountEst(),
-                    d.getDisposalMethod(), d.getMethodDetailsEn(),
+                    d.getDisposalMethod(), d.getMethodDetailsEn(), d.getMethodDetailsAr(),
                     d.getStatus(),
                     d.getScheduledDate(),
                     d.getExecutedAt(), d.getExecutedBy(), d.getExecutorName(),
@@ -122,6 +122,10 @@ public final class PdplExtensionDtos {
             Long recordsCountEst,
             @NotBlank @Size(max = 20) String disposalMethod,
             String methodDetailsEn,
+            // F2-272 (V388) - the Arabic sibling. Uncapped like methodDetailsEn, because the
+            // column is NVARCHAR(MAX): a cap looser than the column protects nothing and a
+            // cap on a MAX column is a product decision, not a fix (F2-184's rule).
+            String methodDetailsAr,
             LocalDateTime scheduledDate,
             @Size(max = 100) String ownerRole,
             @Size(max = 255) String ownerName
@@ -210,5 +214,9 @@ public final class PdplExtensionDtos {
      * annotation would be LOOSER than the column; measured, cap and column agree exactly. A recorded
      * guess is not a measurement, however carefully it is hedged.
      */
-    public record NoticeArchiveRequest(@Size(max = 500) String archiveReasonEn) { }
+    public record NoticeArchiveRequest(
+            @Size(max = 500) String archiveReasonEn,
+            // F2-272 (V388) - cap mirrors the Arabic column exactly, as V388 asserts the two
+            // columns' widths match. Same reasoning as the English cap above.
+            @Size(max = 500) String archiveReasonAr) { }
 }

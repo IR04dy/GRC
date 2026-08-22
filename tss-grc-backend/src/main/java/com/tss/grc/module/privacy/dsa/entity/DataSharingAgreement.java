@@ -108,6 +108,10 @@ public class DataSharingAgreement {
     @Column(name = "termination_reason_en", columnDefinition = "NVARCHAR(MAX)")
     private String terminationReasonEn;
 
+    /** F2-272 (V388) — house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every row that predates V388 uneditable, and nothing can invent Arabic governance text (F2-30's reason). {@code title_ar} and {@code purpose_ar} were already here. */
+    @Column(name = "termination_reason_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String terminationReasonAr;
+
     @Column(name = "is_deleted", nullable = false) private Short isDeleted = 0;
     @Column(name = "is_active",  nullable = false) private Short isActive  = 1;
     @Column(name = "deleted_at") private LocalDateTime deletedAt;

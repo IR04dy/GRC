@@ -459,6 +459,17 @@ public class PrivacyService {
         existing.setActivityNameEn(req.getActivityNameEn());
         existing.setActivityNameAr(req.getActivityNameAr());
         existing.setPurposeEn(req.getPurposeEn());
+        // F2-272 — the Arabic purpose must be carried by the SAME whitelist as the English one.
+        // Without this line V388's purpose_ar is fillable on create (the endpoint binds the entity)
+        // and then permanently UNEDITABLE: this method copies its whitelist onto the LOADED row,
+        // so a field it does not copy keeps its stored value rather than being nulled, and an edit
+        // to the Arabic purpose is accepted with HTTP 200 and silently discarded (F2-214's shape,
+        // not F2-213's reset). Probed both ways: pre-fix a PUT sending a changed purposeAr left
+        // the stored value untouched.
+        // ⚠ activityNameAr two lines up is exactly why this read as covered: a reader who
+        // finds an Arabic field in the whitelist does not then ask which others are missing
+        // (F2-215's two-of-N, inside a single method).
+        existing.setPurposeAr(req.getPurposeAr());
         existing.setLegalBasis(req.getLegalBasis());
         existing.setRetentionPeriodMonths(req.getRetentionPeriodMonths());
         existing.setCrossBorderTransfer(req.getCrossBorderTransfer());

@@ -111,10 +111,19 @@ public class DataSharingAgreementService {
     }
 
     @Transactional
-    public DataSharingAgreement terminate(Long id, String reasonEn) {
+    /**
+     * F2-272 — the termination reason is now bilingual (V388).
+     *
+     * <p>⚠ Both reasons arrive as SCALAR PARAMETERS, so whether they are caller data is a
+     * fact about the CALL SITE and not about this signature (F2-222). They are: the
+     * controller reads them from the request body, which is correct — why an agreement was
+     * terminated is the terminating officer's statement, not something the server can derive.
+     */
+    public DataSharingAgreement terminate(Long id, String reasonEn, String reasonAr) {
         DataSharingAgreement a = get(id);
         a.setStatus("TERMINATED");
         a.setTerminationReasonEn(reasonEn);
+        a.setTerminationReasonAr(reasonAr);
         return repo.save(a);
     }
 }

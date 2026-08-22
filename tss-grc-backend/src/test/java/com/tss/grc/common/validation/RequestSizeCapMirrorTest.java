@@ -89,7 +89,12 @@ class RequestSizeCapMirrorTest {
         new Landing(PdplExtensionDtos.NoticeArchiveRequest.class, "archiveReasonEn",
             PrivacyNotice.class, "archiveReasonEn",
             "PrivacyNoticeService#archive line 130 — the one edge F2-184 measured as a mismatch, "
-            + "and it is an exact match.")
+            + "and it is an exact match."),
+        new Landing(PdplExtensionDtos.NoticeArchiveRequest.class, "archiveReasonAr",
+            PrivacyNotice.class, "archiveReasonAr",
+            "PrivacyNoticeService#archive — the Arabic half added by F2-272 (V388). The cap "
+            + "mirrors the column exactly BECAUSE V388 asserts the two columns' widths match, "
+            + "so a longer English archive reason cannot be untranslatable.")
         // F2-223 — the BowTieDtos.ApproveRequest#approverName landing is DELETED with its field.
         // `approvedByName` is now stamped from CurrentActor, so there is no caller-supplied value
         // for a cap to guard. This gate's own reverse leg is what required the entry to go in the

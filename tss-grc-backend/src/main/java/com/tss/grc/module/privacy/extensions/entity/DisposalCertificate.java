@@ -40,6 +40,9 @@ public class DisposalCertificate {
     @Column(name = "disposal_method", nullable = false, length = 20) private String disposalMethod;
     @Column(name = "method_details_en", columnDefinition = "NVARCHAR(MAX)") private String methodDetailsEn;
 
+    /** F2-272 (V388) — house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every row that predates V388 uneditable, and nothing can invent Arabic governance text (F2-30's reason). {@code scope_description_ar} was already here. */
+    @Column(name = "method_details_ar", columnDefinition = "NVARCHAR(MAX)") private String methodDetailsAr;
+
     /** SCHEDULED | IN_PROGRESS | COMPLETED | VERIFIED | CANCELLED. */
     @Column(nullable = false, length = 20) private String status = "SCHEDULED";
 
