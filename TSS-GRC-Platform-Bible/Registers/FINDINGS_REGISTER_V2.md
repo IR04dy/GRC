@@ -14479,3 +14479,98 @@ getting **403 was correct behaviour**, not a defect. Resolve routes and guards f
   zero-holder role [[F2-253]]/[[F2-254]] measured — another F2-05 conversion site, not this slice.
 - **F2-281's bridge filing, corrected**: `ORG_ADMIN` holds both required permissions and has no live
   holder, so there is an administrator remedy; every alternative grant is too wide.
+
+---
+
+## F2-283 · Six hypotheses refuted, one untested service — the value of the slice was the refutations, and the work was the test nobody had written
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`f7d7e5e8`) |
+| **Severity** | **P4 (two latent defects closed, one untested read aggregator covered)** — `DependencyCascadeService` had **no test of any kind**, and [[F2-282]] had just changed how it selects a process's recovery objectives, leaving a source-scanning detector as the only thing watching it. Writing the test found two latent defects: a **soft-deleted process could conduct the cascade** to the live consumers behind it, and **`SOVEREIGN` ranked below `LOW`** in the criticality tiebreak |
+| **Found by** | executing [[F2-282]]'s filings and disbelieving each in turn ([[F2-221]]). Every substantive hypothesis fell; the one unambiguous gap left was the missing test, and writing it is what surfaced the two latent defects |
+| **Fix** | `DependencyCascadeService`: the BFS no longer enqueues a consumer absent from the tenant's process register, and `criticalityRank` knows `SOVEREIGN` (5) with the unknown-token case documented as a decision · new `DependencyCascadeServiceTest`, 15 tests |
+| **Verified** | per-fix control reverts each change **separately** and each one's leg fires (two-at-once cannot tell which leg catches which defect) · 15/15 after restore · backend **4488/0/0** · live probe **14/14 unchanged** — the two changes are provably inert on this data (0 affected rows), so the probe is a no-regression check and says so |
+
+### The refutations, which are the substance
+
+Six hypotheses, measured in both databases and all **refuted**. Recording them is the
+point: each one is a thing the next reader should not re-derive.
+
+| hypothesis | measured | verdict |
+|---|---|---|
+| `bia_assessments.approval_status = 'ACTIVE'` on 2 rows is unmovable ([[F2-203]]'s shape) | the machine declares `DRAFT → UNDER_REVIEW → APPROVED → ACTIVE → ARCHIVED`, and `ACTIVE` has two outgoing edges | **refuted** — all four stored values are declared |
+| `overall_criticality = 'SOVEREIGN'` is a *tier* value in a criticality column | the javadoc declares it (*"if `national_sovereign ≥ 4`, criticality → SOVEREIGN"*) and there is a `BIA_CRITICALITY_SOVEREIGN` event | **refuted** — it is the top of that vocabulary |
+| `recomputeCriticality` erases a classification when the matrix is empty (it *does* set null, under a comment reading *"leave criticality null"*) | **0 of 8** rows carry a criticality without a matrix behind it | **refuted as live** — latent only |
+| the duplicate `bia_code` `BIA-2026-000007` means no uniqueness | `UX_bia_assessments_org_code` is unique on `(organisation_id, bia_code)` **filtered `WHERE is_deleted = 0`**, and one of the pair is soft-deleted | **refuted** — and it is [[F2-266]]'s filtered-index rule applied correctly |
+| dev has uniqueness/CHECK invariants prod can never get ([[F2-255]]'s bootstrap-only shape, at the schema) | **12 dev-only unique indexes and 39 dev-only CHECKs, and every single one is created by a migration** — zero orphans | **refuted** — the 47-migration deployment gap explains all of it |
+| a soft-deleted process conducts the cascade *today* | **0** dependency edges name a deleted or nonexistent process, in either database | **refuted as live** — latent, and fixed anyway |
+
+🔑 **The fifth is the one worth keeping.** `UX_bia_assessments_org_code` is created by
+`V366__deployed_schema_missing_uniqueness_and_rto_check.sql` — a migration whose *name* says a
+prior slice already found prod was missing it. The gap is pending deployment, not a hole.
+⚙ And the diff produced **2 "prod-only" unique indexes** that are not differences at all:
+`UQ__framewor__357D4CF9…` and `UQ__nafath_t__85C600AE…` are **auto-named** constraints whose
+system-generated suffix differs per database. 🔑 **A schema diff keyed on constraint NAME reports
+every auto-named constraint as a difference** — key on (table, columns, filter) or accept the noise
+knowingly.
+
+### The work: a read aggregator with no test
+
+`DependencyCascadeService` answers *"if core banking fails at 09:00, what breaches by 13:00?"* —
+BFS over `bcm.process_dependencies`, a depth-weighted reach hour, a breach verdict against each
+process's MTPD (or RTO when MTPD is absent), cumulative 1h/4h/8h/24h bands and a confidence ladder.
+None of it was asserted anywhere. [[F2-248]]'s rule: **a path with no test is not a path somebody
+decided was safe** — and [[F2-282]] had just changed its BIA selection, with only a
+source-scanning detector watching this caller.
+
+### Two latent defects the test surfaced
+
+**A soft-deleted process could conduct the cascade.** The BFS enqueued each consumer *before*
+checking it was in `processById`, which comes from the tenant's process register and so excludes
+soft-deleted rows. The row was correctly dropped from the **output** (`if (p == null) continue`) —
+it had already been enqueued, so it propagated reach to whatever sat behind it, and *its* depth set
+*their* depth. A decommissioned business process still conducting a dependency cascade. Latent: 0
+edges name a deleted process. Closed anyway, because what made it harmless was the data
+([[F2-182]]).
+
+**`SOVEREIGN` ranked below `LOW`.** `criticalityRank` knew CRITICAL/HIGH/MEDIUM/LOW and defaulted
+everything else to 0, so the platform's own top tier sorted *last* in its tie group.
+`bcm.critical_processes.criticality` has **no CHECK**, so nothing stops the value being stored
+there. ⚠ The unknown case still ranks 0 and that is now a **documented decision** rather than an
+oversight: this is a tiebreak within one breach-and-depth group, so "unclassified sorts after
+classified" is honest, and inventing a rank for a word the platform does not define would be worse.
+It matters because unrecognised criticality words do exist in this schema —
+`bcm.bia_records.criticality` stores `TIER_2`/`TIER_3` beside `CRITICAL`/`HIGH`/`MEDIUM`
+([[F2-279]] measured it) and neither column is constrained.
+
+### What the test pins that nothing did
+
+BFS records the **shallowest** depth (a shortcut edge wins over a long chain); a cycle back to the
+source terminates; the walk stops at `MAX_DEPTH = 6`; the depth→hour ladder is 1/4/8/24 with
+everything past depth 3 at 24; confidence is 1.0/0.75/0.5/0.25; breach is `reachHour >= threshold`
+so a 2h tolerance survives a 1h reach; **RTO substitutes for a missing MTPD**, which is the
+conservative direction since RTO ≤ MTPD by definition; a process with no BIA is reported and
+**never breached**, because claiming a breach would invent a tolerance nobody recorded; the hour
+bands are cumulative and the widest equals the total; the sort is breach-then-depth-then-criticality;
+and — [[F2-282]]'s disclosure, end to end — **the objective and `mtpdSourceStatus` describe the same
+BIA row**, which is what makes the disclosure worth having rather than worse than none.
+
+⚠ Each fix's control was run **separately**. Reverting both at once cannot tell which leg catches
+which defect, and a leg that fires for the wrong reason is a leg you do not have.
+
+### Filed
+
+- **`bcm.bia_assessments` has six declared link columns nothing populates** — `process_id`,
+  `bia_owner_id`, `service_owner_id`, `process_owner_id`, `evidence_id`, `reviewer_id`, all **0/8**
+  in both databases. [[F2-280]]'s kind 3 (empty, nullable), so latent; and `process_id` being empty
+  is why the register carrying the ISO 22301 `CK_bia_rto_le_mtpd` constraint is joined to no
+  process at all, while the register three services *do* read has no such constraint.
+- **`bcm.bia_assessments.service_id = -1`** on one live DRAFT row, and **`bcm` has no service table
+  of any kind**, so the column references a register that does not exist. The same row duplicates a
+  soft-deleted `bia_code` and has `department = '-'`, so it reads as seed residue — but nothing
+  validates the reference, and a negative id is not a plausible key.
+- **`bcm.critical_processes` has zero CHECK constraints**, so `criticality` is narrowed only by the
+  Java ladders that read it — and two of those ladders (this one and `bia_records.criticality`'s)
+  use different vocabularies.
+- The **auto-named-constraint blind spot** in any schema diff keyed on name.
