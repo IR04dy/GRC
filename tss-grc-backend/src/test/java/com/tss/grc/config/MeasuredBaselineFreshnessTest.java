@@ -609,4 +609,191 @@ class MeasuredBaselineFreshnessTest {
                 m.group(3), versions.size())
             .isEqualTo(versions.size());
     }
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // F2-273 — three MORE restatements of the migration census, all ungated, all measured stale
+    // ─────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * F2-273 — F2-266 gated the migration figure it was <i>reading</i> and left two others in the
+     * same file, and they then drifted by exactly the migrations added since.
+     *
+     * <p>Measured 2026-08-22, before the repair: the gated line
+     * ({@link #claudeMdMigrationLineMatchesTheTree}) read {@code V1→V387 … 375 files} and was
+     * <b>current</b>. {@code CLAUDE.md}'s two other statements of the same fact — the pending range
+     * (<i>"head V344, so V345–V384 are pending the next jar — 40 files"</i>) and the architecture
+     * table's <i>"Flyway V1–V384 (OFF in dev)"</i> — both read <b>V384</b>, three behind, i.e. stale
+     * by exactly V385/V386/V387: the three migrations added after F2-266's leg landed.
+     *
+     * <p>🔑 <b>A gate whose population is one spelling of a fact leaves every other spelling free
+     * to rot, and the gated copy being current is what makes the stale ones credible</b> — a reader
+     * who finds the packaged-head line correct has no reason to distrust the sentence forty lines up.
+     * F2-198's shape at a new depth, and F2-215's two-of-N: F2-266's own javadoc says <i>"CLAUDE.md's
+     * migration line said it was gated, and it was not"</i>, having looked at one line.
+     *
+     * <p>Anti-vacuity: both lines must be FOUND, for the reason the sibling leg gives — an unparsed
+     * line reports a clean tree, which is the failure mode this whole class exists for.
+     */
+    @Test
+    void claudeMdRestatesTheMigrationHeadTwiceMoreAndBothAreNowGated() {
+        Path claude = Path.of("..", "CLAUDE.md");
+        Assumptions.assumeTrue(Files.isRegularFile(claude), "CLAUDE.md not reachable");
+        String text = read(claude);
+
+        List<Integer> versions = migrationVersions();
+        int head = versions.stream().mapToInt(Integer::intValue).max().orElseThrow();
+        int applied = docAppliedHead();
+
+        int[] range = claudePendingRange(text);
+        assertThat(range)
+            .as("CLAUDE.md's pending-range sentence was not found in the shape this leg parses "
+              + "('head **V<applied>**, so **V<lo>" + EN_LIT + "V<hi> are pending** the next jar "
+              + EM_LIT + " <n> files'). If it was reworded, update the pattern — do NOT delete "
+              + "the assertion, because an unparsed line reports a clean tree.")
+            .isNotNull();
+
+        assertThat(range[0])
+            .as("CLAUDE.md says the deployed applied head is V%d; MEASURED_BASELINE.md §7-B says "
+              + "V%d. Both describe the same production server.", range[0], applied)
+            .isEqualTo(applied);
+        assertThat(range[1])
+            .as("CLAUDE.md says the pending set starts at V%d; the first version above the applied "
+              + "head V%d is V%d.", range[1], applied, applied + 1)
+            .isEqualTo(applied + 1);
+        assertThat(range[2])
+            .as("CLAUDE.md says the pending set ends at V%d; the tree's highest version is V%d. This "
+              + "is the figure that was three behind while the gated line one page up was current "
+              + "(F2-273).", range[2], head)
+            .isEqualTo(head);
+        assertThat(range[3])
+            .as("CLAUDE.md says %d migrations are pending; %d files on disk are above the applied "
+              + "head V%d. An understated pending set is how a deployment ships code whose migration "
+              + "has not landed.", range[3], head - applied, applied)
+            .isEqualTo(head - applied);
+
+        Integer archRow = claudeFlywayArchitectureRow(text);
+        assertThat(archRow)
+            .as("CLAUDE.md's architecture table has no 'Flyway V1" + EN_LIT + "V<head> (OFF in "
+              + "dev)' cell in the shape this leg parses. Same warning as above: do not delete the "
+              + "assertion.")
+            .isNotNull();
+        assertThat(archRow)
+            .as("CLAUDE.md's architecture table says the packaged range ends at V%d; it ends at V%d.",
+                archRow, head)
+            .isEqualTo(head);
+    }
+
+    /**
+     * F2-273 — and the leg that DID cover the pending row gated its <b>count</b> and not its
+     * <b>membership</b>, so the number was right while the list it summarises was six short.
+     *
+     * <p>{@link #flywayBaselineArithmeticHolds} asserts {@code docNumber("Pending the next jar")}
+     * equals the number of files above the applied head, and on 2026-08-22 that was correctly 43.
+     * The same cell enumerates the pending migrations one by one — and named 37 of them:
+     * {@code V359}, {@code V360}, {@code V365}, {@code V380}, {@code V386} and {@code V387} were
+     * absent.
+     *
+     * <p>🔑🔑 <b>A count and the enumeration it summarises are two artefacts, and gating the
+     * count makes the gap invisible precisely because the number is right.</b> A reader checking
+     * whether the pending set is described reads the total, finds it correct, and stops.
+     *
+     * <p>Subset, not equality: the cell legitimately mentions versions outside the pending range when
+     * one migration's description refers to another's self-check, so extra V-numbers are fine and a
+     * missing one is not.
+     */
+    @Test
+    void thePendingCellNamesEveryPendingMigrationAndNotJustHowMany() {
+        int applied = docAppliedHead();
+        List<Integer> pending = migrationVersions().stream()
+                .filter(v -> v > applied).sorted().toList();
+        assertThat(pending).as("anti-vacuity: no pending migrations found above V%d", applied)
+                .isNotEmpty();
+
+        // — the ROW, not valueCell(). This document's prose contains literal pipe
+        // characters (vocabulary listings such as "HIGH | MEDIUM | LOW"), so splitting the
+        // row on "|" truncates this logical cell at 15,754 of ~34,000 characters and the leg
+        // reported 14 missing where 4 were. It OVER-reports, so it fails loudly rather than
+        // hiding an omission — but a gate that fails on correct code is the one
+        // failure a gate must never have (F2-214). Reading the whole row is deliberately
+        // permissive: a version named in a neighbouring column would count. That is
+        // acceptable here because the claim is only that a pending migration is NAMED
+        // SOMEWHERE in this row, and a newly added version will not appear by accident.
+        String cell = row("Pending the next jar");
+        Set<Integer> named = new TreeSet<>();
+        Matcher m = Pattern.compile("V(\\d+)").matcher(cell);
+        while (m.find()) named.add(Integer.parseInt(m.group(1)));
+        assertThat(named)
+            .as("anti-vacuity: the 'Pending the next jar' cell names no versions at all, so this leg "
+              + "would pass over any omission.")
+            .hasSizeGreaterThan(10);
+
+        List<Integer> missing = pending.stream().filter(v -> !named.contains(v)).toList();
+        assertThat(missing)
+            .as("§7-B's 'Pending the next jar' cell enumerates the pending migrations, and these "
+              + "are pending but never named: %s. The cell's COUNT is gated by "
+              + "flywayBaselineArithmeticHolds and was correct while six members were missing — "
+              + "a count and its enumeration are two artefacts (F2-273).", missing)
+            .isEmpty();
+    }
+
+    /**
+     * F2-273 — the positive control. Both new detectors are run against the literal wording that
+     * was on {@code master} when the drift was measured, so a pattern that stops matching fails here
+     * instead of reporting a clean tree.
+     *
+     * <p>This is the leg that distinguishes "the figures agree" from "the parse returned nothing",
+     * which on a green tree look identical.
+     */
+    @Test
+    void theRestatementDetectorsFireOnTheDriftTheyWereWrittenFor() {
+        String stale =
+            "Flyway (baseline 292 on the deployed server; head **V344**, so **V345" + EN_LIT
+          + "V384 are pending** the\nnext jar " + EM_LIT + " 40 files). `flyway.clean` is disabled.\n"
+          + "| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1" + EN_LIT
+          + "V384 (OFF in dev) |\n";
+
+        int[] range = claudePendingRange(stale);
+        assertThat(range).as("the pending-range detector no longer matches master's wording")
+                .isNotNull();
+        assertThat(range[0]).isEqualTo(344);
+        assertThat(range[1]).isEqualTo(345);
+        assertThat(range[2]).as("the stale upper bound must be read as V384, not the tree's head")
+                .isEqualTo(384);
+        assertThat(range[3]).isEqualTo(40);
+
+        assertThat(claudeFlywayArchitectureRow(stale))
+            .as("the architecture-row detector no longer matches master's wording")
+            .isEqualTo(384);
+
+        // And neither may match text that merely talks about Flyway.
+        assertThat(claudePendingRange("Flyway is on in prod and off in dev.")).isNull();
+        assertThat(claudeFlywayArchitectureRow("| DB | SQL Server, Flyway (OFF in dev) |")).isNull();
+    }
+
+    /** The en dash and em dash CLAUDE.md uses, as literals for pattern and message building. */
+    private static final String EN_LIT = "\u2013";
+    private static final String EM_LIT = "\u2014";
+
+    /**
+     * {@code head **V<applied>**, so **V<lo>–V<hi> are pending** the next jar — <n> files}.
+     * Returns {@code {applied, lo, hi, n}}, or null if the sentence is not present.
+     *
+     * <p>The sentence wraps in the source, so {@code \s+} spans the line break rather than a literal
+     * {@code \n} — CLAUDE.md is CRLF and an embedded newline could never match (F2-212).
+     */
+    private static int[] claudePendingRange(String text) {
+        Matcher m = Pattern.compile(
+            "head \\*\\*V(\\d+)\\*\\*, so \\*\\*V(\\d+)[" + EN_LIT + "-]V(\\d+) "
+          + "are pending\\*\\*\\s+the\\s+next jar " + EM_LIT + " (\\d+) files")
+            .matcher(text);
+        if (!m.find()) return null;
+        return new int[] { Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+                           Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)) };
+    }
+
+    /** {@code Flyway V1–V<head> (OFF in dev)} in the architecture table. Null if absent. */
+    private static Integer claudeFlywayArchitectureRow(String text) {
+        Matcher m = Pattern.compile("Flyway V1[" + EN_LIT + "-]V(\\d+) \\(OFF in dev\\)")
+                .matcher(text);
+        return m.find() ? Integer.parseInt(m.group(1)) : null;
+    }
 }
