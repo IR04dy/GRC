@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Status** | 🟢 CLOSED 2026-08-22 (`7267062d`) |
 | **Severity** | **P1** — the platform asserted that a Saudi regulator had accepted an ECC filing, with a reference minted by `Math.random()` in the browser |
 | **Found by** | executing [[F2-207]]'s filed frontend-minter population, re-derived first ([[F2-221]]) |
 | **Fix** | `ncaAckRef` deleted (minter, field, badge) · `createThreat` takes the advisory reference instead of inventing it · `authorityReferenceMinting.test.ts` holds a hard zero |
