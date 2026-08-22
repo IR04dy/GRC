@@ -2547,6 +2547,113 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-274 · The link detector's "every way this codebase expresses a destination" omitted the template literal, and a retired page was relinked through the gap
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Severity** | **P2** — a dead control on the PDPL Article 6/29 data-sharing register, and a retired-page gate that was green over a live inbound link |
+| **Found by** | re-deriving [[F2-272]]'s filed `ropaTitleEn` item ([[F2-221]]) — which **refuted the filing** and led to the link that carries the code |
+| **Fix** | `LINK_KEYS` learns the static template literal · `routeReachability` strips comments through a named helper the self-tests exercise · the ROPA chip repointed at `/data-lifecycle?tab=cbt&ropaCode=…` |
+| **Verified** | the retired-redirect leg goes **red naming `/ropa`** the moment the pattern is widened, before the link is touched · 12/12 · harness **6 killed / 0 survived / 0 anchor-miss** · browser-verified end to end on real server data · frontend 75/75 files, 814/814, `tsc` clean |
+
+### The filing was refuted first
+
+[[F2-272]] filed `CrossBorderTransfer.ropaTitleEn` as an [[F2-245]] parent-identity-copy member, with
+the fix *"derive the label from the resolved ROPA, which yields both languages free"*. Measured, in
+both databases: **`ropa_code` resolves to nothing — 0 of 9.** `privacy.processing_activities` has
+**no code column at all** (its only reference is a UUID `external_id`), so there is no ROPA to
+resolve and nothing to derive from. 🔑 **Executing a filing is how you find out it was wrong, for
+the fifth time in this programme — and this one would have sent the next slice to build a derivation
+against a join that does not exist.**
+
+What is actually there is [[F2-203]]'s **disjoint code space**, on statutory registers:
+`ROPA-001`…`ROPA-007` is used by `cross_border_transfers.ropa_code` (9 rows), and
+`linked_ropa_codes` on `data_sharing_agreements` (8) and `privacy_notices` (7) — **no foreign key on
+any of them**, and the register they name cannot produce the code. A **name** join recovers 6 of 9
+(two null labels, one label matching no activity), which is why reconciliation is an owner decision
+and not a side effect of a link fix.
+
+### The instrument: seven patterns under a comment claiming completeness
+
+`routeReachability.test.ts`'s `LINK_KEYS` is introduced as *"Every way this codebase expresses
+'somewhere the user can go'"* and lists `to="…"`, `to={'…'}`, `to: '…'`, `href`, `route` and
+`navigate('…')`. **Not one matches a template literal** — and `DataSharingPage` wrote
+``to={`/ropa`}``.
+
+So `RETIRED_MUST_STAY_UNLINKED`, which F2-199 built precisely because *"a redirect keeps every stale
+link working, so nothing breaks and nobody notices they are stale"*, was **green over a live inbound
+link to `/ropa`** — a page [[F2-198]] retired for rendering nine invented PDPL activities.
+
+Measured: **6 static** template-literal destinations across **148** template links (142 dynamic),
+exactly **1** pointing at a retired redirect. 🔑 **A pattern list whose comment claims completeness
+is the hardest kind to doubt** — [[F2-184]]'s shape in a detector's own documentation, and
+[[F2-198]]'s at a new depth: the invariant is real, its population is a list of spellings.
+
+⚠ Its sibling gate `tabLinkTargets.test.ts` ([[F2-207]]) **does** resolve template literals — it
+found `SocOpsEventsPage`'s `` `/cyber?tab=incidents` `` when it was written. So two link scanners in
+one directory disagreed about what a link is ([[F2-190]]'s shape), and the newer one was right.
+
+### The live half: a chip that was dead three ways
+
+The ROPA-code chips on each data-sharing agreement were `` <Link to={`/ropa`} state={{ ropaCode: code }}> ``:
+
+1. `/ropa` is a **redirect**, not a page.
+2. `<Navigate>` carries **neither search string nor `state`** ([[F2-207]]), so the code was dropped.
+3. The destination — `/privacy?tab=ropa` — has **no ROPA-code filter** to receive it.
+
+And even repaired it can never reach the processing activity, because the code resolves to nothing.
+What it can honestly offer is the other PDPL records carrying the same code, which is what
+`/data-lifecycle` is built for: it reads `?tab` and `?ropaCode` and narrows the Article 29 register.
+
+⚠ **Verified in the browser, on real server data**: the chip renders
+`/data-lifecycle?tab=cbt&ropaCode=ROPA-004`, and following it shows the filter banner *"مُصفّى وفق
+سجل المعالجة: ROPA-004"* with a remove-filter control, on the cross-border tab, narrowed to the one
+matching transfer (Stripe Payments Europe, SCC). A mutation pointing the chip at `/privacy?tab=ropa`
+— the plausible fix — is killed.
+
+### The second hole was mine, and the third was in the leg that caught the second
+
+**The comment written to explain the repointing kept the gate red**, because `ALL` read raw source
+and a quoted link counts as a link. 🔑 **The epitaph reads as the corpse** ([[F2-193]]), for the Nth
+time here — and it is not a one-off, because this codebase's convention is to document a retirement
+by quoting the link it removed. Comments are now stripped, one left-to-right alternation,
+newline-preserving. Measured effect **today**: 398 raw destinations against 396, i.e. **2**
+comment-only, of which **1** is a declared route — so this is a **latent-hazard closure, not a
+defect discovery**, and saying so is the point.
+
+⚠⚠ **Then the mutation making the stripper two sequential passes SURVIVED, twice, for two different
+reasons.** The first attempt merely **reordered the alternation**, which is an *equivalent mutant* —
+`//` and `/*` can never match at the same position, so leftmost-match takes the line comment first
+either way ([[F2-211]] measured this). My own self-test leg says exactly that, and I wrote that
+mutation anyway. The second attempt was genuine and still survived: **the leg tested the `STRIP_COMMENTS`
+constant while the mutation replaced the call site**, so the production path could stop using the
+thing under test with every assertion green. 🔑 **[[F2-205]]'s rule one level over — a leg that
+exercises a primitive says nothing about whether the code under review calls it.** Fixed by routing
+the stripping through a named `stripComments()` that the self-tests exercise, plus a structural leg
+asserting `ALL` builds its bodies through it and that the helper's body is the single-pass form.
+
+⚠ That structural leg's own first draft counted stripping passes **file-wide** and failed on correct
+code, because this suite's two-pass *negative control* looks like a production pass — [[F2-192]]'s
+rule (scope a scan to the shape of its claim) landing on a leg written minutes after quoting it.
+
+### Filed
+
+- **`ROPA-nnn` is a code space with no producer** — `privacy.processing_activities` needs either a
+  human-readable code column (and `ROPA-007`'s label matches no activity, so one row cannot be
+  back-filled) or the three child columns need to move to `external_id` (which orphans 24 live rows
+  across three tables). Both are **owner decisions** ([[F2-183]]/[[F2-196]]/[[F2-210]]'s rule:
+  align a writer to the register's *stored* vocabulary).
+- **The cross-border create form asks the operator to type a ROPA code**, `required: true`, free
+  text, no picker — [[F2-246]]'s *a form that collects a label instead of a link* — and there is no
+  correct value to type, because no register publishes that code space.
+- `RopaWorkflowsController` is a **five-route family keyed on `ropaCode` with no frontend client**:
+  its client, `lib/ropaWorkflows.ts`, was deleted with F2-198's retirement, so the endpoints that
+  bundle a ROPA's notices, transfers and disposal certificates are reachable only by API.
+- The other **5 static template-literal destinations** all point at live routes, so widening the
+  pattern only ever made them *visible*; none was in `INTENTIONALLY_OFF_NAV`, so nothing was
+  tolerated that should not have been.
+
 ## F2-273 · The gated copy of a figure being current is what makes the ungated copies credible
 
 | | |
@@ -2713,8 +2820,12 @@ rule that a fixture satisfying a condition twice cannot tell you which half is l
   `CommitteeActionItem.completionNotesEn`, `NcaEccFiling.peerReviewCommentsEn`,
   `Vulnerability.descriptionEn`) versus internal labels legitimately English-only
   (`Permission.descriptionEn`, `WorkflowState.descriptionEn`).
-- `CrossBorderTransfer.ropaTitleEn` belongs to [[F2-245]]'s family: **derive it from the resolved
-  ROPA, do not add a second copy.**
+- ⚠⚠ `CrossBorderTransfer.ropaTitleEn` — **this filing was REFUTED by [[F2-274]]**, which executed it.
+  It read *`derive it from the resolved ROPA, do not add a second copy`*; measured, `ropa_code`
+  **resolves to nothing (0 of 9)** because `privacy.processing_activities` has no code column at
+  all, so there is no parent to derive from. It is [[F2-203]]'s disjoint-code-space shape, not
+  [[F2-245]]'s. 🔑 **A filing naming a fix is the least-verified thing in it, and this one would
+  have sent the next slice to build a derivation against a join that does not exist.**
 - **Three ungated restatements of the migration census**, all measured stale while the gated line was
   current — see [[F2-273]].
 

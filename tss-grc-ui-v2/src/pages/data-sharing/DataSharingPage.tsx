@@ -210,7 +210,20 @@ export function DataSharingPage() {
                                   {r.linkedRopaCodes && (
                                     <><strong>{t('dsaLinkedRopa')}:</strong>{' '}
                                       {r.linkedRopaCodes.split(',').map(c => c.trim()).filter(Boolean).map(code => (
-                                        <Link key={code} to={`/ropa`} state={{ ropaCode: code }}
+                                        /* F2-274 — this was `to={`/ropa`} state={{ ropaCode: code }}`
+                                           and it was dead three ways. `/ropa` is a redirect F2-198
+                                           left behind when it retired the fabricated ROPA page;
+                                           `<Navigate>` carries neither search string nor `state`
+                                           (F2-207), so the code was dropped; and the destination has
+                                           no ROPA-code filter to receive it. `/data-lifecycle` is the
+                                           page that reads `?ropaCode` and narrows the Article 29
+                                           transfer register to it. ⚠ It cannot navigate to the
+                                           processing ACTIVITY, because `ROPA-nnn` resolves to nothing
+                                           — `privacy.processing_activities` has no code column at
+                                           all (0 of 9 codes resolve, no FK). What this chip honestly
+                                           offers is the other PDPL records carrying the same code. */
+                                        <Link key={code}
+                                          to={`/data-lifecycle?tab=cbt&ropaCode=${encodeURIComponent(code)}`}
                                           style={{ marginInlineEnd: 6, padding: '1px 6px', background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: 4, fontSize: 11, color: 'var(--primary-700)', textDecoration: 'none' }} className="mono">{code}</Link>
                                       ))}
                                       <br/>

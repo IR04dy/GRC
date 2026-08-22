@@ -41,7 +41,26 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const rel = (f: string) => f.slice(SRC.length + 1).split(sep).join(posix.sep);
 
-/** Every way this codebase expresses "somewhere the user can go". */
+/**
+ * Every way this codebase expresses “somewhere the user can go”.
+ *
+ * ⚠⚠ F2-274 — this list said exactly that and omitted the TEMPLATE LITERAL, which is how
+ * this codebase writes every parameterised link. A STATIC path written with backticks was therefore
+ * invisible to every leg below — and `DataSharingPage` wrote `to={`/ropa`}`, so the
+ * retired-redirect leg was GREEN over a live inbound link to a page F2-198 retired. Measured: **6
+ * static** template destinations across 148 template links, exactly **1** of them pointing at a
+ * retired redirect.
+ *
+ * 🔑 A pattern list whose comment claims completeness is the hardest kind to doubt (F2-184's
+ * shape, in a detector's own documentation). Its sibling gate `tabLinkTargets.test.ts` (F2-207)
+ * DOES resolve template literals, so two link scanners in this directory disagreed about what a
+ * link is — F2-190's two-mechanisms shape, and the newer one was right.
+ *
+ * Static only, deliberately: a dynamic target such as `/tprm/vendors/${id}` is not a static route
+ * and `declaredStaticRoutes()` excludes parameterised ones, so admitting it would add strings that
+ * match nothing. A route reachable ONLY through a dynamic link still reads as an orphan, which
+ * over-reports and fails loudly — the safe direction, and the existing behaviour.
+ */
 const LINK_KEYS = [
   /to:\s*'([^']+)'/g,
   /href:\s*'([^']+)'/g,
@@ -50,6 +69,9 @@ const LINK_KEYS = [
   /href="([^"]+)"/g,
   /navigate\('([^']+)'/g,
   /to=\{'([^']+)'\}/g,
+  // F2-274 — the template-literal forms, static only (no `$`).
+  /(?:to|href)=\{`([^`$]+)`\}/g,
+  /navigate\(`([^`$]+)`/g,
 ];
 
 /**
@@ -123,7 +145,32 @@ const INTENTIONALLY_OFF_NAV: Record<string, string> = {
                                   + 'in-app links, so it is now unlinked as intended',
 };
 
-const ALL = walk(SRC).map(f => ({ path: rel(f), body: readFileSync(f, 'utf8') }));
+/**
+ * ⚠⚠ F2-274 — comments are STRIPPED, and they were not before.
+ *
+ * The gate read raw source, so a route merely MENTIONED in a comment counted as a link to it.
+ * For the retired-redirect leg that is a false positive; for the ORPHAN leg it is a false negative
+ * in the dangerous direction — a genuinely unlinked route reads as linked, which is precisely
+ * what “no route is shipped invisible” exists to prevent. This codebase documents its own
+ * retirements by quoting the link they removed, so the hazard is live rather than theoretical: the
+ * comment F2-274 wrote to explain repointing `/ropa` kept that leg red on a fixed tree. 🔑 **The
+ * epitaph reads as the corpse** (F2-193/F2-202/F2-205), for the Nth time in this tree.
+ *
+ * ONE left-to-right alternation, and newlines preserved so line numbers survive: written as two
+ * sequential passes it deletes from a line comment containing a block-open delimiter to the next block-close, costing
+ * F2-198 45% of `App.tsx` and reported a SMALLER population — and `(?<!:)` so a `https://`
+ * inside a string cannot open a comment.
+ */
+const STRIP_COMMENTS = /(?<!:)\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+
+export function stripComments(src: string): string {
+  return src.replace(STRIP_COMMENTS, m => m.replace(/[^\n]/g, ' '));
+}
+
+const ALL = walk(SRC).map(f => ({
+  path: rel(f),
+  body: stripComments(readFileSync(f, 'utf8')),
+}));
 
 function declaredStaticRoutes(): string[] {
   const app = ALL.find(f => f.path === 'App.tsx');
@@ -225,5 +272,102 @@ describe('F2-07b — no route is shipped invisible', () => {
     expect(reachable.has('/dashboard')).toBe(true);
     // ...and it must see the `route:` key whose absence made the first scan over-report by 28.
     expect(reachable.has('/workflows/pdpl/ropa')).toBe(true);
+  });
+});
+
+describe('F2-274 — the link detector sees a template literal, and not a comment', () => {
+  /**
+   * The two holes this closes were found one after the other, and only the second was mine.
+   *
+   * LINK_KEYS listed seven shapes under a comment calling them every way this codebase
+   * expresses a destination, and omitted the template literal — so `DataSharingPage` wrote
+   * to={`/ropa`} and the retired-redirect leg above was GREEN over a live inbound link to a
+   * page F2-198 retired. Measured: 6 static template destinations across 148 template links,
+   * exactly 1 pointing at a retired redirect.
+   *
+   * Then the comment written to explain the repointing kept that leg RED, because the gate read
+   * raw source and a quoted link counts as a link. Measured after stripping: 398 raw destinations
+   * against 396, i.e. 2 comment-only, of which 1 is a declared route — so the stripper is a
+   * LATENT-hazard closure rather than a defect discovery, and it is worth having only because
+   * this codebase documents a retirement by quoting the link it removed.
+   */
+  it('finds a STATIC template-literal destination', () => {
+    const body = 'const a = <Link to={' + '`' + '/ropa' + '`' + '}>x</Link>;';
+    const found = new Set<string>();
+    for (const re of LINK_KEYS) for (const m of body.matchAll(re)) found.add(m[1]);
+    expect([...found],
+      'the template-literal pattern has stopped matching; a static backtick link is invisible again and a retired page can be relinked without this suite noticing')
+      .toContain('/ropa');
+  });
+
+  it('does NOT invent a destination from a parameterised template literal', () => {
+    // 142 of the 148 template links are dynamic. Admitting them would add strings containing
+    // ${...} that match no declared route — noise that reads like a destination.
+    const body = 'to={' + '`' + '/tprm/vendors/${id}' + '`' + '}';
+    const found = new Set<string>();
+    for (const re of LINK_KEYS) for (const m of body.matchAll(re)) found.add(m[1]);
+    expect([...found], 'a dynamic template link must not be reported as a static destination')
+      .toEqual([]);
+  });
+
+  it('strips comments without moving a single line', () => {
+    const src = ['const a = 1;',
+                 '// to="/ropa" was here',
+                 'const b = 2;'].join('\n');
+    const out = stripComments(src);
+    expect(out.split('\n')).toHaveLength(3);
+    expect(out).not.toContain('/ropa');
+    expect(out.split('\n')[2]).toBe('const b = 2;');
+  });
+
+  it('is ONE alternation, so a line comment cannot open a block', () => {
+    // The negative control is the TWO-PASS form, not a reordered alternation: within one
+    // alternation the branch order is a no-op, because // and /* can never match at the same
+    // position (F2-211 measured this). Two passes is what cost F2-198 45% of App.tsx.
+    const src = ['// prose mentioning a block-open delimiter: ' + '/' + '*',
+                 'const keep = ' + JSON.stringify('/keep-me') + ';',
+                 'const x = 1; ' + '/' + '* real block ' + '*' + '/'].join('\n');
+    const oneAlternation = stripComments(src);
+    expect(oneAlternation, 'the correct form must keep code that follows a line comment containing a block-open delimiter').toContain('/keep-me');
+
+    const twoPass = src
+      .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+      .replace(/(?<!:)\/\/[^\n]*/g, m => m.replace(/[^\n]/g, ' '));
+    expect(twoPass, 'the two-pass form must LOSE it — that is the bug being controlled for, and if this ever stops being true the control has gone vacuous')
+      .not.toContain('/keep-me');
+  });
+
+  it('the production path uses the tested helper, once', () => {
+    // ⚠ M6 first SURVIVED because the legs above tested the constant while the
+    // mutation replaced ALL's expression: the production path can stop using the thing
+    // under test and every assertion stays green. 🔑 A leg that exercises a primitive
+    // says nothing about whether the code under review calls it (F2-205), so assert the
+    // call site too.
+    const self = readFileSync(new URL(import.meta.url), 'utf8');
+    expect(self, 'ALL no longer builds its bodies through stripComments()')
+      .toMatch(/body:\s*stripComments\(readFileSync\(/);
+    // The HELPER's body must be the single-pass form. Scoped to the helper rather than the file: a
+    // file-wide count of stripping passes reads this suite's own two-pass negative control as a
+    // production pass and fails on correct code (F2-192 — scope a scan to the shape of its claim,
+    // which my first draft of this very leg did not).
+    const helper = self.match(/function stripComments\([^)]*\)[^{]*\{([\s\S]*?)\n\}/);
+    expect(helper, 'stripComments() moved or was renamed — this leg needs repointing').toBeTruthy();
+    expect(helper![1].replace(/\s+/g, ' ').trim(),
+      'stripComments() is no longer a single pass over one alternation — two sequential passes '
+      + 'delete from a line comment containing a block-open delimiter to the next block-close, '
+      + 'which cost F2-198 45% of App.tsx and reported a SMALLER population')
+      .toBe(String.raw`return src.replace(STRIP_COMMENTS, m => m.replace(/[^\n]/g, ' '));`);
+  });
+
+  it('the data-sharing ROPA chip points at the page that can filter by ROPA code', () => {
+    // Asserted by SHAPE, not by an identifier, so a rename cannot break it (F2-197) and a
+    // silent revert to the retired path cannot pass. `/data-lifecycle` reads ?tab and
+    // ?ropaCode; `/privacy?tab=ropa` (what /ropa redirects to) has no ROPA-code filter, and
+    // <Navigate> carries neither search string nor state (F2-207).
+    const dsp = ALL.find(f => f.path.endsWith('data-sharing/DataSharingPage.tsx'));
+    expect(dsp, 'DataSharingPage moved — this leg needs repointing').toBeDefined();
+    expect(dsp!.body).toMatch(/\/data-lifecycle\?tab=cbt&ropaCode=\$\{encodeURIComponent/);
+    expect(dsp!.body, 'the ROPA chip is pointing at the retired page again')
+      .not.toMatch(/to=\{`\/ropa`\}/);
   });
 });
