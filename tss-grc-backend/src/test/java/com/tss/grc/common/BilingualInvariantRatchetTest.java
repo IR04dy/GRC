@@ -406,15 +406,15 @@ class BilingualInvariantRatchetTest {
      */
     /**
      * F2-271 — <b>the ceiling</b>: asymmetric pairs + EN_ONLY, i.e. every entity field where Arabic
-     * is not guaranteed. <b>204</b> measured on this tree (159 + 45) after V387 closed
-     * {@code privacy.data_breaches}. Decrease-only; see
+     * is not guaranteed. <b>200</b> measured on this tree (159 + 41) after V387 and V388 closed
+     * five privacy registers. Decrease-only; see
      * {@link #arabicIsNotGuaranteedOnFewerFieldsThanBefore()} for why the ceiling is the sum rather
      * than either component.
      */
-    private static final int BASELINE_ARABIC_NOT_GUARANTEED = 204;
+    private static final int BASELINE_ARABIC_NOT_GUARANTEED = 200;
 
     /** Measured, not a ceiling — the sum above is the ceiling. */
-    private static final int BASELINE_EN_ONLY = 45;
+    private static final int BASELINE_EN_ONLY = 41;
 
     @Test
     @DisplayName("F2-271: EN_ONLY fields are counted — the bucket the pair scan names and skips")

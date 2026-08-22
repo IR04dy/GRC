@@ -30,6 +30,17 @@ public class ProcessingActivity {
     @Column(name = "purpose_en", columnDefinition = "NVARCHAR(MAX)")
     private String purposeEn;
 
+    /**
+     * F2-272 (V388) — house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every row that predates V388 uneditable, and nothing can invent Arabic governance text (F2-30's reason).
+     *
+     * <p>The PDPL Article 31 register is required to state the PURPOSE of each processing
+     * activity, and {@code activity_name_ar} already sat beside {@code activity_name_en} on
+     * this same table while the purpose had no Arabic at all — F2-215's two-of-N inside
+     * one row. Populated on 11 of 11 rows in dev and prod, in English only.
+     */
+    @Column(name = "purpose_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String purposeAr;
+
     @Column(name = "legal_basis", length = 100)
     private String legalBasis;
 

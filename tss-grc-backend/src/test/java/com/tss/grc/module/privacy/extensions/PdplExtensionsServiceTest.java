@@ -158,7 +158,12 @@ class PdplExtensionsServiceTest {
             DisposalCreate body = new DisposalCreate(
                     "ropa", "ROPA-2026-001", "Customer accounts",
                     "RET-7Y", "Inactive > 7 years", null, 1500L,
-                    "ANONYMIZE", "Hash + salt PII fields", LocalDateTime.now(),
+                    // F2-272 (V388) — methodDetailsAr. Deliberately non-null in this fixture: a
+                    // null here would make the assertion below pass whether or not the writer
+                    // copies the Arabic field, which is F2-179's rule that a fixture satisfying a
+                    // condition twice cannot tell you which half is load-bearing.
+                    "ANONYMIZE", "Hash + salt PII fields", "تجزئة وتمليح حقول البيانات الشخصية",
+                    LocalDateTime.now(),
                     "DPO", "Sarah");
             DisposalCertificate saved = service.create(body, 1L);
             assertThat(saved.getStatus()).isEqualTo("SCHEDULED");

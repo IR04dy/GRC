@@ -128,6 +128,7 @@ public class PrivacyNoticeService {
         n.setArchivedAt(LocalDateTime.now());
         n.setArchivedBy(archiverId);
         n.setArchiveReasonEn(body == null ? null : body.archiveReasonEn());
+        n.setArchiveReasonAr(body == null ? null : body.archiveReasonAr());
         return repo.save(n);
     }
 

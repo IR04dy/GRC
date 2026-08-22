@@ -60,6 +60,10 @@ public class DataSharingAgreementController {
     @PostMapping("/{id}/terminate")
     @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement terminate(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.terminate(id, body.getOrDefault("reasonEn", ""));
+        // F2-272 — the Arabic reason defaults to null rather than "" so an absent reason is
+        // distinguishable from a blank one; the English side keeps its existing "" default so
+        // no working caller changes behaviour.
+        return service.terminate(id, body.getOrDefault("reasonEn", ""),
+                                 body.get("reasonAr"));
     }
 }

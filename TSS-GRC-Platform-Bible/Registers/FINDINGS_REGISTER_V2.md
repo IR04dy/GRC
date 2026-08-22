@@ -2547,6 +2547,96 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-272 · Four privacy registers were each bilingual for every text column but one
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`3d7f0719`) |
+| **Severity** | **P2** — the PDPL Article 31 purpose of processing, the Article 18 disposal method, a privacy notice's archive reason and a data-sharing agreement's termination reason could none of them be recorded in Arabic |
+| **Found by** | executing [[F2-271]]'s filed 45-member EN_ONLY work list — **reading each member rather than batching**, which is why it filed them with no verdicts ([[F2-188]]) |
+| **Fix** | `V388` adds four nullable, width-mirrored `*_ar` columns · four entities, three DTO records, three writers and one controller follow in the same commit · ceilings `BASELINE_EN_ONLY` **45 → 41** and the sum **204 → 200** |
+| **Verified** | V388 applied twice to dev; all four pairs width-mirrored, Arabic nullable, **0** backfilled · live probe as `compliance` (never `admin`) against planted rows: **7/7 post-fix, 5/7 pre-fix** with both discriminating legs failing · gate 5/5 · backend **4400/0/0**, frontend 75/75 files 808/808, `tsc` clean |
+
+### Reading the list beat batching, and the classification is the finding
+
+`privacy` held five of the 45. Each was read:
+
+| member | what else the table already carries | verdict |
+|---|---|---|
+| `ProcessingActivity.purposeEn` (MAX, 11/11 filled) | `activity_name_ar` | **close** — PDPL Art. 31 requires the register to state each activity's purpose |
+| `DisposalCertificate.methodDetailsEn` (MAX, 5/7) | `scope_description_ar` | **close** — PDPL Art. 18 |
+| `PrivacyNotice.archiveReasonEn` (500, 2/7) | `title_ar`, `purpose_ar`, `retention_period_ar`, `body_ar` | **close** |
+| `DataSharingAgreement.terminationReasonEn` (MAX, 0/8) | `title_ar`, `purpose_ar` | **close** (latent) |
+| `CrossBorderTransfer.ropaTitleEn` (510, 7/9) | — | **exclude** — see below |
+
+🔑🔑 **Each of those four tables is already bilingual for every OTHER text column and monolingual for
+exactly one.** That is [[F2-215]]'s two-of-N **inside a single table**, four times in one module: the
+register was made bilingual and one field was missed, and the presence of four Arabic columns on
+`privacy_notices` is precisely what stops a reader asking about the fifth.
+
+⚠ **The one exclusion is a different family, and adding the column would have made things worse.**
+`ropaTitleEn` is a **label stored beside `ropa_code`** and written from the request
+(`t.setRopaTitleEn(body.ropaTitleEn())`) — [[F2-245]]'s parent-identity-copy shape, where a
+description travelling beside an id can describe the wrong row. The ROPA it names already carries
+`activity_name_en` **and** `activity_name_ar`, so the fix is to **derive** the label from the
+resolved parent, which yields both languages for free. Adding `ropa_title_ar` would have created a
+**third** place one ROPA's name is spelled. 🔑 **A member of a bilingual work list can belong to
+another family entirely, and the fix that closes the list is the wrong fix for it.**
+
+### The re-scoped ceiling was exercised for the first time, and it discriminated
+
+[[F2-271]] moved the ratchet off `BASELINE_ASYMMETRIC_PAIRS` and onto the **sum**, because closing an
+EN_ONLY member adds a nullable Arabic sibling and so makes the pair *visible* to the asymmetry scan —
+a number that got worse when the codebase got better. This slice is the first fix to run against the
+new shape:
+
+```
+asymmetric pairs = 159 (unchanged), EN_ONLY = 41 (was 45), sum = 200 (was 204)
+```
+
+All four English siblings are **nullable**, so the four new pairs are **symmetric** and never reach
+the asymmetry bucket at all — the sum fell by exactly the number of members closed. 🔑 **A
+re-scoped ratchet is only proved by the next real fix**: had the ceiling still been on the
+asymmetry count it would have been unmoved by four genuine closures, which reads identically to
+having done nothing.
+
+### The column would have shipped inert on UPDATE, and one line above is why it read as covered
+
+Both ROPA routes bind the **entity** (`@RequestBody ProcessingActivity`, F2-210), so adding the field to the entity is the wire change and `purpose_ar` is fillable on create. But `PrivacyService#updateRopa` copies a **seven-field whitelist** onto the loaded row — F2-213's family — and `purposeAr` was not in it, so the Arabic purpose would have been **settable once at creation and permanently uneditable thereafter** — an edit accepted with HTTP 200 and silently discarded.
+
+🔑🔑 **The line immediately above it is `existing.setActivityNameAr(req.getActivityNameAr())`.** So the whitelist already carried *an* Arabic field, and [[F2-215]]'s two-of-N landed a third time in this slice — once across four tables, once inside one table, and once **inside a single method**. A reader who finds an Arabic setter in a whitelist has no reason to ask which other Arabic setters are absent.
+
+⚠ Checked rather than assumed for the other three: disposal certificates have **no update path at all** (create plus lifecycle transitions), and the notice archive reason and the agreement termination reason are both written by one-shot actions. `PrivacyNoticeService#supersede`, the version-copy path, carries every Arabic field in pairs and correctly does **not** copy the archive reason — a new version has not been archived. So `purposeAr` was the only exposure, and it was found by reading the writer rather than by any gate.
+
+⚠⚠ **My first characterisation of it was wrong, and the probe is what said so.** I wrote “wiped on every subsequent edit” into four documents and a code comment, then ran the probe against the pre-fix tree expecting leg 4 to fail — and **it passed**. This method copies its whitelist onto the row it *loaded*, so a field it does not copy keeps its stored value; nothing is nulled. The real defect is milder and a different shape: [[F2-214]]'s *a field the server discards*, not [[F2-213]]'s reset. 🔑 **The leg I first wrote could not tell the fix from its absence, and the corrected one — send a DIFFERENT Arabic purpose and assert it changed — fails 2/7 pre-fix and passes 7/7 after.** Asserting that a value *survives* is not asserting that it can be *written*, and on a whitelist update only the second question has an answer worth having.
+
+### Why nullable and not `@NotBlank`
+
+The same reasoning as V387, restated because it is the question a reader asks first: bean validation
+fires on **UPDATE** as well as INSERT, so requiring Arabic would make every row predating V388
+uneditable — and nothing can invent Arabic governance text. `V388` therefore backfills nothing and
+asserts that it backfilled nothing, and each Arabic column's width is asserted **equal** to its
+English sibling's so a longer English statement cannot be untranslatable.
+
+⚠ An existing fixture (`PdplExtensionsServiceTest`) constructs `DisposalCreate` positionally and had
+to gain the new component. It was given **real Arabic text rather than `null`**: a null there would
+let the assertion below it pass whether or not the writer copies the field, which is [[F2-179]]'s
+rule that a fixture satisfying a condition twice cannot tell you which half is load-bearing.
+
+⚠ **`RequestSizeCapMirrorTest` (F2-185b) failed the build on the new `@Size(500)` and was right to.** That gate requires every validated cap on these request types to name a *destination* — the entity field it mirrors and the service that carries the value — in the **same commit** as the cap. The Arabic cap is registered against `PrivacyNotice.archiveReasonAr` with the reason that makes it safe: the cap mirrors the column exactly **because V388 asserts the two columns' widths match**, so a longer English archive reason cannot be untranslatable. 🔑 **A width-mirroring migration and a cap-mirroring gate are the same claim checked from two ends**, and neither is sufficient — the migration cannot see the annotation and the gate cannot see the column's Arabic twin until something declares it.
+
+### Filed
+
+- **41 remaining EN_ONLY fields**, carried forward from [[F2-271]] with no verdicts. The split that
+  matters is governance text (`CommitteeMemberTerm.independenceBasisEn`,
+  `CommitteeActionItem.completionNotesEn`, `NcaEccFiling.peerReviewCommentsEn`,
+  `Vulnerability.descriptionEn`) versus internal labels legitimately English-only
+  (`Permission.descriptionEn`, `WorkflowState.descriptionEn`).
+- `CrossBorderTransfer.ropaTitleEn` belongs to [[F2-245]]'s family: **derive it from the resolved
+  ROPA, do not add a second copy.**
+- **Three ungated restatements of the migration census**, all measured stale while the gated line was
+  current — see [[F2-273]].
+
 ## F2-271 · The bilingual gate names the bucket it skips, in a comment, and the skipped half is the worse one
 
 | | |
