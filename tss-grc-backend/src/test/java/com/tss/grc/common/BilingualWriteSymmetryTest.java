@@ -92,25 +92,100 @@ class BilingualWriteSymmetryTest {
         return out.append(src.substring(last)).toString();
     }
 
-    /** simple entity name -> the En/Ar bases it declares as String fields. */
-    private static Map<String, Set<String>> entityPairs() {
-        Map<String, Set<String>> out = new TreeMap<>();
+    /**
+     * One bilingual pair on one entity. {@code bareStem} records which branch found it, because
+     * the whole of F2-276 is that the two branches have different populations and only one of them
+     * was ever being scanned.
+     */
+    private record Pair(String entity, String en, String ar, boolean bareStem) {
+        /** {@code entity} is a FULLY-QUALIFIED name; print the readable tail. */
+        @Override public String toString() { return simple(entity) + "." + en + "/" + ar; }
+        String id() { return entity + "#" + en; }
+    }
+
+    /**
+     * Every English/Arabic String-field pair on every entity, by BOTH spellings of the English half.
+     *
+     * <p>⚠⚠ <b>F2-276 — the `En` suffix was a third narrowing, and it hid 13 complete pairs.</b>
+     * The first version of this method paired {@code xEn} with {@code xAr}. So did
+     * {@link BilingualInvariantRatchetTest}, whose two buckets (ASYMMETRIC, EN_ONLY) are both keyed
+     * on the English half carrying the suffix. A pair spelled {@code evidenceGuidance} /
+     * {@code evidenceGuidanceAr} is therefore in <b>neither</b> bucket and outside <b>both</b>
+     * gates — not tolerated, not exempted, simply never asked about. F2-198's shape after a
+     * filename, a three-entry allow-list, a module name, an {@code extends} clause, a field-name
+     * list inside a fix and a claim shape in a gate; here the narrowing is <b>a naming
+     * convention</b>.
+     *
+     * <p>🔑 <b>It was found by executing F2-275's own filing and disbelieving it.</b> That filing
+     * called {@code evidence.sub_controls.evidence_guidance_ar} <i>"an *_ar with no English sibling
+     * — the mirror case"</i>. Measured across both databases, columns with no English half of any
+     * spelling number <b>0</b>: the English half is {@code evidence_guidance}, populated on 654 of
+     * 654 rows against the Arabic half's 610. So the pair is complete, the data is fine, and the
+     * defect was in the instrument.
+     *
+     * <p>The bare-stem branch fires only when {@code xEn} does <b>not</b> exist, so it can only ever
+     * ADD pairs — verified in both directions by
+     * {@link #theBareStemBranchAddsExactlyTheHiddenPopulationAndNothingElse()} (F2-225: check a
+     * widening by what it adds, because one too wide silently re-tiers the platform and one too
+     * narrow silently reports a clean tree).
+     */
+    private static List<Pair> entityPairs() {
+        List<Pair> out = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> e : new TreeMap<>(byEntityName()).entrySet()) {
+            String entity = e.getKey();
+            Set<String> fields = e.getValue();
+            for (String f : fields) {
+                if (f.endsWith("En") && fields.contains(f.substring(0, f.length() - 2) + "Ar")) {
+                    out.add(new Pair(entity, f, f.substring(0, f.length() - 2) + "Ar", false));
+                }
+            }
+            for (String f : fields) {
+                if (!f.endsWith("Ar")) continue;
+                String stem = f.substring(0, f.length() - 2);
+                if (stem.isEmpty()) continue;
+                if (fields.contains(stem + "En")) continue;   // ordinary pair, found above
+                if (fields.contains(stem)) out.add(new Pair(entity, stem, f, true));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * FULLY-QUALIFIED entity name -> its String field names.
+     *
+     * <p>⚠⚠ <b>F2-276 — keying this by SIMPLE name silently dropped one twin of every
+     * duplicate-named entity.</b> The first version put into a map keyed on the file's simple name,
+     * so for the 15 simple names this platform declares in two packages the second file visited
+     * <b>overwrote</b> the first — not a union, a replacement — and every bilingual pair on the
+     * losing twin left the population. F2-222 filed that hazard as latent on the ground that "no
+     * key collapses two registers today"; a census keyed on the same name is exactly where it stops
+     * being latent, and it fails in the quiet direction: fewer pairs reads as a cleaner tree.
+     *
+     * <p>Surfaced by an annotation sweep printing {@code !! 2 entity files named Vendor.java} —
+     * {@code scm.Vendor} and {@code tprm.Vendor}, two registers for one concept (F2-247's filing).
+     */
+    private static Map<String, Set<String>> byEntityName() {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
         for (Map.Entry<Path, String> e : sources().entrySet()) {
             String body = e.getValue();
             if (!body.contains("@Entity")) continue;
             Set<String> fields = new LinkedHashSet<>();
             Matcher m = FIELD.matcher(body);
             while (m.find()) fields.add(m.group(1));
-            String name = e.getKey().getFileName().toString().replace(".java", "");
-            Set<String> bases = new LinkedHashSet<>();
-            for (String f : fields) {
-                if (f.endsWith("En") && fields.contains(f.substring(0, f.length() - 2) + "Ar")) {
-                    bases.add(f.substring(0, f.length() - 2));
-                }
-            }
-            if (!bases.isEmpty()) out.put(name, bases);
+            if (!fields.isEmpty()) out.put(fqn(e.getKey()), fields);
         }
         return out;
+    }
+
+    /** {@code src/main/java/com/tss/grc/module/tprm/entity/Vendor.java} -> its dotted class name. */
+    private static String fqn(Path p) {
+        String s = p.toString().replace('\\', '/');
+        int i = s.indexOf("/com/tss/grc/");
+        return s.substring(i + 1, s.length() - ".java".length()).replace('/', '.');
+    }
+
+    private static String simple(String fqn) {
+        return fqn.substring(fqn.lastIndexOf('.') + 1);
     }
 
     private static String cap(String s) {
@@ -118,15 +193,29 @@ class BilingualWriteSymmetryTest {
     }
 
     /**
-     * Does anything write {@code set<Field>} on THIS entity from a caller payload? A source file
-     * counts only if it also names the entity — see the class javadoc on F2-187.
+     * Does anything write {@code set<Field>} on THIS entity from a caller payload?
+     *
+     * <p>Narrowed PER OWNER TYPE, never by field name — F2-187's recorded mistake, which the
+     * reconnaissance pass for this gate walked into by reporting
+     * {@code BcmExerciseScenario.successCriteria} for a call that writes
+     * {@code SupplierResilienceTest}.
+     *
+     * <p>⚠ F2-276 — the narrowing is now the <b>import</b>, not the simple name. A file counts as a
+     * writer for {@code tprm.entity.Vendor} only if it imports that class or lives in its package.
+     * With the simple name, a service writing {@code scm.entity.Vendor}'s Arabic half made the
+     * {@code tprm} twin's pair read as symmetric — and the direction matters: over-approximating the
+     * ARABIC half HIDES an asymmetry, which is the whole defect this gate exists to catch.
      */
     private static boolean writtenFromPayload(String entity, String field) {
         Pattern call = Pattern.compile(
             "\\.set" + cap(field) + "\\(\\s*" + PAYLOAD + "\\b[^;]{0,200}?\\)");
+        String pkg = entity.substring(0, entity.lastIndexOf('.'));
         for (Map.Entry<Path, String> e : sources().entrySet()) {
             String body = e.getValue();
-            if (!body.contains(entity)) continue;
+            boolean owns = body.contains("import " + entity + ";")
+                        || body.contains("import " + pkg + ".*;")
+                        || fqn(e.getKey()).startsWith(pkg + ".");
+            if (!owns) continue;
             if (call.matcher(body).find()) return true;
         }
         return false;
@@ -134,21 +223,37 @@ class BilingualWriteSymmetryTest {
 
     @Test
     void anArabicSiblingIsWritableWhereverItsEnglishHalfIs() {
-        Map<String, Set<String>> pairs = entityPairs();
-        int total = pairs.values().stream().mapToInt(Set::size).sum();
+        List<Pair> pairs = entityPairs();
+        int total = pairs.size();
         assertThat(total)
             .as("anti-vacuity: the En/Ar pair scan found almost nothing, so this gate would pass "
               + "over any asymmetry. A pattern that stops matching reports a clean tree.")
             .isGreaterThan(500);
 
+        // ⚠⚠ F2-276 — THE FLOOR HAS TO SIT ABOVE THE LARGEST *WRONG* ANSWER, NOT ABOVE ZERO
+        // (F2-215). This gate shipped keyed on the entity's SIMPLE name, which silently dropped
+        // one twin of every duplicate-named entity: 568 pairs where 585 exist. Adding the
+        // bare-stem branch to that broken keying gives ~580, so a floor of 500 — or of 570 —
+        // cannot tell the fix from its absence. 590 sits between the wrong answer and the truth,
+        // so reverting either half of the F2-276 widening fails here rather than passing quietly.
+        // Measured 597 = 585 suffix + 12 bare-stem; see target/bilingual-write-symmetry.txt.
+        assertThat(total)
+            .as("The pair population fell below the F2-276 measurement. The two ways that happens "
+              + "are a REVERTED widening (keying entities by simple name loses 17 pairs; dropping "
+              + "the bare-stem branch loses 12) and a genuinely deleted entity. Both deserve a "
+              + "reader — do not lower this to make a build pass. Measured %d.", total)
+            .isGreaterThanOrEqualTo(590);
+
         List<String> asymmetric = new ArrayList<>();
-        for (Map.Entry<String, Set<String>> e : pairs.entrySet()) {
-            for (String base : e.getValue()) {
-                boolean en = writtenFromPayload(e.getKey(), base + "En");
-                boolean ar = writtenFromPayload(e.getKey(), base + "Ar");
-                if (en && !ar) asymmetric.add(e.getKey() + "." + base);
-            }
+        List<String> lines = new ArrayList<>();
+        for (Pair p : pairs) {
+            boolean en = writtenFromPayload(p.entity(), p.en());
+            boolean ar = writtenFromPayload(p.entity(), p.ar());
+            if (en && !ar) asymmetric.add(p.toString());
+            lines.add(String.format("%-6s en=%-5s ar=%-5s %s#%s/%s",
+                p.bareStem() ? "BARE" : "SUFFIX", en, ar, p.entity(), p.en(), p.ar()));
         }
+        publish(pairs, asymmetric, lines);
 
         assertThat(asymmetric)
             .as("These entities let a caller write the ENGLISH half of a bilingual pair and not the "
@@ -158,6 +263,131 @@ class BilingualWriteSymmetryTest {
               + "half beside the English one, under its own null guard so an omitted Arabic value "
               + "leaves the stored one alone rather than clearing it. Measured %d pairs.", total)
             .isEmpty();
+    }
+
+    /**
+     * F2-276 — the bare-stem branch is verified by WHAT IT ADDS, in both directions.
+     *
+     * <p>A widening that is too wide silently re-tiers the platform; one that is too narrow
+     * silently reports a clean tree, which is the quiet direction and the one that let these pairs
+     * sit outside two gates. So the count is asserted <b>exactly</b> rather than as a floor: a
+     * decrease-only figure cannot express <i>the population was undercounted</i> (F2-204), and that
+     * is precisely the failure being closed here. If a new bare-stem pair appears, this leg fails
+     * and a reader has to decide whether the pair should be renamed to the {@code *_en} convention
+     * or left and counted.
+     */
+    @Test
+    void theBareStemBranchAddsExactlyTheHiddenPopulationAndNothingElse() {
+        List<Pair> pairs = entityPairs();
+        List<Pair> bare = pairs.stream().filter(Pair::bareStem).toList();
+
+        assertThat(bare)
+            .as("The bare-stem branch found nothing, so the F2-276 widening has stopped matching "
+              + "and this gate has silently narrowed back to the population it had before.")
+            .isNotEmpty();
+        assertThat(bare.size())
+            .as("Bare-stem pairs (an Arabic field whose English half carries no `En` suffix, so "
+              + "neither this gate nor BilingualInvariantRatchetTest could see it before F2-276). "
+              + "Measured %s. If this moved, say which way and why: a NEW pair of this shape is "
+              + "worth a decision, not a number bump.", bare)
+            .isEqualTo(BARE_STEM_PAIRS);
+
+        // must-pair: the member that produced the finding
+        assertThat(bare.stream().map(Pair::toString))
+            .as("The exemplar that produced F2-276 must stay in the population — it is the only "
+              + "reason anybody knows this shape exists.")
+            .contains("EvidenceSubControl.evidenceGuidance/evidenceGuidanceAr");
+
+        // must-not-pair 1: an ordinary suffixed pair may never be counted twice. Keyed on the
+        // FULLY-QUALIFIED id, so two same-named entities each owning the same pair is legal.
+        List<String> dupes = pairs.stream().map(Pair::id)
+            .filter(s -> pairs.stream().map(Pair::id).filter(s::equals).count() > 1)
+            .distinct().toList();
+        assertThat(dupes)
+            .as("A pair counted by both branches would inflate every figure this gate publishes.")
+            .isEmpty();
+
+        // ⚠⚠ The IMPORT narrowing is load-bearing and nothing else here can show it. The mutation
+        // harness reverted `writtenFromPayload` to matching the entity's SIMPLE name and every leg
+        // stayed green, because with `asymmetric = 0` the two resolvers agree on this corpus — an
+        // equivalent mutant (F2-206) that is nonetheless the shipped defect. What discriminates is
+        // that the two twins of a duplicate-named entity have DIFFERENT writer sets: resolve by
+        // simple name and one twin inherits the other's writes, which for the Arabic half HIDES an
+        // asymmetry. Measured rather than argued.
+        Map<String, List<String>> bySimple = new TreeMap<>();
+        byEntityName().keySet().forEach(f -> bySimple
+            .computeIfAbsent(simple(f), k -> new ArrayList<>()).add(f));
+        int divergent = 0;
+        for (List<String> twins : bySimple.values()) {
+            if (twins.size() < 2) continue;
+            for (String field : byEntityName().getOrDefault(twins.get(0), Set.of())) {
+                boolean a = writtenFromPayload(twins.get(0), field);
+                boolean b = writtenFromPayload(twins.get(1), field);
+                if (a != b) divergent++;
+            }
+        }
+        assertThat(divergent)
+            .as("No field on any duplicate-named entity has a different writer answer for its two "
+              + "twins, which means resolving writers by SIMPLE name would give the same result as "
+              + "resolving them by import — so this gate's per-owner narrowing is no longer doing "
+              + "anything and an asymmetry on one twin can be hidden by the other twin's writes.")
+            .isGreaterThan(0);
+
+        // must-not-pair 2: where BOTH spellings exist the ordinary branch owns the pair, so no
+        // bare-stem entry may name an entity/field that also declares the `En` spelling.
+        Map<String, Set<String>> fields = byEntityName();
+        List<String> shadowed = bare.stream()
+            .filter(p -> fields.getOrDefault(p.entity(), Set.of()).contains(p.en() + "En"))
+            .map(Pair::toString).toList();
+        assertThat(shadowed)
+            .as("These bare-stem pairs sit on entities that ALSO declare the `En` spelling, so the "
+              + "ordinary branch already owns them and the bare field is something else.")
+            .isEmpty();
+    }
+
+    /**
+     * Measured 2026-08-22 over both databases and the entity tree; see
+     * {@link #theBareStemBranchAddsExactlyTheHiddenPopulationAndNothingElse()} for why this is an
+     * equality rather than a ceiling.
+     *
+     * <p>The database shows <b>13</b> such columns and this is 12; the difference is honest and
+     * worth knowing. {@code privacy.privacy_assessments.title / title_ar} belongs to a V1 table
+     * with <b>no {@code @Entity}, no repository and no controller</b> — F2-204's
+     * {@code NO_SERVER_SURFACE} shape — so there is no entity field for any entity-side gate to
+     * pair. Its module's {@code package-info.java} still advertises {@code PrivacyAssessment} as a
+     * module type, which is F2-184's shape. Filed rather than mapped: {@code privacy.dpia} is the
+     * real assessment register, so adding a second is F2-196's disjoint-register defect.
+     */
+    private static final int BARE_STEM_PAIRS = 12;
+
+    /**
+     * Publish the census rather than restating its numbers in prose (F2-265: a count in prose is a
+     * copy of a measurement, and an instruction not to copy it is not an enforcement). The tree's
+     * convention — {@code permission-usage.txt}, {@code server-stamped-fields.txt},
+     * {@code bilingual-en-only.txt}.
+     */
+    private static void publish(List<Pair> pairs, List<String> asymmetric, List<String> lines) {
+        long bare = pairs.stream().filter(Pair::bareStem).count();
+        StringBuilder sb = new StringBuilder()
+            .append("# Bilingual WRITE symmetry - GENERATED by BilingualWriteSymmetryTest.\n")
+            .append("# A pair is listed with whether a caller payload can write each half. The\n")
+            .append("# question is F2-272's: an Arabic column that EXISTS is not one that can be\n")
+            .append("# WRITTEN, and frozen is indistinguishable from protected at the caller.\n")
+            .append("#\n")
+            .append("# SUFFIX = the English half is spelled `xEn`. BARE = it is spelled `x`, which\n")
+            .append("# is invisible to BilingualInvariantRatchetTest's pair scan (F2-276).\n")
+            .append("pairs_total=").append(pairs.size()).append('\n')
+            .append("pairs_suffix=").append(pairs.size() - bare).append('\n')
+            .append("pairs_bare_stem=").append(bare).append('\n')
+            .append("asymmetric=").append(asymmetric.size()).append("\n\n");
+        lines.forEach(l -> sb.append(l).append('\n'));
+        try {
+            Files.createDirectories(Path.of("target"));
+            Files.writeString(Path.of("target", "bilingual-write-symmetry.txt"), sb,
+                              StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
