@@ -47,7 +47,7 @@ public class SignatureService {
         s.setIntent(normIntent);
         s.setStatementEn(statementEn);
         s.setSignerId(userId);
-        s.setSignerName(resolveSignerName(userId));
+        applySignerLabels(s, userId);
         s.setSignerRole(currentRole());
         LocalDateTime signedAt = LocalDateTime.now();
         s.setSignedAt(signedAt);
@@ -68,8 +68,14 @@ public class SignatureService {
      * the call sites rather than a property of this method (F2-182), and
      * {@code CommitteeService.approveMinutes} passes its own {@code approverId} in as a scalar.
      */
-    private String resolveSignerName(Long userId) {
-        return directory.resolve(userId).map(directory::labelFor).orElse(null);
+    private void applySignerLabels(Signature s, Long userId) {
+        // F2-277 — one resolve, both halves. This was `resolveSignerName`, returning the English
+        // name alone while `iam.users` stored `full_name_ar` beside it, so the signatory of an
+        // e-signed governance record rendered in English on an Arabic-primary UI. Both directory
+        // methods are null-safe, so an unresolvable id clears the pair rather than half of it.
+        var u = directory.resolve(userId).orElse(null);
+        s.setSignerName(directory.labelFor(u));
+        s.setSignerNameAr(directory.labelArFor(u));
     }
 
     /** First ROLE_ authority of the current principal, prefix stripped. */
@@ -98,6 +104,7 @@ public class SignatureService {
     private SignatureResponse toResponse(Signature s) {
         return new SignatureResponse(
             s.getId(), s.getEntityType(), s.getEntityId(), s.getIntent(), s.getStatementEn(),
-            s.getSignerId(), s.getSignerName(), s.getSignerRole(), s.getPayloadHash(), s.getSignedAt());
+            s.getSignerId(), s.getSignerName(), s.getSignerNameAr(), s.getSignerRole(),
+            s.getPayloadHash(), s.getSignedAt());
     }
 }

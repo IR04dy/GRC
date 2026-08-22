@@ -396,7 +396,7 @@ class ParentIdentityCopyContractTest {
             // wrong one reports 75 of 75 rows divergent when the same 75 agree. See the resolver's
             // javadoc; picking an authoritative register is an owner decision (F2-196).
             Map.entry(
-            "cyber.cyber_controls :: framework_id + framework_name",
+            "cyber.cyber_controls :: framework_id + framework_name, framework_name_ar",
             "CLOSED by F2-252 — CyberFrameworkReferenceResolver resolves the id IN-TENANT and "
           + "applyFrameworkReference is the pair's single writer: the label is DERIVED from the "
           + "resolved framework, a contradicting label is refused, an echo accepted, a bare label "
@@ -446,7 +446,7 @@ class ParentIdentityCopyContractTest {
           + "recording a blank. Recorded here by F2-251 for the same bookkeeping reason as the "
           + "change-comment pair above."),
             Map.entry(
-            "ethics.aml_alerts :: subject_id + subject_name",
+            "ethics.aml_alerts :: subject_id + subject_name, subject_name_ar",
             "CLOSED by F2-250 — the alert's SUBJECT, the pair this register declares beside the one "
           + "F2-249 closed, in the same entity. AmlAlertService.applySubject resolves the id "
           + "through KycSubjectDirectory and derives the label from what resolved; a label "
@@ -493,7 +493,7 @@ class ParentIdentityCopyContractTest {
           + "'who sent this version out' from the roster. Both halves from CurrentActor now."),
 
             Map.entry(
-            "platform.signatures :: signer_id + signer_name",
+            "platform.signatures :: signer_id + signer_name, signer_name_ar",
             "CLOSED by F2-249 (REFUTED as a defect, and it is the platform's EXEMPLAR of this "
           + "shape) — signer_id has always come from @AuthenticationPrincipal and signer_name has "
           + "always been DERIVED from the row that id names. Two things changed and neither alters "
@@ -708,5 +708,267 @@ class ParentIdentityCopyContractTest {
                 .isTrue();
         assertThat(IDENTITY_COPY.matcher("risk_id").matches())
                 .as("an id is not an identity copy").isFalse();
+    }
+
+    // ── leg 5: F2-277 — a derived label copies BOTH halves of a bilingual parent ───────────────
+
+    /**
+     * The identity copies whose PARENT stores the label in both languages, and the parent column
+     * each one copies. Every member here was CLOSED by an earlier slice of this programme, and
+     * every one of those slices derived the ENGLISH half alone.
+     *
+     * <p>Population resolved by <b>value agreement</b> against every bilingual label pair in the
+     * database, never by name — F2-252's rule that a scan locates and the PAIRING is the
+     * measurement, with the mechanism that a guessed pairing dereferences cleanly and lies. 32
+     * monolingual identity copies exist; exactly these 4 agree fully with a bilingual parent. The
+     * other 28 have a monolingual parent ({@code scm.vendors}), hold an office rather than a
+     * person's name, or name a register nothing resolves — all filed, none of them this.
+     *
+     * <p>🔑 <b>Neither bilingual gate could see any of it.</b> {@code BilingualInvariantRatchetTest}
+     * pairs {@code xEn} with {@code xAr} and buckets what is left as EN_ONLY;
+     * {@code BilingualWriteSymmetryTest} pairs the same two spellings. A copy spelled
+     * {@code framework_name} — bare, no language suffix at all — is in NEITHER bucket and outside
+     * BOTH gates. F2-198's shape after a filename, an allow-list, a module name, an
+     * {@code extends} clause, a field-name list, a claim shape and a naming convention; here the
+     * narrowing is <b>the absence of a suffix</b>.
+     */
+    private static final Map<String, String[]> BILINGUAL_PARENT_COPIES = new TreeMap<>(Map.of(
+            // child entity#field                     parent entity#field(en), #field(ar)
+            "CommitteeMeeting#committeeNameEn",
+            new String[] {"Committee", "nameEn", "nameAr"},
+
+            "CyberControl#frameworkName",
+            new String[] {"CyberFramework", "name", "nameAr"},
+
+            "AmlAlert#subjectName",
+            new String[] {"KycSubject", "fullName", "fullNameAr"},
+
+            "Signature#signerName",
+            new String[] {"User", "fullNameEn", "fullNameAr"}
+    ));
+
+    /**
+     * Where each of those four derivations lives, and both setters it must call.
+     *
+     * <p>Asserted as a (class, method) pair because that is self-verifying: a method that no
+     * longer exists fails, and so does one that stops writing either half. A count would not —
+     * F2-209 recorded a floor of {@code >= 2} surviving the mutation that reverted one of three
+     * call sites.
+     */
+    private static final String[][] DERIVATION_SITES = {
+            {"admin/committee/service/CommitteeService.java", "createMeeting",
+             "setCommitteeNameEn", "setCommitteeNameAr"},
+            {"admin/committee/service/CommitteeCalendarService.java", "generateAnnualCalendar",
+             "setCommitteeNameEn", "setCommitteeNameAr"},
+            {"cyber/service/CyberControlService.java", "applyFrameworkReference",
+             "setFrameworkName", "setFrameworkNameAr"},
+            {"ethics/service/AmlAlertService.java", "applySubject",
+             "setSubjectName", "setSubjectNameAr"},
+            {"signature/service/SignatureService.java", "applySignerLabels",
+             "setSignerName", "setSignerNameAr"},
+    };
+
+    @Test
+    @DisplayName("F2-277: a derived label copies BOTH halves of a bilingual parent")
+    void aDerivedLabelCopiesBothHalvesOfABilingualParent() {
+        Map<String, Class<?>> byName = new TreeMap<>();
+        for (Class<?> c : shippedEntities()) byName.put(c.getSimpleName(), c);
+
+        List<String> missing = new ArrayList<>();
+        List<String> narrower = new ArrayList<>();
+        int checked = 0;
+
+        for (var e : BILINGUAL_PARENT_COPIES.entrySet()) {
+            String[] key = e.getKey().split("#");
+            Class<?> child = byName.get(key[0]);
+            assertThat(child)
+                    .as("BILINGUAL_PARENT_COPIES names entity '%s', which no shipped @Entity "
+                      + "declares. A reason written for something outside the population reads "
+                      + "exactly like a reason for something inside it (F2-199)", key[0])
+                    .isNotNull();
+
+            Class<?> parent = byName.get(e.getValue()[0]);
+            assertThat(parent).as("parent entity '%s' not found", e.getValue()[0]).isNotNull();
+
+            Field childEn = field(child, key[1]);
+            Field parentAr = field(parent, e.getValue()[2]);
+            assertThat(childEn).as("%s has no field %s", key[0], key[1]).isNotNull();
+            assertThat(parentAr).as("%s has no field %s", e.getValue()[0], e.getValue()[2])
+                    .isNotNull();
+
+            // (a) the child must declare the Arabic half at all.
+            Field childAr = field(child, key[1].endsWith("En")
+                    ? key[1].substring(0, key[1].length() - 2) + "Ar" : key[1] + "Ar");
+            if (childAr == null) {
+                missing.add(e.getKey());
+                continue;
+            }
+
+            // (b) and it must be as wide as the column it copies. A copy narrower than its
+            // source is the other half of V391: cyber_controls.framework_name was NVARCHAR(100)
+            // holding a copy of cyber_frameworks.name, which V390 widened to 255.
+            checked++;
+            if (!capacity(childAr).equals(capacity(parentAr))) {
+                narrower.add(e.getKey() + " declares " + capacity(childAr)
+                        + " for a copy of " + e.getValue()[0] + "#" + e.getValue()[2]
+                        + "'s " + capacity(parentAr));
+            }
+            // (c) the ENGLISH halves too — this is what V390 broke and V391 repaired.
+            Field parentEn = field(parent, e.getValue()[1]);
+            if (parentEn != null && !capacity(childEn).equals(capacity(parentEn))) {
+                narrower.add(e.getKey() + " declares " + capacity(childEn)
+                        + " for a copy of " + e.getValue()[0] + "#" + e.getValue()[1]
+                        + "'s " + capacity(parentEn));
+            }
+        }
+
+        assertThat(missing)
+                .as("a derived label whose parent stores BOTH languages must copy both. The "
+                  + "Arabic text already exists in the row this column is a copy of, so this is "
+                  + "not a missing translation — it is a derivation reading one of the two "
+                  + "columns in front of it")
+                .isEmpty();
+        assertThat(narrower)
+                .as("a derived copy must be AS WIDE AS the column it copies. Widening a source "
+                  + "widens every copy's exposure, and the copy is in another table that no "
+                  + "width invariant compares it against — which is exactly how V390 opened a "
+                  + "500 on POST /api/v1/cyber/controls")
+                .isEmpty();
+        assertThat(checked)
+                .as("anti-vacuity: every member must have been width-checked, or this leg is "
+                  + "asserting emptiness over a population it failed to resolve")
+                .isEqualTo(BILINGUAL_PARENT_COPIES.size());
+    }
+
+    @Test
+    @DisplayName("F2-277: each derivation writes both halves in the same method")
+    void eachDerivationWritesBothHalvesInOneMethod() {
+        for (String[] site : DERIVATION_SITES) {
+            Path p = MAIN.resolve("module").resolve(site[0]);
+            assertThat(Files.exists(p)).as("%s does not exist", site[0]).isTrue();
+            String body = methodBody(code(p), site[1]);
+            assertThat(body)
+                    .as("%s#%s not found — a (class, method) pair is self-verifying, and a "
+                      + "renamed writer must move this entry rather than silently leave the "
+                      + "population", site[0], site[1])
+                    .isNotBlank();
+            // ⚠ Asserted as EQUAL COUNTS, not as presence. The first draft used
+            // contains("setXAr("), and the mutation harness showed it green over a deleted
+            // derivation: every one of these methods writes the Arabic half in TWO branches —
+            // derive when the parent resolves, clear when the caller unlinks — so dropping the
+            // derive branch leaves the clear branch and a token check is satisfied by it.
+            // F2-194's substring-satisfied-by-something-else, in a leg written after quoting it.
+            // Equal counts is the shape of the claim "the Arabic half rides with the English one
+            // at EVERY site", and it survives a local being renamed (F2-197).
+            int en = occurrences(body, site[2] + "(");
+            int ar = occurrences(body, site[3] + "(");
+            assertThat(en)
+                    .as("%s#%s writes no %s at all — the (class, method) pair is self-verifying, "
+                      + "so a renamed writer must move this entry", site[0], site[1], site[2])
+                    .isGreaterThan(0);
+            assertThat(ar)
+                    .as("%s#%s writes %s %d times and %s %d times. Both halves of one label come "
+                      + "from ONE resolved row at EVERY site: deriving one and keeping the other "
+                      + "is how a pair comes apart (F2-245), and a site that writes only the "
+                      + "English half is the defect this slice closed",
+                      site[0], site[1], site[2], en, site[3], ar)
+                    .isEqualTo(en);
+        }
+    }
+
+    @Test
+    @DisplayName("F2-277: V391 writes no English label, and asserts only its own writes")
+    void v391WritesNoEnglishLabelAndAssertsOnlyItsOwnWrites() {
+        Path v391 = Path.of("src", "main", "resources", "db", "migration", "sqlserver",
+                "V391__derived_label_bilingual_halves.sql");
+        assertThat(Files.exists(v391)).as("V391 is missing").isTrue();
+        String sql = readSql(v391);
+
+        // Every UPDATE ... SET must target an _ar column. An English label is a point-in-time
+        // snapshot on three of these four registers, so a backfill that "tidied" one would be
+        // rewriting history rather than deriving a missing value.
+        Matcher m = Pattern.compile("(?i)\\bSET\\s+(\\w+)\\.(\\w+)\\s*=").matcher(sql);
+        List<String> written = new ArrayList<>();
+        while (m.find()) written.add(m.group(2));
+        assertThat(written)
+                .as("anti-vacuity: V391 must contain the four backfills this leg is about")
+                .hasSize(4);
+        assertThat(written)
+                .as("V391 may only ever write an Arabic half. The English copies are snapshots.")
+                .allMatch(c -> c.endsWith("_ar"));
+
+        // ⚠ Every backfill must be GUARDED on the English copy still agreeing with its parent.
+        // Three of the four columns are point-in-time snapshots, so copying today's Arabic onto a
+        // stale English snapshot records a name the row never had. The guard's EFFECT needs a
+        // database; its presence does not, and the harness proved that without this leg the guard
+        // can be deleted with every assertion green.
+        long guarded = Pattern.compile("(?i)AND\\s+ISNULL\\(\\w+\\.\\w+_(?:en|name|full_name), *''\\)")
+                .matcher(sql).results().count();
+        assertThat(guarded)
+                .as("each of V391's four backfills must compare the English copy against its "
+                  + "parent's English column, so a row whose parent was renamed since is LEFT "
+                  + "NULL rather than given a name it never carried")
+                .isEqualTo(4);
+
+        // And it must not assert tenant data: a check comparing an English copy against its
+        // parent THROWS on a customer database where the parent was renamed after the copy was
+        // taken, blocking the whole chain (F2-260).
+        assertThat(sql.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("--[^\\n]*", ""))
+                .as("V391 must not compare an English label against its parent outside a "
+                  + "backfill's own WHERE clause — that is an assertion about tenant data")
+                .doesNotContain("THROW 53918");
+    }
+
+    private static String readSql(Path p) {
+        try {
+            return Files.readString(p, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new AssertionError("cannot read " + p, e);
+        }
+    }
+
+    private static Field field(Class<?> type, String name) {
+        for (Field f : allFields(type)) if (f.getName().equals(name)) return f;
+        return null;
+    }
+
+    /**
+     * The capacity a field DECLARES. {@code columnDefinition} wins where present, because that is
+     * what a reader sees — and F2-276 found it is a CLAIM rather than a constraint, since
+     * Hibernate only emits it when generating DDL and {@code ddl-auto=none} means this platform
+     * never does.
+     */
+    private static String capacity(Field f) {
+        Column c = f.getAnnotation(Column.class);
+        if (c == null) return "length=255";
+        if (!c.columnDefinition().isBlank()) {
+            return c.columnDefinition().trim().toUpperCase(java.util.Locale.ROOT);
+        }
+        return "length=" + c.length();
+    }
+
+    /** The brace-balanced body of a named method, or "" — a call is not a declaration (F2-244). */
+    private static String methodBody(String src, String method) {
+        Matcher m = Pattern.compile(
+                "(?:private|public|protected|static|final|void|\\w|<|>|\\[|\\]|,|\\.|\\s)*?\\b"
+                        + Pattern.quote(method) + "\\s*\\([^)]*\\)\\s*\\{").matcher(src);
+        while (m.find()) {
+            int open = src.indexOf('{', m.end() - 1);
+            if (open < 0) continue;
+            int depth = 0;
+            for (int i = open; i < src.length(); i++) {
+                char ch = src.charAt(i);
+                if (ch == '{') depth++;
+                else if (ch == '}' && --depth == 0) return src.substring(open, i + 1);
+            }
+        }
+        return "";
+    }
+
+    /** How many times a literal occurs — a count, because presence is satisfiable elsewhere. */
+    private static int occurrences(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) n++;
+        return n;
     }
 }

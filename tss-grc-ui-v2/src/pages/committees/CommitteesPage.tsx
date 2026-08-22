@@ -805,7 +805,9 @@ export function CommitteesPage() {
                               </button>
                             </td>
                             <td className="mono">{m.meetingCode}</td>
-                            <td>{m.committeeNameEn ?? m.committeeCode}</td>
+                            {/* F2-277 — the derived committee label now has both halves. */}
+                            <td>{(lang === 'ar' && m.committeeNameAr ? m.committeeNameAr
+                                  : m.committeeNameEn) ?? m.committeeCode}</td>
                             <td>{lang === 'ar' && m.titleAr ? m.titleAr : m.titleEn}</td>
                             <td className="mono">{new Date(m.scheduledAt).toLocaleString()}</td>
                             <td><Badge tone={MTG_STATUS_TONE[m.status]}>{m.status.replace('_',' ')}</Badge></td>

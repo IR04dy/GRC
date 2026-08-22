@@ -259,7 +259,7 @@ public final class CommitteeDtos {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record MeetingResponse(
             Long id, String meetingCode, String externalId,
-            Long committeeId, String committeeCode, String committeeNameEn,
+            Long committeeId, String committeeCode, String committeeNameEn, String committeeNameAr,
             String titleEn, String titleAr,
             LocalDateTime scheduledAt, LocalDateTime startedAt, LocalDateTime endedAt,
             String locationOrLink,
@@ -274,7 +274,7 @@ public final class CommitteeDtos {
         public static MeetingResponse from(CommitteeMeeting m) {
             return new MeetingResponse(
                     m.getId(), m.getMeetingCode(), m.getExternalId(),
-                    m.getCommitteeId(), m.getCommitteeCode(), m.getCommitteeNameEn(),
+                    m.getCommitteeId(), m.getCommitteeCode(), m.getCommitteeNameEn(), m.getCommitteeNameAr(),
                     m.getTitleEn(), m.getTitleAr(),
                     m.getScheduledAt(), m.getStartedAt(), m.getEndedAt(),
                     m.getLocationOrLink(),

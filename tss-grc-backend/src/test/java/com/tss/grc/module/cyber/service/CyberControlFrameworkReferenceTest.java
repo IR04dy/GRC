@@ -449,4 +449,113 @@ class CyberControlFrameworkReferenceTest {
             .as("the select must be keyed on the id, not the label")
             .contains("key: 'frameworkId'");
     }
+
+    // ── (5) F2-277 — the Arabic half of the derived label ────────────────────────────
+
+    @Test
+    @DisplayName("F2-277: both halves of the label are derived from the one resolved framework")
+    void bothHalvesOfTheLabelAreDerived() {
+        CyberFramework ecc = framework(1L, ORG, "NCA ECC");
+        ecc.setNameAr("الضوابط الأساسية للأمن السيبراني");
+        register(ecc);
+
+        CyberControl c = new CyberControl();
+        c.setTitleEn("x");
+        c.setFrameworkId(1L);
+
+        CyberControl saved = service.saveControl(c, ORG);
+        assertThat(saved.getFrameworkName()).isEqualTo("NCA ECC");
+        assertThat(saved.getFrameworkNameAr())
+            .as("cyber_frameworks stores name_ar for 4 of 6 rows, and the derivation read only "
+              + "the English half — so an Arabic-primary register rendered an English framework "
+              + "name on every one of its 154 controls")
+            .isEqualTo("الضوابط الأساسية للأمن السيبراني");
+    }
+
+    @Test
+    @DisplayName("F2-277: a framework with no Arabic name leaves the Arabic half NULL, not the code")
+    void aFrameworkWithNoArabicNameLeavesTheArabicHalfNull() {
+        register(framework(3L, ORG, "PCI DSS"));   // nameAr never set
+
+        CyberControl c = new CyberControl();
+        c.setTitleEn("x");
+        c.setFrameworkId(3L);
+
+        CyberControl saved = service.saveControl(c, ORG);
+        assertThat(saved.getFrameworkName()).isEqualTo("PCI DSS");
+        assertThat(saved.getFrameworkNameAr())
+            .as("an empty Arabic label is an honest 'not recorded'; filling it with the English "
+              + "name or the code would be a fabricated governance record (F2-271)")
+            .isNull();
+    }
+
+    @Test
+    @DisplayName("F2-277: an update that omits the id re-derives BOTH halves together")
+    void anUpdateThatOmitsTheIdReDerivesBothHalves() {
+        CyberFramework ecc = framework(1L, ORG, "NCA ECC");
+        ecc.setNameAr("الضوابط الأساسية");
+        register(ecc);
+
+        // The stored row's Arabic half is STALE — the framework was renamed in Arabic since.
+        CyberControl stored = control(9L, 1L, "NCA ECC");
+        stored.setFrameworkNameAr("اسم قديم");
+        when(controlRepo.findByIdAndOrganisationId(9L, ORG)).thenReturn(Optional.of(stored));
+
+        CyberControl req = new CyberControl();
+        req.setTitleEn("renamed");   // no frameworkId, no label: an ordinary edit
+
+        CyberControl saved = service.updateControl(9L, req);
+        assertThat(saved.getFrameworkId()).as("F2-252 — an omitted id keeps the link").isEqualTo(1L);
+        assertThat(saved.getFrameworkName()).isEqualTo("NCA ECC");
+        assertThat(saved.getFrameworkNameAr())
+            .as("both halves are re-derived from the SAME resolved framework, so an edit can "
+              + "never leave one half fresh and the other stale — which is how two spellings of "
+              + "one name come to describe different rows (F2-245)")
+            .isEqualTo("الضوابط الأساسية");
+    }
+
+    @Test
+    @DisplayName("F2-277: a bare label with no id leaves the Arabic half NULL")
+    void aBareLabelWithNoIdLeavesTheArabicHalfNull() {
+        CyberControl c = new CyberControl();
+        c.setTitleEn("x");
+        c.setFrameworkName("A framework that is not in this register");
+
+        CyberControl saved = service.saveControl(c, ORG);
+        assertThat(saved.getFrameworkId()).isNull();
+        assertThat(saved.getFrameworkName()).isEqualTo("A framework that is not in this register");
+        assertThat(saved.getFrameworkNameAr())
+            .as("there is no parent to derive an Arabic half from, and inventing one from the "
+              + "English string would be a fabricated governance record")
+            .isNull();
+    }
+
+    @Test
+    @DisplayName("F2-277: a contradicting ARABIC label is refused, and an echo is accepted")
+    void aContradictingArabicLabelIsRefusedAndAnEchoIsAccepted() {
+        CyberFramework ecc = framework(1L, ORG, "NCA ECC");
+        ecc.setNameAr("الضوابط الأساسية");
+        register(ecc);
+
+        CyberControl lying = new CyberControl();
+        lying.setTitleEn("x");
+        lying.setFrameworkId(1L);
+        lying.setFrameworkNameAr("اسم آخر تمامًا");
+        assertThatThrownBy(() -> service.saveControl(lying, ORG))
+            .as("frameworkNameAr is declared on the request type, so it must be CONSULTED: a "
+              + "declared field the server silently discards tells the caller their value "
+              + "matters (F2-184), which is what makes an inert field worse than none")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("frameworkNameAr")
+            .hasMessageContaining("does not name framework 1");
+
+        CyberControl echo = new CyberControl();
+        echo.setTitleEn("x");
+        echo.setFrameworkId(1L);
+        echo.setFrameworkNameAr("  الضوابط الأساسية  ");
+        assertThat(service.saveControl(echo, ORG).getFrameworkNameAr())
+            .as("an echo must be accepted so a form that round-trips the whole row keeps working "
+              + "in EITHER language, and the stored value is the framework's own spelling")
+            .isEqualTo("الضوابط الأساسية");
+    }
 }

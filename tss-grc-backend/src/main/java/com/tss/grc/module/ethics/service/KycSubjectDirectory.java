@@ -99,9 +99,26 @@ public class KycSubjectDirectory {
         return (code != null && !code.isBlank()) ? code : null;
     }
 
-    /** {@link #require} then {@link #labelFor} — the shape a register wants when it stores both. */
-    @Transactional(readOnly = true)
-    public String requireLabel(Long subjectId, String what) {
-        return labelFor(require(subjectId, what));
+    /**
+     * The Arabic half of the same label, or {@code null}.
+     *
+     * <p>F2-277 — {@code ethics.kyc_subjects.full_name_ar} is populated on 16 of 16 rows, so the
+     * party an AML alert is ABOUT had an Arabic name throughout and the derivation read only the
+     * English one.
+     *
+     * <p>⚙ No {@code subject_code} fallback, unlike {@link #labelFor}: the code is a Latin
+     * identifier, the English half already carries it when the name is blank, and putting it in an
+     * Arabic column would claim an Arabic name that does not exist.
+     */
+    public String labelArFor(KycSubject s) {
+        if (s == null) return null;
+        String full = s.getFullNameAr();
+        return (full != null && !full.isBlank()) ? full : null;
     }
+
+    // ⚠ F2-277 removed `requireLabel(Long, String)`. It was `require` then `labelFor`, and its one
+    // caller now needs BOTH halves of the label — which a resolve-and-label convenience cannot
+    // give without resolving twice. The call site holds the resolved subject and asks this class
+    // for each half, so the two halves of one label always come from one read. An unused
+    // convenience method should not ship (F2-201).
 }

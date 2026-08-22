@@ -24,8 +24,28 @@ public class CyberControl {
     @Column(name = "framework_id")
     private Long frameworkId;
 
-    @Column(name = "framework_name")
+    /**
+     * The derived English label of {@link #frameworkId}'s framework.
+     *
+     * <p>⚠ F2-277 — this carried NO {@code length} at all, so the bean assumed JPA's 255 default
+     * against a NVARCHAR(100) column. That was harmless until V390 widened
+     * {@code cyber_frameworks.name} to 255 to mirror {@code name_ar}: a framework name of 101..255
+     * characters then became legal in the parent and refused by this copy, which answered 500 on
+     * the create (probed live). V391 widens the column and this declares the width, so the two
+     * agree for the first time. <b>A width invariant scoped to a bilingual pair cannot see a
+     * derived copy in another table, and widening the source is what makes the copy overflow.</b>
+     */
+    @Column(name = "framework_name", length = 255)
     private String frameworkName;
+
+    /**
+     * F2-277 — the Arabic half of the same derived label, from
+     * {@code cyber_frameworks.name_ar} (4 of 6 rows hold it). Nullable, because a framework with
+     * no Arabic name must not be unrecordable: an empty Arabic label is an honest "not recorded"
+     * and a manufactured one is a fabricated governance record (F2-271).
+     */
+    @Column(name = "framework_name_ar", length = 255)
+    private String frameworkNameAr;
 
     private String domain;
 

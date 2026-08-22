@@ -50,6 +50,16 @@ public class Signature {
     @Column(name = "signer_name", length = 200)
     private String signerName;
 
+    /**
+     * F2-277 — the Arabic half of the same snapshot, from {@code iam.users.full_name_ar}.
+     *
+     * <p>Nullable and deliberately WITHOUT the username fallback its English sibling carries: the
+     * username is language-neutral and already keeps the row identifiable, so putting it here
+     * would assert an Arabic name the directory does not have.
+     */
+    @Column(name = "signer_name_ar", length = 200)
+    private String signerNameAr;
+
     @Column(name = "signer_role", length = 100)
     private String signerRole;
 

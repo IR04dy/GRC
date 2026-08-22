@@ -105,7 +105,10 @@ export function SignaturePanel({ entityType, entityId, label }: SignaturePanelPr
             }}>
               <Badge tone={INTENT_LABEL[s.intent]?.tone ?? 'neutral'}>{ar ? INTENT_LABEL[s.intent]?.ar : INTENT_LABEL[s.intent]?.en}</Badge>
               <div style={{ minWidth: 0 }}>
-                <span style={{ fontWeight: 600 }}>{s.signerName ?? `#${s.signerId}`}</span>
+                {/* F2-277 — signerNameAr is null when the user has no Arabic name, which
+                    falls back to the English snapshot rather than to the id. */}
+                <span style={{ fontWeight: 600 }}>{(ar && s.signerNameAr ? s.signerNameAr
+                  : s.signerName) ?? `#${s.signerId}`}</span>
                 {s.signerRole && <span style={{ color: 'var(--ink-3)' }}> · {s.signerRole}</span>}
                 {s.statementEn && <div style={{ color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.statementEn}</div>}
                 <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }} title={s.payloadHash}>#{s.payloadHash.slice(0, 16)}…</div>

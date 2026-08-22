@@ -31,7 +31,11 @@ export interface CommitteeMember { name: string; role: string; votingMember?: bo
 
 export interface CommitteeMeeting {
   id: number; meetingCode: string; externalId?: string;
-  committeeId: number; committeeCode?: string; committeeNameEn?: string;
+  committeeId: number; committeeCode?: string;
+  // F2-277 — both halves of the derived committee label. The server copies them together
+  // from the resolved parent, so a surface picks by language and never renders the English
+  // one to an Arabic reader.
+  committeeNameEn?: string; committeeNameAr?: string;
   titleEn?: string; titleAr?: string;
   scheduledAt: string; startedAt?: string; endedAt?: string;
   locationOrLink?: string;

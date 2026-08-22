@@ -357,8 +357,18 @@ class BilingualWriteSymmetryTest {
      * pair. Its module's {@code package-info.java} still advertises {@code PrivacyAssessment} as a
      * module type, which is F2-184's shape. Filed rather than mapped: {@code privacy.dpia} is the
      * real assessment register, so adding a second is F2-196's disjoint-register defect.
+     * <p>⚠ <b>12 → 15 (F2-277), and this is the decision this leg asks for rather than a number
+     * bump.</b> Three of the four Arabic halves F2-277 added are bare-stem pairs, because the
+     * ENGLISH half they mirror is a derived copy whose column has always been bare —
+     * {@code framework_name}, {@code subject_name}, {@code signer_name}. Renaming those three
+     * columns to {@code *_en} would be a migration over live governance data for a naming
+     * convention, so each pair is spelled the way its register already spells it. The fourth,
+     * {@code committee_name_en}/{@code committee_name_ar}, is an ordinary suffixed pair and lands
+     * in the main population instead. 🔑 <b>The bare-stem branch existing is what makes these
+     * three visible at all</b> — before F2-276 a pair spelled this way sat in neither of
+     * {@code BilingualInvariantRatchetTest}'s buckets and outside both gates.
      */
-    private static final int BARE_STEM_PAIRS = 12;
+    private static final int BARE_STEM_PAIRS = 15;
 
     /**
      * Publish the census rather than restating its numbers in prose (F2-265: a count in prose is a

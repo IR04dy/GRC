@@ -333,7 +333,12 @@ public class AmlAlertService {
         if (id == null && label == null) return;               // neither half stated
 
         if (id != null) {
-            String derived = subjects.requireLabel(id, "an AML alert's subject");
+            // F2-277 — resolve ONCE and derive both halves from that one row. requireLabel()
+            // returned the English name alone, and asking a second method for the Arabic one
+            // would have resolved the subject twice, so the two halves of a single label could
+            // come from two reads.
+            var subject = subjects.require(id, "an AML alert's subject");
+            String derived = subjects.labelFor(subject);
             if (label != null && !label.equalsIgnoreCase(derived))
                 throw new IllegalArgumentException(
                     "subjectName '" + label + "' does not name KYC subject " + id + " ('" + derived
@@ -342,6 +347,7 @@ public class AmlAlertService {
                   + "register.");
             t.setSubjectId(id);
             t.setSubjectName(derived);
+            t.setSubjectNameAr(subjects.labelArFor(subject));
             return;
         }
 
@@ -354,7 +360,10 @@ public class AmlAlertService {
               + ". Send subjectId with the subject you mean, or send subjectName unchanged. A "
               + "label on its own would leave the alert naming one party and linked to another.");
         }
+        // Unlinked: the label is the caller's, so there is no parent to derive an Arabic half
+        // from. Cleared with it rather than left standing beside a name it no longer describes.
         t.setSubjectName(label);
+        t.setSubjectNameAr(null);
     }
 
     /**
