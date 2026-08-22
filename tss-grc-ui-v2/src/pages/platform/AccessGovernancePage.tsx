@@ -178,6 +178,12 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
               <th>{isAr ? 'الاسم (AR)' : 'Display (AR)'}</th>
               <th>{isAr ? 'النوع' : 'Type'}</th>
               <th>{isAr ? 'النطاق' : 'Scope'}</th>
+              {/* F2-280 — the privileged-access classification the server now reports. It is the
+                  EFFECTIVE answer (the stored is_privileged flag OR an APPROVE/DELETE grant),
+                  i.e. exactly the predicate the quarterly NCA ECC 2-2 / SAMA CSF 3.3.5 review and
+                  the break-glass "Privileged holders" KPI share. A badge derived some other way
+                  would disagree with the review it summarises, which is worse than none. */}
+              <th>{isAr ? 'مميّز' : 'Privileged'}</th>
               <th>{isAr ? 'الحالة' : 'Status'}</th>
               <th></th>
             </tr></thead>
@@ -192,6 +198,11 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
                     <Badge tone={r.organisationId == null ? 'info' : 'neutral'} dot>
                       {r.organisationId == null ? (isAr ? 'مشترك' : 'Shared') : (isAr ? 'خاص بالمستأجر' : 'Tenant')}
                     </Badge>
+                  </td>
+                  <td>
+                    {r.privileged
+                      ? <Badge tone="danger" dot>{isAr ? 'مميّز' : 'Privileged'}</Badge>
+                      : <Badge tone="neutral" dot>{isAr ? 'عادي' : 'Standard'}</Badge>}
                   </td>
                   <td><Badge tone={r.active ? 'success' : 'warning'} dot>{r.active ? (isAr ? 'نشط' : 'Active') : (isAr ? 'موقوف' : 'Inactive')}</Badge></td>
                   <td>

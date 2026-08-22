@@ -10,8 +10,69 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Long> {
+
+    /**
+     * F2-280 — the one predicate that decides whether a role is PRIVILEGED, for every reader.
+     *
+     * <p>There were two, in one package, and they disagreed. {@code
+     * BreakGlassEventRepository#countPrivilegedHolders} — which feeds the <i>"Privileged
+     * holders"</i> KPI on the break-glass dashboard — read the stored flag
+     * {@code iam.roles.is_privileged}. {@code AccessReviewItemRepository#generateItems} with
+     * scope {@code PRIVILEGED} — which populates the auto-scheduled quarterly NCA ECC 2-2 /
+     * SAMA CSF 3.3.5 privileged access review — <em>derived</em> it from the grants
+     * ({@code p.action IN ('APPROVE','DELETE')}), and said so in its own javadoc. Measured:
+     * <b>12 roles disagreed in dev and 7 in prod</b>, {@code CISO} among them — held, granting
+     * {@code IAM:BREAK_GLASS}, {@code ADMIN:APPROVE} and {@code AUDIT_LOG:WRITE}, inside the
+     * quarterly review and absent from the KPI.
+     *
+     * <p>🔑 <b>Neither half is a copy of the other, which is why this is a UNION and not a
+     * choice.</b> The stored flag carries a judgement the grants cannot express —
+     * {@code EMERGENCY_RESPONDER} is the break-glass role, grants no APPROVE or DELETE, and is
+     * privileged anyway — and the derived half covers roles a tenant creates, which the flag
+     * never can, because {@code Role} did not map the column and {@code RoleUpsertRequest} has
+     * no such field, so <b>every role created through the Access Governance console is 0 by
+     * database default and only a migration could ever change it</b> (the flagged set is
+     * byte-identical in dev and prod: the fourteen V272 seeded). Collapsing to either half
+     * alone would have discarded real classification — F2-251/F2-257's rule, <i>ask whether
+     * the label is a copy before reaching for the derive-from-the-parent fix</i>.
+     *
+     * <p>A union is also the safe direction for a privileged-access review: over-scoping costs
+     * a reviewer's time, under-scoping is the finding an examiner writes up (F2-196 — an
+     * unrecognised member should be chased, not excused).
+     *
+     * <p>⚠ Two traps, both recorded. It <b>leads with a newline</b>, because Java strips
+     * <em>trailing</em> whitespace in a text block, so a caller writing {@code "… WHERE" +
+     * PRIVILEGED_ROLE} would otherwise produce {@code WHERE(r.is_privileged} — the exact
+     * mechanism that killed the app at context startup in {@code
+     * CommitteeMemberTermRepository.CURRENT_SEAT_WINDOW}. And the inner aliases are
+     * {@code rp_priv}/{@code p_priv} rather than {@code rp}/{@code p}, so splicing it into a
+     * host query that already joins those names cannot collide.
+     *
+     * <p>The host must supply {@code iam.roles} under the alias {@code r}.
+     * {@code PrivilegedRolePredicateSharingTest} fails the build if this clause is written
+     * twice anywhere in main sources.
+     */
+    String PRIVILEGED_ROLE = """
+
+        (r.is_privileged = 1 OR EXISTS (
+              SELECT 1 FROM iam.role_permissions rp_priv
+                JOIN iam.permissions p_priv ON p_priv.id = rp_priv.permission_id
+               WHERE rp_priv.role_id = r.id AND p_priv.action IN ('APPROVE','DELETE')))""";
+
     List<Role> findByOrganisationIdOrOrganisationIdIsNull(Long organisationId);
     List<Role> findByIsSystemRoleTrue();
+
+    /**
+     * The ids of every role visible to this tenant that {@link #PRIVILEGED_ROLE} calls
+     * privileged. One query rather than a per-role check, so the role list does not become
+     * ~70 round trips, and one mechanism rather than two (F2-190).
+     */
+    @Query(value = """
+        SELECT r.id FROM iam.roles r
+         WHERE r.is_deleted = 0
+           AND (r.organisation_id = :org OR r.organisation_id IS NULL)
+           AND""" + PRIVILEGED_ROLE, nativeQuery = true)
+    List<Long> privilegedRoleIds(@Param("org") Long org);
 
     // ── retired-role revive support (RBAC governance P0) ────────────────────
     // Role carries @Where(is_deleted = 0), so JPA can never see a soft-deleted

@@ -69,10 +69,11 @@ public class AccessGovernanceService {
     @Transactional(readOnly = true)
     public List<RoleSummary> listRoles() {
         Long org = org();
+        Set<Long> privileged = privilegedRoleIds();   // once, not once per role
         return roles.findByOrganisationIdOrOrganisationIdIsNull(org).stream()
             .filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
             .sorted(Comparator.comparing(Role::getRoleName))
-            .map(AccessGovernanceService::toSummary)
+            .map(r -> toSummary(r, privileged.contains(r.getId())))
             .toList();
     }
 
@@ -361,10 +362,23 @@ public class AccessGovernanceService {
             .orElseThrow(() -> new EntityNotFoundException("Role not found: " + id));
     }
 
-    private static RoleSummary toSummary(Role r) {
+    /**
+     * F2-280 — the privileged ids this tenant's roles resolve to, from the one shared
+     * predicate. One query per call rather than a per-role check: the same mechanism serves the
+     * list and the single-role returns, so there is no second way to ask the question (F2-190).
+     */
+    private Set<Long> privilegedRoleIds() {
+        return new HashSet<>(roles.privilegedRoleIds(org()));
+    }
+
+    private RoleSummary toSummary(Role r) {
+        return toSummary(r, privilegedRoleIds().contains(r.getId()));
+    }
+
+    private static RoleSummary toSummary(Role r, boolean privileged) {
         return new RoleSummary(r.getId(), r.getRoleName(), r.getDisplayNameEn(), r.getDisplayNameAr(),
             Boolean.TRUE.equals(r.getIsSystemRole()), Boolean.TRUE.equals(r.getIsActive()),
-            r.getOrganisationId());
+            r.getOrganisationId(), privileged);
     }
 
     private static String grantCsv(Set<Permission> perms) {

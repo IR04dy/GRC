@@ -14,9 +14,17 @@ public final class GovernanceDtos {
     private GovernanceDtos() {}
 
     /** Role list/detail payload — deliberately WITHOUT the permissions collection
-     *  (serializing the entity lazy-inits Role.permissions outside the session → 500). */
+     *  (serializing the entity lazy-inits Role.permissions outside the session → 500).
+     *
+     *  <p>{@code privileged} is F2-280's disclosure: the effective answer from
+     *  {@code RoleRepository.PRIVILEGED_ROLE}, i.e. the same predicate the quarterly
+     *  privileged access review and the break-glass KPI now share. It is deliberately the
+     *  <em>union</em> rather than the stored {@code is_privileged} flag, so a role the console
+     *  cannot flag but the review does cover reads as privileged here too — a badge that
+     *  disagreed with the review it summarises would be worse than no badge (F2-197). */
     public record RoleSummary(Long id, String roleName, String displayNameEn, String displayNameAr,
-                              boolean systemRole, boolean active, Long organisationId) {}
+                              boolean systemRole, boolean active, Long organisationId,
+                              boolean privileged) {}
 
     public record RoleUpsertRequest(
         @NotBlank @Size(max = 100) @Pattern(regexp = "[A-Z][A-Z0-9_]*",
