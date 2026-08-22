@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 — a census, deliberately with no fix |
+| **Status** | 🟢 CLOSED 2026-08-22 (`66feef5d`) — a census, deliberately with no fix |
 | **Severity** | P3 — no live defect closed; the value is the measurement and the intersection it names |
 | **Found by** | ranking after [[F2-267]]: [[F2-266]] gave the *code* half of [[F2-202]]'s rule a primitive and a census, and the *deadline* half had neither |
 | **Fix** | `ServerOwnedDeadlineContractTest` — census (decrease-only, no verdicts), the intersection asserted exactly, and the shape pinned both ways |
