@@ -202,8 +202,16 @@ class IncidentPromotionCategoryTest {
             payload, "Report a security event", "الإبلاغ عن حدث أمني");
     }
 
+    /**
+     * F2-281 added eight PDPL-classification components. They are left at the
+     * unclassified shape (false + nulls) deliberately: this test is about the
+     * promotion adapter's category mapping, and a promoted incident has not been
+     * classified by the cyber -> PDPL bridge yet, so false IS the real value
+     * rather than a placeholder standing in for one.
+     */
     private static IncidentResponse response() {
         return new IncidentResponse(7_001L, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null);
+            null, null, null, null, null,
+            false, null, null, null, null, null, null, null);
     }
 }

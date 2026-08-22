@@ -269,4 +269,167 @@ class IncidentServiceTest {
         assertThat(de.payload()).containsKey("notifiedAt");
         verify(audit).log(eq("REGULATOR_NOTIFIED"), eq("Incident"), eq(INC_ID), anyString());
     }
+    // ─── F2-281: the PDPL classification and the bodies it feeds ─────
+
+    /**
+     * Builds a classified incident. It has to go through reflection because the
+     * eight bridge columns are mapped {@code updatable = false} with
+     * {@code @Setter(AccessLevel.NONE)} — only {@code CyberPdplBridgeService}'s
+     * native SQL may write them, so no production API can build this state, and
+     * reaching past the API here is the honest way to fixture it.
+     */
+    private static Incident classified(int subjects, String categories) {
+        Incident i = incident("ANALYSIS");
+        i.setTitle("Phishing Email Campaign Detected");
+        i.setDiscoveryDate(java.time.LocalDate.of(2026, 4, 1));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            i, "affectsPersonalData", (short) 1);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            i, "dataSubjectsAffectedEst", subjects);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            i, "dataCategoriesAffected", categories);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            i, "piiClassifiedAt", java.time.LocalDateTime.of(2026, 5, 7, 11, 29));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            i, "linkedDataBreachCode", "07627381-1268-42EC-8E31-F8ED586093AC");
+        return i;
+    }
+
+    private static String body(java.util.List<Map<String, Object>> tmpls, String code) {
+        return tmpls.stream().filter(t -> code.equals(t.get("code"))).findFirst()
+            .map(t -> (String) t.get("prefilledBody")).orElseThrow();
+    }
+
+    private static Map<String, Object> template(java.util.List<Map<String, Object>> tmpls, String code) {
+        return tmpls.stream().filter(t -> code.equals(t.get("code"))).findFirst().orElseThrow();
+    }
+
+    /**
+     * The finding. Measured live before the fix: incident 1 stores 1,450 data
+     * subjects and EMAIL,NATIONAL_ID,PHONE_NUMBER, and the PDPL Article 20
+     * notification the platform generated for the Saudi Data Office contained
+     * neither — the two facts Article 20 turns on, omitted from the document
+     * while the same row held them.
+     */
+    @Test
+    void dataOfficeBody_carries_the_subject_count_and_the_data_categories() {
+        when(repo.findById(INC_ID)).thenReturn(
+            Optional.of(classified(1450, "EMAIL,NATIONAL_ID,PHONE_NUMBER")));
+
+        String b = body(service.regulatoryTemplates(INC_ID), "DATA_OFFICE");
+
+        assertThat(b).contains("PDPL Article 20");
+        assertThat(b).contains("DATA SUBJECTS AFFECTED (EST.): 1450");
+        assertThat(b).contains("CATEGORIES OF PERSONAL DATA AFFECTED: EMAIL,NATIONAL_ID,PHONE_NUMBER");
+        assertThat(b).contains("LINKED PDPL BREACH RECORD: 07627381-1268-42EC-8E31-F8ED586093AC");
+
+        // Found in the browser after every gate was green: LocalDateTime.toString()
+        // emits `2026-05-07T11:29:52.134` -- a raw ISO stamp with milliseconds, two
+        // lines under `DISCOVERED AT: 2026-04-01`, on a document going to a
+        // regulator (F2-209 recorded the same blemish on the SDAIA console).
+        assertThat(b).contains("PERSONAL DATA AFFECTED: CONFIRMED (classified 2026-05-07)");
+        assertThat(b).doesNotContain("2026-05-07T");
+    }
+
+    /**
+     * The load-bearing leg. On a breach notification "0 data subjects affected"
+     * is a factual claim, so an unassessed count must read as absent — F2-213's
+     * rule that a reset is worse than a null, at the point where the value
+     * leaves the platform.
+     */
+    @Test
+    void dataOfficeBody_renders_an_unassessed_count_as_absent_and_never_as_zero() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+
+        String b = body(service.regulatoryTemplates(INC_ID), "DATA_OFFICE");
+
+        assertThat(b).contains("DATA SUBJECTS AFFECTED (EST.): <not yet assessed>");
+        assertThat(b).contains("CATEGORIES OF PERSONAL DATA AFFECTED: <not yet assessed>");
+        assertThat(b).contains("PERSONAL DATA AFFECTED: NOT YET CLASSIFIED");
+        assertThat(b).doesNotContain("AFFECTED (EST.): 0");
+        assertThat(b).contains("LINKED PDPL BREACH RECORD: <none");
+    }
+
+    /**
+     * The HRSD body printed {@code EMPLOYEES AFFECTED: <count>} and
+     * {@code DATA CATEGORIES AFFECTED: <e.g. salary, ID, contract>} — literal
+     * placeholders asking a human to supply values the row already stored.
+     */
+    @Test
+    void hrsdBody_uses_the_stored_values_instead_of_asking_a_human_for_them() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(classified(380, "EMAIL,SALARY")));
+
+        String b = body(service.regulatoryTemplates(INC_ID), "HRSD");
+
+        assertThat(b).contains("EMPLOYEES AFFECTED: 380");
+        assertThat(b).contains("DATA CATEGORIES AFFECTED: EMAIL,SALARY");
+        assertThat(b).doesNotContain("<count>");
+        assertThat(b).doesNotContain("<e.g. salary, ID, contract>");
+    }
+
+    /** And the placeholder survives where there is genuinely nothing to fill it from. */
+    @Test
+    void hrsdBody_still_discloses_an_unassessed_count() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+
+        String b = body(service.regulatoryTemplates(INC_ID), "HRSD");
+
+        assertThat(b).contains("EMPLOYEES AFFECTED: <not yet assessed>");
+        assertThat(b).doesNotContain("EMPLOYEES AFFECTED: 0");
+    }
+
+    /**
+     * Applicability was prose for a human to judge — right for SAMA and CITC,
+     * which the platform cannot know, and wrong for PDPL Article 20, which is
+     * exactly the question the stored classification answers.
+     */
+    @Test
+    void everyTemplate_carries_the_classification_as_one_incident_level_fact() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(classified(1450, "EMAIL")));
+        assertThat(service.regulatoryTemplates(INC_ID))
+            .allSatisfy(t -> assertThat(t.get("piiClassification")).isEqualTo("CONFIRMED"));
+
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+        assertThat(service.regulatoryTemplates(INC_ID))
+            .allSatisfy(t -> assertThat(t.get("piiClassification")).isEqualTo("NOT_CLASSIFIED"));
+    }
+
+    /**
+     * The withdrawal, asserted rather than assumed. Suppressing the Article 20
+     * notification for an unclassified incident would turn "nobody has assessed
+     * this yet" into a clean bill on a statutory clock, and under-scoping a
+     * statutory obligation is the finding an examiner writes up (F2-196/F2-197).
+     */
+    @Test
+    void anUnclassifiedIncident_is_still_offered_the_Article20_notification() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+
+        java.util.List<Map<String, Object>> tmpls = service.regulatoryTemplates(INC_ID);
+
+        assertThat(tmpls).hasSize(5);
+        Map<String, Object> pdpl = template(tmpls, "DATA_OFFICE");
+        assertThat(pdpl.get("piiClassification")).isEqualTo("NOT_CLASSIFIED");
+        assertThat(pdpl.get("deadlineHours")).isEqualTo(72);
+        assertThat(pdpl).containsKey("overdue");
+    }
+
+    /**
+     * The snapshot carried {@code dataOfficeNotifiedAt} — the Article 20
+     * notification stamp — and not the classification that makes that
+     * notification owed. Two of N, in one payload (F2-215).
+     */
+    @Test
+    void phaseSnapshot_carries_the_fact_that_makes_the_PDPL_clock_owed() {
+        when(repo.findById(INC_ID)).thenReturn(
+            Optional.of(classified(1450, "EMAIL,NATIONAL_ID")));
+        when(repo.save(any(Incident.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> snap = service.advancePhase(INC_ID);
+
+        assertThat(snap).containsKey("dataOfficeNotifiedAt");
+        assertThat(snap).containsEntry("affectsPersonalData", true);
+        assertThat(snap).containsEntry("linkedDataBreachCode",
+            "07627381-1268-42EC-8E31-F8ED586093AC");
+        assertThat(snap.get("piiClassifiedAt")).isNotNull();
+    }
 }

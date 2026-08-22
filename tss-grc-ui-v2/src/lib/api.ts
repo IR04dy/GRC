@@ -3228,6 +3228,27 @@ export interface IncidentDto {
   timelineJson?: string;
   lessonsLearned?: string; lessonsLearnedAr?: string;
   createdAt?: string; updatedAt?: string;
+
+  /**
+   * PDPL classification (F2-281). Real columns on `cyber.incidents`, written by
+   * the cyber -> PDPL bridge (`/api/privacy/cyber-bridge/trigger`) and declared
+   * by nothing until F2-281 -- so an incident classified as affecting personal
+   * data looked identical to one that was not, on every surface.
+   *
+   * Read-only: the bridge owns the writes, and `IncidentRequest` deliberately
+   * declares none of these. A field the request type does not declare can never
+   * arrive (F2-233), which is why there is no matching entry below.
+   */
+  affectsPersonalData?: boolean;
+  /** Estimated affected data subjects. Absent means NOT ASSESSED, never zero. */
+  dataSubjectsAffectedEst?: number;
+  dataCategoriesAffected?: string;
+  personalDataPiiAssessment?: string;
+  linkedDataBreachId?: number;
+  /** The linked breach's external id -- the reference an SDAIA filing cites. */
+  linkedDataBreachCode?: string;
+  piiClassifiedAt?: string;
+  piiClassifiedBy?: number;
 }
 export interface IncidentRequest {
   title: string; titleAr?: string;
@@ -3245,6 +3266,14 @@ export interface IncidentPhaseSnapshot {
   ncaHeyNotifiedAt?: string; dataOfficeNotifiedAt?: string;
   citcNotifiedAt?: string; samaNotifiedAt?: string; hrsdNotifiedAt?: string;
   mitreTactics?: string; mitreTechniques?: string;
+  /**
+   * F2-281 — this snapshot carried `dataOfficeNotifiedAt`, the PDPL Article 20
+   * notification stamp, and not the classification that makes that notification
+   * owed. Two of N, in one payload.
+   */
+  affectsPersonalData?: boolean;
+  piiClassifiedAt?: string;
+  linkedDataBreachCode?: string;
 }
 export interface RegulatoryTemplate {
   code: 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD';
@@ -3253,6 +3282,18 @@ export interface RegulatoryTemplate {
   overdue: boolean; notifiedAt?: string;
   submissionChannel: string; applicabilityHint: string;
   prefilledBody: string;
+  /**
+   * F2-281. Applicability was disclosed as prose for a human to judge --
+   * correct for SAMA ("for SAMA-licensed financial institutions") and CITC,
+   * which the platform cannot know, and wrong for PDPL Article 20, which is
+   * exactly the question `affects_personal_data` answers and which the platform
+   * had stored on the row all along.
+   *
+   * Carried, NOT acted on: every template is still offered and `overdue` is
+   * unchanged, because turning "nobody has assessed this yet" into a clean bill
+   * on a statutory clock is the failure an examiner writes up.
+   */
+  piiClassification: 'CONFIRMED' | 'NOT_CLASSIFIED';
 }
 export type SaudiRegulator = 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD';
 /**

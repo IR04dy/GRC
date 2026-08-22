@@ -438,6 +438,9 @@ public class IncidentService {
             ? i.getDiscoveryDate().atStartOfDay()
             : (i.getCreatedAt() != null ? i.getCreatedAt() : java.time.LocalDateTime.now());
         long hoursSinceDiscovery = java.time.temporal.ChronoUnit.HOURS.between(discovered, java.time.LocalDateTime.now());
+        // F2-281: one incident-level fact, resolved once and carried by every
+        // template, so no template can hold its own idea of the classification.
+        String piiClassification = i.isPiiConfirmed() ? "CONFIRMED" : "NOT_CLASSIFIED";
 
         java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
 
@@ -448,7 +451,8 @@ public class IncidentService {
             24, hoursSinceDiscovery, i.getNcaHeyNotifiedAt(),
             "https://hey.nca.gov.sa  (replace with operational submission URL)",
             "Cybersecurity incident with material impact — NCA mandate for all government and CNI",
-            renderNcaHeyBody(i)
+            renderNcaHeyBody(i),
+            piiClassification
         ));
         out.add(template(
             "DATA_OFFICE",
@@ -457,7 +461,8 @@ public class IncidentService {
             72, hoursSinceDiscovery, i.getDataOfficeNotifiedAt(),
             "Submit via Saudi Data Office portal once available",
             "Personal data breach — PDPL Article 20 mandates 72-hour notification",
-            renderDataOfficeBody(i)
+            renderDataOfficeBody(i),
+            piiClassification
         ));
         out.add(template(
             "CITC",
@@ -466,7 +471,8 @@ public class IncidentService {
             24, hoursSinceDiscovery, i.getCitcNotifiedAt(),
             "Submit via CITC operator portal",
             "For telecom and cloud-provider customers — CITC Cybersecurity Requirements",
-            renderCitcBody(i)
+            renderCitcBody(i),
+            piiClassification
         ));
         out.add(template(
             "SAMA",
@@ -475,7 +481,8 @@ public class IncidentService {
             48, hoursSinceDiscovery, i.getSamaNotifiedAt(),
             "Submit via SAMA Cyber Threat Intelligence Sharing channel",
             "For SAMA-licensed financial institutions",
-            renderSamaBody(i)
+            renderSamaBody(i),
+            piiClassification
         ));
         out.add(template(
             "HRSD",
@@ -484,16 +491,33 @@ public class IncidentService {
             72, hoursSinceDiscovery, i.getHrsdNotifiedAt(),
             "Submit via HRSD employer portal",
             "If the breach affects employee personal or payroll data",
-            renderHrsdBody(i)
+            renderHrsdBody(i),
+            piiClassification
         ));
         return out;
     }
 
+    /**
+     * F2-281 adds {@code piiClassification}.
+     *
+     * <p>Applicability was disclosed as prose for a human to judge — right for
+     * SAMA ("for SAMA-licensed financial institutions") and CITC, which the
+     * platform cannot know, and wrong for PDPL Article 20, which is exactly the
+     * question {@code affects_personal_data} answers and which the platform had
+     * stored on the row all along.
+     *
+     * <p>It is carried and NOT acted on: the template is still offered and
+     * {@code overdue} is unchanged. Suppressing the notification for an
+     * unclassified incident would turn "nobody has assessed this yet" into a
+     * clean bill on a statutory clock, and under-scoping a statutory obligation
+     * is the finding an examiner writes up (F2-196, F2-197).
+     */
     private java.util.Map<String, Object> template(String code, String titleEn, String titleAr,
                                                     int deadlineHours, long hoursSinceDiscovery,
                                                     java.time.LocalDateTime notifiedAt,
                                                     String submissionChannel, String applicabilityHint,
-                                                    String prefilledBody) {
+                                                    String prefilledBody,
+                                                    String piiClassification) {
         java.util.Map<String, Object> m = new java.util.HashMap<>();
         m.put("code", code);
         m.put("titleEn", titleEn);
@@ -506,6 +530,7 @@ public class IncidentService {
         m.put("submissionChannel", submissionChannel);
         m.put("applicabilityHint", applicabilityHint);
         m.put("prefilledBody", prefilledBody);
+        m.put("piiClassification", piiClassification);
         return m;
     }
 
@@ -519,12 +544,43 @@ public class IncidentService {
             + "\nCURRENT NIST PHASE: " + nullSafe(i.getNistPhase())
             + "\nDESCRIPTION:\n" + nullSafe(i.getDescription());
     }
-    private String renderDataOfficeBody(Incident i) {
+    /**
+      * PDPL Article 20 breach notification to the Saudi Data Office.
+      *
+      * <p>F2-281: this body omitted the number of affected data subjects and the
+      * categories of personal data affected -- the two facts Article 20 turns on
+      * -- while {@code cyber.incidents} stored both on the same row. Measured
+      * live: incident 1 holds 1,450 subjects and EMAIL,NATIONAL_ID,PHONE_NUMBER
+      * and neither appeared in the notification the platform generated for it.
+      *
+      * <p>An unassessed count renders as NOT YET ASSESSED and never as 0: on a
+      * breach notification "0 data subjects affected" is a factual claim, and a
+      * reset is worse than a null (F2-213). The three placeholders that remain
+      * are the honest kind -- likely consequences, mitigation actions and the DPO
+      * contact have no column anywhere, so there is nothing to fill them from
+      * (F2-209's third state).
+      */
+     private String renderDataOfficeBody(Incident i) {
         return "BREACH NOTIFICATION — PDPL Article 20"
             + "\nINCIDENT TITLE: " + nullSafe(i.getTitle())
             + "\nDISCOVERED AT: " + nullSafe(i.getDiscoveryDate())
             + "\nNATURE OF BREACH: " + nullSafe(i.getCategory())
             + "\nSEVERITY: " + nullSafe(i.getSeverity())
+            // The classification date renders as a plain DATE. Found in the browser
+            // after every gate was green: `LocalDateTime.toString()` emits
+            // `2026-05-07T14:29:52.134` -- a raw ISO stamp with milliseconds, two
+            // lines under `DISCOVERED AT: 2026-04-05`, on a document going to a
+            // regulator. F2-209 recorded exactly this blemish on the SDAIA console.
+            + "\nPERSONAL DATA AFFECTED: " + (i.isPiiConfirmed()
+                ? "CONFIRMED" + (i.getPiiClassifiedAt() == null ? ""
+                    : " (classified " + i.getPiiClassifiedAt().toLocalDate() + ")")
+                : "NOT YET CLASSIFIED — assess before submitting")
+            + "\nDATA SUBJECTS AFFECTED (EST.): " + notAssessed(i.getDataSubjectsAffectedEst())
+            + "\nCATEGORIES OF PERSONAL DATA AFFECTED: " + notAssessed(i.getDataCategoriesAffected())
+            + "\nPII ASSESSMENT: " + notAssessed(i.getPersonalDataPiiAssessment())
+            + "\nLINKED PDPL BREACH RECORD: " + (i.getLinkedDataBreachCode() == null
+                ? "<none — no breach record has been raised for this incident>"
+                : i.getLinkedDataBreachCode())
             + "\nLIKELY CONSEQUENCES: <to be completed by DPO>"
             + "\nMITIGATION ACTIONS: <to be completed>"
             + "\nDPO CONTACT: <to be completed>"
@@ -553,12 +609,26 @@ public class IncidentService {
         return "HRSD EMPLOYEE-DATA BREACH NOTIFICATION"
             + "\nINCIDENT TITLE: " + nullSafe(i.getTitle())
             + "\nDISCOVERED: " + nullSafe(i.getDiscoveryDate())
-            + "\nDATA CATEGORIES AFFECTED: <e.g. salary, ID, contract>"
-            + "\nEMPLOYEES AFFECTED: <count>"
+            + "\nDATA CATEGORIES AFFECTED: " + notAssessed(i.getDataCategoriesAffected())
+            + "\nEMPLOYEES AFFECTED: " + notAssessed(i.getDataSubjectsAffectedEst())
             + "\nMITIGATION: <actions taken>"
             + "\nDESCRIPTION:\n" + nullSafe(i.getDescription());
     }
     private static String nullSafe(Object o) { return o == null ? "<not provided>" : o.toString(); }
+
+    /**
+     * F2-281. Renders a classification field that has not been assessed yet.
+     *
+     * <p>Deliberately distinct from {@link #nullSafe}: "&lt;not provided&gt;" is
+     * right for a field somebody simply did not fill in, and wrong for a
+     * statutory count, where the reader has to be able to tell "nobody has
+     * assessed this" from "assessed, and the answer is none". Blank counts as
+     * absent, because a blank category list is not a statement either.
+     */
+    private static String notAssessed(Object o) {
+        if (o == null || o.toString().isBlank()) return "<not yet assessed>";
+        return o.toString();
+    }
 
     /** Snapshot of NIST + Saudi-notification fields for the workflow endpoints to return. */
     private java.util.Map<String, Object> phaseSnapshot(Incident i) {
@@ -573,6 +643,12 @@ public class IncidentService {
         m.put("hrsdNotifiedAt",         i.getHrsdNotifiedAt());
         m.put("mitreTactics",           i.getMitreTactics());
         m.put("mitreTechniques",        i.getMitreTechniques());
+        // F2-281: this snapshot carried dataOfficeNotifiedAt -- the PDPL Article 20
+        // notification stamp -- and not the classification that makes that
+        // notification owed. Two of N, in one map (F2-215).
+        m.put("affectsPersonalData",    i.isPiiConfirmed());
+        m.put("piiClassifiedAt",        i.getPiiClassifiedAt());
+        m.put("linkedDataBreachCode",   i.getLinkedDataBreachCode());
         return m;
     }
 
@@ -605,7 +681,11 @@ public class IncidentService {
             i.getAssignee(), i.getDiscoveryDate(), i.getResolutionDate(),
             i.getDescription(), i.getTimelineJson(),
             i.getLessonsLearned(), i.getLessonsLearnedAr(),
-            i.getCreatedAt(), i.getUpdatedAt()
+            i.getCreatedAt(), i.getUpdatedAt(),
+            i.isPiiConfirmed(), i.getDataSubjectsAffectedEst(),
+            i.getDataCategoriesAffected(), i.getPersonalDataPiiAssessment(),
+            i.getLinkedDataBreachId(), i.getLinkedDataBreachCode(),
+            i.getPiiClassifiedAt(), i.getPiiClassifiedBy()
         );
     }
 }
