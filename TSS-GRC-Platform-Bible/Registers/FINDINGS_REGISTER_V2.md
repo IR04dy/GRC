@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Status** | 🟢 CLOSED 2026-08-22 (`1f0c85d8`) |
 | **Severity** | **P2** — a dead control on the PDPL Article 6/29 data-sharing register, and a retired-page gate that was green over a live inbound link |
 | **Found by** | re-deriving [[F2-272]]'s filed `ropaTitleEn` item ([[F2-221]]) — which **refuted the filing** and led to the link that carries the code |
 | **Fix** | `LINK_KEYS` learns the static template literal · `routeReachability` strips comments through a named helper the self-tests exercise · the ROPA chip repointed at `/data-lifecycle?tab=cbt&ropaCode=…` |
