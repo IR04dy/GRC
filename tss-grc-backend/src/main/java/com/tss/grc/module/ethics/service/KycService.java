@@ -128,6 +128,25 @@ public class KycService {
         body.setDispositionNotes(null);
         body.setSarFiled(false);
         body.setSarReference(null);
+        // F2-286 — `screenedAt` used to be `insertable = false`, so a caller could send it, the
+        // response echoed it, and the column took `sysutcdatetime()` at insert time. Nothing
+        // could ever state when a screening actually ran: measured, all 12 live rows are
+        // microsecond instants in three insert batches, and two of them read as decided 370 days
+        // before they were screened. When a screening ran is the screening run's fact to report
+        // (F2-268's third kind), so the column is insertable now and the caller may state it --
+        // and this default is mandatory rather than tidy, because the column is NOT NULL and an
+        // omitted value would otherwise reach the INSERT as null.
+        //
+        // A screening cannot have happened in the future, and refusing that is what makes the
+        // widening safe: it is the one value that could only be a forgery. Nothing sends this
+        // field today, so no working request can start failing (F2-182).
+        if (body.getScreenedAt() == null) {
+            body.setScreenedAt(LocalDateTime.now());
+        } else if (body.getScreenedAt().isAfter(LocalDateTime.now().plusMinutes(5))) {
+            throw new IllegalArgumentException(
+                "screenedAt cannot be in the future — a screening that has not happened yet "
+                + "cannot have produced a match. Omit it to record the screening as happening now.");
+        }
         if (body.getDisposition() == null) body.setDisposition("NEEDS_REVIEW");
         if ("TRUE_MATCH".equals(body.getDisposition())
             && List.of("OFAC_SDN", "UN_CONSOLIDATED", "EU_CONSOLIDATED", "SAMA_LOCAL").contains(body.getListSource())) {

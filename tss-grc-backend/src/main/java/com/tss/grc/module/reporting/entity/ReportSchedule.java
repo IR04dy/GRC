@@ -1,5 +1,6 @@
 package com.tss.grc.module.reporting.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -23,6 +24,13 @@ public class ReportSchedule {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // F2-286 — the column is insertable = false, so the DATABASE refuses a caller's value
+    // and the create hands back the instance Jackson bound: without this the response
+    // echoed a value the row does not carry, and only a re-fetch showed the truth. This
+    // says the mapping refuses it, not that the caller should never state it — where the
+    // caller should, the fix is to make the column insertable (F2-286 did that for
+    // ethics.screening_hits.screened_at, whose value nothing could ever state).
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "external_id", insertable = false, updatable = false)
     private UUID externalId;
 
