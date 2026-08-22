@@ -973,11 +973,12 @@ class FullReplaceUpdateContractTest {
      * question of them would demand roughly sixty reasons for a contract that does not exist.
      */
     private static final Map<String, String> DERIVED_IGNORED_FIELDS = new LinkedHashMap<>() {{
-        put("/api/v1/bcm/bia/{} :: linkedRiskId",
-            "BcmBiaRequest declares it and BcmService#updateBia's seven-field whitelist omits it, "
-            + "so a BIA's linked risk is settable on create (the endpoint binds BiaRecord) and "
-            + "frozen thereafter. Populated on 0 of 10 live rows in dev and prod, so latent — "
-            + "F2-275's shape, filed rather than fixed inside a slice about the instrument.");
+        // /api/v1/bcm/bia/{} :: linkedRiskId was here and is CLOSED by F2-279 —
+        // BcmService#updateBia writes it now, so this map must no longer carry it (the
+        // forward leg enforces that direction). Its entry read "settable on create and
+        // frozen thereafter"; the reason the freeze protected nothing is that the create
+        // already accepted the value unvalidated, and it still does — the reference cannot
+        // be verified from bcm without a new module edge on a decrease-only graph ratchet.
         put("/api/v1/bcm/legacy-plans/{} :: status",
             "BY DESIGN. F2-234 made this route accept an ECHO of the stored status and refuse a "
             + "CHANGE, because bcm.bcm_plans has no CHECK on status and every transition guard is "
