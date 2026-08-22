@@ -2547,6 +2547,128 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-268 · F2-202's rule has two halves, and the deadline half had never been counted
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 — a census, deliberately with no fix |
+| **Severity** | P3 — no live defect closed; the value is the measurement and the intersection it names |
+| **Found by** | ranking after [[F2-267]]: [[F2-266]] gave the *code* half of [[F2-202]]'s rule a primitive and a census, and the *deadline* half had neither |
+| **Fix** | `ServerOwnedDeadlineContractTest` — census (decrease-only, no verdicts), the intersection asserted exactly, and the shape pinned both ways |
+| **Verified** | 3/3 mutations killed · the pin caught a real gap in my own detector before it shipped |
+
+### The rule, and the half nobody counted
+
+[[F2-202]]: **only the server may issue a tracking code or a statutory deadline.** [[F2-266]] and
+[[F2-267]] gave the *code* half a primitive (`ReferenceCodeMint`) and a census (93 → 92). The
+*deadline* half had been applied one instance at a time — [[F2-202]] itself (the PDPL Article 4
+30-day DSR clock, minted in the browser), [[F2-172]] (the intake SLA), [[F2-196]] (the DSR sweep
+excluding `EXTENDED`), [[F2-250]] (`aml_alerts.sla_due_at`, filed and unresolved) — **and never
+counted.** Four findings, no population, which is [[F2-208]]'s shape.
+
+Measured by the gate: **22 create-path sites take a deadline from the request; 11 compute it
+server-side.** Published to `target/caller-supplied-deadlines.txt`.
+
+### Why this is a census and not a ban
+
+Three kinds live in the population and only one is [[F2-202]]'s defect, so the gate records **no
+verdicts** ([[F2-188]]):
+
+1. **Policy- or statute-derived** — the platform, not the caller, knows the interval.
+   `DataSubjectRightsService#createDsr` does `receivedAt.plusDays(30)` (PDPL Art. 4);
+   `PrivacyAssuranceService#createBreach` does `detectedAt().plusHours(72)` (PDPL Art. 20);
+   `IntakeService` does `now.plusHours(routing.slaHours())`. **The only defect bucket.**
+2. **A plan the operator sets** — `ObligationService#create`'s `firstDueDate`,
+   `ChangeManagementService#addCondition`'s `dueAt`. There is no interval to derive: the first
+   occurrence of a recurring obligation is a date somebody chooses, and refusing it would fail on
+   correct code ([[F2-214]]).
+3. **An outside party's date** — `ObService#createTpp`'s `certExpiresAt` is on the TPP's
+   certificate. [[F2-209]]'s rule for references applies unchanged: a date only an outside authority
+   can set is *received and recorded, or absent*, and the server may not compute it either.
+
+### The intersection is the work list
+
+Six properties the platform **already knows how to compute** and takes from a caller somewhere else
+— asserted exactly rather than as a ceiling, because a decrease-only count cannot express *the
+population was undercounted* ([[F2-204]]):
+
+`dueDate` · `nextReviewDue` · `nextReviewDueDate` · `nextTestDue` · `slaDeadline` · `targetDate`
+
+Two are worth naming:
+
+🔑 **`OutsourcingArrangementService` computes `nextReviewDueDate` as `today.plusMonths(12)` in
+`recordReview` and takes it from the request in `create` *and* `update` — one class.** [[F2-215]]'s
+two-of-N at its most literal, on a SAMA outsourcing review cadence that is really consumed:
+`OutsourcingArrangementRepository` queries `nextReviewDueDate <= :asOf`, and both databases hold 14
+arrangements, all dated, **2 already past due**. The sibling `SubprocessorService` names its cadence
+(`REVIEW_CADENCE_MONTHS`); this one hard-codes `12`, so nothing else can see it. ⚠ There is also no
+`last_review_date` column, so `recordReview` records the next due date without recording when the
+review happened.
+
+🔑 **`SupplierResilienceTestService#create :: setNextTestDue` is caller-only while `DrPlanService`
+and `ExitPlanService` both default to `LocalDate.now().plusMonths(6)` — and that is the class
+[[F2-267]] edited one slice earlier to fix `testCode`.** *A class you have already edited reads as
+one you have already checked* ([[F2-185]]b), and the edit was mine.
+
+⚠ **Filed rather than fixed, and the reason is a judgement this gate must not pre-empt.** On a
+`create` there is no prior review or test for a cadence to anchor to, so the first date is arguably
+kind 2 — but `update` then lets it be pushed out indefinitely, which can empty the reviews-due list.
+Whether an operator may exceed a cadence is a product decision about a customer's SAMA obligations,
+and inventing an answer to make the register look enforced is [[F2-196]]'s defect.
+
+### It resolves F2-250's recorded uncertainty
+
+[[F2-250]] filed `ethics.aml_alerts.sla_due_at` as *"no server computation anywhere: this line is
+its only writer, so the deadline is the caller's **by design rather than by oversight**"* — a
+recorded uncertainty. Measured: **no AML SLA is declared anywhere** in the backend or the frontend;
+the only statement of one is a comment in a **seed DDL** (`-- usually +30 days from detection`); and
+**nothing reads the column** — no sweep, no query, no export, no rendered surface, where `socops`
+has `SECURITY_EVENT_SLA_BREACHED` and a scheduled sweep over the same column name. So it is **inert
+rather than by design**, and building the SLA is a product decision, not a fix. [[F2-178]]'s rule:
+re-measure a recorded blocker before believing its estimate.
+
+### My own detector was too narrow, and the pin caught it before it shipped
+
+⚠⚠ The first pattern required a **capitalised** suffix, so bare `targetDate`, `validUntil` and
+`nextTestDue` never matched. Measured in the tree: `setTargetDate` exists in **7** files,
+`setExpiryDate` in **8**, `setExpiresAt` in **6**, `setValidUntil` in **3**, `setNextTestDue` in
+**3**. The throwaway Python locator used the same regex and reported **16** where the corrected gate
+measures **22** — 🔑 **an under-count reads exactly like a smaller population**, and the only reason
+it did not ship as the census is that the must-match pin failed on `targetDate` on its first run.
+The widening then exposed real false positives in the tree (`dueOffsetBusinessDays`,
+`evidenceExpiryWarningDays`, `avgTargetScore`, `expiredEvidence`, `expiringContracts`,
+`hasNetZeroTarget`) and each is pinned as a must-NOT-match, because a **count** of days is not a
+deadline.
+
+⚠ **The classification order is load-bearing.** `FROM_SERVER` is tested before `FROM_REQUEST`,
+because the house fallback shape — `req.x() != null ? req.x() : LocalDate.now().plusMonths(6)` —
+reads the request *and* computes, and for this census the interesting fact is that the platform
+**can** compute the interval. Breaking `FROM_SERVER` moves those sites into the caller bucket and
+the count goes **22 → 27**, which is how the census leg catches a broken classifier rather than
+leaving that entirely to the pin.
+
+### Verification
+
+3 mutations, 3 killed. ⚠ **M3 survived its first run and the mutation was at fault, not the gate**:
+I replaced **1 of 3 alternatives** in `FROM_SERVER`, and every server-computed site also matches
+`plusDays`/`plusMonths`, so the mutated code was not wrong ([[F2-206]] — and the recorded rule to
+check the site count before believing a surviving mutation). Against the whole pattern it is killed
+by **two** legs.
+
+🔑 **The property that matters here is that a decrease-only ceiling cannot see a detector that
+stopped matching** ([[F2-69]]) — so M1, which narrows the pattern, is caught by the pin and the
+intersection rather than by the count. That is the whole argument for shipping three legs instead of
+one.
+
+⚙ **Filed:** the six intersection properties as a work list with no verdicts — read the two named
+above first. `ethics.aml_alerts.sla_due_at` is inert and its SLA is a product decision.
+`OutsourcingArrangementService` hard-codes its cadence where the sibling names one, and the register
+has no `last_review_date`. And `ApprovalRequestService#create :: setSlaDeadline` lets the requester
+choose the deadline of their own approval request, on the register [[F2-226]] found accepting a
+forged `requested_by` — an internal SLA rather than a statutory one, so it is kind 1 or kind 2
+depending on whether the platform declares an approval SLA anywhere, which this slice did not
+measure.
+
 ## F2-267 · Nine of the ten "sharpest unread" members I filed one slice earlier already had a UNIQUE index
 
 | | |

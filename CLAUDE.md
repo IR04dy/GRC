@@ -1872,6 +1872,70 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **F2-202'S RULE HAS TWO HALVES AND ONLY ONE WAS EVER COUNTED** (F2-268, measured
+  2026-08-22). *Only the server may issue a tracking code **or a statutory deadline***. F2-266 and
+  F2-267 gave the **code** half a primitive (`ReferenceCodeMint`) and a census; the **deadline**
+  half had been applied one instance at a time — F2-202 itself (the PDPL Art. 4 30-day DSR
+  clock, minted in the browser), F2-172 (the intake SLA), F2-196 (the sweep that excluded
+  `EXTENDED`), F2-250 (`aml_alerts.sla_due_at`, filed) — **and never counted**. Measured by
+  the gate: **22 create-path sites take a deadline from the request, 11 compute it server-side**
+  (`target/caller-supplied-deadlines.txt`).
+  ⚠ **A caller-supplied deadline is NOT automatically wrong — three kinds, one defect.**
+  **(1) Policy- or statute-derived**, where the platform knows the interval and the server must own
+  it (`receivedAt.plusDays(30)` for PDPL Art. 4, `detectedAt().plusHours(72)` for Art. 20,
+  `now.plusHours(routing.slaHours())` for intake) — the only defect bucket. **(2) A plan the
+  operator sets**, where there is no interval to derive (`ObligationService#create`'s
+  `firstDueDate`) — refusing it would fail on correct code (F2-214). **(3) An outside party's
+  date** (`ObService#createTpp`'s `certExpiresAt`) — F2-209's rule unchanged: received and
+  recorded, or absent, and the server may not compute it either. **Classify before you touch one.**
+  🔑 **THE INTERSECTION IS THE WORK LIST**: six properties the platform already computes
+  somewhere and takes from a caller elsewhere — `dueDate`, `nextReviewDue`,
+  `nextReviewDueDate`, `nextTestDue`, `slaDeadline`, `targetDate`. Asserted **exactly**, not as a
+  ceiling, because a decrease-only count cannot express *the population was undercounted* (F2-204).
+  ⚠⚠ **The sharpest member is inside ONE class, and the second is in a class I had just
+  edited.** `OutsourcingArrangementService` computes `nextReviewDueDate` as `today.plusMonths(12)`
+  in `recordReview` and takes it from the request in `create` **and** `update` — F2-215's
+  two-of-N, on a SAMA cadence the repository really consumes (`nextReviewDueDate <= :asOf`; 14
+  arrangements in both databases, **2 already past due**), with the cadence a **literal** where the
+  sibling `SubprocessorService` names one (`REVIEW_CADENCE_MONTHS`) and **no `last_review_date`
+  column at all**. And `SupplierResilienceTestService#create :: setNextTestDue` is caller-only while
+  `DrPlanService` and `ExitPlanService` both default to `plusMonths(6)` — **the class F2-267
+  edited one slice earlier to fix `testCode`.** *A class you have already edited reads as one you
+  have already checked* (F2-185b), and the edit was mine.
+  ⚙ **Filed rather than fixed, deliberately.** On a create there is no prior review or test for
+  a cadence to anchor to, so the first date is arguably kind 2 — but `update` then lets it be
+  pushed out indefinitely, which can empty the reviews-due list. **Whether an operator may exceed a
+  cadence is a product decision about a customer's SAMA obligations**, and inventing an answer to
+  make the register look enforced is F2-196's defect.
+  ⚙ **It resolves F2-250's recorded uncertainty**: `ethics.aml_alerts.sla_due_at` was filed as
+  *"the caller's by design rather than by oversight"*. Measured — **no AML SLA is declared
+  anywhere** in the backend or frontend, the only statement of one is a comment in a **seed DDL**
+  (`-- usually +30 days from detection`), and **nothing reads the column**: no sweep, no query, no
+  export, no rendered surface, where `socops` has `SECURITY_EVENT_SLA_BREACHED` and a scheduled
+  sweep over the same column name. **Inert rather than by design**, and building the SLA is a
+  product decision. F2-178's rule: re-measure a recorded blocker before believing its estimate.
+  ⚠⚠ **MY OWN DETECTOR WAS TOO NARROW AND THE MUST-MATCH PIN CAUGHT IT BEFORE IT SHIPPED
+  AS THE CENSUS.** The first pattern required a **capitalised** suffix, so bare `targetDate`,
+  `validUntil` and `nextTestDue` never matched — and `setTargetDate` exists in **7** files,
+  `setExpiryDate` in **8**, `setExpiresAt` in **6**, `setValidUntil` in **3**, `setNextTestDue` in
+  **3**. The throwaway Python locator used the same regex and reported **16** where the corrected
+  gate measures **22**. 🔑 **An under-count reads exactly like a smaller population**, and
+  the only thing that stopped it was a pin that fails on a name the pattern must match. The widening
+  then exposed real false positives (`dueOffsetBusinessDays`, `evidenceExpiryWarningDays`,
+  `avgTargetScore`, `expiredEvidence`, `expiringContracts`, `hasNetZeroTarget`), each now a
+  must-NOT-match: **a COUNT of days is not a deadline.**
+  ⚠ **The classification ORDER is load-bearing.** Test the server-computation pattern BEFORE
+  the request-read one, because the house fallback shape
+  (`req.x() != null ? req.x() : LocalDate.now().plusMonths(6)`) does both — and for this census
+  the interesting fact is that the platform **can** compute the interval. Breaking the server
+  pattern moves those sites into the caller bucket and the count goes **22 → 27**, which is how
+  the census leg catches a broken classifier rather than leaving that to the pin alone.
+  ⚠ **A decrease-only ceiling cannot see a detector that stopped matching** (F2-69), so the
+  mutation that NARROWS the pattern is caught by the pin and the exact intersection, never by the
+  count. That is the argument for three legs rather than one. ⚠ And M3 survived its first run
+  because I replaced **1 of 3 alternatives** in the server pattern — every server-computed site
+  also matches `plusDays`/`plusMonths`, so the mutated code was not wrong (F2-206, and the recorded
+  rule to check the site count before believing a surviving mutation).
 - ⚠⚠ **ASK THE UNIQUE-INDEX QUESTION FIRST: IT IS THE DIFFERENCE BETWEEN *A DUPLICATE IS
   STORABLE* AND *A CALLER PICKED THE STRING*** (F2-267, measured 2026-08-22). Executing F2-266's
   own filed list of *"sharpest unread"* caller-named references, **nine of ten already carried a
