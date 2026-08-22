@@ -33,7 +33,25 @@ public class ScreeningHit {
     @Column(name = "match_summary", columnDefinition = "NVARCHAR(MAX)")
     private String matchSummary;
 
-    @Column(name = "screened_at", nullable = false, insertable = false, updatable = false)
+    /**
+     * When the screening run that produced this match was performed.
+     *
+     * <p>F2-286 — this was {@code insertable = false}, which meant no API caller and no
+     * Hibernate write could ever state it: the column could only ever hold {@code
+     * sysutcdatetime()} at the moment the row was inserted. Measured on the live register, all
+     * 12 rows are microsecond-precision instants clustered into three seed-insert batches on one
+     * day, while {@code decided_at} beside them holds round business times — so two hits were
+     * recorded as decided 370 days <em>before</em> they were screened. The precision is the tell:
+     * a column whose every value is a microsecond instant in insert-shaped clusters was filled by
+     * a default, not by anybody stating a fact.
+     *
+     * <p>It stays {@code updatable = false} because when a screening ran is a fact about a past
+     * event, not a field to edit — {@code disposition()} records what was decided about the match
+     * and leaves this alone. {@code recordHit} supplies the clock when the caller does not, which
+     * is not optional: with the column NOT NULL, an omitted value would now reach the INSERT as
+     * null.
+     */
+    @Column(name = "screened_at", nullable = false, updatable = false)
     private LocalDateTime screenedAt;
 
     @Column(name = "disposition", nullable = false, length = 30)

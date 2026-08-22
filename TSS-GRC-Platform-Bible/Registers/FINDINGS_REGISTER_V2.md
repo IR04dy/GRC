@@ -14766,3 +14766,127 @@ erase the fields it is trying to set.
   predicate rather than three inline comparisons.
 - The **English-only notification bodies** and the breach `status` vocabulary having no CHECK remain
   as [[F2-209]]/[[F2-281]] filed them; nothing here touched either.
+
+---
+
+## F2-286 · A column the mapping refuses must not be accepted at the wire — and `insertable = false` on a column nobody else can fill means the fact can never be recorded at all
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`f8baca8b`) |
+| **Severity** | **P3** — `ethics.screening_hits.screened_at` was `insertable = false`, so no API caller and no Hibernate write could ever state **when a sanctions screening ran**: the column could only hold the instant its row was inserted. Meanwhile the create accepted a `screenedAt`, discarded it, and echoed it back. Measured live: all 12 rows in both databases are microsecond-precision instants in three seed-insert batches on one day, while `decided_at` beside them holds round business times — so **2 of 12 hits read as decided 370 days before they were screened** |
+| **Found by** | asking [[F2-285]]'s question one level up — *how many other entity-bound creates echo a field the database refuses?* |
+| **Fix** | `screened_at` becomes **insertable** (still `updatable = false`) and `KycService#recordHit` supplies the clock when the caller does not, and refuses a future screening · the remaining **13** refused columns are closed at the wire with `@JsonProperty(access = READ_ONLY)` — 8 newly, and [[F2-285]]'s own five strengthened · new `RefusedColumnWireContractTest` (hard zero, derived population, no exemption map) and `KycScreeningTimeTest` |
+| **Verified** | live probe **6/6 pre-fix, 13/13 post-fix** as `auditor` / `compliance` against planted `[REVIEW-TEST]` rows, the **columns** checked and not just the response · pre-fix control **5 of 11** legs fire, `javap` verified in both directions · backend **4510/0/0** |
+
+### F2-215's two-of-N, on the slice that had just shipped
+
+[[F2-285]] fixed five columns on `privacy.data_breaches` that the database refused and the
+create response echoed. Measured the next morning, those were five members of a
+**fourteen**-member shape: `insertable = false` fields, outside `ServerOwnedFieldsModule`'s
+nine, on an entity a `@PostMapping @RequestBody` binds.
+
+🔑🔑 **The discriminator is not "does the endpoint bind the entity" — it is "does the handler
+return the instance Jackson bound".** `AmlAlertService#create` does
+`AmlAlert a = new AmlAlert(); applyEditable(a, req); return repo.save(a)`, so the caller's
+instance is never saved and never returned. **Eight of the nine survivors are immune for
+exactly that reason** — the shape [[F2-213]] drove this platform toward, paying a second
+dividend. The one that was not immune was `KycService#recordHit`: `return hitRepo.save(body)`.
+
+### The sharper half: a column nobody could fill
+
+`insertable = false` does not merely refuse *the caller* — it refuses **Hibernate**, so the
+column can only ever take its database default. For `screened_at` that default is
+`sysutcdatetime()`, i.e. *the moment the row was inserted*, which is not when the screening
+ran.
+
+🔑 **The precision is the tell.** A column whose every value is a microsecond instant
+clustered into insert-shaped batches was filled by a default; one holding round business
+times was stated by somebody:
+
+```
+ethics.screening_hits.screened_at     2026-05-03 12:04:17.880489  x2
+                                      2026-05-03 13:42:37.160240  x8
+                                      2026-05-03 13:43:21.435985  x2
+   id=1  screened=2026-05-03 12:04:17.880489   decided=2025-04-29 04:00:00
+   id=2  screened=2026-05-03 12:04:17.880489   decided=2025-04-29 04:30:00
+```
+
+⚠ And the one route that could have corrected it is the one that appeared to work: `recordHit`
+accepted `screenedAt`, the column discarded it, and the response echoed it — so a caller who
+supplied the real screening time was told it had been recorded.
+
+### The rule, and what it deliberately does not assert
+
+**If the mapping refuses the value, the wire must not accept it. If the caller should be able
+to state it, make the column insertable.** That reading settles both halves without presuming
+who owns a fact — and the same measurement has *opposite* correct answers depending on the
+owner: F2-285's five are read-only because **the bridge** owns them, and `screened_at` is
+insertable because **the screening run** does ([[F2-268]]'s third kind — an outside party's
+date is received and recorded, or absent).
+
+⚠ The default is not tidiness. The column is NOT NULL, so once insertable an omitted value
+would reach the INSERT as **null** — `recordHit` supplying the clock is what stops the widening
+breaking the create outright. And a screening cannot have happened in the future: refusing that
+is what makes the widening safe, because it is the one value that could only ever be forged.
+Nothing sends the field today, so no working request can start failing ([[F2-182]]).
+
+### `@Setter(AccessLevel.NONE)` does not stop Jackson writing a field
+
+⚠⚠ The gate's first run reported [[F2-285]]'s own five as **open at the wire**, and it was
+right. `MapperFeature.INFER_PROPERTY_MUTATORS` is on by default, so a visible getter pulls in
+the private field even with no setter. F2-285's `@PrePersist` fixes the **echo** — the response
+is honest — and the value still *arrives*. 🔑 **A reader who sees "no setter" reads "not
+bindable".** All thirteen now carry one mechanism.
+
+### Instrument errors, four of mine
+
+- ⚠⚠ **A detector keyed on annotation POSITION cannot see a claim.** The census read the
+  annotation block *between* `@Column` and the field, and the fix puts `@JsonProperty` one line
+  *above* `@Column` — so it reported eight already-closed fields as open. Annotation order is
+  meaningless to Java. The gate asks **Jackson** instead, which is immune to position, to which
+  annotation was used, and to a mixin.
+- ⚠⚠ **A patch script that re-reads each file from disk per target and writes once at the end
+  keeps only the LAST edit per file — and reports every one as done**, because it verifies
+  against a buffer it then discards. `AmlAlert` has two targets; one was silently dropped. Only
+  re-measuring from disk caught it. A script may not certify its own write.
+- ⚠ **A route regex anchored on `@PostMapping` looking *forward* returned 0 on a tree holding
+  47**, because the house style puts a multi-line `@Operation`/`@PreAuthorize` block in between.
+  Anchor on `@RequestBody` and walk **back** to the enclosing signature. A smaller population
+  reads exactly like a clean tree.
+- ⚠ **A first pass paired the `Optional` external-id finder from one twin with the table from
+  the other.** `AuditEngagement` and `AuditEngagementRepository` each exist in two packages
+  ([[F2-222]]'s 15 duplicate simple names), so a "live" hit was a mis-pairing — [[F2-278]]'s
+  landmine, caught before it shipped. Resolved: **9 of 10 registers with such a finder carry a
+  unique index, and the tenth's finder belongs to the other twin**, so that whole hypothesis is
+  refuted at 10 of 10.
+
+### Which legs discriminate
+
+5 of 11 fire on the pre-fix tree. 🔑 **The three unit legs about a *stated* value cannot
+discriminate, and the reason is worth stating: a mocked repository has no schema, so no unit
+test can see an `insertable = false` column** — `hitRepo.save(body)` returns the body with the
+caller's value intact whatever the mapping says. Only the live probe could see this, which is
+house rule 4 earning its place again. F2-285's gate stayed green throughout, which is what
+proves the control reverted exactly what it meant to.
+
+### Filed
+
+- **`ethics.aml_alerts.first_detected_at` is still `insertable = false`**, so the API can never
+  state when suspicious activity was first detected — the start of the FIU reporting clock. Not
+  the same defect: the column holds **8 distinct real business dates** across 10 rows, because
+  the seed wrote them by direct SQL, bypassing Hibernate. Enabling it means widening
+  `applyEditable`, which is a product call about whether an alert's detection time is the
+  caller's to state.
+- **The 12 seeded `screened_at` insert-instants, and the 2 hits decided before they were
+  screened.** Identical in dev and prod. Rewriting live AML rows in two databases is an **owner
+  decision** ([[F2-183]]/[[F2-196]]), and there is no source for the real screening times.
+- **`LocalDateTime` columns are stored in UTC and rendered in the JVM's local zone** (UTC+3
+  here), so a stated `09:15` reads `06:15` in the column. Round-trips are lossless and the two
+  are never comparable directly — [[F2-178]]'s mirror, and it cost one probe iteration.
+- **`GuardExpressions.stripComments` removes comment LINES rather than blanking them** (76 → 59
+  on one file measured here), so any offset taken from its output does not refer to the file.
+  Every assertion in the new gate is a `contains`, which is why that is safe.
+- `ethics.screening_hits` has **no CHECK constraint** on `list_source` or `disposition`, and
+  `ethics.kyc_subjects.full_name` has an `*_ar` sibling the create does not require (house rule
+  7).
