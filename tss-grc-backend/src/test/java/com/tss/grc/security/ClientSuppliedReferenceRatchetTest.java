@@ -136,7 +136,7 @@ class ClientSuppliedReferenceRatchetTest {
      * Decrease-only. Measured on this tree by the leg below; a fix lowers it, and a new
      * caller-named reference has to be a deliberate raise with a reason.
      */
-    private static final int BASELINE_CALLER_NAMED_REFERENCES = 93;
+    private static final int BASELINE_CALLER_NAMED_REFERENCES = 92;   // F2-267 closed scm.supplier_resilience_tests.test_code
 
     /** A method header, used only to attribute a call site to its enclosing method. */
     private static final Pattern METHOD_HEADER = Pattern.compile(
