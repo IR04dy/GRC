@@ -14085,3 +14085,215 @@ path says nothing about the path beside it. `createRole`/`updateRole` now have t
 * `SubprocessorController`'s javadoc cites `is_privileged` as evidence that `PRIVACY_MANAGER` is
   a real privacy job family. It is true today and it is a **third artefact reasoning about the
   flag**, in prose, in another module — outside any scan of readers ([[F2-193]]).
+
+---
+
+## F2-281 · The PDPL Article 20 notification omitted the two facts Article 20 turns on, and the same row stored both
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`9d3d50d3`) |
+| **Severity** | **P2** — `GET /api/v1/incidents/{id}/regulatory-templates` renders the PDPL Article 20 personal-data-breach notification an operator files with the **Saudi Data Office**, and that body carried neither the number of affected data subjects nor the categories of personal data affected. Probed live: incident 1 stores **1,450** data subjects and `EMAIL,NATIONAL_ID,PHONE_NUMBER` and the generated notification contained neither. The **HRSD** body went further and printed `EMPLOYEES AFFECTED: <count>` and `DATA CATEGORIES AFFECTED: <e.g. salary, ID, contract>` — literal placeholders asking a human to re-source values the row already held |
+| **Found by** | executing [[F2-280]]'s top filing and reading the emitting service rather than the columns: *what does an emitted document assert, and what does it ask a human to supply that the platform already knows?* |
+| **Fix** | `Incident` maps the eight cyber → PDPL bridge columns **read-only** (`insertable = false, updatable = false` + `@Setter(AccessLevel.NONE)`) · one predicate `Incident#isPiiConfirmed()` · `renderDataOfficeBody` and `renderHrsdBody` carry the stored values, with `notAssessed(...)` so an unassessed count renders as absent and never as `0` · every template carries `piiClassification` · `phaseSnapshot` carries the classification beside the notification stamp · `IncidentResponse` + `IncidentDto` declare it, `IncidentRequest` deliberately does not · new `PdplClassificationWireContractTest` |
+| **Verified** | read-only probe **16/16 pre-fix**, **22/22 post-fix** as `so_officer` (the last three plant their own victim and prove the column, not just the response, is untouched) · pre-fix control reverts four production sources + one fixture, recompiles, and **14 discriminating legs fire**, `javap` checked both ways, 32/32 after restore · harness **13 killed / 0 survived / 0 anchor-miss** · backend **4464/0/0** · frontend `tsc` clean, 76 files / 818 tests · browser confirms incident 1 renders `DATA SUBJECTS AFFECTED (EST.): 1450` with a `badge-danger` badge, and an unclassified incident a **neutral** one |
+
+### The route in, and why it is a different question from F2-280's
+
+[[F2-280]] closed one member of its 26-entity subset-mapping census and filed the rest. Its
+sharpest unread entry was *"`cyber.incidents`' eight unmapped PDPL columns and the mirror five on
+`privacy.data_breaches` — both ends of the cyber → PDPL bridge, written by
+`CyberPdplBridgeService`'s deliberate native SQL and readable by nothing else."*
+
+Re-derived first ([[F2-221]]), the filing's list is exactly right and its **category** was
+understated. Measured against `sys.columns` in both databases:
+
+| | dev | prod |
+|---|---|---|
+| `cyber.incidents` columns / mapped by `Incident` | 39 / 30 | 39 / 30 |
+| rows | 44 | 48 |
+| classified as affecting personal data | 2 | 2 |
+| `privacy.data_breaches` columns | 27 | 25 (V387 pending) |
+
+`affects_personal_data` is **`smallint NOT NULL DEFAULT 0`**, so it is F2-280's **kind 1** — the
+category where the database default decides the value — not the kind-2 *"populated and unmapped,
+invisible rather than wrong"* the filing implied. Here the default happens to be **correct** (a new
+incident affects no personal data until somebody classifies it), which is why the mapping is
+`insertable = false`: leaving the column out of Hibernate's INSERT is what lets the default apply.
+
+🔑 **The cost was not that the classification was invisible. The cost was in a document that
+leaves the platform.**
+
+### The emitted notification
+
+`IncidentService#regulatoryTemplates` builds five Saudi regulator notifications, each with its own
+deadline, submission channel and a `prefilledBody` the operator copies out. `IncidentsPage` renders
+all five with a per-template *"mark notified"* button, so this is a routed, reachable, rendered
+surface — not dark code.
+
+Before the fix, `renderDataOfficeBody` was:
+
+```
+BREACH NOTIFICATION — PDPL Article 20
+INCIDENT TITLE / DISCOVERED AT / NATURE OF BREACH / SEVERITY
+LIKELY CONSEQUENCES: <to be completed by DPO>
+MITIGATION ACTIONS: <to be completed>
+DPO CONTACT: <to be completed>
+DESCRIPTION: …
+```
+
+Nothing about how many people were affected, and nothing about what kind of personal data — while
+`data_subjects_affected_est` and `data_categories_affected` sat on the row being rendered.
+
+🔑 **This is a new rung under [[F2-199]]'s harm ladder rather than a repeat of it.** F2-199 and
+[[F2-209]] were about a document asserting things the platform had *invented*. This one asserts
+nothing false; it **omits what the platform knows** and asks a human to supply it by hand — and a
+hand-typed count can disagree with the record it was supposed to come from, on the notification
+that starts a 72-hour statutory clock.
+
+The HRSD body is the same defect one degree sharper, because it names the gap out loud:
+
+```
+DATA CATEGORIES AFFECTED: <e.g. salary, ID, contract>
+EMPLOYEES AFFECTED: <count>
+```
+
+Three placeholders were **kept**, and the difference is the point ([[F2-209]]'s third state):
+likely consequences, mitigation actions and the DPO contact have **no column anywhere**, so there
+is nothing to fill them from. A placeholder over a column that exists is a defect; a placeholder
+over a column that does not exist is a disclosure.
+
+### The applicability question the platform could answer and asked anyway
+
+`applicabilityHint` is prose for a human to judge — *"For SAMA-licensed financial institutions"*,
+*"For telecom and cloud-provider customers"*, *"If the breach affects employee personal or payroll
+data"*. That is **right** for SAMA, CITC and HRSD: the platform cannot know whether its tenant is a
+bank. It is wrong for PDPL Article 20, which is exactly the question `affects_personal_data`
+answers, on the row, stored, since V-whatever created the column.
+
+Probed live: a non-PII incident is offered the Article 20 notification and flagged **overdue**.
+
+⚠⚠ **The template is still offered and `overdue` is unchanged, and that withdrawal is asserted in
+both directions.** Suppressing the notification for an unclassified incident would convert *"nobody
+has assessed this yet"* into a clean bill on a statutory clock — and under-scoping a statutory
+obligation is the finding an examiner writes up ([[F2-196]]), while [[F2-197]] is the rule that an
+invented all-clear closes a question an invented figure would merely raise. What ships is the
+classification **carried** (`piiClassification: CONFIRMED | NOT_CLASSIFIED`) and disclosed on the
+Article 20 card as a neutral *"not yet assessed"* badge rather than a green one. A one-directional
+gate would let a later reader add the suppression as an apparent improvement, so
+`theClassificationIsCarriedAndDoesNotSuppressATemplate` asserts that no template is conditional and
+that all five are still built.
+
+### Read-only, and why that is stronger than a guard
+
+The eight columns are mapped `insertable = false, updatable = false`. The classification is a
+privacy-module decision, so putting a writable mapping on the incident entity would create a way to
+forge a PDPL classification from an incident-module route — [[F2-213]]'s family, latent rather than
+absent.
+
+Each also carries **`@Setter(AccessLevel.NONE)`**, which is the **first use of that idiom in this
+codebase** (0 of 432 entities used it). The reason is worth the eight lines: a Lombok setter over a
+non-updatable column compiles, runs and **silently does nothing** — the decoy shape [[F2-184]]
+named, because it answers the question a reader was about to ask. Suppressing it makes the write a
+**compile error**, which is stronger than any gate and cannot rot.
+
+⚙ The cost is visible in the test fixture: `classified(...)` has to use
+`ReflectionTestUtils.setField`, because **no production API can build that state**. That is the
+honest shape rather than a workaround — only `CyberPdplBridgeService`'s native SQL may write these,
+and a fixture that reaches past the API is documenting exactly that.
+
+### One predicate, because F2-280 measured what a second copy costs
+
+Four surfaces ask *"is this incident classified as affecting personal data?"* — the Article 20 body,
+the HRSD body, the template applicability and the response DTO. `Incident#isPiiConfirmed()` is the
+only comparison, and `theClassificationIsComparedInExactlyOnePlace` holds it at exactly one in the
+entity and zero in the service. One slice earlier, F2-280 measured what the alternative costs: two
+readers of one governance fact, disagreeing on 12 roles in dev and 7 in prod.
+
+⚠ Its first draft was `affectsPersonalData\s*(?:!=|==|>|<)` and **failed on the correct code**,
+because `isPiiConfirmed()` is `affectsPersonalData != null && affectsPersonalData != 0` — two
+matches, one of them a null check. A gate that fails on correct code trains the next reader to edit
+the assertion rather than the code ([[F2-214]]), so the pattern is now scoped to a comparison
+against a **numeric literal**: the shape of its claim, not the field's name.
+
+### What the census could not see, and what it did
+
+The eight columns were written by **one** writer and read by **none** — grep over the whole backend
+and the whole frontend returned zero readers outside `CyberPdplBridgeService` itself. So no
+reachability, provenance or wire-contract instrument in the tree could have surfaced this:
+
+- `apiClientMethodReachability` resolves API-client methods — the bridge's client exists and is called.
+- `pageDataProvenance` asks whether a page calls a server — `IncidentsPage` does.
+- `exportProvenance` asks whether an emitting file has server data in scope — it does, and
+  [[F2-203]]/[[F2-205]] sharpened that to *which* data reaches the emission, which is also satisfied:
+  the body genuinely is built from the loaded row. **The row simply did not carry the fields.**
+- `PrivacyWireContractTest` adjudicates the privacy DTOs against their entity ([[F2-211]]'s *the wire
+  nominates, `sys.columns` adjudicates*). This is the **mirror** case: the column exists, is
+  populated, and no wire nominates it — so there was nothing for that instrument to adjudicate.
+
+🔑 **That last one is the reusable shape. [[F2-211]] built an instrument for "the DTO declares a
+field the table does not have." The inverse — "the table has a populated column no DTO declares" —
+is F2-198's shape, and it is only findable by starting from the TABLE.** F2-280's census is that
+starting point, which is why this finding came out of it rather than out of any gate.
+
+### Found in the browser after every gate was green, and it was mine
+
+The badge and both bodies rendered correctly, and the Article 20 line read:
+
+```
+PERSONAL DATA AFFECTED: CONFIRMED (classified 2026-05-07T14:29:52.134)
+```
+
+`LocalDateTime.toString()`, two lines under `DISCOVERED AT: 2026-04-05`, on a document going to a
+regulator — a raw ISO stamp with milliseconds beside a plain date, on an Arabic-primary platform.
+[[F2-209]] recorded this exact blemish on the SDAIA console (*"the awareness timestamp printing raw
+`2026-08-14T12:21:45` beside localised dates everywhere else"*), and I introduced it in the line I
+added. 🔑 **Nth consecutive slice where the browser finds something no code-scoped gate can see —
+and the first where the thing it found was written by the slice itself.** Fixed to
+`.toLocalDate()`, pinned by an assertion that the body contains no `T`-separated stamp at all
+rather than by asserting the corrected string alone.
+
+### A second gate fired, and it was right to
+
+Mapping the columns made `pii_classified_by` visible to [[F2-256]]'s
+`UnwritableActorColumnContractTest` — an actor column no Java writer sets — and the full build
+failed on it. That is two instruments in series, the second becoming *able* to see the column
+because the first mapped it, which is [[F2-236]]'s recorded rule (*after converting an
+attribution, run the other gate*).
+
+The verdict is BY DESIGN and it names something worth keeping: the column **is** written, by the
+bridge's native `UPDATE`, in the **same statement** as `pii_classified_at`. So unlike every other
+member of that map the clock and the actor have one owner and neither is blank. It reads as
+unwritable because the derivation resolves **setters** — F2-256 recorded Jackson as the one write
+mechanism bytecode cannot see, and **native SQL is the second**. And the absence of a setter here
+is the *fix*, not the defect.
+
+### Measured in passing, and filed
+
+- **The bridge log and the register disagree, in both databases.** `privacy.cyber_breach_bridge_log`
+  holds 8 rows claiming three bridge firings and one link; the incident register shows **two**
+  classifications. Log rows 7–8 name incident 24 → breach 20, and in dev incident 24 carries no
+  link and breach 20 no back-reference (in prod it is soft-deleted). Row 6's event code
+  **`BREACH_LINKED` is written by no code path in the platform** — the service writes only
+  `BRIDGE_FIRED`, `BREACH_CREATED` and `BRIDGE_SKIPPED`. Byte-identical across two independently-used
+  databases, so seed-origin ([[F2-280]]'s evidence rule). **Owner decision** — reconciling it
+  rewrites live governance rows.
+- **A dangling parent-identity copy.** Incident 13 carries `linked_data_breach_code =
+  1af90431-…` with **no** `linked_data_breach_id` and `affects_personal_data = 0`, titled *"Insider
+  data exfiltration — DLP triggered"*, in `CONTAINMENT`. The code is lower-case where the bridge's
+  two are upper-case, so it was not written by the bridge, and it resolves to no breach in either
+  database. [[F2-245]]'s shape with the id absent — and it means one row simultaneously says *"no
+  personal data"* and *"here is the PDPL breach record"*. **Owner decision.**
+- **No non-admin persona can operate the bridge.** `POST /api/privacy/cyber-bridge/trigger` demands
+  `PRIVACY:WRITE` **and** `CYBER:WRITE`. `so_officer` is the CISO, holds `CYBER:WRITE` and
+  `INCIDENT:WRITE`, and is **403 even on the bridge log** ([[F2-209]] measured that CISO holds no
+  PRIVACY grant at all). So the classification that feeds the Article 20 notification is reachable
+  only by the platform administrator — [[F2-253]]'s shape, at the intersection of two permissions.
+- **The trigger form asks an operator to type a raw numeric incident id** (`kind: 'number', required:
+  true`), with no picker — [[F2-246]]'s collect-a-label-instead-of-a-link shape, and
+  `triggerForIncident` uses `getSingleResult()`, so a wrong id is a `NoResultException` rather than a
+  404 naming the field.
+- **All five notification bodies are English-only**, on an Arabic-primary platform whose SDAIA
+  portal is Arabic (house rule 7). Pre-existing across the whole family, not introduced here.
+- `privacy.data_breaches` still has `title_ar`/`description_ar` in dev only (V387 is one of the 47
+  pending), and the bridge's INSERT sets neither.

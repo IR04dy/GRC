@@ -36,6 +36,7 @@ import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
 import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
+import { PdplApplicabilityBadge } from '../../components/privacy/PdplApplicabilityBadge';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
@@ -753,6 +754,7 @@ export function IncidentsPage() {
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{tmpl.titleEn}</div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)' }} dir="rtl">{tmpl.titleAr}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{tmpl.applicabilityHint}</div>
+                      <PdplApplicabilityBadge tmpl={tmpl} isAr={lang === 'ar'} />
                     </div>
                     <div style={{ minWidth: 180, textAlign: 'right' }}>
                       <div className="mono" style={{ color: colour, fontWeight: 700, fontSize: 13 }}>

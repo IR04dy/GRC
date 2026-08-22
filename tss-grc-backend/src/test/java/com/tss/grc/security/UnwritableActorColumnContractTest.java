@@ -410,6 +410,17 @@ class UnwritableActorColumnContractTest {
             "FILED by F2-249 — the label half of the same pair. F2-252 measured its live values as "
             + "an OFFICE ('Cyber Risk & Compliance Officer / …') rather than a person, so deriving "
             + "it from a resolved user would destroy information (F2-251's rule)."),
+        Map.entry("Incident#piiClassifiedBy",
+            "BY DESIGN, and it names a SECOND write mechanism this gate cannot see. F2-281 mapped "
+            + "cyber.incidents' eight PDPL-bridge columns so the classification would be on the "
+            + "incident's own wire; the column IS written, by CyberPdplBridgeService's native "
+            + "UPDATE, in the SAME statement as pii_classified_at — so unlike the rest of this map "
+            + "the clock and the actor have one owner and neither is blank (2 of 44 rows in dev, 2 "
+            + "of 48 in prod, both carrying both). It reads as unwritable here because the "
+            + "derivation resolves SETTERS: F2-256 recorded Jackson as the one mechanism bytecode "
+            + "cannot see, and native SQL is the second. Mapped @Setter(AccessLevel.NONE) "
+            + "deliberately, so a Java write is a compile error rather than a silent no-op — i.e. "
+            + "the absence of a setter is the FIX, not the defect."),
         Map.entry("Policy#approverId",
             "DARK TWICE — module/compliance/entity/Policy declares it and PolicyService writes it "
             + "nowhere, not even inside the methods that would; and DarkServiceMethodTest already "
