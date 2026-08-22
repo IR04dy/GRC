@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.resilience.service;
 
+import com.tss.grc.common.reference.ReferenceCodeMint;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.scm.service.VendorReferenceResolver;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
@@ -64,7 +66,24 @@ public class SupplierResilienceTestService {
                 TenantContext.getCurrentTenant());
         e.setVendorId(vendor.id());
         e.setVendorName(vendor.name());
-        e.setTestCode(req.testCode());
+        // F2-267 — the reference an ISO 22301 / SAMA reviewer cites is the server's to
+        // issue (F2-172(d)). Before this the create stored req.testCode() verbatim with NO
+        // minter anywhere and NO unique index, so two operators typing the same code both
+        // succeeded — and the form's own placeholder ('SRT-2026-009') taught them to type
+        // the next number in the sequence. ⚠ The comment six lines above already listed
+        // what is server-controlled and did not include this column, which is why the create
+        // read as audited (F2-215's two-of-N).
+        //
+        // Refused rather than ignored: a caller who sends one has to learn the value is not
+        // theirs, and the minted code is on the response. A BLANK code used to be stored as
+        // null, so a resilience test could exist with no reference at all.
+        if (req.testCode() != null && !req.testCode().isBlank()) {
+            throw new IllegalArgumentException(
+                "testCode: this register's code is minted by the server when the test is "
+              + "created, so it cannot be supplied here. Omit the field — the minted code is "
+              + "returned on the response.");
+        }
+        e.setTestCode(ReferenceCodeMint.mint("SRT-" + LocalDate.now().getYear()));
         e.setTitleEn(req.titleEn());
         e.setTitleAr(req.titleAr());
         e.setTestType(req.testType());

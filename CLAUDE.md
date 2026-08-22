@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V385 packaged; next free V386** (373 files; ⚠ this line said "V1→V295 / next free
+— **V1→V386 packaged; next free V387** (374 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
@@ -1872,6 +1872,53 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **ASK THE UNIQUE-INDEX QUESTION FIRST: IT IS THE DIFFERENCE BETWEEN *A DUPLICATE IS
+  STORABLE* AND *A CALLER PICKED THE STRING*** (F2-267, measured 2026-08-22). Executing F2-266's
+  own filed list of *"sharpest unread"* caller-named references, **nine of ten already carried a
+  UNIQUE index** — `subprocessorCode`, `bowtieCode`, `kriCode`, `noticeCode`,
+  `arrangementCode`, `campaignCode`, `scenarioCode`, `clauseCode`, `planCode`. So a caller can
+  choose a **well-formed** code and cannot create a duplicate, which is F2-259's verdict (a naming
+  question) and **not** F2-253's (a defect). 🔑 **F2-253 filed `subprocessorCode` as
+  F2-172(d)'s family without mentioning `UQ_subp_code`, and F2-266 carried that reading forward to
+  four more members without re-checking** — the same conflation F2-264 found three slices
+  carrying, one register over.
+  ⚠ **The one real member was `scm.supplier_resilience_tests.test_code`**: caller-only with
+  **no generator anywhere in the owning class**, `nvarchar(80)` nullable, **no unique index**, 11
+  rows in both databases across two disjoint code spaces (`SRT-2026-00n`, `SRT-GOV-00n`). Its
+  collector was a free-text form box placeholdered **`'SRT-2026-009'`** — the next number in
+  the server's own sequence — and a **blank** input stored null, so a resilience test could
+  exist with no reference at all. 🔑 **The service's own comment listed what is
+  server-controlled and `setTestCode(req.testCode())` sat two lines below it**, with F2-246's
+  vendor-resolver comment directly above, so the create read as audited (F2-215's two-of-N).
+  ⚙ Fixed with one `ReferenceCodeMint.mint("SRT-" + year)` call, which is the test of F2-266's
+  claim that the next application would be a call rather than a twelfth generator. It was.
+  ⚠⚠ **F2-264'S LANDMINE RECURRED AND ITS OWN REMEDY IS WHAT I SKIPPED.** My probe omitted
+  `@NotBlank scenarioDescriptionEn`, so the caller-supplied-code leg and the no-code leg both got an
+  identical bean-validation 400 — and **the refusal leg scored a PASS on it**, because `@Valid`
+  fires before the service so the refusal never ran. F2-264 wrote *"resolve every mandatory field
+  from the DTO before reading a write probe's result"* one slice earlier. **Read the request record's
+  components before writing the payload, not after the probe disagrees.**
+  ⚠⚠ **A SED-DERIVED PROBE INHERITS THE ORIGINAL'S ASSUMPTIONS ABOUT A DIFFERENT TABLE.**
+  Deriving this probe from F2-266's carried over a `description` column this table does not have
+  — and my guard against exactly that (`assert "description" not in s`) matched
+  `scenario_description_en`, **rejected the patch, and let the old file run again**, planting rows
+  twice. 🔑 **A guard whose token also occurs innocently rejects the fix and leaves the
+  defect** — the substring-satisfied-by-something-else shape, inside a patch guard. Write a
+  fresh probe per table.
+  ⚠ **And sweep by the BARE `[REVIEW-TEST]` prefix, never the probe's own suffix.** Earlier runs
+  planted `[REVIEW-TEST] V386 probe` while my sweep looked for `[REVIEW-TEST] F2-267`, so three rows
+  survived and the table read 14 against 11. House rule 5's tag is the bare prefix for this reason.
+  ⚠ **A method-name scan across all services mis-attributes a setter to the wrong owner** —
+  F2-187's recorded mistake, hit twice in one throwaway here (`scenarioCode`, `planCode`), plus an FE
+  column that mixed CCM's unrelated `testCode` with this register's. **Resolve per owner type.**
+  ⚙ **Filed:** `clauseCode` is a **frontend** minter (`ContractClausesPage`'s
+  `nextClauseCode(category)`), so it belongs to F2-207's filed population of 14 client-side
+  reference minters, not this one. `subprocessorCode`'s generator is a **check-then-insert over 899
+  values** with a 50-attempt retry, so a concurrent duplicate becomes a 500 rather than corruption
+  because `UQ_subp_code` backstops it — replacing it would change the format of a **public**
+  PDPL transparency reference, a product decision with no defect behind it. The two `SRT-*` code
+  spaces are left unreconciled: both are legal and distinct, and collapsing two seeded notations on
+  a register a SAMA reviewer reads is an owner decision.
 - ⚠⚠ **A GATE THAT CORRECTLY REFUSES TO *BAN* A SHAPE LEAVES IT UNCOUNTED, AND SIX SLICES THEN
   CLOSED IT ONE INSTANCE AT A TIME** (F2-266, measured 2026-08-22).
   `ClientSuppliedReferenceRatchetTest` keys on `\bset(?:ExternalId|RefNumber)\s*\(`, and the first

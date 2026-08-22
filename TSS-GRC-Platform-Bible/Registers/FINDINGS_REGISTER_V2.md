@@ -2547,6 +2547,113 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-267 · Nine of the ten "sharpest unread" members I filed one slice earlier already had a UNIQUE index
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`696064d0`) |
+| **Severity** | P2 on the one real member — a caller-named ISO 22301 / SAMA supplier-resilience test reference with no minter and no unique index; P4 correction on the other nine |
+| **Found by** | executing [[F2-266]]'s own filed work list, re-derived first ([[F2-221]]) |
+| **Fix** | `SupplierResilienceTestService` mints via `ReferenceCodeMint` · `V386` filtered UNIQUE index · the `testCode` form input deleted · census 93 → 92 |
+| **Verified** | 9/9 probe legs (3 index + 6 API) as `ranalyst` against planted rows · V386 applied twice · cleanup re-counted to 11 |
+
+### The correction
+
+[[F2-266]] filed *"sharpest unread members are kind 3: `subprocessorCode` (PDPL Art. 30), `kriCode`,
+`bowtieCode`, `arrangementCode` (SAMA outsourcing), `noticeCode`"* — the implication being that they
+were `alertCode`-shaped, i.e. **a duplicate is storable**. Measured across ten candidates, asking
+the unique-index question *first*:
+
+| property | table.column | UNIQUE index? | caller |
+|---|---|---|---|
+| `subprocessorCode` | `privacy.subprocessor` | **YES** (`UQ_subp_code`) | overrides a fallback minter |
+| `bowtieCode` | `risk.bowtie_analysis` | **YES** | overrides a fallback minter |
+| `kriCode` | `risk.kri_definition` | **YES** | overrides a fallback minter |
+| `noticeCode` | `privacy.privacy_notices` | **YES** | caller-only |
+| `arrangementCode` | `tprm.outsourcing_arrangement` | **YES** | overrides a fallback minter |
+| `campaignCode` | `tprm.vendor_bcp_campaign` | **YES** | overrides a fallback minter |
+| `scenarioCode` | `sust.tcfd_climate_scenario` | **YES** | server-only |
+| `clauseCode` | `scm.contract_clauses` | **YES** | caller-only (**the FE mints it** — [[F2-207]]'s filed population) |
+| `planCode` | `scm.exit_plans` | **YES** | — |
+| **`testCode`** | **`scm.supplier_resilience_tests`** | **no** | **caller-only, no minter anywhere** |
+
+🔑 **Nine of ten are F2-259's verdict, not F2-253's**: a caller can choose a *well-formed* code and
+cannot create a duplicate, so it is a naming question rather than a defect. [[F2-253]]'s filing of
+`subprocessorCode` as [[F2-172]](d)'s family never mentioned that `UQ_subp_code` exists — and
+[[F2-266]] carried that reading forward to four more members without re-checking. **Ask the
+unique-index question first; it is the difference between "a duplicate is storable" and "a caller
+picked the string".**
+
+### The one real member
+
+`scm.supplier_resilience_tests.test_code` — the reference an ISO 22301 / SAMA reviewer cites for a
+supplier resilience test. `create` does `e.setTestCode(req.testCode())` with **no generator anywhere
+in the owning class**, the column is `nvarchar(80)` **nullable** with **no unique index** (4 indexes,
+none unique on it), and 11 rows in dev and prod carry 11 distinct codes across **two disjoint code
+spaces** (`SRT-2026-00n` ×8, `SRT-GOV-00n` ×3 — [[F2-203]]'s shape in miniature).
+
+⚠ **The collector was the form, with the same placeholder shape three slices have now removed.**
+`ResilienceTestsPage` offered a free-text `testCode` box placeholdered **`'SRT-2026-009'`** — the
+next number in the server's own sequence — so two operators typing it both succeeded. And because
+the create had no minter, a **blank** input stored null: a resilience test with no reference at all.
+
+🔑 **The service's own comment listed what is server-controlled** — *"status/outcome and all
+attribution, audit, soft-delete and rowVersion columns are server-controlled (SEC-FIN-004) — never
+taken from the request body"* — and `setTestCode(req.testCode())` sat **two lines below it**, with
+[[F2-246]]'s vendor-resolver comment directly above, so the create read as audited. [[F2-215]]'s
+two-of-N, and [[F2-213]]'s rule that naming two fields to rescue is what a reader does when the
+editable list is implicit.
+
+⚙ **This slice is also the test of [[F2-266]]'s claim** that the next application would be *a call
+rather than a new generator*. It was: one import, one `ReferenceCodeMint.mint("SRT-" + year)`.
+
+### Four instrument errors of mine, every one caught by running something
+
+⚠⚠ **My batch script mis-attributed two setters by not resolving the owner type.** It reported
+`scenarioCode → generateScenarioCode()` and `planCode → code` by taking the **first match across all
+services**, which is [[F2-187]]'s recorded mistake verbatim (*"a method-NAME fallback silently
+clears the methods most likely to be duplicated elsewhere — resolve per owner type"*). It also
+reported `testCode` as having a fallback minter; the owning class has none — that fallback belongs to
+**CCM's** `testCode`, an unrelated register. Its FE column mixed the two for the same reason.
+
+⚠⚠ **[[F2-264]]'s landmine recurred and its own remedy is what I skipped.** My probe's payload
+omitted `@NotBlank scenarioDescriptionEn`, so the caller-supplied-code leg and the no-code leg both
+got an identical bean-validation 400 — and **the refusal leg scored a PASS on it**. `@Valid` fires
+before the service, so the refusal never ran. F2-264 wrote *"resolve every mandatory field from the
+DTO before reading a write probe's result"*; I did not, one slice later.
+
+⚠⚠ **A sed-derived probe inherits the original's assumptions about a DIFFERENT table.** Deriving
+this probe from F2-266's carried over a `description` column `scm.supplier_resilience_tests` does not
+have; my guard against that (`assert "description" not in s`) then matched
+`scenario_description_en`, rejected the patch, and the old file ran **again** — planting rows twice.
+🔑 **A guard whose token also occurs innocently rejects the fix and leaves the defect**, which is
+this register's substring-satisfied-by-something-else shape, in a patch guard.
+
+⚠ **And I cleaned by the probe's own tag rather than the house prefix.** The earlier runs planted
+`[REVIEW-TEST] V386 probe`; my sweep looked for `[REVIEW-TEST] F2-267`, so three rows survived and
+the table read 14 against 11. House rule 5's tag is the **bare** `[REVIEW-TEST]` for exactly this
+reason. Swept by the prefix across every text column and re-counted to 11.
+
+### Verification
+
+V386 applied **twice** to dev via pyodbc: the index exists, is unique **and filtered**, keyed on
+`(organisation_id, test_code)`; a duplicate is refused with `uq_srt_test_code` **named in the
+message**; a fresh code is accepted; two NULL-coded rows are accepted, so the filter is load-bearing
+(the column's nullability is reachable — the create used to store a blank as null). Live probe as
+`ranalyst`, **9/9**: caller's code → **400** naming the field and the mint; no code → **201** with
+`SRT-2026-6X3K-WXY4`; a second create → `SRT-2026-RE4G-RNVX`. Cleanup swept by the house tag and
+re-counted: 0 tagged, table back to 11.
+
+⚙ **Filed:** the census is **92**. `clauseCode` is a **frontend** minter
+(`ContractClausesPage.tsx: nextClauseCode(category)`) and therefore belongs to [[F2-207]]'s filed
+population of 14 client-side reference minters, not to this one. `subprocessorCode`'s generator is a
+**check-then-insert over 899 values** (`SUBP-YYYY-001..899`, `Math.random`) with a 50-attempt retry —
+so a concurrent duplicate becomes a 500 rather than corruption, because `UQ_subp_code` backstops it;
+replacing it would change the format of a **public** PDPL transparency reference, which is a product
+decision with no defect behind it. And the two `SRT-*` code spaces are left unreconciled
+deliberately: both are legal and distinct, and collapsing two seeded notations on a register a SAMA
+reviewer reads is an owner decision, not a side effect of adding a constraint.
+
 ## F2-266 · A gate that correctly refuses to ban a shape leaves it uncounted, and six slices each filed one instance by hand
 
 | | |

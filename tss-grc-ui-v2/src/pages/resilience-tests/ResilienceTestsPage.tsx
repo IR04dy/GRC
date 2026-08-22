@@ -104,7 +104,12 @@ export function ResilienceTestsPage() {
   }
 
   const CREATE_FIELDS: FieldDef[] = [
-    { kind: 'text', key: 'testCode',   label: t('srtColCode'), span: 4, placeholder: 'SRT-2026-009' },
+    // F2-267 — no testCode input. The reference an ISO 22301 / SAMA reviewer cites is
+    // minted by the server (F2-172(d)); the box here was placeholdered 'SRT-2026-009', which
+    // taught the operator to type the next number in the server's own sequence — the shape
+    // F2-236, F2-245 and F2-266 each had to remove. With no minter and no unique index, two
+    // operators typing the same code both succeeded. The code is still rendered (see the
+    // srtColCode column below); what is gone is the ability to choose it.
     // F2-246 — the vendor PICKER, not a free-text name. The old field was a required
     // text box and the payload carried no id, so every row this form created was
     // unjoinable: 32 of 53 live rows across the four SCM vendor registers carry a
@@ -130,7 +135,6 @@ export function ResilienceTestsPage() {
   async function onCreate(values: Record<string, unknown>) {
     try {
       await api.post('/api/scm/resilience/tests', {
-        testCode: String(values.testCode ?? '').trim() || undefined,
         vendorId: values.vendorId ? Number(values.vendorId) : undefined,
         titleEn: String(values.titleEn ?? '').trim(),
         titleAr: String(values.titleAr ?? '').trim() || undefined,
