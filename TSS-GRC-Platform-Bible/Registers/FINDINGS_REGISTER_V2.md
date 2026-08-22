@@ -13718,3 +13718,181 @@ than repaired, because you can always relax an assertion, so mutating the CHECK 
 - **`FullReplaceUpdateContractTest` still lacks [[F2-233]]'s store-read narrowing** — correctly, and
   now with a measurement behind it rather than a filing. Do not port it: it changes nothing today
   and weakens the taint analysis. Recorded so the next reader does not re-open it.
+
+---
+
+## F2-279 · An entity that maps a subset of its table is outside the platform's tenant machinery by construction
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`6d750f5c`) |
+| **Severity** | **P2** — on `bcm.bia_records`: the **database column DEFAULT decided every row's tenant** rather than `TenantContext`; a row whose own `organisation_id` named another tenant was **served to an org-1 caller**; and `DELETE` answered **204 with the record still in the register**. All three probed live, dev = prod |
+| **Found by** | re-deriving [[F2-278]]'s own filing — and **refuting its premise** before writing any code |
+| **Fix** | `BiaRecord` maps `organisation_id` and `is_deleted` and carries `@Where(is_deleted = 0)` · `createBia` stamps the tenant unconditionally · `requireOwnedBia`/`listBia`/`getStats` scope on the row's own tenant column · `deleteBia` sets the soft-delete flag instead of writing a status token · `updateBia` writes `linkedRiskId` (the filed freeze) · new `TenantColumnMappingContractTest` |
+| **Verified** | probe **10/10 pre-fix and 10/10 post-fix** as `compliance` against planted rows · pre-fix control: **3 of 3** tree-dependent legs fire · harness **10 mutations** · backend **4437/0/0** |
+
+### The filed premise was false, and the refutation is the finding
+
+[[F2-278]] filed this as its readiest unread item: *"`/api/v1/bcm/bia/{} :: linkedRiskId` is
+declared by `BcmBiaRequest`, omitted from `BcmService#updateBia`'s seven-field whitelist, so
+settable on create and frozen after."* The freeze is real. Its stated premise is not.
+
+`BcmService#createBia` carried this comment:
+
+> *"BiaRecord carries no organisationId column; tenant scoping is inherited via the parent
+> CriticalProcess link, so the target process must be validated to belong to the current
+> tenant before persisting."*
+
+Measured from `sys.columns`, identical in dev and prod: **`bcm.bia_records` has 29 columns**, and
+`organisation_id BIGINT NOT NULL DEFAULT ((1))` is one of them. The entity mapped **eleven**.
+
+🔑 **The column order in the migration is the fingerprint.** `V1__core_schemas.sql` — the *first*
+migration — creates the table with all 29, and its first eleven columns are **exactly** the
+entity's eleven, in the entity's order, with everything the entity omits following after. The
+table was extended and the entity never followed. By mapped-field gap this is the widest in the
+platform: **18 columns**, against `cyber.incidents` at 8.
+
+### The narrowing is a property the entity declines to declare
+
+`TenantWriteGuardInterceptor` is the platform-wide tenant write backstop —
+`application-prod.yml` calls it the guarantee that *"a single missed per-service guard cannot
+silently write across tenants"*. It resolves the tenant by property name:
+
+```java
+int orgIdx = indexOf(propertyNames, ORG_PROP);
+if (orgIdx < 0) {
+    // Entity doesn't have an organisationId — out of scope for …
+```
+
+So an entity that does not map the column is outside the backstop **by construction**, and the
+guard says so in a comment nobody had cause to read.
+
+🔑🔑 **[[F2-216]] found and closed one narrowing in this exact class** — it exempts a row whose
+`organisationId` is **null**, which on eight tables means *every tenant*. The narrowing one level
+up, *the entity has no such property at all*, was never counted. F2-198's shape after a filename,
+a three-entry allow-list, a module name, an `extends` clause, a field-name list inside a fix, a
+claim shape in a gate, a naming convention and the absence of a suffix.
+
+**Measured:** of **432** shipped entities, **35** declare no `organisationId`, and **exactly one**
+of those 35 maps a table that has the column. Identical in both databases.
+
+### Three live consequences, all probed
+
+Probed as `compliance` (holds `BCM:READ`/`WRITE`/`DELETE`), against processes and rows the probe
+planted itself ([[F2-206]]) — **10/10 pre-fix**:
+
+| | pre-fix | post-fix |
+|---|---|---|
+| a body claiming `organisationId: 2` | silently discarded — the property did not exist | overridden by the stamp |
+| a row whose own `organisation_id` = 2, parent process org 1 | **served to the org-1 caller** | withheld |
+| a row with `is_deleted = 1` | **served** | filtered |
+| `DELETE` then `GET` | **204, and still in the list** (`status = 'DELETED'`, `is_deleted = false`) | 204, gone; `status` still `DRAFT` |
+| `PUT linkedRiskId 5 → 6` | 200, stored **5** | 200, stored 6 |
+| `PUT linkedRiskId → null` | 200, stored **5** | 200, cleared |
+
+The tenant half is **latent on data** and the reason is worth stating: every active user is in
+organisation 1, *and* `bcm.critical_processes` holds org-1 rows only, so no second tenant can
+reach the create at all. What was demonstrable — and was demonstrated — is that neither the write
+path nor the read path consulted the column.
+
+⚠ **An index on an unmapped column is the tell.** `V228__backfill_org_indexes.sql` built
+`ix_bia_records_org (organisation_id, is_deleted)` over **both** omitted columns, and nothing has
+ever used it. 🔑 **A migration that indexes a column no entity maps is a statement that somebody
+expected a query that does not exist.**
+
+### The false premise was written twice, and the test asserted the defect
+
+The claim appeared in `BcmService#createBia` **and** as the section comment over the BIA tests in
+`BcmServiceTest` (*"BiaRecord has no organisationId column; tenant ownership is enforced via the
+parent CriticalProcess"*). 🔑 **Two independent artefacts agreeing, with nobody maintaining the
+agreement** ([[F2-177]]) — correct both, or the next reader finds the survivor.
+
+And `deleteBia_of_own_tenant_soft_deletes_via_save` asserted:
+
+```java
+assertThat(b.getStatus()).isEqualTo("DELETED");
+```
+
+— the status token, under a name that says *soft_deletes*. Nth instance after [[F2-159]],
+[[F2-175]], [[F2-227]], [[F2-234]], [[F2-236]], [[F2-243]] and [[F2-244]]. 🔑 **Hardest to spot
+when it describes the code accurately, and its NAME is what stops you reading the assertion.**
+Repurposed rather than deleted: the half that protects the record — never a hard delete, exactly
+one save — is kept.
+
+⚠ A sibling leg was **vacuous**: `verify(biaRepo, never()).findByProcessId(...)` pointed at a
+finder the new `listBia` never calls, so it would have passed trivially forever. **When you change
+a repository, re-point every `never()` at the finder the code now reaches.**
+
+### Only one of the two mapped fields needed scrubbing
+
+`isDeleted` is one of `ServerOwnedFieldsModule`'s nine server-owned fields, and that introspector
+reports them `READ_ONLY` on **any** `@Entity` — not only `BaseEntity` subclasses. So mapping it
+closes the wire automatically, pre-empting [[F2-215]]'s born-deleted defect (`"isDeleted": true`
+on a create storing a row `@Where` hides from every query *including* the service's own duplicate
+check).
+
+That same javadoc states it *"does not touch `organisationId`, which is
+`MassAssignmentRatchetTest`'s own"* — so the tenant stamp has to be explicit and
+**unconditional**, which is [[F2-216]]'s recorded pattern. 🔑 **Check which mechanism already covers a field before
+writing a guard for it, and check which does not.**
+
+### The gate verifies rather than asserts, and that was a measurement
+
+The obvious instrument is a named map of reasons — *"this table has no tenant column
+because…"* — and [[F2-188]] measured what that produces: five claims, five false, with fluency
+doing the work. It is unnecessary here, because the question is answerable from the **migration
+corpus**, the same hermetic source `MigrationVocabularies` reads for CHECK constraints.
+
+Measured: **all 35 resolve to a `CREATE TABLE`, 0 unresolved.** So
+`TenantColumnMappingContractTest` ships as a **hard zero with no exemption map at all** — mapping
+the column is always available, so it cannot fail on correct code ([[F2-214]]) — and an
+unresolved table **fails** rather than dropping out of the population, because *unresolved reads
+identically to clean* ([[F2-206]]).
+
+⚠ **Only 2 of its 8 legs discriminate on this tree, and it says so** ([[F2-225]]). The pre-fix
+control fires `noEntityOmitsATenantColumnItsTableDeclares` and
+`biaRecordMapsItsTenantAndItsSoftDeleteFlag`; the rest are synthetic self-tests, anti-vacuity
+floors, or **pins whose tripwire is in the future** — including the
+`is_deleted`-without-`@Where` census, which passes on master precisely because `BiaRecord` does
+not map the flag there. **A green pin is not a discriminating pass.**
+
+⚠ **A ceiling I predicted was wrong.** I wrote `BASELINE_MAPS_DELETED_WITHOUT_WHERE = 14` from
+*"fifteen minus the one I just fixed"*. Measured, it is **9**. 🔑 **A baseline lifted from a
+prediction is worse than no baseline, because it looks measured** ([[F2-195]]) — caught before
+commit by asserting zero once and reading the failure message.
+
+### The filed freeze was the least of it, and fixing it does not fix the reference
+
+`linkedRiskId` is writable now. It is **still unverified**: `module/bcm` has **0 imports of
+`module/risk`**, so validating the reference needs a new module edge and `ModuleGraphRatchetTest`
+is decrease-only and may never be raised. Nothing in the platform dereferences the column today,
+so no reader can be misled by a bad id — **a fact about today, not a property of the control**
+([[F2-182]]).
+
+⚠ **And the picker was measured and not built.** The form collects `linkedRiskId` as a raw
+**number input** — [[F2-245]]/[[F2-246]]'s collect-a-label-instead-of-a-link shape, with
+`processId` on the *same form* already a select. A risk picker needs `RISK:READ`, and **5 of the
+10 roles holding `BCM:WRITE` do not hold it** (`PLATFORM_ADMIN` among them, though it bypasses in
+code). 🔑 **A picker would be worse than the number box: it implies the reference is guaranteed
+while the server still cannot check it** — [[F2-184]]'s shape at an affordance. Measure the
+picker's guard before offering one ([[F2-250]]).
+
+### Filed
+
+- **The 17 still-unmapped columns**, which hold real data no wire can carry:
+  `financial_impact` / `operational_impact` / `regulatory_impact` / `reputational_impact` — **the
+  four ISO 22301 §8.2.2 impact dimensions a BIA exists to record, on 7 of 10 live rows** — plus
+  `owner_name` and `business_unit` on 10 of 10, `notes` on 7, `approved_by`/`approved_at` on 1.
+  [[F2-198]]'s shape at eight fields at once; mapping them is a product change.
+- **`criticality` is `NOT NULL DEFAULT ('MEDIUM')` and unmapped**, so a created BIA silently
+  disagrees with its own mapped `overall_impact` from birth, and the table stores `TIER_2`/`TIER_3`
+  beside `CRITICAL`/`HIGH`/`MEDIUM` under **zero CHECK constraints** ([[F2-196]]'s shape inside one
+  column). Collapsing two notations on live rows is an **owner decision**.
+- **The 9-member `is_deleted`-without-`@Where` census** — `compliance.assessments`,
+  `evidence.evidence_links`, `risk.risk_categories` and six `platform.*` integration logs. Mostly
+  append-only, where the flag is vestigial; clearing it means reading each one.
+- **The cross-module reference validation** and **the risk picker**, both above.
+- **Three services outside `BcmService` still read BIAs by the parent-process link**
+  (`DependencyCascadeService`, `BcmBoardPackService`, `MtpdInheritanceService`), each passing a
+  process-id list it resolved from its own tenant's processes — tenant-correct by that route, so
+  re-scoping them is defence in depth rather than a defect.

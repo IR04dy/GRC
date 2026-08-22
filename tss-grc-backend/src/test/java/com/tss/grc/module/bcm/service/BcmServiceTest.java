@@ -272,9 +272,14 @@ class BcmServiceTest {
 
     // ─── BIA tenant scope (SEC-BCM-001 — IDOR / CWE-639) ─────────────
     //
-    // BiaRecord has no organisationId column; tenant ownership is enforced
-    // via the parent CriticalProcess. These lock the cross-tenant read /
-    // overwrite / hard-delete IDOR shut.
+    // ⚠⚠ This comment read "BiaRecord has no organisationId column; tenant ownership is
+    // enforced via the parent CriticalProcess" until F2-279. The column has existed since
+    // V1__core_schemas.sql — BIGINT NOT NULL DEFAULT ((1)) — and the entity simply did not
+    // map it, so the database default decided every row's tenant and no query could scope on
+    // it. The claim was written HERE and in BcmService, and two independent statements of a
+    // false premise are what made it look settled (F2-177). Tenant ownership is now enforced
+    // on the row's own column AND on the parent-process reference: different questions
+    // (F2-242). These lock the cross-tenant read / overwrite / hard-delete IDOR shut.
 
     @Test
     void listBia_with_processId_of_other_tenant_throws_EntityNotFound() {
@@ -285,16 +290,34 @@ class BcmServiceTest {
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining("Critical process not found");
 
-        verify(biaRepo, never()).findByProcessId(any(), any());
+        // ⚠ F2-279: this verified the RETIRED finder, which listBia no longer calls at all —
+        // so it would have passed trivially forever. Point a never() at the finder the code
+        // actually reaches, or it asserts nothing.
+        verify(biaRepo, never()).findByOrganisationIdAndProcessId(any(), any(), any());
+        verify(biaRepo, never()).findByOrganisationId(any());
     }
 
     @Test
     void listBia_with_own_processId_returns_records() {
         when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
-        when(biaRepo.findByProcessId(eq(PROC_ID), any()))
+        when(biaRepo.findByOrganisationIdAndProcessId(eq(ORG_ID), eq(PROC_ID), any()))
             .thenReturn(new PageImpl<>(java.util.List.of(bia(PROC_ID))));
 
         assertThat(service.listBia(PROC_ID)).hasSize(1);
+    }
+
+    @Test
+    void listBia_without_processId_reads_by_the_tenant_column_not_the_process_link() {
+        // F2-279: the old form enumerated the org's process ids and returned any row whose
+        // PARENT was ours, so a row whose own organisation_id named another tenant was
+        // served (probed live). ix_bia_records_org exists for this query.
+        when(biaRepo.findByOrganisationId(ORG_ID))
+            .thenReturn(java.util.List.of(bia(PROC_ID)));
+
+        assertThat(service.listBia(null)).hasSize(1);
+
+        verify(biaRepo).findByOrganisationId(ORG_ID);
+        verify(biaRepo, never()).findByProcessIdIn(any());
     }
 
     @Test
@@ -309,9 +332,8 @@ class BcmServiceTest {
 
     @Test
     void updateBia_of_other_tenant_throws_EntityNotFound_and_no_save() {
-        // BIA row exists, but its parent process belongs to OTHER_ORG.
-        when(biaRepo.findById(ID)).thenReturn(Optional.of(bia(PROC_ID)));
-        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+        // The row is not this tenant's, so the org-scoped load misses.
+        when(biaRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateBia(ID, bia(PROC_ID)))
             .isInstanceOf(EntityNotFoundException.class);
@@ -320,9 +342,23 @@ class BcmServiceTest {
     }
 
     @Test
-    void deleteBia_of_other_tenant_throws_EntityNotFound_never_hard_deletes() {
-        when(biaRepo.findById(ID)).thenReturn(Optional.of(bia(PROC_ID)));
+    void updateBia_of_a_row_whose_parent_process_is_another_tenants_throws() {
+        // Both checks are kept on purpose: the row can be ours while the parent-process
+        // REFERENCE it holds (or the new one supplied) is not (F2-242).
+        when(biaRepo.findByIdAndOrganisationId(ID, ORG_ID))
+            .thenReturn(Optional.of(bia(PROC_ID)));
         when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.updateBia(ID, bia(PROC_ID)))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Critical process not found");
+
+        verify(biaRepo, never()).save(any());
+    }
+
+    @Test
+    void deleteBia_of_other_tenant_throws_EntityNotFound_never_hard_deletes() {
+        when(biaRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.deleteBia(ID))
             .isInstanceOf(EntityNotFoundException.class);
@@ -331,17 +367,67 @@ class BcmServiceTest {
         verify(biaRepo, never()).save(any());
     }
 
+    /**
+     * ⚠⚠ F2-279: this asserted {@code b.getStatus()).isEqualTo("DELETED")} — i.e. it asserted
+     * the defect as correct, and its name already said "soft_deletes". {@code is_deleted} was
+     * unmapped and the entity carried no {@code @Where}, so writing a status token deleted
+     * nothing: probed live, {@code DELETE} answered 204 and the row stayed in the list. Nth
+     * instance of a test locking in a defect, and it is hardest to spot when it describes the
+     * code accurately (F2-159). Repurposed rather than deleted — the half that protects the
+     * record (never a hard delete, exactly one save) is kept.
+     */
     @Test
-    void deleteBia_of_own_tenant_soft_deletes_via_save() {
+    void deleteBia_of_own_tenant_sets_the_soft_delete_flag_not_a_status_token() {
         BiaRecord b = bia(PROC_ID);
-        when(biaRepo.findById(ID)).thenReturn(Optional.of(b));
+        when(biaRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(b));
         when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
         when(biaRepo.save(any(BiaRecord.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.deleteBia(ID);
 
-        assertThat(b.getStatus()).isEqualTo("DELETED");
+        assertThat(b.getIsDeleted()).isTrue();
+        assertThat(b.getStatus())
+            .as("the lifecycle status is not a delete marker; @Where(is_deleted = 0) is")
+            .isEqualTo("DRAFT");
         verify(biaRepo).save(b);
         verify(biaRepo, never()).deleteById(any());
+    }
+
+    @Test
+    void createBia_stamps_the_tenant_and_never_takes_it_from_the_body() {
+        // F2-279: bcm.bia_records.organisation_id is NOT NULL DEFAULT ((1)) and the entity
+        // did not map it, so Hibernate never named the column and the DATABASE DEFAULT
+        // decided the tenant. ServerOwnedFieldsModule deliberately does not cover
+        // organisationId, so the stamp has to be here and must be unconditional.
+        BiaRecord req = bia(PROC_ID);
+        req.setOrganisationId(OTHER_ORG);        // hostile: a body claiming another tenant
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
+        when(biaRepo.save(any(BiaRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BiaRecord saved = service.createBia(req);
+
+        assertThat(saved.getOrganisationId()).isEqualTo(ORG_ID);
+        assertThat(saved.getId()).as("null id forces an INSERT rather than a merge").isNull();
+    }
+
+    @Test
+    void updateBia_writes_the_linked_risk_so_it_is_not_frozen_after_creation() {
+        // F2-279: BcmBiaRequest has always declared linkedRiskId and the whitelist omitted
+        // it, so a BIA's linked risk was settable once at creation and every later edit was
+        // accepted with HTTP 200 and silently discarded.
+        BiaRecord existing = bia(PROC_ID);
+        existing.setLinkedRiskId(5L);
+        when(biaRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(existing));
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
+        when(biaRepo.save(any(BiaRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BiaRecord req = bia(PROC_ID);
+        req.setLinkedRiskId(6L);
+        assertThat(service.updateBia(ID, req).getLinkedRiskId()).isEqualTo(6L);
+
+        // and it must be clearable, not just changeable
+        BiaRecord clear = bia(PROC_ID);
+        clear.setLinkedRiskId(null);
+        assertThat(service.updateBia(ID, clear).getLinkedRiskId()).isNull();
     }
 }

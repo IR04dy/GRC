@@ -245,12 +245,17 @@ public class BcmService {
     }
 
     /**
-     * Loads a BIA record by id and enforces that its parent process belongs to
-     * the current tenant. Throws EntityNotFoundException (→ 404) on a miss or
-     * cross-tenant access.
+     * Loads a BIA record by id under the row's <em>own</em> tenant, and also asserts its
+     * parent process belongs to that tenant. Throws EntityNotFoundException (→ 404) on a
+     * miss or cross-tenant access.
+     * <p>⚠ F2-279: the org filter is new. Until then this was a bare {@code findById} and
+     * scoping was delegated entirely to the parent-process check, because {@link BiaRecord}
+     * did not map {@code organisation_id}. Both checks are kept: the org filter answers
+     * "who owns this row", the process check answers "is the reference this row holds one
+     * of ours" — different questions (F2-242).
      */
     private BiaRecord requireOwnedBia(Long id) {
-        BiaRecord b = biaRepo.findById(id)
+        BiaRecord b = biaRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
             .orElseThrow(() -> new EntityNotFoundException("BIA record not found: " + id));
         requireOwnedProcess(b.getProcessId());   // throws if parent process is another tenant's
         return b;
@@ -258,25 +263,32 @@ public class BcmService {
 
     @Transactional(readOnly = true)
     public List<BiaRecord> listBia(Long processId) {
+        Long orgId = TenantContext.requireOrganisationId();
         if (processId != null) {
             requireOwnedProcess(processId);   // reject cross-tenant processId before reading its BIAs
-            return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent();
+            return biaRepo.findByOrganisationIdAndProcessId(orgId, processId, Pageable.unpaged())
+                .getContent();
         }
-        // Return all BIA records for this org's processes
-        List<Long> processIds = processRepo.findByOrganisationId(TenantContext.requireOrganisationId(), Pageable.unpaged())
-            .map(CriticalProcess::getId).getContent();
-        if (processIds.isEmpty()) return List.of();
-        return biaRepo.findByProcessIdIn(processIds);
+        // ⚠ F2-279: read the tenant's rows by the tenant column, not by enumerating its
+        // process ids. The old form returned any row whose PARENT was ours, so a row whose
+        // own organisation_id named another tenant was served (probed). ix_bia_records_org
+        // exists for exactly this query.
+        return biaRepo.findByOrganisationId(orgId);
     }
 
     @Transactional
     public BiaRecord createBia(BiaRecord req) {
         // Mass-assignment defense — see createPlan(). Null id forces INSERT.
-        // BiaRecord carries no organisationId column; tenant scoping is
-        // inherited via the parent CriticalProcess link, so the target process
-        // must be validated to belong to the current tenant before persisting.
+        // The target process must belong to the current tenant before persisting.
         requireOwnedProcess(req.getProcessId());
         req.setId(null);
+        // ⚠⚠ F2-279: stamp the tenant. bcm.bia_records.organisation_id is
+        // BIGINT NOT NULL DEFAULT ((1)) and this entity did not map it, so Hibernate never
+        // named the column and THE DATABASE DEFAULT decided every row's tenant. It is not
+        // covered by ServerOwnedFieldsModule — that introspector's own javadoc says it
+        // "does not touch organisationId" — so the stamp has to be here, and it is
+        // unconditional so a body field can never survive it.
+        req.setOrganisationId(TenantContext.requireOrganisationId());
         return biaRepo.save(req);
     }
 
@@ -293,16 +305,31 @@ public class BcmService {
         existing.setMtpdHours(req.getMtpdHours());
         existing.setOverallImpact(req.getOverallImpact());
         existing.setStatus(req.getStatus());
+        // ⚠ F2-279: `BcmBiaRequest` has always declared linkedRiskId and this whitelist
+        // omitted it, so a BIA's linked risk was settable once at creation (the endpoint
+        // binds the entity) and frozen thereafter — an edit accepted with HTTP 200 and
+        // silently discarded. Frozen and protected are indistinguishable from the caller's
+        // side (F2-275), and the freeze protected nothing, since the create already
+        // accepted the value unvalidated.
+        // ⚠ It is still unvalidated: verifying the risk belongs to this tenant needs a
+        // bcm → risk module edge, and ModuleGraphRatchetTest is decrease-only and may never
+        // be raised. Nothing in the platform dereferences this column today, so no reader
+        // can be misled by a bad id — a fact about today, not a property of the control
+        // (F2-182). Filed with the graph blocker stated.
+        existing.setLinkedRiskId(req.getLinkedRiskId());
         return biaRepo.save(existing);
     }
 
     @Transactional
     public void deleteBia(Long id) {
-        // Tenant-scoped + soft delete: re-load under the parent-process tenant
-        // filter (throws 404 cross-tenant) and mark DELETED instead of the
-        // previous hard biaRepo.deleteById(id), which deleted across tenants.
+        // ⚠⚠ F2-279: set the platform's own soft-delete flag. This used to write
+        // status = 'DELETED' because the entity did not map is_deleted and carried no
+        // @Where, so DELETE answered 204 and the record STAYED IN THE LIST — rendered as a
+        // BIA whose status is the word DELETED (probed; 0 rows carry that token in either
+        // database, so nothing needs migrating). The entity's @Where(is_deleted = 0) is what
+        // makes this an actual delete, for all five finders at once.
         BiaRecord b = requireOwnedBia(id);
-        b.setStatus("DELETED");
+        b.setIsDeleted(true);
         biaRepo.save(b);
     }
 
@@ -384,8 +411,11 @@ public class BcmService {
         var plans = planRepo.findByOrganisationId(orgId, Pageable.unpaged()).getContent();
         var processesPage = processRepo.findByOrganisationId(orgId, Pageable.unpaged());
         long totalProcesses = processesPage.getTotalElements();
-        List<Long> processIds = processesPage.map(CriticalProcess::getId).getContent();
-        long totalBia = biaRepo.findByProcessIdIn(processIds).size();
+        // ⚠ F2-279: count by the tenant column, matching what listBia() returns. Counting
+        // by the parent-process link instead let this KPI disagree with the register it
+        // summarises (F2-197 — a figure that disagrees with the list it opens is worse than
+        // no figure), and it counted soft-deleted rows, which @Where now excludes.
+        long totalBia = biaRepo.findByOrganisationId(orgId).size();
         var exercises = exerciseRepo.findByOrganisationId(orgId, Pageable.unpaged()).getContent();
 
         long totalPlans = plans.size();
