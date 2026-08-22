@@ -14322,3 +14322,160 @@ is the *fix*, not the defect.
   portal is Arabic (house rule 7). Pre-existing across the whole family, not introduced here.
 - `privacy.data_breaches` still has `title_ar`/`description_ar` in dev only (V387 is one of the 47
   pending), and the bridge's INSERT sets neither.
+
+---
+
+## F2-282 · Three readers of one BIA register, two orderings and three null behaviours — and a `default` method would have hidden the fix from every test that mocks the repository
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`bb59b2bf`) |
+| **Severity** | **P3 (latent, and it gates an ISO 22301 control)** — a process can carry several BIA records and two of the ten live ones do. All three readers of `BiaRecordRepository#findByProcessIdIn` chose one per process with a hand-rolled loop, and the three loops disagreed on the ordering *and* on what to do with a null MTPD. RTO ≤ MTPD by definition, so the reader a control consults decides whether a continuity plan is compliant — and the vendor-inheritance control asks exactly that of a supplier's attested recovery time. They coincide on every live row today, which is what made it invisible |
+| **Found by** | asking F2-196's question of `bcm.bia_records` — *how many things read this, and do they agree?* — after F2-280 filed `bcm.critical_processes`' unmapped MTPD/RTO/RPO. Measured **nine** MTPD columns across `bcm`/`bcm_lc`, then read the three services that share one |
+| **Fix** | `module/bcm/service/BiaObjectives.authoritativeByProcess(...)` — one pure function, lowest stated MTPD, a row stating one always beating a row that does not · all three callers ask it · `ImpactRow`/`CascadeImpactRow` gain `mtpdSourceStatus` so an unapproved objective is visible · new `BiaObjectiveSelectionSharingTest` |
+| **Verified** | live read-only probe **14/14** as `compliance` + `rmanager` (13 impact rows across 3 cascades, every objective and status matching the lowest-MTPD BIA) · pre-fix control reverts the three callers and **2 of 8 legs fire**, `javap` checked, 8/8 after restore · backend **4473/0/0** · frontend `tsc` clean · `MtpdInheritanceServiceTest` passes **unchanged**, which is the tell that the second design was right |
+
+### Route in, and two redirections that are part of the finding
+
+[[F2-281]] filed two items. Re-deriving the first ([[F2-221]]) **weakened my own filing**: it said
+*"no non-admin persona can operate the bridge at all"* — true — while omitting that `ORG_ADMIN`
+holds **both** `PRIVACY:WRITE` and `CYBER:WRITE` and merely has no live holder. That is
+[[F2-253]]'s distinction, which the filing failed to apply: a role nobody holds has an
+administrator remedy, and a permission nobody can hold does not. Measured, every alternative grant
+is too wide — `DPO`/`PRIVACY_MANAGER`/`GRC_ADMINISTRATOR` would gain the **18-role** cyber write
+surface, `CISO`/`SECURITY_ANALYST` the whole privacy write surface including the DSR queue. So it
+is a narrower finding than filed, with a remedy, and the filing is corrected rather than executed.
+
+Then I asked F2-281's *question* of the whole emitting population — *what does a document ask a
+human to supply that the platform already knows?* Census: **36 placeholder literals in 19 files**.
+Refined to placeholders that instruct a human rather than HTML tags or `nullSafe` fallbacks, the
+population is essentially `IncidentService` **alone**, and F2-281 already closed the only two with
+a column behind them; the remaining seven are [[F2-209]]'s third state. 🔑 **A generalisation that
+returns nothing new is a result, not a dead end** ([[F2-216]]) — and saying so is what stops the
+next reader re-running it.
+
+### Nine columns for three objectives
+
+Measured against `sys.columns` in both databases, MTPD alone lives in nine places:
+
+| column | rows | values |
+|---|---|---|
+| `bcm.bia_records.mtpd_hours` | 10/10 | **72, 168, 336, 1** |
+| `bcm.bia_assessments.mtpd_hours` | 8/8 | 8, 12, 24, 48, 72, 216 |
+| `bcm_lc.bia_records.mtpd_hours` | 8/8 | 8, 24, 12 |
+| `bcm.bcp_plans.mtpd_hours` | 10/10 | 8, 12, 24 |
+| `bcm.dr_plans.mtpd_hours` | 16/17 | 8, 24, 48 |
+| `bcm.mtpd_inheritance_finding.process_mtpd_hours` | 8/8 | 4, 4, 8, 8 |
+| `bcm.plan_templates.default_mtpd_hours` | 8/8 | 24, 8, 48, 120 |
+| `bcm.bia_quantitative.mtpd_breach_at` | 1/1 | **`'72h'` — an `nvarchar`** |
+| **`bcm.critical_processes.mtpd_hours`** | **0/10** | the canonical register, unmapped ([[F2-280]]'s filed item, confirmed) |
+
+⚠ Two hypotheses were **refuted** before the real one landed, and both refutations matter.
+`BcmBiaAssessmentService` *does* enforce ISO 22301 — `validateRtoMtpd` blocks the `APPROVED`
+transition when RTO > MTPD — and it reads both from **one entity**, so it is internally sound.
+And the two selection rules that do differ **agree on all 8 processes today**, because in both
+multi-BIA cases the latest record also happens to be the lowest. The divergence is latent.
+
+### Three copies of one decision
+
+| reader | ordering | a null MTPD |
+|---|---|---|
+| `DependencyCascadeService` | lowest | may seed the map, then replaced by any non-null row |
+| `BcmBoardPackService` | lowest | **`continue`d past** — a process whose only BIA left MTPD blank was *absent from the board pack* rather than present with no objective |
+| `MtpdInheritanceService` | **latest by `assessmentDate`** | filtered only **after** selecting — so a blank MTPD on the most recent record cost the process its objective entirely, and the vendor gap became unmeasurable |
+
+🔑 **What made it harmless was three independent implementations happening to coincide, and nobody
+was maintaining that** ([[F2-177]]). The rule chosen is **lowest stated MTPD**, by measurement
+rather than taste: two of the three already did it, it is the conservative direction, and adopting
+it changes nothing on either live database.
+
+⚠ The cascade's own javadoc said step 3 uses *"first-found ordering"*. **False** — it has always
+preferred the lowest. The comment understated the code, which is the safe direction to be wrong in,
+and it is corrected rather than deleted because the ordering is the whole reason a process with two
+BIAs gets a defensible answer ([[F2-184]]'s shape, benign variant).
+
+🔑 **And the comment that named these three callers was mine.** [[F2-279]]'s
+`BiaRecordRepository` javadoc enumerates all three and asks only the **tenant** question of them.
+[[F2-215]]'s two-of-N inside a comment: a reader who finds the callers listed and one question
+answered does not then ask what the other question is.
+
+### The design correction, which is the reusable part
+
+⚠⚠ The first draft put the predicate on `BiaRecordRepository` as a **`default` method**. It
+compiled, it passed all eight of its own legs — and it **broke two existing
+`MtpdInheritanceServiceTest` cases**, because **a Mockito mock does not execute default methods**.
+The mocked repository answered nothing, the stubbed `findByProcessIdIn` went unused (surfacing as
+`UnnecessaryStubbing`) and the resolved MTPD silently became empty.
+
+🔑🔑 **A decision placed on a mockable interface is a decision every test that mocks that interface
+silently loses.** [[F2-237]]'s family — *a mocked collaborator answers, and then the test is
+asserting the mock* — at a new site, and the failure mode is the dangerous direction: had those two
+tests not existed, the predicate would have shipped returning nothing under every mock in the tree.
+
+A static function over a supplied list has no such hole: the callers keep their existing query, so
+**the two tests then passed unchanged**, which is the tell that the second design was right rather
+than merely different. `theRepositoryDeclaresNoDecision` keeps it off the interface.
+
+### What is deliberately not fixed
+
+⚠⚠ Neither the old loops nor the new predicate consults `status`, and **4 of 8 processes resolve to
+an unapproved BIA**. For `Core Banking Operations` (CRITICAL) the winner is an `IN_PROGRESS` record
+stating MTPD **1h** over an `APPROVED` one stating **72h** — a 72× difference on the process a
+Saudi bank's continuity plan is built around. `bcm.bia_records` has **zero CHECK constraints** and
+holds `APPROVED` 6 / `IN_PROGRESS` 2 / `UNDER_REVIEW` 1 / `DRAFT` 1.
+
+Preferring the approved row would make these controls report **less** disruption on a customer's
+data, and nothing here can tell whether 1h or 72h is that organisation's real tolerance — 72 hours
+for core banking is implausible, which is itself a reason to think the *draft* is the better number
+and the approved figure is stale seed data. So the status is put **on the wire**
+(`mtpdSourceStatus`, disclosed on every cascade impact row) and the choice is filed.
+🔑 [[F2-197]]: disclose, never manufacture an all-clear — and a control reporting less risk is
+exactly the change that must not be a side effect of a de-duplication.
+
+### My own errors, both caught by running things
+
+⚠ The gate's detector had **two loose alternatives**, one of them
+`(?:<|>)\s*\w+\.getMtpdHours\(\)` — and **a Java lambda arrow contains a `>`**, so
+`.filter(b -> b.getMtpdHours() != null)` matched and the gate failed on the correct code this slice
+had just written. A gate that fails on correct code trains the next reader to edit the assertion
+rather than the code ([[F2-214]]). Requiring the getter on **both** sides is the pattern's actual
+claim, and the two lambda shapes are now must-not-match cases.
+
+⚠ The pre-fix control initially reverted the repository too, so the test referenced a method that
+did not exist and the control **failed to compile** — and a control that cannot run reads exactly
+like a gate that passed ([[F2-278]]/[[F2-212]]). Rescoped to the three callers it fires **2 of 8**;
+the other six are the predicate's own unit tests, the detector self-test with its positive and
+negative controls, and the written-once pin on the file the control deliberately keeps ([[F2-225]] —
+name which legs discriminate rather than counting green).
+
+⚠ And the probe guessed a route again: `/api/v1/bcm/mtpd-inheritance/dependencies` is
+`/api/v1/bcm/process-vendor-dependencies`, and `/assessments` is guarded
+`hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')` — so `compliance`
+getting **403 was correct behaviour**, not a defect. Resolve routes and guards from the controller
+(the recurring landmine since [[F2-198]]); the corrected probe asserts that 403 as a leg.
+
+### Measured in passing, and filed
+
+- **`bcm.critical_processes.{mtpd,rto,rpo}_hours` — NULL on all 10 rows, unmapped.** The canonical
+  process register states none of the three ISO 22301 objectives; every reader goes to a BIA
+  instead. F2-280's filed item, confirmed and still open: mapping columns that are empty everywhere
+  would be an inert mapping ([[F2-184]]), so this needs a product decision about whether the
+  process or the BIA owns the objective.
+- **Two live BIAs per process for the two most critical processes**, differing 72× and 168×
+  (`Core Banking Operations` 72h/1h, `Customer Onboarding` 168h/1h), identical in dev and prod.
+  Whether both should exist is an owner decision; the platform has no uniqueness constraint and no
+  supersede path on that register.
+- **`bcm.bia_assessments.process_id` is NULL on all 8 rows**, so the register the ISO 22301
+  RTO ≤ MTPD gate guards is linked to **no process at all** and no process appears in both BIA
+  registers. F2-196's disjoint-register shape, and the reason the gate's own soundness does not help
+  the three readers.
+- **`bcm.mtpd_inheritance_finding.process_mtpd_hours` holds 4/4/8/8** — matching neither the lowest
+  nor the latest BIA for those processes, so the stored SAMA-outsourcing findings are stale seed
+  values and a recompute moves them. For process 1 it would go 4h → 1h, widening the gap against
+  vendor 8 from 4h to 7h and turning vendor 3's `INFO` into a finding.
+- **`DependencyCascadeService` has no test of any kind** ([[F2-248]]), which is why the detector plus
+  its controls carries the weight for that caller.
+- `MtpdInheritanceController` guards five routes with `hasAnyRole(...)` naming **`BCM_MANAGER`**, the
+  zero-holder role [[F2-253]]/[[F2-254]] measured — another F2-05 conversion site, not this slice.
+- **F2-281's bridge filing, corrected**: `ORG_ADMIN` holds both required permissions and has no live
+  holder, so there is an administrator remedy; every alternative grant is too wide.
