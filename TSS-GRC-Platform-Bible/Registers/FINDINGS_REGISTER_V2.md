@@ -2668,7 +2668,25 @@ are the ones whose store has a real server side, since there the browser is mint
 server should own — `ACC-` (risk acceptances) and `KRI-BR-` in `riskLifecycle.ts`, `IR-`/`SOC-`/`PT-`
 in `cyberLifecycle.ts`, and `CLS-` in `ContractClausesPage` ([[F2-267]] already identified that one).
 `RES-`/`ACT-` in `CommitteesPage` mint from a local `seq` counter against a server-backed committee
-register, which is a race as well as a provenance question.
+register.
+
+⚠ **`RES-`/`ACT-` MEASURED AND REFUTED as a corruption risk (F2-270), and with them the seam.**
+Both columns already carry a UNIQUE index — `UQ_resolution_code` and `UQ_action_item_code`, on
+`(organisation_id, code)`, present in **both** databases with **0 duplicate groups** (22 resolutions
+in dev and 20 in prod, 33 actions in each — the two databases differ, so that is a measurement
+rather than an assumption). A concurrent filing is therefore **refused, not duplicated**: a UX gap
+with no retry on conflict, not a data defect — [[F2-259]]'s verdict, exactly as [[F2-267]] found for
+nine of ten members. What *was* wrong is the prose: both minters carried comments claiming the code
+*"can't collide with an existing one"* / *"collision-safe"*, which is true of the list the page has
+loaded and silent about the database — and the action one **named the index**, which is what made
+the claim look checked ([[F2-184]]). Corrected in place.
+
+🔑 **Three slices in, this seam is worked out, and recording that is worth more than finding it a
+fourth time.** [[F2-266]], [[F2-267]] and [[F2-269]] closed the genuinely sharp members — a code
+with no minter and no unique index, and an authority's reference invented in the browser. Every
+remaining candidate has resolved the same way: **ask the unique-index question first, and where one
+exists the answer is a naming question.** The next slice should change the question rather than work
+down this list.
 
 ## F2-268 · F2-202's rule has two halves, and the deadline half had never been counted
 
