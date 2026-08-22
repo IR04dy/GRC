@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Status** | 🟢 CLOSED 2026-08-22 (`3d7f0719`) |
 | **Severity** | **P2** — the PDPL Article 31 purpose of processing, the Article 18 disposal method, a privacy notice's archive reason and a data-sharing agreement's termination reason could none of them be recorded in Arabic |
 | **Found by** | executing [[F2-271]]'s filed 45-member EN_ONLY work list — **reading each member rather than batching**, which is why it filed them with no verdicts ([[F2-188]]) |
 | **Fix** | `V388` adds four nullable, width-mirrored `*_ar` columns · four entities, three DTO records, three writers and one controller follow in the same commit · ceilings `BASELINE_EN_ONLY` **45 → 41** and the sum **204 → 200** |
