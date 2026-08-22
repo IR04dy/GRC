@@ -43,6 +43,10 @@ public class CapaTask {
     @Column(name = "cancelled_at") private LocalDateTime cancelledAt;
     @Column(name = "cancellation_reason_en", columnDefinition = "NVARCHAR(MAX)") private String cancellationReasonEn;
 
+    /** F2-275 (V389) - house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every record predating V389 uneditable, and nothing can invent Arabic governance text (F2-30's reason). */
+    @Column(name = "cancellation_reason_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String cancellationReasonAr;
+
     @Column(name = "progress_notes_en", columnDefinition = "NVARCHAR(MAX)") private String progressNotesEn;
     @Column(name = "progress_notes_ar", columnDefinition = "NVARCHAR(MAX)") private String progressNotesAr;
     @Column(name = "evidence_refs", columnDefinition = "NVARCHAR(MAX)") private String evidenceRefs;

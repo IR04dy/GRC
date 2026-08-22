@@ -39,6 +39,7 @@ public class ApprovalRequestDto {
     private String decisionCommentAr;
     private String delegatedFrom;
     private String delegationReasonEn;
+    private String delegationReasonAr;
 
     public static ApprovalRequestDto from(ApprovalRequest e) {
         return ApprovalRequestDto.builder()
@@ -52,7 +53,7 @@ public class ApprovalRequestDto {
             .status(e.getStatus())
             .decidedAt(e.getDecidedAt()).decidedBy(e.getDecidedBy())
             .decisionCommentEn(e.getDecisionCommentEn()).decisionCommentAr(e.getDecisionCommentAr())
-            .delegatedFrom(e.getDelegatedFrom()).delegationReasonEn(e.getDelegationReasonEn())
+            .delegatedFrom(e.getDelegatedFrom()).delegationReasonEn(e.getDelegationReasonEn()).delegationReasonAr(e.getDelegationReasonAr())
             .build();
     }
 
@@ -66,5 +67,6 @@ public class ApprovalRequestDto {
         // For DELEGATED:
         private String newAssignedTo;
         private String delegationReasonEn;
+        private String delegationReasonAr;
     }
 }

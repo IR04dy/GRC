@@ -53,6 +53,10 @@ public class RegulatoryChange {
     @Column(name = "linked_evidence", columnDefinition = "NVARCHAR(MAX)") private String linkedEvidence;
 
     @Column(name = "deprioritisation_reason_en", columnDefinition = "NVARCHAR(MAX)") private String deprioritisationReasonEn;
+
+    /** F2-275 (V389) - house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every record predating V389 uneditable, and nothing can invent Arabic governance text (F2-30's reason). */
+    @Column(name = "deprioritisation_reason_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String deprioritisationReasonAr;
     @Column(name = "closed_at") private LocalDateTime closedAt;
 
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt = LocalDateTime.now();

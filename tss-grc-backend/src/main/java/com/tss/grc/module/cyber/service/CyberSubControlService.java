@@ -63,10 +63,28 @@ public class CyberSubControlService {
     /**
      * F2-213 — the fields an operator can actually edit through this endpoint.
      *
-     * Persisting the REQUEST OBJECT nulled `descriptionAr`, which `CyberSubControlRequest`
-     * does not declare — so editing an NCA ECC sub-control through the English form deleted
-     * its Arabic description, in a platform whose primary language is Arabic (house rule 7).
-     * Preserved here; offering it means adding the input, which is filed, not invented.
+     * <p>Persisting the REQUEST OBJECT nulled {@code descriptionAr}, because the form that drives
+     * this endpoint does not send it — so editing an NCA ECC sub-control through the English form
+     * deleted its Arabic description, in a platform whose primary language is Arabic (house rule 7).
+     *
+     * <p>⚠⚠ F2-275 — {@link com.tss.grc.common.BilingualWriteSymmetryTest} flagged this on its
+     * first run, and the finding is that <b>preserving a field is not the same as protecting it</b>.
+     * Omitting {@code descriptionAr} from this whitelist stopped the deletion and left the column
+     * <b>permanently uneditable</b> — F2-272's defect on
+     * {@code privacy.processing_activities.purpose_ar} exactly, where an edit was accepted with HTTP
+     * 200 and silently discarded. 🔑 <b>Frozen and protected are indistinguishable from the
+     * caller's side.</b> A NULL GUARD gives both properties at once: an omitted Arabic description
+     * leaves the stored one alone, and a supplied one is written.
+     *
+     * <p>⚠ And a correction to my own correction, which is the more useful half. I first wrote that
+     * {@code CyberSubControlRequest} <i>"does not exist — its only occurrence in the whole tree was
+     * this sentence"</i>, having grepped the Java tree alone. <b>It exists in TypeScript</b>
+     * ({@code tss-grc-ui-v2/src/lib/api.ts}), which is exactly what F2-213 meant and what
+     * {@code FullReplaceUpdateContractTest}'s reverse leg then proved by failing the build the
+     * moment this write was added: the server may not write a column its only client cannot put on
+     * the wire. So the fix is BOTH halves in one commit — the guarded write here and the field on
+     * the frontend type. 🔑 <b>"That type does not exist" is a claim about every tree, and this
+     * platform has two.</b>
      */
     private void applyEditable(CyberSubControl existing, CyberSubControl req) {
         existing.setControlId(req.getControlId());
@@ -74,6 +92,7 @@ public class CyberSubControlService {
         existing.setTitleEn(req.getTitleEn());
         existing.setTitleAr(req.getTitleAr());
         existing.setDescriptionEn(req.getDescriptionEn());
+        if (req.getDescriptionAr() != null) existing.setDescriptionAr(req.getDescriptionAr());
         existing.setControlOwner(req.getControlOwner());
         existing.setImplementationStatus(req.getImplementationStatus());
         existing.setMaturityLevel(req.getMaturityLevel());

@@ -286,6 +286,9 @@ public class ApprovalRequestService {
             r.setDelegatedFrom(r.getAssignedTo());
             r.setAssignedTo(req.getNewAssignedTo());
             if (req.getDelegationReasonEn() != null) r.setDelegationReasonEn(req.getDelegationReasonEn());
+            // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
+            // omitted Arabic reason leaves the stored one alone rather than clearing it.
+            if (req.getDelegationReasonAr() != null) r.setDelegationReasonAr(req.getDelegationReasonAr());
         }
         // PENDING (re-pending from DELEGATED) keeps assignedTo as set by the
         // prior DELEGATED transition — no field mutation needed here.

@@ -110,6 +110,9 @@ public class AuditEngagementService {
             case "CANCELLED"  -> {
                 e.setCancelledAt(now);
                 if (req.getCancellationReasonEn() != null) e.setCancellationReasonEn(req.getCancellationReasonEn());
+                // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
+                // omitted Arabic reason leaves the stored one alone rather than clearing it.
+                if (req.getCancellationReasonAr() != null) e.setCancellationReasonAr(req.getCancellationReasonAr());
             }
             default -> { /* no extra side-effects */ }
         }

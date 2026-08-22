@@ -178,6 +178,9 @@ public class NcaEccFilingService {
             case "CANCELLED" -> {
                 f.setCancelledAt(now);
                 if (req.getCancellationReasonEn() != null) f.setCancellationReasonEn(req.getCancellationReasonEn());
+                // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
+                // omitted Arabic reason leaves the stored one alone rather than clearing it.
+                if (req.getCancellationReasonAr() != null) f.setCancellationReasonAr(req.getCancellationReasonAr());
             }
             default -> { /* DRAFT (revision) — no extra side-effects */ }
         }

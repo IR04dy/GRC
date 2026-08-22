@@ -49,5 +49,9 @@ public class ApprovalRequest {
     @Column(name = "delegated_from", length = 255) private String delegatedFrom;
     @Column(name = "delegation_reason_en", columnDefinition = "NVARCHAR(MAX)") private String delegationReasonEn;
 
+    /** F2-275 (V389) - house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every record predating V389 uneditable, and nothing can invent Arabic governance text (F2-30's reason). */
+    @Column(name = "delegation_reason_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String delegationReasonAr;
+
     @Column(name = "is_deleted", nullable = false) private Short isDeleted = 0;
 }
