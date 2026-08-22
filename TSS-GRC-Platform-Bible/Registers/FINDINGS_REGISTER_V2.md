@@ -13203,3 +13203,134 @@ Dependency-ordered, not severity-ordered. Severity says what matters; this says 
 **The one decision that must be made before Wave 2:** is the commercial model **per-module SKUs** or a
 single suite? F2-04, F2-05 and F2-06 are P0/P1 under the first reading and P2 hygiene under the second.
 This is Baseline §9 question 2, and it is a business decision — it is not ours to assume.
+
+## F2-276 · A gate's population had three narrowings, not one — and the sibling gate is immune because it reflects
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`8219c056`) |
+| **Severity** | **P3** — a latent-hazard closure, not a defect discovery, and saying which is the point (F2-274). 29 bilingual pairs were outside the write-symmetry gate's population; **0** of them turned out to be asymmetric. The one live thing found was a capacity asymmetry on `cyber.cyber_frameworks`, where an English framework name the register could not hold had an Arabic translation it could |
+| **Found by** | executing [[F2-275]]'s own filing and **disbelieving it** |
+| **Fix** | the bare-stem pair branch + FQN keying + import-resolved writers in `BilingualWriteSymmetryTest` · a new declared-capacity leg in `BilingualInvariantRatchetTest` · `V390` widens two English columns to mirror their Arabic siblings · the census published to `target/bilingual-write-symmetry.txt` |
+| **Verified** | gate **597 pairs / 0 asymmetric** (585 suffix + 12 bare-stem) · V390 applied twice, both pairs mirrored, Arabic untouched, 6 rows unchanged · live probe **9/9** as `so_officer` · harness **6 killed / 0 survived / 0 anchor-miss** · backend **4407/0/0** |
+
+### F2-275's filing was wrong, and the refutation is the finding
+
+That filing named nine EN_ONLY members in `evidence` and described one of them as *"an `evidence_guidance_ar`
+with **no English sibling** — the mirror case."* Measured across both databases, Arabic columns with no
+English half of **any** spelling number **0**. The English half is `evidence_guidance` — a **bare stem** with
+no `_en` suffix — populated on **654 of 654** rows against the Arabic half's **610**.
+
+So the pair is complete, the data is fine, and the defect was in the instrument. `BilingualWriteSymmetryTest`
+pairs `xEn` with `xAr`; so does `BilingualInvariantRatchetTest`, whose two buckets (ASYMMETRIC, EN_ONLY) are
+both keyed on the English half carrying the suffix. **A pair spelled `evidenceGuidance` / `evidenceGuidanceAr`
+is in neither bucket and outside both gates** — not tolerated, not exempted, never asked about.
+
+🔑 F2-198's shape after a filename, a three-entry allow-list, a module name, an `extends` clause, a field-name
+list inside a fix and a claim shape in a gate. Here the narrowing is **a naming convention**. Measured: **12**
+such pairs on entities, **13** columns in the database.
+
+### The second narrowing, and why the sibling gate never had it
+
+An annotation sweep over the 12 printed `!! 2 entity files named Vendor.java`, which is how the next one
+surfaced. `BilingualWriteSymmetryTest` keyed its field map on the entity's **simple name** in a
+`LinkedHashMap`, so for the 15 simple names this platform declares in two packages the second file visited
+**overwrote** the first — not a union, a replacement — and every bilingual pair on the losing twin left the
+population. Measured cost: **568 pairs where 585 exist.**
+
+🔑🔑 **`BilingualInvariantRatchetTest` cannot have this defect, because it enumerates entities by REFLECTION and
+gets distinct `Class` objects.** My gate reads source. CLAUDE.md records the rule — *"measure this from
+BYTECODE, never a source regex"*, with four pattern mistakes and three phantom counts behind it — and I wrote
+a source-reading gate one slice ago knowing it. [[F2-222]] filed the duplicate-name hazard as latent on the
+ground that *"no key collapses two registers today"*; **a census keyed on the same name is exactly where it
+stops being latent**, and it fails in the quiet direction, because fewer pairs reads as a cleaner tree.
+
+The writer resolution moved to the **import** at the same time, and the direction is what matters:
+over-approximating the ARABIC half **hides** an asymmetry, which is the whole defect this gate exists to catch.
+
+### The third narrowing was honest, and it is a filing
+
+The database shows 13 bare-stem columns and the gate reports 12. `privacy.privacy_assessments.title /
+title_ar` belongs to a `V1` table with **no `@Entity`, no repository and no controller** — [[F2-204]]'s
+`NO_SERVER_SURFACE` shape, 6 live rows — so no entity-side gate can pair it. Its module's
+`package-info.java` still advertises `PrivacyAssessment` as a module type ([[F2-184]]'s shape). Filed rather
+than mapped: `privacy.dpia` is the real assessment register, so adding a second is [[F2-196]]'s defect.
+
+### The live half: the two halves of a pair had different CAPACITIES
+
+V387, V388 and V389 each assert that a **new** Arabic column mirrors its English sibling's width. That had
+never been applied to the pairs already there. Measured over both databases, **643 pairs, exactly 2
+mismatches**, both on `cyber.cyber_frameworks` and both with the **English** half narrower:
+
+| column | was | sibling |
+|---|---|---|
+| `name` | NVARCHAR(100) | `name_ar` NVARCHAR(255) |
+| `description_en` | NVARCHAR(500) | `description_ar` NVARCHAR(MAX) |
+
+⚠⚠ **The entity is the tell, and the bean-level symmetry is what concealed it.** `descriptionEn` and
+`descriptionAr` carry the **identical** annotation — `@Column(columnDefinition = "NVARCHAR(MAX)")` — against
+columns of 500 and MAX. `columnDefinition` is a **claim**, not a constraint: Hibernate only emits it when it
+generates DDL, and `ddl-auto=none` means this platform never does. And `name` carried
+`@Column(nullable = false)` with **no length at all**, so the bean assumed JPA's 255 default against a
+100-character column — a 101-character English framework name passes every validator and is refused by SQL
+Server as **error 2628**, a 500 rather than a 400 naming the field, and 2628 does not report the limit
+([[F2-185b]]'s family).
+
+V390 **widens the English halves and never narrows the Arabic**: widening cannot refuse a row that exists
+today, the Arabic widths are the ones V37 chose deliberately, and it makes the entity's own declared intent
+true for the first time. Six self-checks THROW, including one asserting the Arabic halves were **not** touched,
+because the mirror can be satisfied from either side and narrowing Arabic is the wrong repair. Longest stored
+values are 9 and 175 characters, so this closes a latent asymmetry rather than repairing damage.
+
+⚠ **The new capacity leg would NOT have caught it, and it says so.** Both halves declared the same capacity;
+the asymmetry was between the declaration and the column, which no hermetic gate can see under
+`ddl-auto=none`. What the leg closes is the **inverse** hazard — declaring different capacities, where the
+declaration is all a reader has. The schema half is enforced by V387–V390's own THROWing self-checks.
+
+### All three mutation survivors were equivalent on this corpus, and each was a missing floor
+
+With `asymmetric = 0` and every declared capacity matching, reverting the writer narrowing, dropping the
+bare-stem spelling from the capacity leg, or ignoring `columnDefinition` entirely all changed **nothing
+observable**. Per [[F2-206]] a survivor is a hole only if the mutated code is wrong — all three were wrong,
+and undetectable. Closed by assertion rather than recorded as equivalent ([[F2-263]]'s precedent):
+
+- **the pair floor sits at 590**, between the largest wrong answer (~580, the broken keying plus the
+  bare-stem branch) and the truth (597). A floor of 500 — or of 570 — cannot tell the fix from its absence
+  ([[F2-215]]).
+- **the capacity leg counts its own bare-stem and `columnDefinition` comparisons** and requires both to be
+  non-trivial, so a leg that stops reading either reports it.
+- **the import narrowing is asserted by measurement**: at least one field on a duplicate-named entity must
+  give a different writer answer for its two twins, or the per-owner narrowing is doing nothing.
+
+6 killed / 0 survived / 0 anchor-miss after. One anchor-miss was mine, from restructuring the code the anchor
+pointed at — a distinct non-zero outcome precisely so it cannot read as a pass ([[F2-212]]).
+
+### Two probe corrections, both mine
+
+My payload sent `"code": "REVTEST-F276"` and the entity's field is **`frameworkCode`**. The endpoint binds the
+**entity**, Spring Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`, so the key was **silently discarded** — and the
+row was created anyway, so the lookup leg failed for a reason unrelated to its claim ([[F2-244]]) while the
+create it depended on had worked. 🔑 [[F2-214]]'s exact shape, in my own probe, three slices after recording it.
+
+⚠ And my first frontend check grepped `lib/api.ts` alone, reporting `purposeAr` and `subProcessorLegalNameAr`
+as absent from the TypeScript wire — a PDPL Article 30 register's legal name looked English-only. Both modules
+have **their own** client (`lib/digitalSignature.ts`, `lib/subprocessors.ts`). All 12 bare-stem Arabic halves
+are on the wire. 🔑 **A detector scoped to one file reports a smaller population, and here the smaller
+population read as a finding rather than as a clean tree.**
+
+### Filed
+
+- **The 9 `evidence` EN_ONLY members stand as a work list**, with the shape now measured: every one of the
+  eight tables is bilingual for its **name or title** and monolingual for its **description**, and
+  `evidence.evidence_reviews` has no Arabic column of any kind (19 rows, `notes_en` filled 10). Populations
+  are real — `controls` 174 rows all filled, `sub_controls` 572 of 654, `frameworks` 16 of 16 — so this is a
+  migration plus nine writers, not a batch.
+- `privacy.privacy_assessments`: 6 live rows, no entity, no repository, no controller, and a
+  `package-info.java` that advertises the type. Mapping it is an **owner decision**, because `privacy.dpia`
+  already is the assessment register.
+- `cyber.cyber_frameworks` holds **2 of 6 rows with no Arabic name** and **0 of 6 with an Arabic
+  description** — house rule 7 in data rather than in schema. No backfill: inventing Arabic governance text is
+  fabrication, so this needs a tenant to supply it.
+- **Two test-support entity enumerators** now exist for one question (this gate's source walk and the
+  ratchet's reflective `entities()`), which is [[F2-190]]'s shape. Extracting one would let the source-reading
+  gate inherit reflection's immunity to the simple-name collapse.
