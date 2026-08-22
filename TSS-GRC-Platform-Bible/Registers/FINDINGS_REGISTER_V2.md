@@ -14295,6 +14295,18 @@ is the *fix*, not the defect.
   resolve may simply be one nobody cleaned up in either.**
 - **Pre-existing `[REVIEW-TEST]` residue in the PRODUCTION database, from earlier slices.** Measured
   while sweeping this one: **11 columns across 9 prod tables** carry the tag, including
+  ⚠ **Corrected by [[F2-285]]'s sweep, 2026-08-22: that figure counted the tables this entry
+  goes on to NAME. The full sweep of every text column says 19 columns across 12 tables,
+  21 rows in 10 registers** — the omissions are `cyber.incidents.description`,
+  `cyber.incidents.personal_data_pii_assessment`, `evidence.evidence_request_comments.body`,
+  `socops.security_event.rule_name`, `.source_system`, and the two append-only trail tables
+  (`platform.audit_log` 145 messages, `platform.notifications` 11). The newest tagged register
+  row is `risk.risks` at **2026-07-06** and the newest tagged prod audit message is
+  **2026-07-09**, so the dating holds and nothing since has added to it. 🔑 **A count produced
+  by naming what you can see measures your own enumeration** — print the sweep's total beside
+  it. ⚙ The DEV half of the same sweep is the control worth keeping: **11 columns and ZERO
+  register rows**, every hit append-only trail, which cannot be cleaned without deleting audit
+  history — so a non-zero dev column count is not by itself residue.
   `cyber.incidents.title` ×4 (all soft-deleted, all created 2026-07-04 by `admin` — the CY-B / CY-C
   / SOC-C probes), `cyber.cyber_action_plans.description_en` ×4, `cyber.cyber_incidents.title_en` ×2,
   `socops.security_event.external_id` ×2, and one row each in `capa.tasks` (already filed by
