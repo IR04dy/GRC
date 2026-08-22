@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -343,6 +344,108 @@ class BilingualInvariantRatchetTest {
         Column col = f.getAnnotation(Column.class);
         String column = col == null || col.name().isBlank() ? f.getName() : col.name();
         return schema + "." + table + "." + column;
+    }
+
+    /**
+     * F2-276 — the two halves of a bilingual pair must DECLARE the same capacity.
+     *
+     * <p>This class asks whether the Arabic sibling <b>exists</b> and whether it is
+     * <b>annotated</b> symmetrically. A third question sits beside those two and had never been
+     * asked: do the two halves have the same <b>capacity</b>? A mismatch means one language can
+     * express a value the other cannot, which is house rule 7 in a dimension nobody measured.
+     *
+     * <p>Measured over both databases, 643 En/Ar column pairs carried exactly <b>2</b> mismatches,
+     * both on {@code cyber.cyber_frameworks} and both with the ENGLISH half narrower —
+     * {@code name} NVARCHAR(100) against {@code name_ar} NVARCHAR(255), and
+     * {@code description_en} NVARCHAR(500) against {@code description_ar} NVARCHAR(MAX). V390
+     * widened the English halves (widening cannot refuse a row that exists; narrowing Arabic can).
+     *
+     * <p>⚠⚠ <b>This leg would NOT have caught that, and saying so is the point.</b> Both halves of
+     * the description pair carried the <b>identical</b> annotation,
+     * {@code @Column(columnDefinition = "NVARCHAR(MAX)")}, against columns of 500 and MAX — so the
+     * pair was symmetric at the bean and asymmetric at the schema, and {@code ddl-auto=none} means
+     * nothing ever compares the claim with the column. What this leg closes is the <b>inverse</b>
+     * hazard, which is real and distinct: declaring different capacities for the two halves, where
+     * the declaration is all a reader has. The schema half is enforced by V387–V390's own THROWing
+     * self-checks, which run on every deployment.
+     *
+     * <p>⚠ Deliberately covers BOTH spellings of the English half — {@code xEn} and the bare
+     * {@code x} that F2-276 found 12 of. A new leg keyed on the same narrowing as the old ones
+     * would be this slice's own finding, one method down.
+     */
+    @Test
+    void bothHalvesOfABilingualPairDeclareTheSameCapacity() {
+        List<String> mismatched = new ArrayList<>();
+        int pairs = 0;
+        int bareStem = 0;
+        int viaColumnDefinition = 0;
+        for (Class<?> c : entities()) {
+            Map<String, Field> byName = new LinkedHashMap<>();
+            for (Field f : c.getDeclaredFields()) {
+                if (f.getType() == String.class) byName.put(f.getName(), f);
+            }
+            for (Field ar : byName.values()) {
+                if (!ar.getName().endsWith("Ar")) continue;
+                String stem = ar.getName().substring(0, ar.getName().length() - 2);
+                Field en = byName.get(stem + "En");
+                boolean bare = false;
+                if (en == null) {
+                    en = byName.get(stem);                     // bare-stem spelling (F2-276)
+                    bare = en != null;
+                }
+                if (en == null) continue;
+                pairs++;
+                if (bare) bareStem++;
+                String de = declaredCapacity(en);
+                String da = declaredCapacity(ar);
+                if (de.startsWith("NVARCHAR") || da.startsWith("NVARCHAR")) viaColumnDefinition++;
+                if (!de.equals(da)) {
+                    mismatched.add(c.getSimpleName() + "." + stem
+                                   + " en=" + de + " ar=" + da);
+                }
+            }
+        }
+
+        // ⚠⚠ Both anti-vacuity numbers exist because the mutation harness proved a bare
+        // `pairs > 500` cannot see either narrowing being reintroduced: on a tree where every
+        // declared capacity already matches, dropping a whole spelling or a whole annotation from
+        // the comparison changes NOTHING observable. A floor has to sit above the largest WRONG
+        // answer, not above zero (F2-215).
+        assertThat(pairs)
+            .as("anti-vacuity: the pair scan found almost nothing, so this leg would pass over any "
+              + "capacity mismatch. A pattern that stops matching reports a clean tree (F2-69).")
+            .isGreaterThan(500);
+        assertThat(bareStem)
+            .as("The bare-stem spelling has left this comparison, so the leg has re-acquired the "
+              + "exact narrowing its own javadoc warns about — an Arabic field whose English half "
+              + "carries no `En` suffix would stop being compared at all (F2-276).")
+            .isGreaterThan(5);
+        assertThat(viaColumnDefinition)
+            .as("No pair is being compared through its `columnDefinition`, so this leg is only "
+              + "reading `length` — and a pair declaring NVARCHAR(MAX) against NVARCHAR(500) is "
+              + "then invisible, which is the exact shape V390 repaired.")
+            .isGreaterThan(20);
+
+        assertThat(mismatched)
+            .as("These bilingual pairs DECLARE different capacities, so one language can express a "
+              + "value the other cannot — house rule 7 in the width dimension. Widen the English "
+              + "half to match the Arabic, never the reverse: widening cannot refuse a row that "
+              + "exists today and Arabic is not shorter than English. Measured %d pairs.", pairs)
+            .isEmpty();
+    }
+
+    /**
+     * What the mapping CLAIMS this column can hold. {@code columnDefinition} wins when present
+     * because that is what Hibernate would emit; otherwise the JPA default is 255, which is a claim
+     * a reader has no reason to doubt and which nothing verifies under {@code ddl-auto=none}.
+     */
+    private static String declaredCapacity(Field f) {
+        Column col = f.getAnnotation(Column.class);
+        if (col == null) return "length=255";
+        if (!col.columnDefinition().isBlank()) {
+            return col.columnDefinition().trim().toUpperCase(java.util.Locale.ROOT);
+        }
+        return "length=" + col.length();
     }
 
     /** @return every {@code *_en}/{@code *_ar} pair, regardless of constraints. */

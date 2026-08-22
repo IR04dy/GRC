@@ -21,7 +21,18 @@ public class CyberFramework {
     @Column(name = "organisation_id", nullable = false)
     private Long organisationId;
 
-    @Column(nullable = false)
+    /**
+     * F2-276 — the length is DECLARED now, and V390 is what made the declaration true.
+     *
+     * <p>This carried {@code @Column(nullable = false)} with no length, so the bean assumed
+     * Hibernate's 255-character default against a {@code NVARCHAR(100)} column while its Arabic
+     * sibling below was explicitly {@code length = 255}. The two halves of one bilingual pair had
+     * different capacities: a 101-character English framework name passed every validator and was
+     * refused by SQL Server as error 2628 — a 500 rather than a 400 naming the field, and 2628 does
+     * not report the limit. Nothing could see it, because {@code ddl-auto=none} means no one ever
+     * compares a mapping's claim with the column.
+     */
+    @Column(nullable = false, length = 255)
     private String name;
 
     private String version;
