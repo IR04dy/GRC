@@ -50,6 +50,7 @@ public class NcaEccFilingDto {
     private LocalDateTime acknowledgedAt;
     private LocalDateTime cancelledAt;
     private String cancellationReasonEn;
+    private String cancellationReasonAr;
     private String linkedCapaIds;
     private String linkedEvidence;
 
@@ -73,7 +74,7 @@ public class NcaEccFilingDto {
             .cisoApprovalAt(e.getCisoApprovalAt()).cisoApprover(e.getCisoApprover())
             .submittedAt(e.getSubmittedAt()).submissionReference(e.getSubmissionReference())
             .acknowledgedAt(e.getAcknowledgedAt())
-            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn())
+            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn()).cancellationReasonAr(e.getCancellationReasonAr())
             .linkedCapaIds(e.getLinkedCapaIds()).linkedEvidence(e.getLinkedEvidence())
             .build();
     }
@@ -94,6 +95,7 @@ public class NcaEccFilingDto {
         private String peerReviewCommentsEn;
         private String submissionReference;
         private String cancellationReasonEn;
+        private String cancellationReasonAr;
         private String linkedCapaIds;
         private String linkedEvidence;
     }

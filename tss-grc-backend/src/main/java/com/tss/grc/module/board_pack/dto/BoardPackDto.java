@@ -82,6 +82,7 @@ public class BoardPackDto {
     private String publicationUrl;
     private LocalDateTime cancelledAt;
     private String cancellationReasonEn;
+    private String cancellationReasonAr;
 
     public static BoardPackDto from(BoardPack e) {
         return BoardPackDto.builder()
@@ -104,7 +105,7 @@ public class BoardPackDto {
             .reviewCommentsEn(e.getReviewCommentsEn())
             .approvedAt(e.getApprovedAt()).approvedBy(e.getApprovedBy())
             .publishedAt(e.getPublishedAt()).publicationUrl(e.getPublicationUrl())
-            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn())
+            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn()).cancellationReasonAr(e.getCancellationReasonAr())
             .build();
     }
 
@@ -116,5 +117,6 @@ public class BoardPackDto {
         private String reviewCommentsEn;
         private String publicationUrl;
         private String cancellationReasonEn;
+        private String cancellationReasonAr;
     }
 }

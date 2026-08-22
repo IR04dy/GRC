@@ -32,6 +32,7 @@ public class CapaTaskDto {
     private LocalDateTime closedAt;
     private LocalDateTime cancelledAt;
     private String cancellationReasonEn;
+    private String cancellationReasonAr;
     private String progressNotesEn;
     private String progressNotesAr;
     private String evidenceRefs;
@@ -61,7 +62,7 @@ public class CapaTaskDto {
             .submittedForVerificationAt(e.getSubmittedForVerificationAt())
             .verifiedAt(e.getVerifiedAt()).verifiedBy(e.getVerifiedBy())
             .closedAt(e.getClosedAt())
-            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn())
+            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn()).cancellationReasonAr(e.getCancellationReasonAr())
             .progressNotesEn(e.getProgressNotesEn()).progressNotesAr(e.getProgressNotesAr())
             .evidenceRefs(e.getEvidenceRefs())
             .createdAt(e.getCreatedAt())
@@ -75,6 +76,7 @@ public class CapaTaskDto {
         // F2-22b(vi): verifiedBy removed — it is stamped from the authenticated principal.
         // Leaving it declared would advertise a field the service ignores.
         private String cancellationReasonEn;
+        private String cancellationReasonAr;
         private String progressNotesEn;
         private String progressNotesAr;
         private String evidenceRefs;

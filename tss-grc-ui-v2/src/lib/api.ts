@@ -2190,14 +2190,25 @@ export interface CyberControlDto {
 export interface CyberSubControlDto {
   id: number; controlId: number;
   subControlNumber: string; titleEn: string; titleAr?: string;
-  descriptionEn?: string;
+  // F2-275 — `descriptionAr` is a real, populated column on `cyber.sub_controls` and this type
+  // never declared it, so the Arabic description of an NCA ECC sub-control was invisible to every
+  // client (F2-198's shape). F2-213 had removed it from the server's update whitelist to stop the
+  // English form DELETING it, which preserved it and left it permanently uneditable — frozen and
+  // protected are indistinguishable from the caller's side. The server now writes it under a null
+  // guard, and `FullReplaceUpdateContractTest` requires this type to be able to carry it: the
+  // server may not write a column its only client cannot put on the wire.
+  descriptionEn?: string; descriptionAr?: string;
   controlOwner?: string;
   maturityLevel?: string; implementationStatus?: string;
   evidenceRequired?: boolean;
 }
 export interface CyberSubControlRequest {
   controlId: number; subControlNumber?: string;
-  titleEn: string; titleAr?: string; descriptionEn?: string;
+  // Declaring it is what makes the guarded server write legitimate. Whether the sub-control FORM
+  // grows an Arabic textarea is a separate product question and stays filed — a field the type can
+  // express and the form does not collect is honest; a field the server writes and the type cannot
+  // express is not.
+  titleEn: string; titleAr?: string; descriptionEn?: string; descriptionAr?: string;
   controlOwner?: string;
   maturityLevel?: string; implementationStatus?: string;
   evidenceRequired?: boolean;

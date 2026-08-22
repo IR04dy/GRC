@@ -187,6 +187,9 @@ public class RegulatoryChangeService {
         }
         if ("DEPRIORITISED".equals(req.getStatus())) {
             if (req.getDeprioritisationReasonEn() != null) c.setDeprioritisationReasonEn(req.getDeprioritisationReasonEn());
+            // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
+            // omitted Arabic reason leaves the stored one alone rather than clearing it.
+            if (req.getDeprioritisationReasonAr() != null) c.setDeprioritisationReasonAr(req.getDeprioritisationReasonAr());
         }
         if (req.getLinkedControls() != null) c.setLinkedControls(req.getLinkedControls());
         if (req.getLinkedCapaIds() != null)  c.setLinkedCapaIds(req.getLinkedCapaIds());

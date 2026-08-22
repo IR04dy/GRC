@@ -52,6 +52,10 @@ public class NcaEccFiling {
     @Column(name = "cancelled_at") private LocalDateTime cancelledAt;
     @Column(name = "cancellation_reason_en", columnDefinition = "NVARCHAR(MAX)") private String cancellationReasonEn;
 
+    /** F2-275 (V389) - house rule 7. Nullable and NOT @NotBlank on purpose: bean validation fires on UPDATE too, so requiring Arabic would make every record predating V389 uneditable, and nothing can invent Arabic governance text (F2-30's reason). */
+    @Column(name = "cancellation_reason_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String cancellationReasonAr;
+
     @Column(name = "linked_capa_ids", columnDefinition = "NVARCHAR(MAX)") private String linkedCapaIds;
     @Column(name = "linked_evidence", columnDefinition = "NVARCHAR(MAX)") private String linkedEvidence;
 

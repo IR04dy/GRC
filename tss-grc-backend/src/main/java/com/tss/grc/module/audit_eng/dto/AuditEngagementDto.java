@@ -32,6 +32,7 @@ public class AuditEngagementDto {
     private LocalDateTime closedAt;
     private LocalDateTime cancelledAt;
     private String cancellationReasonEn;
+    private String cancellationReasonAr;
     private Integer budgetHours;
     private Integer actualHours;
     private Integer findingsCount;
@@ -56,7 +57,7 @@ public class AuditEngagementDto {
             .reportIssuedAt(e.getReportIssuedAt())
             .followUpStartedAt(e.getFollowUpStartedAt())
             .closedAt(e.getClosedAt())
-            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn())
+            .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn()).cancellationReasonAr(e.getCancellationReasonAr())
             .budgetHours(e.getBudgetHours()).actualHours(e.getActualHours())
             .findingsCount(e.getFindingsCount())
             .linkedFindingIds(e.getLinkedFindingIds())
@@ -69,6 +70,7 @@ public class AuditEngagementDto {
         @NotBlank @Pattern(regexp = "PLANNING|FIELDWORK|REPORTING|FOLLOW_UP|CLOSED|CANCELLED")
         private String status;
         private String cancellationReasonEn;
+        private String cancellationReasonAr;
         private Integer actualHours;
         private String linkedFindingIds;
     }

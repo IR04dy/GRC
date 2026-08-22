@@ -202,6 +202,9 @@ public class CapaTaskService {
         if ("CANCELLED".equals(req.getStatus())) {
             t.setCancelledAt(now);
             if (req.getCancellationReasonEn() != null) t.setCancellationReasonEn(req.getCancellationReasonEn());
+            // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
+            // omitted Arabic reason leaves the stored one alone rather than clearing it.
+            if (req.getCancellationReasonAr() != null) t.setCancellationReasonAr(req.getCancellationReasonAr());
         }
         if (req.getProgressNotesEn() != null) t.setProgressNotesEn(req.getProgressNotesEn());
         if (req.getProgressNotesAr() != null) t.setProgressNotesAr(req.getProgressNotesAr());

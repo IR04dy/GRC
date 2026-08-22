@@ -2547,6 +2547,127 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-275 · Six registers are bilingual for what the record IS and monolingual for WHY IT WAS STOPPED
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`510eefff`) |
+| **Severity** | **P2** — why an IIA audit engagement was cancelled, why a CAPA was cancelled, why a SAMA/NCA/SDAIA regulatory change was deprioritised, why an approval was delegated, why a board pack was withdrawn and why an NCA ECC filing was cancelled could none of them be recorded in Arabic |
+| **Found by** | working [[F2-271]]'s EN_ONLY list and grouping its members by **concept** rather than by module |
+| **Fix** | `V389` adds six nullable, width-mirrored `*_ar` columns · six entities, six DTOs (response + `TransitionRequest` + outbound mapper) and six null-guarded writes · a new gate for the half the bilingual ratchet cannot see |
+| **Verified** | V389 applied twice; six pairs width-mirrored, nullable, **0** backfilled · live probe **9/9** as `auditor` driving two registers HTTP-to-column · gate **568 pairs / 0 asymmetric** · harness **7 killed / 0 survived / 0 anchor-miss** · backend **4405/0/0**, frontend 75/814, `tsc` clean |
+
+### The shape, and why grouping by concept found it
+
+[[F2-272]] closed four members in `privacy` and established the framing: a table already bilingual
+for every *other* text column and monolingual for exactly one is [[F2-215]]'s two-of-N, because the
+Arabic columns already present are what stop a reader asking about the missing one. Grouping the
+remaining 41 by concept rather than by module found that shape at its most systematic:
+
+| register | pairs already bilingual | the one that is not |
+|---|---|---|
+| `audit_eng.engagements` | title, objective, scope (3 of 4) | `cancellation_reason` |
+| `capa.tasks` | title, description, progress_notes (3 of 4) | `cancellation_reason` |
+| `regchange.changes` | title, summary, impact_summary (3 of 4) | `deprioritisation_reason` |
+| `approvals.requests` | three pairs (3 of 4) | `delegation_reason` |
+| `nca_ecc.filings` | title, gap_summary (2 of 4) | `cancellation_reason` |
+| `board_pack.packs` | title (1 of 3) | `cancellation_reason` |
+
+🔑 **One concept, six registers, six modules: the happy-path fields were made bilingual and the
+exception-path field was not, every time.** That is not six coincidences — it is what happens when
+bilingualism is added by walking a form rather than a schema, and the cancel path is not on the form.
+
+### The gate: an Arabic column that EXISTS is not one that can be WRITTEN
+
+`BilingualInvariantRatchetTest` asks two questions — is the `*_ar` sibling **declared**, and is it
+**annotated** symmetrically. Both are about the entity. Neither can see what [[F2-272]] found on
+`purpose_ar`: a column fillable on create and silently unwritable afterwards, because the update
+whitelist named the English field and not the Arabic one, so the edit was accepted with **HTTP 200**
+and discarded.
+
+`BilingualWriteSymmetryTest` asks the complementary question — *if a service writes `setXEn` on an
+entity, does anything write `setXAr` on that same entity?* Measured **568 En/Ar pairs, 0
+asymmetric**, so it ships as a hard zero with an **empty exemption map**: writing the Arabic half
+beside the English one is always available, so there is no correct code for it to fail on
+([[F2-214]]).
+
+⚠ **Resolved PER OWNER TYPE, and my reconnaissance pass did not.** Matching the setter anywhere in
+the tree reported `BcmExerciseScenario.successCriteria` as a violation — but that call writes
+`SupplierResilienceTest`, a different entity sharing the field name. [[F2-187]]'s recorded mistake,
+and **the tell was that the reported entity had no writer for *either* half.**
+
+### The seventh member, in a module this slice was not about
+
+The gate fired on `CyberSubControl.descriptionAr` on its first run. [[F2-213]] had removed it from
+that service's update whitelist because persisting the request object was **deleting** it, and left a
+comment: *"Preserved here; offering it means adding the input, which is filed, not invented."*
+
+🔑🔑 **Preserving a field is not protecting it.** Omitting it stopped the deletion and left the
+column **permanently uneditable** — F2-272's defect exactly — and **frozen and protected are
+indistinguishable from the caller's side.** A null guard gives both properties at once: an omitted
+Arabic description leaves the stored one alone, and a supplied one is written.
+
+⚠⚠ **And then a correction to my own correction, which is the more useful half.** I first wrote into
+that comment that `CyberSubControlRequest` *"does not exist — its only occurrence in the whole tree
+was this sentence"*, having grepped the **Java** tree alone. It exists in **TypeScript**
+(`lib/api.ts`), which is precisely what F2-213 meant — and `FullReplaceUpdateContractTest`'s reverse
+leg proved it by failing the build the moment the write was added: *the server may not write a column
+its only client cannot put on the wire*. 🔑 **"That type does not exist" is a claim about every tree,
+and this platform has two.** The fix is both halves in one commit — the guarded write and the field
+on the frontend type. Whether the sub-control *form* grows an Arabic textarea stays filed: a field
+the type can express and the form does not collect is honest; a field the server writes and the type
+cannot express is not.
+
+### The re-scoped ceiling, third consecutive fix
+
+```
+asymmetric pairs = 159 (unchanged), EN_ONLY 41 → 35, sum 200 → 194
+```
+
+All six English siblings are nullable, so the new pairs are **symmetric** and the sum fell by exactly
+the number of members closed. [[F2-271]]'s re-scoping keeps paying: on the old ceiling this would
+have read as having done nothing.
+
+### A register's row count is only a measurement if no probe residue is in it
+
+My baseline said `capa.tasks` held **22** rows in dev against **15** in prod, and wrote *"the
+databases differ, so that is a measurement"* into the migration. **Both figures were probe
+residue.** Dev carried **eight** leftover `[REVIEW-TEST]` rows from earlier slices, which this
+slice's own bare-tag sweep removed ([[F2-267]]'s rule), leaving exactly the **14** [[F2-208]]
+recorded. 🔑 **"The two databases differ" is the shape residue takes when you believe the first
+number.**
+
+⚠ **Prod still carries one** — `CAPA-2026-19F2D8`, soft-deleted and therefore invisible to the API,
+so inert. Removing a row from a customer database is not a side effect of a migration (house rule 6),
+so it is **reported and left**: an owner decision.
+
+### Two probe corrections, both mine
+
+The transition body key is **`status`**, resolved from each `TransitionRequest`. My first two
+guesses (`target`, `to`) both returned **400**, and a 400 from a wrong key reads exactly like the fix
+being rejected — so the corrected probe carries **no fallback**, because a fallback hides which key
+is real ([[F2-250]]).
+
+⚠ And `mvn -o compile` did **not** trigger a DevTools restart, so my wait loop spun for ten minutes
+against a listener still serving pre-V389 code — [[F2-252]]'s recorded hazard, where a probe would
+have scored the fix as not working. Killed and relaunched after confirming by `-Djava.io.tmpdir` that
+the process was this session's and that :8090 belongs to the prod jar ([[F2-216]]: identify a process
+by its arguments, never a log timestamp).
+
+### Filed
+
+- **35 remaining EN_ONLY fields.** The largest single-module cluster is `evidence` with **9** — the
+  assurance fabric 14 modules adopt — and it is a *different* sub-shape: `evidence.evidence_reviews`
+  has **no Arabic column of any kind**, where the other eight tables are bilingual for their name or
+  title and monolingual for their description. `evidence.sub_controls` also carries an
+  `evidence_guidance_ar` with **no English sibling**, which is the mirror case and worth a look.
+- **`review_comments_en` / `peer_review_comments_en`** (`board_pack.packs`, `nca_ecc.filings`) are
+  *what a reviewer said*, not *why something stopped* — a different concept, deliberately not mixed
+  into this slice. The NCA ECC one is the sharper: it is the four-eyes peer review on a regulator
+  filing and it is the only member of either group with real data (3 of 4 rows).
+- The one `[REVIEW-TEST]` row in the production `capa.tasks`.
+- Whether the cyber sub-control form should collect an Arabic description.
+
 ## F2-274 · The link detector's "every way this codebase expresses a destination" omitted the template literal, and a retired page was relinked through the gap
 
 | | |

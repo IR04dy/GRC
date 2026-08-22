@@ -34,6 +34,7 @@ public class RegulatoryChangeDto {
     private String linkedCapaIds;
     private String linkedEvidence;
     private String deprioritisationReasonEn;
+    private String deprioritisationReasonAr;
     private LocalDateTime closedAt;
 
     public static RegulatoryChangeDto from(RegulatoryChange e) {
@@ -55,7 +56,7 @@ public class RegulatoryChangeDto {
             .linkedControls(e.getLinkedControls())
             .linkedCapaIds(e.getLinkedCapaIds())
             .linkedEvidence(e.getLinkedEvidence())
-            .deprioritisationReasonEn(e.getDeprioritisationReasonEn())
+            .deprioritisationReasonEn(e.getDeprioritisationReasonEn()).deprioritisationReasonAr(e.getDeprioritisationReasonAr())
             .closedAt(e.getClosedAt())
             .build();
     }
@@ -77,5 +78,6 @@ public class RegulatoryChangeDto {
         private String linkedCapaIds;
         private String linkedEvidence;
         private String deprioritisationReasonEn;
+        private String deprioritisationReasonAr;
     }
 }
