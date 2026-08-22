@@ -14574,3 +14574,95 @@ which defect, and a leg that fires for the wrong reason is a leg you do not have
   Java ladders that read it — and two of those ladders (this one and `bia_records.criticality`'s)
   use different vocabularies.
 - The **auto-named-constraint blind spot** in any schema diff keyed on name.
+
+---
+
+## F2-284 · F2-230's gate keys on SQL, so every hand-rolled Java rank ladder was outside it — and my own census manufactured a ladder that does not exist
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`394376fb`) |
+| **Severity** | **P4 (instrument gap, no product defect found)** — [[F2-230]] built `OrderedVocabulary` for the question *is this ordered vocabulary being sorted lexically?* and its gate keys on **SQL**: derived `OrderBy…` query names and `CASE … END DESC` inside `@Query`. A **Java** `switch (token) { case "CRITICAL" -> 4; … }` is invisible to it by construction. [[F2-283]] is what that cost — `criticalityRank` ranked `SOVEREIGN` below `LOW`, and it took writing that service's first unit test to find it |
+| **Found by** | executing [[F2-283]]'s filing (*two Java ladders read a criticality column with different vocabularies*) and asking the general question: how many such ladders exist, and do they agree? |
+| **Fix** | new `JavaRankLadderCensusTest` — derives every Java token→int ladder from source and holds **7** of them as exact maps, with the duration/multiplier subtraction pinned in both directions. **No production change**: nothing it found was a defect |
+| **Verified** | control deletes F2-283's `SOVEREIGN` arm and the census fails naming the exact diff — *"expected {SOVEREIGN=5, CRITICAL=4, …} but is {CRITICAL=4, …}"* — so this gate would have caught that defect the day the ladder was written · 4/4 after restore · backend **4492/0/0** |
+
+### The seven refutations that preceded it
+
+This slice began by re-deriving F2-283's filing and every product-level hypothesis fell. Recorded so
+the next reader does not re-derive them:
+
+- **`MtpdInheritanceService#severityRank` is correct.** It is documented *"lower rank = more
+  urgent"* and used with `comparingInt` **ascending**, so `CRITICAL = 0` sorts first. Inverted
+  relative to the cascade's ladder and **not** a defect — the direction is part of the ladder.
+- **Its repository query `…OrderBySeverityAsc` is lexical and harmless**, because the service
+  re-sorts the stream with `severityRank()` before returning. It is the exemplar of the safe form.
+- **The four lexical graded sorts with no Java re-sort are all `AutomationRule.priority`, which is
+  `int`** — and for a numeric column a lexical sort *is* a correct numeric sort ([[F2-230]] recorded
+  that 4 of its 10 candidates were numeric for the same reason).
+- **`ThreatIntelCorrelationService#severityRank` correctly has no `SOVEREIGN`** — that is a BCM
+  national-criticality tier, not a threat-intel severity band. The absence is right.
+
+🔑 **And the four "inverted pairs" that looked sharpest were my detector, not the code.**
+`TenableInboundService.slaDays` is `CRITICAL=0, HIGH=0, MEDIUM=1, LOW=3`;
+`CyberAssessmentService.dueDaysForRisk` is `LOW=60, HIGH=14, CRITICAL=7`. Both read as inverted
+ranks and both are **days**. `RiskExposureService.effectivenessFactor` is a multiplier. Counting
+those as ranks produced **11 "inverted pairs", almost all noise**. [[F2-268]] recorded the same rule
+one noun over — *a COUNT of days is not a deadline* — and here it is **a duration is not a rank**.
+That subtraction is now a gate leg with its own reverse direction, so an entry excluded as a
+duration must still *be* a ladder in the tree and must not have rank-shaped numbers.
+
+### Why an exact map and not a rule
+
+There is no rule to assert. The ladders legitimately differ in **direction** and in **vocabulary**,
+so a shared-convention assertion would fail on correct code — the one failure a gate must never have
+([[F2-214]]). Each ladder therefore declares its exact token→rank map: adding a token, dropping one
+or renumbering fails, and a new ladder fails until it is declared and therefore read. Nothing in it
+is prose that can rot.
+
+### My own census manufactured a ladder, and that is the finding
+
+⚠⚠ The first draft resolved the enclosing method with a pattern matching only an **int-returning**
+signature. A ladder inside a method returning anything else resolved to `"?"`, and every unnamed
+ladder in one file then collapsed into **one bucket** — fusing `WorkflowRequestService`'s two
+unrelated switches, `hopVia`'s candidate order (`SUBMITTED=0, RESUBMITTED=1`) and the WF-9 quorum
+**threshold** (`ANY=1, MAJORITY=(total/2)+1`), into a phantom vocabulary
+`{ANY, RESUBMITTED, SUBMITTED}` that exists nowhere in the codebase.
+
+🔑🔑 **It did not merely mislabel a ladder — it manufactured one.** With methods resolving, `hopVia`
+has **two** tokens and the quorum switch has **one** integer-literal arm (`MAJORITY` and `QUORUM`
+map to expressions, not literals), so both sit below the three-token threshold and **neither is a
+ladder at all**. Fused, they summed *past* it. **A phantom merge is worse than a miss, because a
+population that grew looks measured.**
+
+⚠ And `theDerivationFindsAllThreeSyntaxesAndSplitsByMethod` **claims** to guard exactly this — its
+fixture simply had three nameable methods, so it could not see the unnameable case. 🔑 **A
+self-test that only exercises the resolvable case cannot see the unresolvable one collapsing.**
+
+⚠ The second draft then over-corrected: a signature pattern widened to any return type matches
+`return switch (s) {` as type=`return`, name=`switch`, so **every** ladder keyed as `#switch` and all
+twelve collapsed into a single bucket. 🔑 **Widening a pattern and excluding what the widening newly
+admits are one change, not two.** Keywords are excluded now, and an unresolved ladder is keyed by its
+own offset so two can never merge.
+
+⚠ Two of my declared keys were also **guessed method names** — `#ndrProgress` for what is an inline
+switch in `dashboard()`, and `#hopVia` for a ladder below the threshold. Both were corrected from the
+gate's own output rather than from reading, which is the right direction: **the census is the
+authority for what the census contains.**
+
+### The seven ladders
+
+| ladder | vocabulary | direction |
+|---|---|---|
+| `DependencyCascadeService#criticalityRank` | SOVEREIGN 5 → LOW 1 | higher = worse |
+| `MtpdInheritanceService#severityRank` | CRITICAL 0 → LOW 3 | **lower = worse**, used ascending |
+| `ThreatIntelCorrelationService#severityRank` | CRITICAL 4 → LOW 1 | higher = worse |
+| `CptyService#bandRank` | BREACH 3, RED 2, AMBER 1 | SAMA large-exposure RAG |
+| `DataclassService#classOrder` | TOP_SECRET 4 → PUBLIC 1 | NCA/SDAIA classification |
+| `ControlMapService#coverageRank` | EXPIRED 2, PARTIAL 1, GAP 0 | staleness |
+| `DataOfficerQueryService#dashboard` | ACCEPTED 3, SUBMITTED 2, READY 1 | NDR cycle progress |
+
+⚙ Note what this slice did **not** do: it changed no production code. Every product hypothesis was
+refuted, and inventing a change to justify the measurement would have been the error. What ships is
+the instrument that makes F2-283's defect class unrepresentable — plus the record of why the
+obvious-looking convergence of these seven ladders is not something to enforce.
