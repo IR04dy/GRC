@@ -111,7 +111,7 @@ PUBLISHED = {
     "zero_test_packages": 7,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 378,          # +V387 (F2-271, privacy.data_breaches title_ar +
+    "migration_files": 379,          # +V387 (F2-271, privacy.data_breaches title_ar +
                                      #   description_ar - house rule 7 on a PDPL statutory
                                      #   record) / +V386 (F2-267, uq_srt_test_code) / +V385 (F2-266, uq_aml_alert_code — a FILTERED unique
                                      #   index on (organisation_id, alert_code). Filtered because the
@@ -120,7 +120,7 @@ PUBLISHED = {
                                      #   code-less alert. Ships with the writer that makes it safe
                                      #   (F2-183): AmlAlertService now mints the code.
                                      #   Previously +V380 (F2-255, AUDIT_LOG:WRITE).
-    "migration_head": 390,
+    "migration_head": 391,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against

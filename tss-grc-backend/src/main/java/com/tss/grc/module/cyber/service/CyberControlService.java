@@ -93,35 +93,80 @@ public class CyberControlService {
                                          boolean isCreate) {
         Long sentId = req.getFrameworkId();
         String sentName = trimToNull(req.getFrameworkName());
+        String sentNameAr = trimToNull(req.getFrameworkNameAr());
 
         if (sentId != null) {
             var f = frameworks.require(sentId, orgId);
-            if (sentName != null && !sentName.equalsIgnoreCase(f.getName()))
-                throw new IllegalArgumentException(
-                    "frameworkName '" + sentName + "' does not name framework " + sentId
-                        + " ('" + f.getName() + "') — the label is derived from the framework, so "
-                        + "send the id alone, or send the framework's real name");
+            requireEchoOrNothing("frameworkName", sentName, f.getName(),
+                "does not name framework " + sentId + " ('" + f.getName() + "')", SEND_ID_ALONE);
+            requireEchoOrNothing("frameworkNameAr", sentNameAr, f.getNameAr(),
+                "does not name framework " + sentId + " ('" + f.getNameAr() + "')", SEND_ID_ALONE);
             target.setFrameworkId(f.getId());
             target.setFrameworkName(f.getName());
+            target.setFrameworkNameAr(f.getNameAr());
             return;
         }
 
         Long storedId = isCreate ? null : target.getFrameworkId();
         if (storedId == null) {
-            // Unlinked: the label is the caller's to state, and to clear.
+            // Unlinked: BOTH labels are the caller's to state, and to clear. There is no parent to
+            // derive from, so an Arabic label here records a framework that is not in the register
+            // — which house rule 7 wants recordable rather than English-only.
             target.setFrameworkId(null);
             target.setFrameworkName(sentName);
+            target.setFrameworkNameAr(sentNameAr);
             return;
         }
 
         // Linked, and the caller named no id. Keep BOTH halves — see the javadoc above.
-        String derived = frameworks.labelFor(storedId, orgId);
-        String current = derived != null ? derived : target.getFrameworkName();
-        if (sentName != null && !sentName.equalsIgnoreCase(trimToNull(current) == null ? "" : current))
-            throw new IllegalArgumentException(
-                "frameworkName '" + sentName + "' contradicts this control's linked framework "
-                    + storedId + " ('" + current + "') — send frameworkId to change the link");
+        var derived = frameworks.labelsFor(storedId, orgId);
+        boolean resolved = derived.en() != null;
+        String current = resolved ? derived.en() : target.getFrameworkName();
+        String currentAr = resolved ? derived.ar() : target.getFrameworkNameAr();
+        requireEchoOrNothing("frameworkName", sentName, current,
+            "contradicts this control's linked framework " + storedId + " ('" + current + "')",
+            SEND_ID_TO_RELINK);
+        requireEchoOrNothing("frameworkNameAr", sentNameAr, currentAr,
+            "contradicts this control's linked framework " + storedId + " ('" + currentAr + "')",
+            SEND_ID_TO_RELINK);
         target.setFrameworkName(current);
+        // F2-277: the Arabic half rides with the English one. Falling back to the stored value
+        // when the framework has since become unresolvable keeps the two halves describing the
+        // same row — deriving one and keeping the other is how a pair comes apart.
+        target.setFrameworkNameAr(currentAr);
+    }
+
+    /**
+     * A label the server derives: not stated is fine, an ECHO of the derived value is fine,
+     * anything else is refused and told where to go (F2-231/F2-234).
+     *
+     * <p>⚠ F2-277 — one helper for both halves rather than two hand-written comparisons. The
+     * English half had this rule and the Arabic half did not, which would have made a sent Arabic
+     * label an INERT field: declared on the wire, silently discarded, and therefore telling a
+     * caller their value matters (F2-184). Case-insensitive because the columns collate that way
+     * (F2-179).
+     */
+    private static final String SEND_ID_ALONE =
+        "the label is derived from the framework, so send frameworkId alone, or send the "
+            + "framework's real name";
+
+    /**
+     * ⚠ A DIFFERENT remedy, and keeping the two apart is the point. Here the caller sent no id
+     * and a label that differs, i.e. is trying to RELINK BY NAME — the one operation this pair's
+     * hazard forbids, because two registers share an id space and carry near-identical names. An
+     * existing test asserts this wording, and it caught the first draft of the shared helper
+     * flattening both refusals into one message: a diagnostic whose only job is to send the
+     * caller somewhere is worthless if it sends them to the wrong place (F2-243).
+     */
+    private static final String SEND_ID_TO_RELINK = "send frameworkId to change the link";
+
+    private static void requireEchoOrNothing(String field, String sent, String derivedValue,
+                                             String because, String remedy) {
+        if (sent == null) return;
+        String current = trimToNull(derivedValue);
+        if (current != null && sent.equalsIgnoreCase(current)) return;
+        throw new IllegalArgumentException(
+            field + " '" + sent + "' " + because + " — " + remedy);
     }
 
     private static String trimToNull(String s) {

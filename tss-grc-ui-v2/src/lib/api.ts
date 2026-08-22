@@ -536,7 +536,9 @@ export interface AmlAlertDto {
   titleEn: string; titleAr?: string;
   description: string;
   subjectId?: number;
+  // F2-277 — derived from ethics.kyc_subjects, which holds both halves on all 16 rows.
   subjectName?: string;
+  subjectNameAr?: string;
   counterpartyName?: string;
   counterpartyCountry?: string;
   transactionCount?: number;
@@ -2178,7 +2180,11 @@ export interface CyberFrameworkDto {
 
 // ─── Cyber · Controls ───────────────────────────────────────────────────────
 export interface CyberControlDto {
-  id: number; frameworkId?: number; frameworkName?: string; domain?: string;
+  id: number; frameworkId?: number;
+  // F2-277 — the server derives BOTH halves from the resolved framework; neither is the
+  // caller's to send (F2-252).
+  frameworkName?: string; frameworkNameAr?: string;
+  domain?: string;
   controlNumber: string; titleEn: string; titleAr?: string;
   procedureEn?: string;
   controlType?: string; controlOwner?: string;
@@ -2368,6 +2374,11 @@ export interface CyberExceptionRequest {
 export interface CyberControlRequest {
   controlNumber: string; titleEn: string; titleAr?: string;
   frameworkId?: number; frameworkName?: string;
+  // F2-277 — declared for the same reason frameworkName is: the server DERIVES both halves
+  // from the resolved framework and accepts an echo, so a form that round-trips the whole
+  // row keeps working in either language. Sending a value that contradicts the framework is
+  // refused, which is what keeps this from being an inert field (F2-184).
+  frameworkNameAr?: string;
   domain?: string;
   procedureEn?: string;
   controlType?: string; controlOwner?: string;
@@ -3523,7 +3534,11 @@ export const SIGN_INTENTS: SignIntent[] = ['APPROVE', 'REVIEW', 'ACKNOWLEDGE', '
 export interface SignatureDto {
   id: number; entityType: string; entityId: number;
   intent: SignIntent; statementEn?: string;
-  signerId?: number; signerName?: string; signerRole?: string;
+  signerId?: number;
+  // F2-277 — signerNameAr deliberately has no username fallback: the username is
+  // language-neutral and already keeps the row identifiable through signerName.
+  signerName?: string; signerNameAr?: string;
+  signerRole?: string;
   payloadHash: string; signedAt?: string;
 }
 export const signaturesApi = {

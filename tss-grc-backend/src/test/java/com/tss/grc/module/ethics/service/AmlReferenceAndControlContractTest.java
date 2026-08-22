@@ -90,10 +90,23 @@ class AmlReferenceAndControlContractTest {
                   + "string beside a resolved id is F2-245's travelling-label defect: the halves "
                   + "then describe different parties and the one on screen has no vote")
                 .isTrue();
+        // F2-277 — asserted by SHAPE rather than by the old `subjects.requireLabel(` spelling.
+        // That convenience was `require` then `labelFor`, and this method now needs BOTH halves of
+        // the label, which a resolve-and-label helper cannot give without resolving twice. A gate
+        // keyed on an identifier breaks on your own refactor (F2-197), and the claim was never
+        // about the method's name.
         assertThat(subject)
-                .as("and the resolution must be tenant-narrowed through the directory — "
+                .as("the resolution must be tenant-narrowed through the directory — "
                   + "FK_aml_subject refuses a nonexistent id and knows nothing about tenancy")
-                .contains("subjects.requireLabel(");
+                .containsPattern("subjects\\.require(?:Label)?\\s*\\(");
+        assertThat(subject)
+                .as("F2-277 — and BOTH halves of the label must come from ONE resolve, so the "
+                  + "two halves of a single label can never come from two reads")
+                .contains("setSubjectNameAr(");
+        assertThat(subject.split("subjects\\.require", -1).length - 1)
+                .as("exactly one resolve: asking the directory twice is how the English half and "
+                  + "the Arabic half come to describe different rows")
+                .isEqualTo(1);
         assertThat(assigns(subject, "setSubjectName", "s.getSubjectName()"))
                 .as("the label may never be taken straight from the request; the only label that "
                   + "reaches storage unresolved is the label-only branch's, which the schema "

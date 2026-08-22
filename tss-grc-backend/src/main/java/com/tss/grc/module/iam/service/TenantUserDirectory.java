@@ -114,6 +114,28 @@ public class TenantUserDirectory {
         return (full != null && !full.isBlank()) ? full : u.getUsername();
     }
 
+    /**
+     * The Arabic half of the same label, or {@code null}.
+     *
+     * <p>⚠ F2-277 — {@code iam.users} stores {@code full_name_ar} (4 of 7 rows), and every reader
+     * of {@link #labelFor} was copying the English half of a bilingual parent into a monolingual
+     * column. The javadoc above discusses the blank fallback, and the difference between a
+     * reference and an attribution, and cites {@code platform.signatures} as the family's correct
+     * member — and never mentioned that it reads one of the two names the parent holds. <b>A
+     * careful comment about a column is not a comment about its language.</b>
+     *
+     * <p>⚙ Deliberately WITHOUT {@link #labelFor}'s username fallback. The username is
+     * language-neutral and already keeps the record identifiable through the English half, so
+     * returning it here would assert an Arabic name this directory does not have — which is
+     * F2-271's rule that an empty Arabic value is honest and a manufactured one is a fabricated
+     * governance record.
+     */
+    public String labelArFor(User u) {
+        if (u == null) return null;
+        String full = u.getFullNameAr();
+        return (full != null && !full.isBlank()) ? full : null;
+    }
+
     /** {@link #require} then {@link #labelFor}, for the common "resolve and derive" pair. */
     @Transactional(readOnly = true)
     public String requireLabel(Long userId, String what) {

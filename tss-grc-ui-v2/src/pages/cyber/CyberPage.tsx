@@ -834,7 +834,11 @@ export function CyberPage() {
   // ── Columns ──
   const controlCols: Column<CyberControlDto>[] = [
     { header: t('colControl'),    cell: r => <span style={{ fontWeight: 600 }}>{r.controlNumber} · {r.titleEn}</span> },
-    { header: t('colFramework'),  cell: r => <Badge tone="info">{r.frameworkName ?? '—'}</Badge> },
+    // F2-277 — the framework label is derived from the resolved framework in both
+    // languages. The ECC filter below deliberately keeps matching the ENGLISH half: it
+    // compares against stored English names, so preferring Arabic would empty it.
+    { header: t('colFramework'),  cell: r => <Badge tone="info">{(lang === 'ar' && r.frameworkNameAr
+                                                ? r.frameworkNameAr : r.frameworkName) ?? '—'}</Badge> },
     { header: t('colDomain'),     cell: r => r.domain ?? '—' },
     { header: t('colType'),       cell: r => r.controlType ?? '—' },
     { header: t('colOwner'),      cell: r => r.controlOwner ?? '—' },

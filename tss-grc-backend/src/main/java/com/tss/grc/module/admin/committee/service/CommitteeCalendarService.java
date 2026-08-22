@@ -114,6 +114,10 @@ public class CommitteeCalendarService {
             m.setCommitteeId(committee.getId());
             m.setCommitteeCode(committee.getCode());
             m.setCommitteeNameEn(committee.getNameEn());
+            // F2-277 — this method already reached for committee.getNameAr() three lines below,
+            // for the meeting TITLE, and copied only the English half of the NAME. The writer knew
+            // the parent was bilingual; the derivation read one of the two columns in front of it.
+            m.setCommitteeNameAr(committee.getNameAr());
             m.setMeetingCode(code);
             m.setTitleEn(committee.getNameEn() + " — " + quarterOf(date) + " " + year);
             m.setTitleAr(committee.getNameAr() == null ? null

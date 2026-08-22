@@ -27,6 +27,18 @@ public class CommitteeMeeting {
     @Column(name = "committee_name_en", length = 255)
     private String committeeNameEn;
 
+    /**
+     * F2-277 — the Arabic half of the same derived label. Both writers hold the resolved
+     * {@code Committee} when they copy the English name, and {@code admin.committees} stores
+     * {@code name_ar} for 19 of 19 rows, so this was never a missing translation: it was a
+     * derivation that read one of the two columns in front of it.
+     *
+     * <p>Width mirrors the PARENT's Arabic half (255), not a round number — a copy narrower than
+     * its source is the other half of V391.
+     */
+    @Column(name = "committee_name_ar", length = 255)
+    private String committeeNameAr;
+
     @Column(name = "meeting_code", nullable = false, length = 64)
     private String meetingCode;
 

@@ -60,6 +60,16 @@ public class AmlAlert {
     @Column(name = "subject_name", length = 500)
     private String subjectName;
 
+    /**
+     * F2-277 — the Arabic half of the derived subject label, from
+     * {@code ethics.kyc_subjects.full_name_ar} (16 of 16 rows hold it). F2-250 built
+     * {@code KycSubjectDirectory} so an AML alert could not name a subject the caller invented,
+     * and derived the English name alone; on an Arabic-primary UI the party an alert is ABOUT then
+     * rendered in English only.
+     */
+    @Column(name = "subject_name_ar", length = 500)
+    private String subjectNameAr;
+
     @Column(name = "counterparty_name", length = 500)
     private String counterpartyName;
 

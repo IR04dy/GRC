@@ -853,10 +853,13 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     // F2-250 — three states, and the last two must not look alike (F2-209): a subject resolved
     // in the KYC register; a party recorded by name only, disclosed as unlinked rather than
     // presented as if it were a register entry; and nothing recorded at all.
+    // F2-277 — a linked subject's label is derived from the KYC register in both languages
+    // (full_name_ar is populated on 16 of 16 rows). An UNLINKED party has no parent to
+    // derive from, so subjectNameAr is null there and this falls back to what was typed.
     { header: t('amlFldSubjectName'), width: '200px', cell: a =>
         !a.subjectName ? '—' : (
           <div>
-            <div>{a.subjectName}</div>
+            <div>{lang === 'ar' && a.subjectNameAr ? a.subjectNameAr : a.subjectName}</div>
             {a.subjectId == null && (
               <span className="ethics-unlinked" role="status"
                     title={t('amlSubjectUnlinkedHint')}

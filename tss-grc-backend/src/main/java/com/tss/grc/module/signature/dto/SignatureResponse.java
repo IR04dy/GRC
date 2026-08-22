@@ -10,6 +10,8 @@ public record SignatureResponse(
     String statementEn,
     Long signerId,
     String signerName,
+    /** F2-277 — the Arabic half of the derived signer label, from iam.users.full_name_ar. */
+    String signerNameAr,
     String signerRole,
     String payloadHash,
     LocalDateTime signedAt

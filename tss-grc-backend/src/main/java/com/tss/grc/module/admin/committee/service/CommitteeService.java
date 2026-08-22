@@ -257,6 +257,10 @@ public class CommitteeService {
         m.setCommitteeId(parent.getId());
         m.setCommitteeCode(parent.getCode());
         m.setCommitteeNameEn(parent.getNameEn());
+        // F2-277 — both halves from the one resolved parent. Deriving the English name alone left
+        // a committee's identity English-only on an Arabic-primary UI, with the Arabic already
+        // stored on the row this is a copy of.
+        m.setCommitteeNameAr(parent.getNameAr());
         m.setMeetingCode(generateMeetingCode(parent.getCode()));
         m.setExternalId("MTG_" + UUID.randomUUID().toString().substring(0, 12));
         m.setTitleEn(req.titleEn());

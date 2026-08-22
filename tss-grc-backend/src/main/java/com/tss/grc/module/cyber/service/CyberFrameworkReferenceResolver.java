@@ -76,8 +76,28 @@ public class CyberFrameworkReferenceResolver {
             "frameworkId " + frameworkId + " does not name a framework in this organisation"));
     }
 
-    /** The derived label for a resolvable framework, or {@code null}. Never the caller's string. */
-    public String labelFor(Long frameworkId, Long orgId) {
-        return resolve(frameworkId, orgId).map(CyberFramework::getName).orElse(null);
+    /**
+     * The derived labels for a resolvable framework, in <b>both languages</b>, or a pair of nulls.
+     * Never the caller's strings.
+     *
+     * <p>⚠ F2-277 — this replaced a {@code labelFor} that returned the English name alone. A
+     * single method rather than two is not tidiness: {@code labelFor}/{@code labelArFor} would
+     * each have resolved the framework independently, so the two halves of one label could in
+     * principle come from two reads. Returning them together makes them <b>one derivation from one
+     * resolved row</b>, which is F2-245's rule that the claim preventing drift is about where the
+     * writes live.
+     *
+     * <p>{@code nameAr} is nullable in the parent (2 of 6 rows), so a null Arabic half here is an
+     * honest "the framework has no Arabic name" and never a failure to derive.
+     */
+    public Labels labelsFor(Long frameworkId, Long orgId) {
+        return resolve(frameworkId, orgId)
+                .map(f -> new Labels(f.getName(), f.getNameAr()))
+                .orElse(Labels.NONE);
+    }
+
+    /** Both halves of a framework's derived label, always read from one resolved row. */
+    public record Labels(String en, String ar) {
+        public static final Labels NONE = new Labels(null, null);
     }
 }

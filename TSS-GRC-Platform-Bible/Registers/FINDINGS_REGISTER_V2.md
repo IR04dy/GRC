@@ -13334,3 +13334,216 @@ population read as a finding rather than as a clean tree.**
 - **Two test-support entity enumerators** now exist for one question (this gate's source walk and the
   ratchet's reflective `entities()`), which is [[F2-190]]'s shape. Extracting one would let the source-reading
   gate inherit reflection's immunity to the simple-name collapse.
+
+## F2-277 · A derived label inherits its parent's bilingualism only if the derivation copies both halves
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`d86b3fcc`) |
+| **Severity** | **P2** — one live 500 on `POST /api/v1/cyber/controls`, opened by V390 one slice earlier and reachable by any tenant with a framework name over 100 characters; plus four registers rendering a governance label English-only on an Arabic-primary UI (house rule 7), the largest being all **154** cyber controls |
+| **Found by** | executing [[F2-276]]'s filed EN_ONLY work list and reading its members against the OTHER families on this register |
+| **Fix** | `V391` (widen the copy to its source + four Arabic halves, backfilled BY DERIVATION) · both halves derived at all five writers · `labelsFor`/`labelArFor` on the three directories · two new legs in `ParentIdentityCopyContractTest` · four wire types and four render sites |
+| **Verified** | probe **7/7 pre-fix, 11/11 post-fix** as `so_officer` · V391 applied twice, guarded branch exercised by a planted divergence · harness **13 killed / 0 survived / 0 anchor-miss** · backend **4419/0/0** · frontend 75 files / 814 tests, `tsc` clean |
+
+### The filing was right and its GROUPING was wrong
+
+[[F2-276]] filed nine `evidence` EN_ONLY members as the next work, and [[F2-275]] had already recorded
+the better rule: **group an EN_ONLY work list by CONCEPT, not by module.** Applying that to the full
+35-member census found three members that are not house-rule-7 gaps at all — they are
+[[F2-245]]'s **parent-identity copies**, where a child stores a parent's id beside a copy of that
+parent's label. [[F2-272]] had already noticed one (`CrossBorderTransfer.ropaTitleEn`) and filed it
+as a one-off, with the correct reasoning: *adding `ropa_title_ar` would create a **third** place one
+ROPA's name is spelled; the fix is to derive it from the parent, which yields both languages free.*
+
+Measured, that is a population and not an incident.
+
+### The two censuses overlap and neither gate can see the other
+
+`BilingualInvariantRatchetTest` buckets a `*En` field with no `*Ar` sibling as EN_ONLY.
+`BilingualWriteSymmetryTest` pairs the same two spellings. **A monolingual identity copy spelled
+BARE — `framework_name`, `subject_name`, `signer_name`, `asset_name` — is in NEITHER bucket and
+outside BOTH gates**: it is not `xEn`, so it is not EN_ONLY, and there is no `xAr`, so it is not a
+pair.
+
+🔑 [[F2-198]]'s shape after a filename, a three-entry allow-list, a module name, an `extends` clause,
+a field-name list inside a fix, a claim shape in a gate and a naming convention. Here the narrowing
+is **the absence of a suffix**. And note it is the *complement* of [[F2-276]]'s finding: there a
+bare-stem pair was complete and invisible, here a bare-stem column is *incomplete* and invisible.
+
+### Which half is wrong is decided by the PARENT, and by measurement
+
+For a copy of a parent's identity the language question is settled by the parent: if the parent
+stores `name_en` and `name_ar`, a single bare column on the child can only hold one of them, so it
+is monolingual **by construction**.
+
+Resolved by **value agreement** against every bilingual label pair in the database — never by name,
+because [[F2-252]] established the mechanism: a scan locates and **the pairing is the measurement**,
+and when two registers share an id space a guessed pairing *dereferences cleanly and lies*. Measured
+over both databases:
+
+| | |
+|---|---|
+| monolingual name-like identity copies | **32** (dev), 30 in prod |
+| of which spelled BARE, invisible to both gates | **30** |
+| **full value agreement with a BILINGUAL parent** | **4** |
+| partial agreement | 9 — all the `scm`/`tprm` vendor registers, whose parent `scm.vendors` is itself monolingual ([[F2-246]]/[[F2-247]]'s two-vendor-register question) |
+| no bilingual parent agrees | 19 — person *attributions* now holding usernames ([[F2-236]]/[[F2-249]]), offices rather than names, and the asset registers [[F2-249]] filed as unresolvable |
+
+The four:
+
+| child | parent | derivable |
+|---|---|---|
+| `admin.committee_meetings.committee_name_en` | `admin.committees.name_ar` | 34/34 |
+| `cyber.cyber_controls.framework_name` | `cyber.cyber_frameworks.name_ar` | 153/154 |
+| `ethics.aml_alerts.subject_name` | `ethics.kyc_subjects.full_name_ar` | 2/2 |
+| `platform.signatures.signer_name` | `iam.users.full_name_ar` | 1/4 |
+
+🔑🔑 **Every one of the four was CLOSED by an earlier slice of this programme, and every one of those
+slices derived the English half alone** — [[F2-252]] built `CyberFrameworkReferenceResolver.labelFor`,
+[[F2-250]] `KycSubjectDirectory`, [[F2-249]] `TenantUserDirectory` (and named `platform.signatures`
+the family's *exemplar*). [[F2-215]]'s two-of-N: a reader who finds a resolver deriving the label
+does not then ask **which language** it derived. [[F2-252]]'s own filing said
+*"`cyber.cyber_controls.framework_name` has no `*_ar` while `cyber_frameworks` carries `name_ar`"* —
+filed as one member; measured, it is four.
+
+⚠ `TenantUserDirectory.labelFor`'s javadoc is the sharpest instance. It discusses the blank
+fallback, the difference between a reference and an attribution, and cites `platform.signatures` as
+the correct member of this family — and never mentions that it reads one of the two names its parent
+holds. **A careful comment about a column is not a comment about its language.**
+
+⚠ `CommitteeCalendarService` is the sharpest in code: it reaches for `committee.getNameAr()` **three
+lines below** copying `getNameEn()` into the name column, for the meeting *title*. The writer knew
+the parent was bilingual; the derivation read one of the two columns in front of it.
+
+### The live half: V390 made a derived copy narrower than the column it copies
+
+`cyber.cyber_controls.framework_name` was `NVARCHAR(100)` and holds a copy of
+`cyber.cyber_frameworks.name`, which **V390 (F2-276, one slice earlier) widened to 255** so it would
+mirror `name_ar`. So a framework name of 101–255 characters became legal in the parent and refused
+by the copy.
+
+**The two databases disagree, and that disagreement is the evidence:**
+
+```
+dev  (V390 applied)   framework_name 100  <-  name 255    COPY NARROWER
+prod (V390 pending)   framework_name 100  <-  name 100    consistent
+```
+
+Probed live as `so_officer` (never `admin`): `POST /frameworks` with a 150-character name → **200**,
+then `POST /controls` linked to it → **500**, while the identical call against a short-named
+framework → **200**. Post-fix the same call answers **200** with a 150-character derived label.
+
+🔑 **A width invariant scoped to the two halves of a bilingual pair WITHIN one entity cannot see a
+derived copy in another table — and widening the source is what makes the copy overflow.** F2-276's
+own capacity leg is exactly that shape. Latent rather than live (0 stored names exceed 100 today),
+and saying which is the point ([[F2-274]]).
+
+⚠ The entity is the second tell: `CyberControl.frameworkName` carried `@Column(name =
+"framework_name")` with **no length**, so the bean assumed JPA's 255 default against a 100-character
+column — the same declaration-versus-column gap F2-276 found on the parent, one table down.
+
+### The backfill is DERIVED, not authored — which is why this family may be backfilled at all
+
+[[F2-271]]'s rule is that an Arabic governance value must never be manufactured: an empty column is
+an honest *not recorded*, a machine translation is a fabricated record. That rule is about
+**inventing** text. Here the text already exists in the parent row this column is a copy of, and the
+UPDATE performs exactly the operation the writer performs. **190 of 194 linked rows** were filled
+without anything being authored.
+
+⚠⚠ **Guarded on agreement**, because three of the four are point-in-time snapshots (a signature's
+signer name is documented as surviving later user renames). Copying today's Arabic onto a row whose
+English half no longer matches the parent would record a name the row never had. Measured 0
+disagreements in both databases — so the guard is a no-op everywhere it can be measured, and the
+branch is exercised by a deliberately diverged `[REVIEW-TEST]` row rather than assumed ([[F2-183]]).
+It correctly left that row NULL.
+
+⚠ V391 carries **no** check comparing an English copy against its parent. It was written and
+removed: on a customer database a committee renamed after its meetings were created legitimately
+leaves the older snapshot, so the check would THROW and block the whole chain. **A migration may
+assert its own writes and never tenant data** ([[F2-260]]) — and that is also why check 4 *is* safe,
+since the four columns are created by this file, so every non-null value it sees is one it just
+wrote. The structural claim (this migration writes no English column) is asserted hermetically
+instead.
+
+### The gate, and the hole the harness found in it
+
+Both legs live in `ParentIdentityCopyContractTest`, because that is where the identity-copy
+**enumerator** already is and [[F2-276]] filed *two test-support entity enumerators for one question*
+as [[F2-190]]'s shape. A third would be worse.
+
+⚠⚠ **The structural leg's first draft asserted the Arabic setter was PRESENT in the method, and the
+harness showed it green over a deleted derivation.** Every one of these methods writes the Arabic
+half in **two** branches — derive when the parent resolves, clear when the caller unlinks — so
+dropping the derive branch leaves the clear branch and `contains("setXAr(")` is satisfied by it.
+[[F2-194]]'s substring-satisfied-by-something-else, in a leg written after quoting it. Replaced by
+**equal counts**: the two halves must be written the same number of times, which is what *"the
+Arabic half rides with the English one at every site"* actually means, and which survives a local
+being renamed ([[F2-197]]).
+
+⚠ Two more real holes, both closed rather than recorded as tolerated (all four survivors were
+**wrong** code, so none is an equivalent mutant — [[F2-206]]): nothing asserted that a contradicting
+**Arabic** label is refused, and nothing asserted the backfill's agreement guard exists.
+
+⚠ And one survivor was the harness's own fault: M2 was classified against
+`ParentIdentityCopyContractTest` while the assertion that catches it lives in
+`CyberControlFrameworkReferenceTest`. **Classify a mutation by its assertion, not by the file it
+edits** ([[F2-208]]).
+
+### `FullReplaceUpdateContractTest` failed, correctly about the contract and not about its own stated harm
+
+It reported that `PUT /api/v1/cyber/controls/{id}` writes `frameworkNameAr`, which its client
+cannot send. Its stated harm — *"the field arrives null on every call and is written null"* — does
+not apply: the value is derived from the resolved framework. It fires because its taint analysis
+cannot tell a resolver's RESULT from its ARGUMENTS, and **[[F2-233]] made exactly that narrowing in
+the sibling gate `ServerStampedFieldContractTest`** (*"the id is the caller's; the row it names is
+the server's"*) **while this gate never got it.** Filed as an instrument observation rather than
+fixed here: changing a shared gate's taint rule inside a slice that is not about it risks weakening
+it, and an honest alternative was available.
+
+The alternative taken: declare the Arabic half on `CyberControlRequest` **and consult it**, exactly
+as the English half is consulted. Merely declaring it would be an inert field telling a caller their
+value matters ([[F2-184]]). Both halves now accept an ECHO and refuse a CONTRADICTION
+([[F2-231]]/[[F2-234]]), so a form that round-trips the whole row keeps working in either language.
+
+⚠ Extracting the shared refusal flattened two remedies into one, and an existing test caught it: an
+id sent with a wrong label means *"send the id alone, or send the real name"*, while a label
+differing with no id sent means *"send frameworkId to change the link"* — the caller is trying to
+relink BY NAME, the one operation this pair's hazard forbids. **A shared refusal must carry the
+remedy, not just the reason.**
+
+### Two of my own errors, the second after correcting the first
+
+My unit test asserted that omitting `frameworkId` on update *unlinks* and clears both halves.
+[[F2-252]] deliberately made an omitted id mean **leave the link alone** — copying the pair in
+`applyEditable` is what nulled `framework_id` on 75 of 75 live rows — so there is no unlink path on
+update and the leg was testing something the service is written not to do. Replaced by the claim
+that does exist: an edit **re-derives both halves together**, so one can never be fresh while the
+other is stale.
+
+🔑 **I then left the identical wrong expectation in the live probe and it failed there too.**
+[[F2-215]]'s two-of-N inside one slice, on my own correction. And a guessed method name
+(`materialise` for `CommitteeCalendarService#generateAnnualCalendar`) was caught by the new gate's
+own (class, method) pair — which is exactly why that pair is self-verifying.
+
+### Filed
+
+- **The 9 `evidence` EN_ONLY members still stand**, unchanged by this slice and still a migration
+  plus nine writers rather than a batch. `EN_ONLY` fell 35 → 34 and `BASELINE_ARABIC_NOT_GUARANTEED`
+  194 → 193, from `committee_name_en` gaining its sibling.
+- **`FullReplaceUpdateContractTest` lacks [[F2-233]]'s store-read taint narrowing** that its sibling
+  `ServerStampedFieldContractTest` has. Two gates, one taint question, the narrowing applied to one.
+  Worth doing on its own, where the risk of weakening a security gate can be measured properly.
+- **The 9 partial-agreement vendor copies** are blocked on the two-vendor-register question
+  ([[F2-246]]/[[F2-247]]): `scm.vendors` is monolingual, so there is no Arabic to derive, and giving
+  it one is an owner decision about which register is authoritative.
+- **The 19 no-parent copies** are a different family — [[F2-236]]/[[F2-249]]'s actor attribution,
+  where the column now holds a username (language-neutral) or an office. Not this shape.
+- `risk.scenarios.risk_title_en`'s **11 live divergent rows** reproduced independently here (7
+  distinct stored titles, none matching any bilingual parent), confirming [[F2-245]]'s measurement
+  and its owner decision: choosing per row whether the id or the label was the intent.
+- **`cyber.cyber_frameworks` still holds 2 of 6 rows with no Arabic name and 0 of 6 with an Arabic
+  description**, so a control's derived Arabic label is empty for two frameworks. No backfill —
+  inventing Arabic governance text is fabrication, and this needs a tenant to supply it.
+- `SignaturesPage.tsx` collects a **required** `signerName` for the *other* signature register
+  (`DigitalSignatureDtos`), which the server may or may not honour. Not read; a different register,
+  and [[F2-225]]'s shape if it turns out the server ignores it.
