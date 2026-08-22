@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Status** | 🟢 CLOSED 2026-08-22 (`696064d0`) |
 | **Severity** | P2 on the one real member — a caller-named ISO 22301 / SAMA supplier-resilience test reference with no minter and no unique index; P4 correction on the other nine |
 | **Found by** | executing [[F2-266]]'s own filed work list, re-derived first ([[F2-221]]) |
 | **Fix** | `SupplierResilienceTestService` mints via `ReferenceCodeMint` · `V386` filtered UNIQUE index · the `testCode` form input deleted · census 93 → 92 |
