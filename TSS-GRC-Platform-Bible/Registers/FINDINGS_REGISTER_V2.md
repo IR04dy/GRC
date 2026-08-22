@@ -14270,14 +14270,39 @@ is the *fix*, not the defect.
 
 ### Measured in passing, and filed
 
-- **The bridge log and the register disagree, in both databases.** `privacy.cyber_breach_bridge_log`
-  holds 8 rows claiming three bridge firings and one link; the incident register shows **two**
-  classifications. Log rows 7–8 name incident 24 → breach 20, and in dev incident 24 carries no
-  link and breach 20 no back-reference (in prod it is soft-deleted). Row 6's event code
-  **`BREACH_LINKED` is written by no code path in the platform** — the service writes only
-  `BRIDGE_FIRED`, `BREACH_CREATED` and `BRIDGE_SKIPPED`. Byte-identical across two independently-used
-  databases, so seed-origin ([[F2-280]]'s evidence rule). **Owner decision** — reconciling it
-  rewrites live governance rows.
+- **CORRECTED after the residue sweep — one anomaly, not three.** The first draft of this item read
+  *"The bridge log and the register disagree, in both databases … 8 rows claiming three bridge
+  firings and one link; the incident register shows two classifications … Byte-identical across two
+  independently-used databases, so seed-origin."* Arithmetically right and **wrongly attributed**,
+  and the residue sweep is what showed it. Re-measured row by row against both databases including
+  soft-deleted rows:
+  - Log rows **1–5** are correct and fully consistent: incidents 1 and 4 classified, breaches 6 and
+    7 created and back-referenced, one legitimate `BRIDGE_SKIPPED` re-evaluation.
+  - Log rows **7–8** name incident 24, which in prod is `[REVIEW-TEST] CY-B consolidation test` —
+    **soft-deleted probe residue from 2026-07-04**, whose breach 20 is also soft-deleted and does
+    back-reference it. In dev the same two rows were **hard-deleted**, so the log points at nothing.
+    That is not a bridge defect: an audit log **should** outlive the records it describes, and
+    `cyber_breach_bridge_log` carries no FK precisely so it can. 🔑 **The dangling reference is a
+    difference in how two cleanups were done, and calling it seed-origin because the two databases
+    agree was the error — they agree because the LOG was never cleaned in either.**
+  - Row **6** is the one real anomaly and it stands: event code **`BREACH_LINKED`, written by no
+    code path in the platform** (the service writes only `BRIDGE_FIRED`, `BREACH_CREATED`,
+    `BRIDGE_SKIPPED`), naming incident 2 ↔ breach 1 where **neither side carries a link**
+    (`linked_data_breach_id` NULL, `source_cyber_incident_id` NULL, `auto_generated = 0`).
+    Byte-identical in both databases at 2026-05-09 13:23, so seed-origin. **Owner decision.**
+  🔑 **The reusable part: "the two databases agree, so it is seed data" (F2-280's evidence rule) is
+  sound for a WRITTEN value and unsound for a DANGLING one — a reference both databases fail to
+  resolve may simply be one nobody cleaned up in either.**
+- **Pre-existing `[REVIEW-TEST]` residue in the PRODUCTION database, from earlier slices.** Measured
+  while sweeping this one: **11 columns across 9 prod tables** carry the tag, including
+  `cyber.incidents.title` ×4 (all soft-deleted, all created 2026-07-04 by `admin` — the CY-B / CY-C
+  / SOC-C probes), `cyber.cyber_action_plans.description_en` ×4, `cyber.cyber_incidents.title_en` ×2,
+  `socops.security_event.external_id` ×2, and one row each in `capa.tasks` (already filed by
+  [[F2-275]]), `cyber.vulnerabilities`, `cyber.vuln_exceptions`, `privacy.data_breaches` and
+  `risk.risks`. None is from this slice — every script here targeted `TSS_GRC` and `:8084`. Removing
+  a row from a customer database needs the user's explicit OK (house rule 6), so this is **reported,
+  not cleaned**. ⚙ It also explains the F2-275 filing's lone `capa.tasks` row as one member of a
+  larger population rather than a one-off.
 - **A dangling parent-identity copy.** Incident 13 carries `linked_data_breach_code =
   1af90431-…` with **no** `linked_data_breach_id` and `affects_personal_data = 0`, titled *"Insider
   data exfiltration — DLP triggered"*, in `CONTAINMENT`. The code is lower-case where the bridge's
