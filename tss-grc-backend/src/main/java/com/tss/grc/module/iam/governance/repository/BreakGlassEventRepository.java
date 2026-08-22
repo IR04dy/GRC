@@ -1,6 +1,7 @@
 package com.tss.grc.module.iam.governance.repository;
 
 import com.tss.grc.module.iam.governance.entity.BreakGlassEvent;
+import com.tss.grc.module.iam.repository.RoleRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -58,12 +59,19 @@ public interface BreakGlassEventRepository extends JpaRepository<BreakGlassEvent
 
     // ── analytics natives (plan §6.7) ────────────────────────────────────────
 
-    /** Distinct users holding at least one privileged role. */
+    /**
+     * Distinct users holding at least one privileged role.
+     *
+     * <p>F2-280 — this read {@code r.is_privileged = 1} while the quarterly privileged access
+     * review two files away derived the same question from the grants, and the two disagreed on
+     * 12 roles in dev and 7 in prod. Both now share {@link RoleRepository#PRIVILEGED_ROLE},
+     * whose javadoc records why the answer is their union rather than either one.
+     */
     @Query(value = """
         SELECT COUNT(DISTINCT ur.user_id) FROM iam.user_roles ur
-        JOIN iam.roles r ON r.id = ur.role_id AND r.is_privileged = 1 AND r.is_deleted = 0
+        JOIN iam.roles r ON r.id = ur.role_id AND r.is_deleted = 0
         JOIN iam.users u ON u.id = ur.user_id AND u.organisation_id = :org AND u.is_deleted = 0
-        """, nativeQuery = true)
+        WHERE""" + RoleRepository.PRIVILEGED_ROLE, nativeQuery = true)
     long countPrivilegedHolders(@Param("org") Long org);
 
     /** Assignments held by users with no login in ≥90 days (or never). */

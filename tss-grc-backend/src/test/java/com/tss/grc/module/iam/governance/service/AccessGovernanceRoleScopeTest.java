@@ -382,4 +382,81 @@ class AccessGovernanceRoleScopeTest {
         assertThat(saved.displayNameEn()).isEqualTo("Chief Information Security Officer");
         assertThat(saved.active()).isTrue();
     }
+
+    // ── F2-280: the privileged classification comes from the shared predicate ────
+
+    /**
+     * The union itself lives in SQL, so no mocked repository can exercise it — what a unit test
+     * can pin is that the summary asks {@code privilegedRoleIds} rather than reading the
+     * entity's stored flag. That distinction is invisible on screen for the fourteen roles V272
+     * seeded (there the two agree) and wrong for every role a tenant creates, which is the
+     * regression worth a test.
+     */
+    @Test
+    void privilegedComesFromTheSharedPredicateAndNotFromTheStoredFlag() {
+        Role flaggedOnly = role(41L, "EMERGENCY_RESPONDER", null, true);
+        flaggedOnly.setIsPrivileged(true);
+        Role derivedOnly = role(42L, "CISO", null, true);
+        derivedOnly.setIsPrivileged(false);      // the state measured live in dev AND prod
+        Role neither = role(43L, "VIEWER", null, true);
+        neither.setIsPrivileged(false);
+
+        when(roles.findByOrganisationIdOrOrganisationIdIsNull(TENANT))
+            .thenReturn(List.of(flaggedOnly, derivedOnly, neither));
+        // The shared clause is a UNION, so the server answers with both — including the role
+        // whose stored flag is 0.
+        when(roles.privilegedRoleIds(TENANT)).thenReturn(List.of(41L, 42L));
+
+        assertThat(service.listRoles())
+            .filteredOn(RoleSummary::privileged)
+            .extracting(RoleSummary::roleName)
+            .containsExactlyInAnyOrder("EMERGENCY_RESPONDER", "CISO");
+    }
+
+    /**
+     * The SINGLE-ROLE path must ask the same question. {@code listRoles} resolves the set once
+     * and calls the two-argument summary directly, so a test that only drives the list says
+     * nothing about {@code createRole}/{@code updateRole}/{@code cloneRole} — and the mutation
+     * making the one-argument summary read {@code r.getIsPrivileged()} survived the whole build
+     * until this existed. F2-205's rule: a leg that exercises one path proves nothing about the
+     * path beside it.
+     */
+    @Test
+    void createAndUpdateAlsoReportPrivilegedFromTheSharedPredicate() {
+        Role fresh = role(61L, "NEW_APPROVER", TENANT, false);
+        fresh.setIsPrivileged(false);                     // the database default, always
+        when(roles.findByOrganisationIdOrOrganisationIdIsNull(TENANT)).thenReturn(List.of());
+        when(roles.findRetiredRoleId(any(), any())).thenReturn(Optional.empty());
+        when(roles.save(any(Role.class))).thenReturn(fresh);
+        when(roles.findById(61L)).thenReturn(Optional.of(fresh));
+        // The server says privileged because the role grants APPROVE — the stored flag is 0.
+        when(roles.privilegedRoleIds(TENANT)).thenReturn(List.of(61L));
+        asTenantAdmin();
+
+        assertThat(service.createRole(
+            new RoleUpsertRequest("NEW_APPROVER", "New approver", "معتمد جديد", true)).privileged())
+            .as("a role created through the console reports the shared predicate's answer")
+            .isTrue();
+        assertThat(service.updateRole(61L,
+            new RoleUpsertRequest("NEW_APPROVER", "New approver", "معتمد جديد", null)).privileged())
+            .as("and so does an edit of it")
+            .isTrue();
+    }
+
+    /**
+     * And the list must ask once, not once per role: a per-row check is how a 70-role console
+     * becomes 70 round trips, and it is also a second way to ask one question (F2-190).
+     */
+    @Test
+    void theRoleListResolvesThePrivilegedSetInOneQuery() {
+        when(roles.findByOrganisationIdOrOrganisationIdIsNull(TENANT)).thenReturn(List.of(
+            role(51L, "A_ROLE", null, false),
+            role(52L, "B_ROLE", null, false),
+            role(53L, "C_ROLE", null, false)));
+        when(roles.privilegedRoleIds(TENANT)).thenReturn(List.of());
+
+        service.listRoles();
+
+        verify(roles, org.mockito.Mockito.times(1)).privilegedRoleIds(TENANT);
+    }
 }

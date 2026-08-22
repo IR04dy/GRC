@@ -3988,6 +3988,17 @@ export const adminApi = {
 export interface GovRoleDto {
   id: number; roleName: string; displayNameEn: string; displayNameAr?: string | null;
   systemRole: boolean; active: boolean; organisationId?: number | null;
+  /**
+   * F2-280 — the privileged-access classification, and it is the EFFECTIVE answer rather than
+   * the stored `iam.roles.is_privileged` flag. Two server-side readers of "privileged"
+   * disagreed (the break-glass "Privileged holders" KPI read the flag; the quarterly NCA ECC
+   * 2-2 / SAMA CSF 3.3.5 review derived it from APPROVE/DELETE grants) and now share one
+   * predicate — their union, because the flag carries a judgement the grants cannot express
+   * and the grants cover roles a tenant creates, which the flag never could. Read-only: no
+   * write path exists, because un-flagging a role narrows a privileged review and that is a
+   * governance decision.
+   */
+  privileged: boolean;
 }
 export interface GovMatrixCell { module: string; action: string; permissionName: string; granted: boolean; }
 export interface GovMatrixDto { roleId: number; roleName: string; systemRole: boolean; cells: GovMatrixCell[]; }

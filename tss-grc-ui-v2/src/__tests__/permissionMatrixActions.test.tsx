@@ -92,6 +92,9 @@ const CATALOGUE_ACTIONS_2026_07_31 = [
 const TENANT_ROLE: GovRoleDto = {
   id: 900, roleName: 'REVIEW_TEST_ROLE', displayNameEn: 'Review test', displayNameAr: 'دور اختبار',
   systemRole: false, active: true, organisationId: 1,
+  // F2-280 — false because this fixture grants nothing; the matrix tests below add APPROVE
+  // cells, and whether that makes the role privileged is the server's answer, not a fixture's.
+  privileged: false,
 };
 
 /** One module per action plus a shared module, so every action has at least one live cell. */

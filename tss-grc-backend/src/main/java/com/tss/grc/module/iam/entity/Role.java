@@ -31,6 +31,34 @@ public class Role extends BaseEntity {
     @Column(name = "is_system_role")
     private Boolean isSystemRole = false;
 
+    /**
+     * F2-280 — the privileged-access classification, {@code NOT NULL DEFAULT 0}, which this
+     * entity did not map.
+     *
+     * <p>Because Hibernate never names an unmapped column in its INSERT, <b>the database
+     * default decided it for every role the platform has ever created</b> — and
+     * {@code RoleUpsertRequest} has no such field either, so there was no write path of any
+     * kind. Measured: the flagged set is byte-identical in dev and prod, the fourteen roles
+     * V272 seeded, while a role created through the Access Governance console granting
+     * {@code ADMIN:APPROVE} is 0 forever. Meanwhile a native query in
+     * {@code BreakGlassEventRepository} read it as the <i>"Privileged holders"</i> KPI on the
+     * break-glass dashboard. Mapping it is what makes the classification reachable from Java at
+     * all; {@link com.tss.grc.module.iam.repository.RoleRepository#PRIVILEGED_ROLE} is what
+     * makes the two readers agree.
+     *
+     * <p>🔑 The entity carried a careful essay about {@code is_active} being a dead control
+     * (below) directly above a second governance flag it declined to declare. <b>A reader who
+     * finds one governance flag explained at length does not then ask which others are
+     * missing</b> — F2-215's two-of-N, on one entity.
+     *
+     * <p>⚠ Not writable from the wire, deliberately. No endpoint binds {@code Role} (the only
+     * role bodies are {@code RoleUpsertRequest}), so mapping it opens no mass-assignment path;
+     * and <em>un</em>-flagging a role would narrow a privileged-access review, which is a
+     * governance decision rather than a side effect of a mapping fix. Filed.
+     */
+    @Column(name = "is_privileged")
+    private Boolean isPrivileged = false;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 

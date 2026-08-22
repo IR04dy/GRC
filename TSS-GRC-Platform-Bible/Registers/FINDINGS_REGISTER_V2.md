@@ -13896,3 +13896,192 @@ picker's guard before offering one ([[F2-250]]).
   (`DependencyCascadeService`, `BcmBoardPackService`, `MtpdInheritanceService`), each passing a
   process-id list it resolved from its own tenant's processes — tenant-correct by that route, so
   re-scoping them is defence in depth rather than a defect.
+
+## F2-280 · "Privileged" was answered twice in one module, and the stored answer had no writer
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`ed2697fe`) |
+| **Severity** | **P2** — the break-glass dashboard's *"Privileged holders"* KPI read `iam.roles.is_privileged`; the auto-scheduled quarterly NCA ECC 2-2 / SAMA CSF 3.3.5 privileged access review derived the same question from APPROVE/DELETE grants. **12 roles disagreed in dev and 7 in prod**, `CISO` among them — held, granting `IAM:BREAK_GLASS`, and inside the review while absent from the KPI. The stored half had **no write path of any kind**: probed live, a role created through the Access Governance console granting `ADMIN:APPROVE` is `is_privileged = 0` forever and the KPI does not move when it is granted |
+| **Found by** | asking F2-279's question one level up — *which entities map a STRICT SUBSET of their table, and do the omitted columns hold real data?* — then ranking the 26 answers by what the omission can make **wrong** rather than by size |
+| **Fix** | `RoleRepository.PRIVILEGED_ROLE`: one spliced SQL clause, the **union** of the stored flag and the derived grant test, consumed by both readers · `Role` maps `is_privileged` · `RoleSummary`/`GovRoleDto` report the effective classification and `AccessGovernancePage` renders it · new `PrivilegedRolePredicateSharingTest` |
+| **Verified** | probe **11/11 pre-fix and 13/13 post-fix** as `compliance` against a planted `[REVIEW-TEST]` role · pre-fix control reverts six sources, recompiles and confirms the two discriminating legs fire, `javap` checked both ways · harness **11 killed / 0 survived / 0 anchor-miss** · backend **4448/0/0** · frontend 75 files / 814 tests, `tsc` clean |
+
+### The route in, because it generalises F2-279 rather than repeating it
+
+[[F2-279]] measured **one column name**. Its gate asks whether an entity maps the
+`organisation_id` its table declares — 35 entities declare no `organisationId`, exactly one of
+those mapped a table that has it — and its own filing then named **seventeen** unmapped columns
+on that one table. So the general question was never asked: *which entities map a strict subset
+of their table, and what do the omissions cost?*
+
+Measured by reflection over `target/classes` against `sys.columns` in both databases:
+**26 of 432 shipped entities map a strict subset**, 4 more resolve to no table at all. Ranked by
+consequence rather than by gap size, three kinds:
+
+| kind | members | what it costs |
+|---|---|---|
+| **NOT NULL + DEFAULT, unmapped** | **8** | Hibernate never names the column in its INSERT, so **the database default decides the value** — F2-279's mechanism, generalised |
+| **populated, unmapped** | 37 | real data no wire can carry (F2-198's shape) — invisible, not wrong |
+| **empty, nullable** | 47 | latent |
+
+`bcm.bia_records` is still the widest gap (16 after F2-279's two), `cyber.incidents` next at 8.
+🔑 **But the sharpest member is not the widest — it is a single column on `iam.roles`,**
+`is_privileged`, because it is a **security classification** whose default is the *flattering*
+value and because something reads it.
+
+### Two definitions, one module, and they disagree
+
+Two native queries, both feeding the access-governance surface:
+
+* `BreakGlassEventRepository#countPrivilegedHolders` — *"Distinct users holding at least one
+  privileged role"* — read the **stored** flag, `r.is_privileged = 1`. It is the
+  *"Privileged holders"* / *"حاملو صلاحيات مميزة"* KPI rendered on `AccessAssuranceTabs`.
+* `AccessReviewItemRepository#generateItems` with scope `PRIVILEGED` — **derived** it from the
+  grants, `p.action IN ('APPROVE','DELETE')` — and said so in its class javadoc. It populates
+  the campaign `RecertificationService#autoScheduleForOrg` opens every quarter as
+  *"Q{n}-{year} privileged access review"*.
+
+Measured, both databases:
+
+| | dev | prod |
+|---|---|---|
+| STORED `is_privileged = 1` | **14** roles | **14** roles (byte-identical set) |
+| DERIVED grants APPROVE or DELETE | **24** roles | **19** roles |
+| disagreeing | **12** | **7** |
+
+The disagreeing set is not obscure: `CISO`, `CFO`, `CRO`, `BOARD_SECRETARY`, `CHANGE_MANAGER`,
+`AML_OFFICER`, `ETHICS_OFFICER`, `SHARIA_OFFICER`, `LEGAL_COUNSEL`, `SERVICE_OWNER`,
+`CONSUMER_PROTECTION_OFFICER`. And **2 of the 3 roles holding `IAM:BREAK_GLASS` are not flagged
+privileged** — `CISO` and `IR_LEAD` — on a KPI that sits on the break-glass dashboard.
+
+The reverse case matters as much: **`EMERGENCY_RESPONDER` is flagged privileged and grants no
+APPROVE or DELETE**, so it is in the KPI and *outside* the quarterly review's scope.
+
+### Why the stored half could never be right
+
+`Role` did not map the column, and `RoleUpsertRequest` declares
+`roleName`/`displayNameEn`/`displayNameAr`/`isActive` and nothing else. So there was **no writer
+of any kind** — not a screen, not an endpoint, not a service. `is_privileged` is
+`NOT NULL DEFAULT 0`, and Hibernate never names an unmapped column in an INSERT, so every role
+the platform has ever created took the database's default. That the flagged set is
+**byte-identical in dev and prod** is the evidence: it is exactly what V272 seeded, and nothing
+has moved it since.
+
+Probed live as `compliance` (GRC_ADMINISTRATOR, the only holder of `IAM:WRITE` — `admin` proves
+nothing about authorization), against a `[REVIEW-TEST]` role the probe plants itself:
+
+```
+POST /api/v1/iam/governance/roles            201  (a role the console can create)
+PUT  /api/v1/iam/governance/roles/{}/matrix  200  ADMIN:READ + ADMIN:APPROVE
+   stored flag    = 0        <- the database default decided it
+   derived        = 1        <- the quarterly review covers its holders
+   GET /roles     : no `privileged` key at all — the console cannot even report it
+   GET /analytics : privilegedHolders 5 -> 5 after granting the role  <- the KPI does not move
+   review scope   : 6                                                <- 1 holder reviewed and uncounted
+```
+
+### Why the answer is their UNION, and not a choice between them
+
+Neither half is a copy of the other, so [[F2-251]]/[[F2-257]]'s rule applies —
+*ask whether the label is a copy before reaching for the derive-from-the-parent fix.*
+
+* The **flag** carries a judgement the grants cannot express: break-glass is privileged although
+  it grants no APPROVE or DELETE. Collapsing to the derived half discards that.
+* The **derived** half covers a role a tenant creates, which the flag never could. Collapsing to
+  the stored half leaves every future role unclassified.
+
+A union is also the safe direction for a privileged-access review: over-scoping costs a
+reviewer's time, under-scoping is the finding an examiner writes up ([[F2-196]] — an unrecognised
+member should be chased, not excused).
+
+`RoleRepository.PRIVILEGED_ROLE` is that clause, spliced into both readers — the
+`CommitteeMemberTermRepository.CURRENT_SEAT_WINDOW` precedent, and it inherits both of that
+constant's recorded traps: it **leads with a newline** (Java strips *trailing* whitespace in a
+text block, so `"… WHERE" + PRIVILEGED_ROLE` would otherwise emit `WHERE(r.is_privileged` and
+kill the app at context startup), and its inner aliases are `rp_priv`/`p_priv` so splicing it
+into a host that already joins `rp`/`p` cannot collide.
+
+### 🔑 The file already held the correct rule, about a different predicate
+
+`RoleRepository`'s own javadoc, on the F2-94 holder count:
+
+> *"The holder predicate is **deliberately identical** to
+> `UserRepository#findActiveByOrganisationIdAndRoleName` … F2-62's defect was a report and an
+> enforcement point computing access separately and drifting apart, each half defensible
+> alone."*
+
+That is this finding's shape, written on this very interface, one predicate over. [[F2-195]]
+again — **the codebase can hold the correct rule, in prose, beside the place it was not
+applied.** And `Role` carries a careful multi-paragraph essay about `is_active` having been a
+dead control directly above a second governance flag it declined to declare: [[F2-215]]'s
+two-of-N, inside one entity. **A reader who finds one governance flag explained at length does
+not then ask which others are missing.**
+
+### What was deliberately NOT done
+
+* **No write path for the flag.** Flagging a role is scrutiny-increasing and safe; *un*-flagging
+  one narrows a privileged-access review, which is a governance decision about a customer's
+  organisation and not a side effect of a mapping fix. With the union in place a role granting
+  APPROVE or DELETE is privileged automatically, so the residual capability is only *flag a role
+  that grants neither* — filed.
+* **No migration.** The column has existed since V272 and nothing needed backfilling; the union
+  changes what is *computed*, not what is stored.
+* **No third reader.** `SodViolationRepository`'s `p.action IN ('WRITE','APPROVE','DELETE')` is a
+  different question — *a read-only persona that can write* — and the gate's pattern is
+  deliberately the **two-element** list so it cannot fire on it. A gate that fails on correct
+  code trains the next reader to edit the assertion ([[F2-214]]).
+
+### Instrument notes
+
+`PrivilegedRolePredicateSharingTest` is a **hard zero with no exemption map**: sharing the
+constant is always available, so there is no correct code for it to fail on. Eight legs — the
+clause written once (comparison-shaped, because `@Column(name = "is_privileged")` is a *mapping*
+and a bare-token pattern fires on it and fails on correct code, which is what the first draft
+did), both readers consuming it, the leading newline, paren balance and alias hygiene, the union
+being a union, the entity mapping, both halves of the wire, and a stripper self-test whose
+negative control is the **two-pass** form rather than a reordered alternation ([[F2-211]]).
+
+⚠ **The stripper is load-bearing here because of this slice's own javadoc**: `RoleRepository`'s
+comment quotes `p.action IN ('APPROVE','DELETE')` and `BreakGlassEventRepository`'s quotes
+`r.is_privileged = 1`, both explaining what they replaced. Reading raw source counts the epitaph
+as the corpse ([[F2-193]]) — mutation M11 confirms it.
+
+⚠⚠ **Two of my own gate legs fell to the harness, and both are shapes this register already
+names.** *(a)* The frontend leg was `contains("privileged")` over raw `api.ts`, and the JSDoc
+above the field says *"privileged-access classification"* — so **deleting the field left the leg
+green**. [[F2-194]]'s substring-satisfied-by-something-else, in a leg written after quoting it;
+now comment-stripped and asserted as `privileged\s*:\s*boolean`. *(b)* The unit test drove
+`listRoles`, which calls the two-argument summary directly, so making the **single-role** summary
+read `r.getIsPrivileged()` survived the whole build — [[F2-205]]'s rule that a leg exercising one
+path says nothing about the path beside it. `createRole`/`updateRole` now have their own leg.
+**11 killed / 0 survived / 0 anchor-miss** after.
+
+### Filed
+
+* **The 26-entity subset-mapping census**, with the three kinds above and the eight
+  NOT-NULL-with-a-DEFAULT members named. It is a filing rather than a gate because a *hermetic*
+  instrument would have to enumerate every column of a table from the 379-file migration corpus
+  (`CREATE TABLE` plus every `ALTER … ADD`), where this measurement used `sys.columns`; a
+  half-parsed census reports a smaller population, which reads exactly like a clean tree
+  ([[F2-206]]). **No verdicts** ([[F2-188]]).
+* The sharpest unread members: **`cyber.incidents`' eight unmapped PDPL columns**
+  (`affects_personal_data`, `pii_classified_at/by`, `linked_data_breach_id/code`,
+  `data_categories_affected`, `data_subjects_affected_est`, `personal_data_pii_assessment`) and
+  the **mirror five on `privacy.data_breaches`** (`source_cyber_incident_id/number`,
+  `auto_generated`, `auto_generated_at`, `auto_generation_rule`) — both ends of the cyber→PDPL
+  bridge, written by `CyberPdplBridgeService`'s **deliberate native SQL** and readable by nothing
+  else. The bridge log has its own entity and controller, so an operator can see *that* it fired;
+  whether an incident affects personal data is not on the incident's own wire.
+* **`iam.roles.description_en` is populated on 60 of 70 roles in dev and 49 of 59 in prod and is
+  mapped by nothing** — F2-198's shape on the role catalogue. Not mapped here, because a column
+  mapped with no surface is an inert mapping ([[F2-184]]); it needs a surface decision.
+* **`iam.users.password_changed_at`** (5 of 7 rows) and **`mfa_secret`** are likewise unmapped, so
+  no password-age policy can read or display the former.
+* **`bcm.critical_processes`' `mtpd_hours`/`rto_hours`/`rpo_hours`** — the ISO 22301 recovery
+  objectives, unmapped and empty on all 10 rows, beside a live `MtpdInheritanceService`.
+* **Whether a tenant admin may declare a role privileged** (and un-declare one) — an owner
+  decision, and the only part of the stored half this slice deliberately left closed.
+* `SubprocessorController`'s javadoc cites `is_privileged` as evidence that `PRIVACY_MANAGER` is
+  a real privacy job family. It is true today and it is a **third artefact reasoning about the
+  flag**, in prose, in another module — outside any scan of readers ([[F2-193]]).
