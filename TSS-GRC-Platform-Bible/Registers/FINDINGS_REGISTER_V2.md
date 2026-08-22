@@ -2547,6 +2547,138 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-271 · The bilingual gate names the bucket it skips, in a comment, and the skipped half is the worse one
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 |
+| **Severity** | **P2** — a PDPL Article 20 breach record could not be described in Arabic, on a platform whose primary language is Arabic |
+| **Found by** | changing the question after [[F2-270]] recorded the reference-minting seam as worked out |
+| **Fix** | `V387` adds `title_ar` + `description_ar` · the entity, the writer, the wire and the console follow · `BilingualInvariantRatchetTest` counts EN_ONLY and its **ceiling moves to the sum** |
+| **Verified** | V387 applied twice, Arabic round-tripped on a planted row, cleanup re-counted to 17 · gate 5/5 · frontend 75/75 files, 808/808 |
+
+### The instrument
+
+House rule 7: *"user-visible records carry `*_en` **and** `*_ar`; Arabic names are backend-mandatory."*
+`BilingualInvariantRatchetTest` (F2-30) is the only thing that checks it, and it pairs each `*En`
+entity field with its `*Ar` sibling to find **asymmetric annotation** — mandatory English beside
+optional Arabic. When the sibling does not exist it does:
+
+```java
+} catch (NoSuchFieldException e) {
+    continue;   // EN_ONLY — needs a migration, not an annotation
+}
+```
+
+🔑 **So the gate names the bucket it skips, understands why it is different, and never counts it.**
+The narrowing is the **existence of the sibling** — [[F2-198]]'s shape at a new depth, after a
+filename, an allow-list, a module name, an `extends` clause, a field-name list, a claim shape and an
+access modifier.
+
+**Measured: 47 EN_ONLY fields**, against 158 asymmetric pairs and 580 pairs. And EN_ONLY is the
+**worse** half: an asymmetric pair lets Arabic be supplied and merely fails to require it, while a
+missing column means Arabic **cannot be recorded at all** — and it needs a migration, so the
+annotation sweep the ratchet measures can never reach it.
+
+⚠ The census independently reproduces four instances that five earlier slices had each filed by
+hand — [[F2-209]] (`privacy.data_breaches` has no `title_ar`/`description_ar`), [[F2-245]]
+(`risk.scenarios.risk_title_ar`), [[F2-252]] (`cyber.cyber_controls.framework_name`, where the
+sibling register carries `name_ar`) and [[F2-213]] (`iam.users.job_title_en`). Four independent
+confirmations of a number nobody had produced.
+
+### The member closed
+
+`privacy.data_breaches` — the PDPL Article 20 personal-data-breach register — carried `title_en`
+NOT NULL and `description_en`, and **no `*_ar` column of any kind**. 17 rows in dev, 18 in prod (the
+databases differ, so that is a measurement).
+
+⚠ **The platform has two breach registers and the one that already supports Arabic is not the
+statutory one**: `pages/dataOfficer/BreachPage.tsx` collects `titleEn` *and* `titleAr` for
+`data_officer.breach`. [[F2-196]]'s disjoint-register shape with the statutory half the poorer of
+the two; V387 does not reconcile them, because choosing which register is authoritative for a PDPL
+breach changes what the platform reports to SDAIA and is an owner decision.
+
+⚠ **The absence had been documented three times and closed none.** `lib/api.ts` carried *"There is
+no `severity` and no `titleAr` column on `privacy.data_breaches` — … the second is filed as a real
+gap against house rule 7"*, written while [[F2-211]] and [[F2-214]] were both working on this exact
+register. Corrected in place.
+
+`V387` adds both columns **nullable, width-mirrored** (`NVARCHAR(255)` and `NVARCHAR(MAX)`, checked
+against `sys.columns` — a narrower Arabic column would truncate a title the English one accepts, and
+Arabic is not shorter), with **no backfill** and **no `@NotBlank`**: nothing can invent Arabic
+governance text, so the honest state is absent, and bean validation fires on UPDATE so requiring it
+would make all 17 breaches uneditable. The entity, `updateBreach`, both wire types and
+`PdplBreachConsole` follow in the same commit, because a column no write path fills is an inert
+column ([[F2-198]]'s shape).
+
+### 🔑🔑 The instrument finding: the ceiling was on a number that gets worse when you fix things
+
+Closing an EN_ONLY member means adding a **nullable** Arabic sibling. That makes the pair *visible*
+to the asymmetry scan, so `en_only` falls by one and `asymmetric` rises by one — measured, **47 → 45
+and 158 → 159**. The decrease-only ceiling on asymmetric pairs therefore **failed on the commit that
+fixed the worse half of house rule 7**, with the message:
+
+> *"Add `@NotBlank` to the `*_ar` field — do not raise the baseline."*
+
+which on a populated column is exactly what this class elsewhere warns makes every existing record
+uneditable. **The instrument told me to break editing rather than let its count move.**
+
+⚠⚠ **And it had already written the reason down.** The constant's own javadoc ends:
+
+> *"an instrument that asks about **mapped** things cannot see **unmapped** ones, and its green
+> reading is not evidence of absence … **Mapping a column made this number worse and the codebase
+> better.**"*
+
+🔑 **So the gate documented why its number was the wrong number and stayed keyed on it** —
+[[F2-195]]'s shape, the codebase holding the correct rule in prose beside the place it was not
+applied, and the fourth instance of that in this session.
+
+Per [[F2-204]] the answer is to re-scope rather than raise. The ceiling is now the **sum** —
+*fields where Arabic is not guaranteed*, `asymmetric + EN_ONLY` = **204** — which cannot be gamed in
+either direction:
+
+| change | effect on the sum |
+|---|---|
+| a new English-only column | +1 → **fails** |
+| a new mandatory-EN / optional-AR pair | +1 → **fails** |
+| adding a nullable Arabic sibling to a mandatory English one | −1 and +1 → **unchanged**, because the defect *moved* |
+| adding a symmetric pair, or annotating an Arabic column whose rows hold Arabic | → **falls** |
+
+Both components are still printed and asserted individually as measurements, so a reader can see
+which half moved; only the sum is a ceiling. `BASELINE_ASYMMETRIC_PAIRS` is **deleted** rather than
+kept — by then its only remaining mention was a message telling a reader to lower it, and its value
+(158) was stale against a measured 159, which is an inert constant answering the question a reader
+was about to ask ([[F2-184]]).
+
+### Two errors of mine
+
+⚠ **`BUILD FAILURE` with no `Tests run:` line, and it was my working directory.** I ran `mvn` from
+`src/test/java/com/tss/grc/common`, which has no POM. [[F2-255]] records this exact tell and the
+same cause; the absence of that line is the signal, whatever produced it.
+
+⚠ Two patch scripts missed their anchors because `—` in a Python string stays literal where the
+file holds a real em-dash, and one because a `+` was missing between concatenated lines. Both were
+loud. The rule this repo already states — **use the Write/Edit tools for content carrying
+escapes** — applies to em-dashes as much as to regex backslashes.
+
+### Verification
+
+V387 applied **twice** to dev via pyodbc: both columns exist, widths mirror their English siblings
+exactly (510/510 bytes and MAX/MAX), both nullable, **0 rows backfilled**, and Arabic round-tripped
+on a row the probe planted (`title_ar = '…اختبار ثنائي اللغة'`) with cleanup re-counted to 17. Gate
+**5/5** — `en_only=45`, `asymmetric=159`, `sum=204`, `all_pairs=582`. Frontend **75/75 files,
+808/808 tests**, `tsc` clean. Census moved in all three paired artefacts.
+
+⚙ **Filed:** the **45** remaining EN_ONLY fields as a work list with **no verdicts** — two shapes
+live in there and they want opposite treatment. A PDPL or committee record's title is governance text
+that house rule 7 is about (`CommitteeMemberTerm.independenceBasisEn`,
+`CommitteeActionItem.completionNotesEn`, `NcaEccFiling.peerReviewCommentsEn`,
+`DataSharingAgreement.terminationReasonEn`); an internal label such as
+`Permission.descriptionEn` or `WorkflowState.descriptionEn` may legitimately be English-only, and
+deciding which is which is a reading job this number must not pre-empt. Also unchanged: the two
+disjoint breach registers, and `privacy.data_breaches.breach_type` still free text with no CHECK
+([[F2-214]]'s filing).
+
 ## F2-269 · A four-click flow ended by displaying a fabricated National Cybersecurity Authority acknowledgement
 
 | | |

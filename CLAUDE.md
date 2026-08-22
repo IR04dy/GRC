@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V386 packaged; next free V387** (374 files; ⚠ this line said "V1→V295 / next free
+— **V1→V387 packaged; next free V388** (375 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
@@ -1872,6 +1872,76 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A DECREASE-ONLY CEILING SAT ON A NUMBER THAT GETS *WORSE* WHEN THE CODEBASE GETS BETTER, AND
+  THE CONSTANT'S OWN JAVADOC HAD ALREADY WRITTEN THAT DOWN** (F2-271, measured 2026-08-22).
+  `BilingualInvariantRatchetTest` (F2-30) is the only thing checking house rule 7. It pairs each
+  `*En` entity field with its `*Ar` sibling and measures **asymmetric annotation**; where the
+  sibling does not exist it does `continue;   // EN_ONLY — needs a migration, not an annotation`.
+  🔑 **So the gate NAMES the bucket it skips, understands why it differs, and never counts it** —
+  the narrowing is the **existence of the sibling**, F2-198's shape after a filename, an allow-list,
+  a module name, a controller-bearing table, an `extends` clause, a field-name list, a claim shape
+  and an access modifier. Measured: **47 EN_ONLY fields**, against 158 asymmetric pairs and 580
+  pairs.
+  ⚠ **EN_ONLY is the WORSE half.** An asymmetric pair lets Arabic be supplied and merely fails to
+  require it; a missing column means the Arabic **cannot be recorded at all**, on a platform whose
+  primary language is Arabic — and it needs a **migration**, so the annotation sweep the ratchet
+  measures can never reach it. The census independently reproduced four members that five earlier
+  slices had each filed by hand (F2-209 `privacy.data_breaches`, F2-245 `risk.scenarios`, F2-252
+  `cyber.cyber_controls.framework_name`, F2-213 `iam.users.job_title_en`) — four confirmations of a
+  number nobody had produced.
+  🔑🔑 **THE INSTRUMENT FINDING: closing an EN_ONLY member RAISES the asymmetry count.** The fix is
+  a **nullable** Arabic sibling (nullable because nothing can invent Arabic governance text for rows
+  that predate the column — the ratchet's own reason for being a ratchet), which makes the pair
+  *visible* to the pair scan. Measured on V387: **47 → 45 and 158 → 159.** So the decrease-only
+  ceiling **failed on the very commit that fixed the worse half of the rule**, and its message read
+  *"Add `@NotBlank` to the `*_ar` field — do not raise the baseline"* — which on a populated column
+  is exactly what that same class warns makes **every existing record uneditable**. **The instrument
+  told me to break editing rather than let its count move.**
+  ⚠⚠ **AND IT HAD ALREADY WRITTEN THE REASON.** The constant's javadoc ends: *"an instrument that
+  asks about **mapped** things cannot see **unmapped** ones, and its green reading is not evidence of
+  absence … **Mapping a column made this number worse and the codebase better.**"* 🔑 **The gate
+  documented why its number was the wrong number and stayed keyed on it** — F2-195's shape, the
+  codebase holding the correct rule in prose beside the place it was not applied.
+  ⚙ **Per F2-204, re-scoped rather than raised: the ceiling is the SUM** — *fields where Arabic is
+  not guaranteed*, `asymmetric + EN_ONLY` = **204** — which cannot be gamed in either direction. A
+  new English-only column **+1 fails**; a new mandatory-EN/optional-AR pair **+1 fails**; adding a
+  nullable Arabic sibling is **−1 and +1, unchanged**, which is right because the defect *moved*
+  rather than went away; a symmetric pair or an annotation on a column whose rows already hold
+  Arabic **falls**. Both components are still printed and asserted as measurements so a reader can
+  see which half moved; only the sum is a ceiling. `BASELINE_ASYMMETRIC_PAIRS` is **deleted** — its
+  only remaining mention was a message telling a reader to lower it, at a stale 158 against a
+  measured 159, i.e. an inert constant answering the question a reader was about to ask (F2-184).
+  ⚙ **The member closed: `privacy.data_breaches` (V387).** The PDPL Article 20 personal-data-breach
+  register carried `title_en` NOT NULL and **no `*_ar` column of any kind** — 17 rows in dev, 18 in
+  prod (the databases differ, so that is a measurement). ⚠ **The platform has TWO breach registers
+  and the one that already supports Arabic is not the statutory one**: `pages/dataOfficer/
+  BreachPage.tsx` collects `titleEn` *and* `titleAr` for `data_officer.breach` — F2-196's shape with
+  the statutory half the poorer, and reconciling them changes what the platform reports to SDAIA, so
+  it is an owner decision. ⚠⚠ **The absence had been documented THREE times and closed none**:
+  `lib/api.ts` read *"There is no `severity` and no `titleAr` column on `privacy.data_breaches` — …
+  filed as a real gap against house rule 7"*, written while F2-211 and F2-214 were both working on
+  this exact register. Corrected in place.
+  ⚙ **V387's shape is the reusable part for this family**: both columns **NULLABLE** (a NOT NULL
+  would refuse every pre-existing row), **width-mirrored** against their English siblings and
+  checked against `sys.columns` (a narrower Arabic column truncates a title the English one accepts,
+  and Arabic is not shorter), **no backfill** (an empty Arabic title is an honest *not recorded*; a
+  machine-translated one is a fabricated governance record) and **no `@NotBlank`** (it fires on
+  UPDATE too). The entity, `updateBreach`, both wire types and `PdplBreachConsole` land in the same
+  commit, because a column no write path fills is an inert column (F2-198's shape).
+  ⚠ **`BUILD FAILURE` with no `Tests run:` line, and it was my working directory again** — I ran
+  `mvn` from `src/test/java/com/tss/grc/common`, which has no POM. F2-255 records this exact tell:
+  **the absence of that line is the signal, whatever produced it**, and the surefire report on disk
+  then answers an older question.
+  ⚠ **An em-dash in a patch script's Python string stays literal where the file holds a real one**,
+  so two anchors missed. The recorded rule — use the Write/Edit tools for content carrying escapes —
+  covers `—` as much as `\b`.
+  ⚙ **Filed:** the **45** remaining EN_ONLY fields as a work list with **no verdicts**, because two
+  shapes live in it and want opposite treatment. Governance text house rule 7 is about
+  (`CommitteeMemberTerm.independenceBasisEn`, `CommitteeActionItem.completionNotesEn`,
+  `NcaEccFiling.peerReviewCommentsEn`, `DataSharingAgreement.terminationReasonEn`) against an
+  internal label that may legitimately be English-only (`Permission.descriptionEn`,
+  `WorkflowState.descriptionEn`) — deciding which is which is a reading job the number must not
+  pre-empt.
 - ⚠⚠ **A FOUR-CLICK FLOW ENDED BY DISPLAYING A FABRICATED NATIONAL CYBERSECURITY AUTHORITY
   ACKNOWLEDGEMENT** (F2-269, measured 2026-08-22). `cyberLifecycle.transitionFiling` minted
   `NCA-ACK-<year>-<Math.random()>` on the `ACCEPTED` transition and `CyberLifecyclePage` rendered it
