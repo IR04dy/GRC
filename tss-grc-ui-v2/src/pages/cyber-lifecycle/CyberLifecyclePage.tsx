@@ -217,7 +217,12 @@ function EccTab({ filing, onTransition }: { filing: EccFiling; onTransition: (s:
           <div className="cyc-ecc-action">
             <Badge tone={FILING_STATUS_TONE[filing.status]}>{FILING_STATUS_LABEL[filing.status][lang]}</Badge>
             <Badge tone="primary">{filing.year}</Badge>
-            {filing.ncaAckRef && <Badge tone="success" className="mono">{filing.ncaAckRef}</Badge>}
+            {/* F2-269 - no NCA acknowledgement badge. It rendered `ncaAckRef`, minted
+                here with Math.random() on the ACCEPTED transition, as a green success
+                badge - a fabricated statement that the National Cybersecurity Authority
+                had accepted this filing. There is no column and no NCA integration that
+                could receive a real one, so per F2-209 it is deleted rather than
+                rewired. The real register is at /nca-ecc/filings (F2-205). */}
           </div>
         }>
         <div className="cyc-card-intro">
@@ -527,7 +532,8 @@ function ThreatsTab({ threats, onAck, onCreate }: {
               <div className="cyc-card-chips">
                 <Badge tone={th.severity === 'CRITICAL' ? 'danger' : th.severity === 'HIGH' ? 'warning' : 'info'}>{th.severity}</Badge>
                 <Badge tone="primary">{THREAT_SOURCE_LABEL[th.source][lang]}</Badge>
-                <span className="mono cyc-card-mono">{th.sourceRef}</span>
+                {/* F2-269 - em-dash rather than a blank when the advisory carried no reference. */}
+                <span className="mono cyc-card-mono" title={th.sourceRef ? undefined : (lang === 'ar' ? 'لم تُرفق الجهة المُصدِرة رقم تعميم' : 'The issuing body supplied no advisory number')} aria-label={th.sourceRef ?? (lang === 'ar' ? 'لم تُرفق الجهة المُصدِرة رقم تعميم' : 'The issuing body supplied no advisory number')}>{th.sourceRef ?? '—'}</span>
                 <span className="mono cyc-card-mono">· {th.issuedAt.slice(0, 10)}</span>
                 {th.acknowledged
                   ? <Badge tone="success"><CheckCircle2 size={11} /> {t('cycAcked')}</Badge>

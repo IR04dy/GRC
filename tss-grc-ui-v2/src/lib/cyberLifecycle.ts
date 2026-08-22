@@ -105,8 +105,21 @@ export interface EccFiling {
   approvedBy?: string;
   approvedAt?: string;
   submittedAt?: string;
-  /** NCA acknowledgement reference. */
-  ncaAckRef?: string;
+  // F2-269 — `ncaAckRef` is DELETED, not renamed and not left nullable.
+  //
+  // It held an NCA acknowledgement reference minted here with `Math.random()` on the ACCEPTED
+  // transition, and CyberLifecyclePage rendered it as a green `success` badge. There is no
+  // `nca_ack_ref` column anywhere in the platform and no NCA integration that could receive one,
+  // so the value could only ever have been invented.
+  //
+  // F2-209's rule decides the fix: a reference only an outside authority can issue is RECEIVED AND
+  // RECORDED, OR ABSENT — the server may not mint it either, so there was nothing to move it to.
+  // Same precedent as F2-209's `onDispatch`: when a control's output describes something the
+  // platform cannot do at all, the fix is deletion rather than rewiring.
+  //
+  // The status flow itself is kept: recording "we submitted and they accepted" is a legitimate
+  // operator note, and this store's browser-local nature is already disclosed on the page (F2-205).
+  // What is gone is the platform inventing the regulator's own reference number for it.
   createdAt: string;
 }
 
@@ -190,8 +203,14 @@ export interface ThreatAdvisory {
   id: string;
   /** Source (NCA Haseen / KSA-CERT / SAMA / sector ISAC). */
   source: 'NCA-HASEEN' | 'KSA-CERT' | 'SAMA-ISAC' | 'TELECOM-ISAC' | 'INTERNAL';
-  /** Advisory id from source. */
-  sourceRef: string;
+  /**
+   * The advisory id **the issuing body assigned**, as received.
+   *
+   * F2-269 — optional, because an advisory that arrived without one has none, and inventing it is
+   * what this field used to do. Absent renders as an em-dash with a hint, never as a blank
+   * (F2-209's three states: a value, not-yet-recorded, or no source for it at all).
+   */
+  sourceRef?: string;
   titleEn: string;
   titleAr: string;
   severity: ThreatSeverity;
@@ -481,7 +500,10 @@ export function transitionFiling(status: EccFilingStatus, by?: string): EccFilin
   if (status === 'PEER_REVIEW') { updated.reviewedBy = by; updated.reviewedAt = now; }
   if (status === 'CISO_APPROVAL') { updated.approvedBy = by; updated.approvedAt = now; }
   if (status === 'SUBMITTED') { updated.submittedAt = now; }
-  if (status === 'ACCEPTED') { updated.ncaAckRef = `NCA-ACK-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`; }
+  // F2-269 — the ACCEPTED branch used to mint `NCA-ACK-<year>-<Math.random()>` here. Reached by a
+  // four-click flow (DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED → cycMarkAccepted), it made
+  // the page display a fabricated National Cybersecurity Authority acknowledgement as a green
+  // success badge. An authority's reference is received and recorded, or absent (F2-209).
   return saveFiling(updated);
 }
 
@@ -734,11 +756,18 @@ export function reclassifyAsset(assetId: string, newTier: AssetTier): CyberAsset
   return saveAsset({ ...a, tier: newTier });
 }
 
-export function createThreat(source: ThreatAdvisory['source'], severity: ThreatSeverity, titleEn: string, titleAr: string, summaryEn: string, summaryAr: string): ThreatAdvisory {
+export function createThreat(source: ThreatAdvisory['source'], severity: ThreatSeverity, titleEn: string, titleAr: string, summaryEn: string, summaryAr: string, advisoryRef?: string): ThreatAdvisory {
   const id = `THR-${new Date().getFullYear()}-${String(loadThreats().length + 1).padStart(3, '0')}`;
-  const sourceRef = source === 'NCA-HASEEN' ? `NCA-AD-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999)).padStart(4, '0')}`
-    : source === 'SAMA-ISAC' ? `SAMA-CTI-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999)).padStart(3, '0')}`
-    : `INT-${Date.now()}`;
+  // F2-269 — this used to invent the ISSUING BODY's own advisory number: `NCA-AD-<year>-<random>`
+  // for an NCA HASEEN advisory and `SAMA-CTI-<year>-<random>` for a SAMA ISAC one, both from
+  // Math.random(). F2-207 filed it; the reason it was latent rather than live is that the only
+  // caller passes 'INTERNAL', so neither branch was reachable from any screen — a fact about
+  // today, not a property of the control (F2-182), which is why it is closed anyway.
+  //
+  // An advisory number belongs to the body that issued it, so it is RECEIVED AND RECORDED, OR
+  // ABSENT (F2-209). It is now a caller-supplied parameter and stays undefined when the advisory
+  // did not come with one; only the INTERNAL case, where the reference is ours, is minted.
+  const sourceRef = source === 'INTERNAL' ? `INT-${Date.now()}` : advisoryRef;
   const t: ThreatAdvisory = {
     id, source, sourceRef,
     titleEn, titleAr, severity,
