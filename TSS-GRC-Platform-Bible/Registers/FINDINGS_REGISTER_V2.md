@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Status** | 🟢 CLOSED 2026-08-22 (`510eefff`) |
 | **Severity** | **P2** — why an IIA audit engagement was cancelled, why a CAPA was cancelled, why a SAMA/NCA/SDAIA regulatory change was deprioritised, why an approval was delegated, why a board pack was withdrawn and why an NCA ECC filing was cancelled could none of them be recorded in Arabic |
 | **Found by** | working [[F2-271]]'s EN_ONLY list and grouping its members by **concept** rather than by module |
 | **Fix** | `V389` adds six nullable, width-mirrored `*_ar` columns · six entities, six DTOs (response + `TransitionRequest` + outbound mapper) and six null-guarded writes · a new gate for the half the bilingual ratchet cannot see |
