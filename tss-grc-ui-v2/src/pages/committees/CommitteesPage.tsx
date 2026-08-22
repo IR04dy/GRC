@@ -251,9 +251,16 @@ export function CommitteesPage() {
       toast.danger(isAr ? 'يُرجى تعبئة الحقول المطلوبة' : 'Please fill the required fields');
       return;
     }
-    // seq is per-meeting; resolutionCode is unique per org. Derive both from
-    // the meeting + the resolutions already on record so the new row slots in
-    // sequentially and the generated code can't collide with an existing one.
+    // seq is per-meeting; resolutionCode is unique per org.
+    //
+    // ⚠ F2-270 corrected this comment. It read "the generated code can't collide with an existing
+    // one", which is true of the list THIS PAGE has loaded and says nothing about the database.
+    // Two secretaries filing from two browsers compute the same next code, and the loser's insert
+    // hits UQ_resolution_code on (organisation_id, resolution_code) — a real unique index in both
+    // databases, measured, so the outcome is a refused write rather than a duplicate. That is why
+    // this is a UX gap (no retry on conflict) and not a corruption risk, and why the code is not
+    // moved server-side: the caller may choose a well-formed code and cannot create a duplicate,
+    // which is F2-259's verdict rather than F2-172(d)'s.
     const existing = resolutions.filter(r => r.meetingId === meetingId);
     let seq = existing.reduce((mx, r) => Math.max(mx, r.seq || 0), 0) + 1;
     const codes = new Set(resolutions.map(r => r.resolutionCode));
@@ -465,8 +472,12 @@ export function CommitteesPage() {
       toast.danger(isAr ? 'تاريخ الاستحقاق مطلوب' : 'A due date is required'); return;
     }
     // seq is per-meeting; action_code is unique per org (UQ_action_item_code).
-    // Derive both collision-safe from the actions already on record so the new
-    // row slots in sequentially and the generated code can't clash.
+    //
+    // ⚠ F2-270 corrected this comment. It read "collision-safe … the generated code can't clash",
+    // which holds against the list THIS PAGE has loaded and not against the database — the same
+    // over-claim as the resolution minter above, and for the same reason. UQ_action_item_code
+    // exists in both databases (measured), so a concurrent filing is refused rather than
+    // duplicated. This comment already named the index, which is what made the claim look checked.
     const existing = actions.filter(a => a.meetingId === meetingId);
     let seq = existing.reduce((mx, a) => Math.max(mx, a.seq || 0), 0) + 1;
     const codes = new Set(actions.map(a => a.actionCode));
