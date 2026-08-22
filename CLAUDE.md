@@ -1872,6 +1872,69 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A FOUR-CLICK FLOW ENDED BY DISPLAYING A FABRICATED NATIONAL CYBERSECURITY AUTHORITY
+  ACKNOWLEDGEMENT** (F2-269, measured 2026-08-22). `cyberLifecycle.transitionFiling` minted
+  `NCA-ACK-<year>-<Math.random()>` on the `ACCEPTED` transition and `CyberLifecyclePage` rendered it
+  as a green `success` badge, monospaced, beside the filing's status and year — reached by four
+  buttons each offered by the status it applies to: `DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED
+  → cycMarkAccepted`. Measured: **no `nca_ack_ref` column anywhere in either database** (the only
+  acknowledgement columns are `rrp.rrp_cycle.regulator_ack_reference`,
+  `bcm.crisis_regulatory_notifications.acknowledgement_reference` and
+  `regreporting.regreport_filing.regulator_ack_reference` — three different registers), no server
+  field, and no NCA integration of any kind. **The value could only ever have been invented.**
+  🔑🔑 **THIS IS THE TOP RUNG OF F2-199'S HARM LADDER.** A fabricated dashboard misleads whoever is
+  looking and looking again corrects it; a fabricated export leaves the platform; **a fabricated
+  ACKNOWLEDGEMENT asserts that a regulator has accepted a filing** — and a green badge carrying a
+  monospaced reference is exactly what somebody would screenshot as evidence that it did.
+  ⚠⚠ **F2-205 EDITED THIS FILE, RETIRED ITS FABRICATED EXPORTS, LEFT COMMENTS SAYING THE FILING
+  STORE IS BROWSER-LOCAL — AND LEFT THIS.** 🔑 **A disclosure in the CODE is not a disclosure on the
+  SCREEN.** The operator sees no comment; they see a green badge. F2-215's two-of-N, and F2-185b's
+  *a class you have already edited reads as one you have already checked.*
+  ⚙ **The fix is DELETION and F2-209 is why**: an authority's reference is *received and recorded,
+  or absent* — **the server may not mint it either**, so there was nowhere to move it to. Same
+  precedent as F2-209's `onDispatch`: when a control's output describes something the platform cannot
+  do at all, the fix is deletion rather than rewiring. ⚠ **And deleting must not assert health**
+  (F2-197), so the boundary matters: the STATUS FLOW IS KEPT — recording *"we submitted and they
+  accepted"* is a legitimate operator note, and the real register is at `/nca-ecc/filings`, which the
+  page already links to. What is gone is the platform inventing the regulator's number for it; where
+  an advisory genuinely carried no reference, the row now shows an **em-dash with a bilingual hint**
+  on `title` *and* `aria-label` (F2-209's three states).
+  ⚠ **The latent half, closed anyway.** `createThreat` invented the ISSUING BODY's own advisory
+  number — `NCA-AD-<year>-<random>` for NCA HASEEN, `SAMA-CTI-<year>-<random>` for SAMA ISAC, both
+  filed by F2-207. Latent only because its **single caller passes `'INTERNAL'`**, which is a fact
+  about today rather than a property of the control (F2-182). The reference is a caller-supplied
+  parameter now and stays absent when the advisory carried none.
+  ⚠⚠ **THIS GATE IS A HARD ZERO WHERE THE THREE BEFORE IT WERE CENSUSES, AND THE REASON IS THE
+  TEST.** F2-266/F2-267/F2-268 all shipped counts, because a caller-supplied reference or deadline is
+  often legitimate and a ban would fail on correct code (F2-214). **There is no correct reason for a
+  browser to generate a Saudi regulator's own reference number**, so this one bans it — with two
+  exclusions pinned rather than assumed: **a RECORDED reference is not a MINTED one** (the seed corpus
+  carries real received numbers like `sourceRef: 'NCA-AD-2026-0148'`; no entropy on the line, and
+  banning those would have deleted real data), and a label formatted from a server id is not a mint.
+  The 26 non-authority mints ride a separate decrease-only figure with **no verdicts**, because some
+  of those stores have no server side at all (F2-204) and the browser's mint is the only id the row
+  will ever have.
+  ⚠⚠ **MY FIRST SCAN REPORTED LINE NUMBERS FROM THE COMMENT-STRIPPED TEXT, SO EVERY ONE WAS WRONG.**
+  The authority hit came back as "line 630", which in the real file is an unrelated field mapping — I
+  opened it, found nothing, and only then noticed the offset. **F2-242 records the remedy and I did
+  not apply it: strip comments while PRESERVING NEWLINES** (`m => m.replace(/[^\n]/g, ' ')`).
+  Corrected, it reports 484 / 739 / 740, which the pre-fix control confirms against the raw file —
+  🔑 **the control is what proves the stripper, not just the ban.**
+  ⚠ **It also counted display LABELS as minters.** `INC-${String(i.id).padStart(4,'0')}` formats a
+  server-assigned id, which is legitimate; the discriminator is whether the string incorporates a
+  server id or **entropy**. Raw 38 → 31 mints → 26 after separating the authority bucket, i.e. **14
+  of 38 subtracted** (9 `SHA-256` digests, 5 server-id labels), which is why the exclusion count has
+  its own anti-vacuity floor.
+  ⚠ **And the path resolution was invented rather than copied.** `new URL('..', import.meta.url)
+  .pathname` yields `D:\src` on Windows and every walk failed with `ENOENT`; the house idiom in
+  eleven sibling gates is `join(process.cwd(), 'src')`. 🔑 **A harness convention that already exists
+  in the tree is not worth re-deriving** — and this is the same lesson as F2-211's *before writing a
+  scanner, read the scanner this repo already has.*
+  ⚙ **Filed:** the **26** non-authority browser mints, sharpest being the ones whose store has a real
+  server side — `ACC-` (risk acceptances) and `KRI-BR-` in `riskLifecycle.ts`, `IR-`/`SOC-`/`PT-` in
+  `cyberLifecycle.ts`, `CLS-` in `ContractClausesPage` (F2-267 named that one), and `RES-`/`ACT-` in
+  `CommitteesPage`, which mint from a local `seq` counter against a server-backed committee register
+  — a race as well as a provenance question.
 - ⚠⚠ **F2-202'S RULE HAS TWO HALVES AND ONLY ONE WAS EVER COUNTED** (F2-268, measured
   2026-08-22). *Only the server may issue a tracking code **or a statutory deadline***. F2-266 and
   F2-267 gave the **code** half a primitive (`ReferenceCodeMint`) and a census; the **deadline**

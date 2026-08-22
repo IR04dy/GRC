@@ -2547,6 +2547,129 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-269 · A four-click flow ended by displaying a fabricated National Cybersecurity Authority acknowledgement
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`7267062d`) |
+| **Severity** | **P1** — the platform asserted that a Saudi regulator had accepted an ECC filing, with a reference minted by `Math.random()` in the browser |
+| **Found by** | executing [[F2-207]]'s filed frontend-minter population, re-derived first ([[F2-221]]) |
+| **Fix** | `ncaAckRef` deleted (minter, field, badge) · `createThreat` takes the advisory reference instead of inventing it · `authorityReferenceMinting.test.ts` holds a hard zero |
+| **Verified** | pre-fix control fires naming all three sites at their true line numbers · frontend 75/75 files, 808/808 tests |
+
+### The live one
+
+`cyberLifecycle.transitionFiling` minted the acknowledgement reference on the `ACCEPTED` transition:
+
+```ts
+if (status === 'ACCEPTED') { updated.ncaAckRef = `NCA-ACK-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`; }
+```
+
+and `CyberLifecyclePage` rendered it as a green `success` badge, monospaced, beside the filing's
+status and year. **Fully reachable** — four buttons, each offered by the status it applies to:
+`DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED →` `cycMarkAccepted` (a `CheckCircle2` primary
+button). On that last click the screen shows something like `NCA-ACK-2026-K7QP`.
+
+Measured: there is **no `nca_ack_ref` column anywhere** in either database (the only acknowledgement
+columns are `rrp.rrp_cycle.regulator_ack_reference`, `bcm.crisis_regulatory_notifications
+.acknowledgement_reference` and `regreporting.regreport_filing.regulator_ack_reference` — three
+different registers), no server field, and no NCA integration of any kind. **The value could only
+ever have been invented.**
+
+🔑 **This is the top rung of [[F2-199]]'s harm ladder.** A fabricated dashboard misleads whoever is
+looking at it, and looking again corrects it; a fabricated export leaves the platform; **a
+fabricated acknowledgement asserts that a regulator has accepted a filing** — and a green badge
+carrying a monospaced reference is exactly what an operator would screenshot as evidence that it
+did.
+
+⚠⚠ **[[F2-205]] edited this file, retired its fabricated exports, and left comments disclosing that
+the filing store is browser-local — and left this.** The page carries *"Nothing persists them today
+because the filing store is still browser-local"* a few lines above the tab that renders the badge.
+🔑 **A disclosure in the code is not a disclosure on the screen.** The operator sees no comment;
+they see a green badge. [[F2-215]]'s two-of-N, and [[F2-185]]b's *a class you have already edited
+reads as one you have already checked*.
+
+### The latent one, closed anyway
+
+`createThreat` invented the **issuing body's own advisory number**:
+
+```ts
+const sourceRef = source === 'NCA-HASEEN' ? `NCA-AD-${year}-${Math.random()…}`
+  : source === 'SAMA-ISAC' ? `SAMA-CTI-${year}-${Math.random()…}` : `INT-${Date.now()}`;
+```
+
+[[F2-207]] filed exactly this. It is latent because **the single caller passes `'INTERNAL'`**, so
+neither authority branch is reachable from any screen — a fact about today rather than a property of
+the control ([[F2-182]]), which is why it is closed regardless. `advisoryRef` is a caller-supplied
+parameter now, `sourceRef` is optional, and only the `INT-` case — where the reference is ours — is
+still minted.
+
+### The fix is deletion, and F2-209 is why
+
+**An authority's reference is received and recorded, or absent — the server may not mint it
+either**, so there was nowhere to move `ncaAckRef` to. Same precedent as [[F2-209]]'s `onDispatch`:
+*when a control's output describes something the platform cannot do at all, the fix is deletion
+rather than rewiring.*
+
+⚠ **Deleting must not assert health** ([[F2-197]]), so the boundary matters: the **status flow is
+kept** — recording *"we submitted and they accepted"* is a legitimate operator note, and the real
+register is at `/nca-ecc/filings`, which this page already links to. What is gone is the platform
+inventing the regulator's reference number for it. And where an advisory genuinely carried no
+reference, the row now shows an **em-dash with a bilingual hint** on `title` *and* `aria-label`
+rather than a blank ([[F2-209]]'s three states).
+
+### Why this gate is a hard zero where the last three were censuses
+
+[[F2-266]], [[F2-267]] and [[F2-268]] all shipped **counts**, because a caller-supplied reference or
+deadline is often legitimate and a ban would fail on correct code ([[F2-214]]). Here there is **no
+correct reason for a browser to generate a Saudi regulator's own reference number**, so
+`authorityReferenceMinting.test.ts` bans it outright — with two exclusions asserted rather than
+assumed:
+
+- **A recorded reference is not a minted one.** The seed corpus carries real received advisory
+  numbers (`sourceRef: 'NCA-AD-2026-0148'`); no entropy on the line, so the entropy requirement
+  excludes them, and that exclusion is pinned. Banning those would have deleted real data.
+- **A label formatted from a server id is not a mint**, and `crypto.subtle.digest('SHA-256', …)` is
+  not a reference at all. My first scan counted both — **9 `SHA-256` hits and 5 server-id labels out
+  of 38 raw sites** — so the subtraction is 14 of 38 and the exclusion count has its own
+  anti-vacuity floor.
+
+The non-authority mints ride a separate decrease-only figure (**26**) with **no verdicts**: those are
+our own references, and some of those stores have no server side at all ([[F2-204]]'s
+`NO_SERVER_SURFACE` population), where the browser's mint is the only id the row will ever have.
+
+### Three instrument errors of mine
+
+⚠⚠ **My first scan reported line numbers from the comment-STRIPPED text, so every one was wrong.**
+The authority hit came back as "line 630", which in the real file is an unrelated field mapping —
+I read it, found nothing, and only then noticed the offset. [[F2-242]] records the remedy and I did
+not apply it: **strip comments while preserving newlines.** The corrected scan reports 484 / 739 /
+740, which the pre-fix control confirms against the raw file.
+
+⚠ **It also counted display labels as minters.** `INC-${'{'}String(i.id).padStart(4,'0')}` formats a
+server-assigned id, which is legitimate; the discriminator is whether the string incorporates a
+server id or entropy. Raw 38 → 31 mints → 26 after separating the authority bucket.
+
+⚠ **And the path resolution was invented rather than copied.** `new URL('..', import.meta.url)
+.pathname` yielded `D:\src` on Windows and every walk failed with `ENOENT`; the house idiom in
+`kpiProvenance.test.ts` is `join(process.cwd(), 'src')`. 🔑 **A test-harness convention that already
+exists in eleven sibling files is not worth re-deriving.**
+
+### Verification
+
+Pre-fix control: restoring master's two files makes the hard zero fail, naming **all three** sites
+at their true line numbers — which is also what proves the newline-preserving stripper works. The
+detector's self-test pins both retired shapes as must-fire, a recorded reference as must-not-fire,
+and both exclusions. Frontend **75/75 files, 808/808 tests**; `npx tsc --noEmit` clean; 0 live
+(non-comment) references to `ncaAckRef` remain.
+
+⚙ **Filed:** the **26** non-authority browser mints as a work list with no verdicts. The sharpest
+are the ones whose store has a real server side, since there the browser is minting a reference the
+server should own — `ACC-` (risk acceptances) and `KRI-BR-` in `riskLifecycle.ts`, `IR-`/`SOC-`/`PT-`
+in `cyberLifecycle.ts`, and `CLS-` in `ContractClausesPage` ([[F2-267]] already identified that one).
+`RES-`/`ACT-` in `CommitteesPage` mint from a local `seq` counter against a server-backed committee
+register, which is a race as well as a provenance question.
+
 ## F2-268 · F2-202's rule has two halves, and the deadline half had never been counted
 
 | | |
@@ -2663,11 +2786,22 @@ one.
 ⚙ **Filed:** the six intersection properties as a work list with no verdicts — read the two named
 above first. `ethics.aml_alerts.sla_due_at` is inert and its SLA is a product decision.
 `OutsourcingArrangementService` hard-codes its cadence where the sibling names one, and the register
-has no `last_review_date`. And `ApprovalRequestService#create :: setSlaDeadline` lets the requester
-choose the deadline of their own approval request, on the register [[F2-226]] found accepting a
-forged `requested_by` — an internal SLA rather than a statutory one, so it is kind 1 or kind 2
-depending on whether the platform declares an approval SLA anywhere, which this slice did not
-measure.
+has no `last_review_date`. ⚠ **`ApprovalRequestService#create :: setSlaDeadline` was filed here as
+*"kind 1 or kind 2 depending on whether the platform declares an approval SLA anywhere, which this
+slice did not measure"* — MEASURED, and it is kind 2 BY DESIGN.**
+`V22__approvals.sql` declares the column *"optional hard deadline"*; **no approval SLA is declared
+anywhere** in the backend or the frontend (every `*_sla_hours` in the tree belongs to
+`cyber/vuln_sla`, a properly modelled per-severity policy engine with warning and breach
+fractions); and `lib/approvalsApi.ts` **already** handles absence with a `NO_DEADLINE` state, under
+a comment recording that it is populated on **12 of 22 rows in dev and 12 of 21 in prod** —
+measured back at [[F2-201]]. So there is no interval for the server to own, and refusing the
+caller's value would break a working request ([[F2-214]]). It remains true that the requester
+chooses it on the register [[F2-226]] found accepting a forged `requested_by`, but that is the
+column's stated purpose rather than a defect.
+
+🔑 **Recorded at the line rather than raised as its own finding** ([[F2-261]]) — and it is the
+second consecutive slice whose most useful output was a correction to the filing of the slice
+before it.
 
 ## F2-267 · Nine of the ten "sharpest unread" members I filed one slice earlier already had a UNIQUE index
 
