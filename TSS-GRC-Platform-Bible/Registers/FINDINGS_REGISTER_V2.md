@@ -2547,6 +2547,87 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-273 · The gated copy of a figure being current is what makes the ungated copies credible
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-22 (`b55db727`) |
+| **Severity** | **P3** — no runtime effect, but a stale pending-migration range is an input to a deployment decision, and reusing a taken version number is a Flyway checksum failure on the deployed server |
+| **Found by** | updating the migration census for V388 as [[F2-272]]'s docs step, and finding two of the three CLAUDE.md figures already three versions behind |
+| **Fix** | three new legs on `MeasuredBaselineFreshnessTest`: both ungated CLAUDE.md restatements parsed and asserted, the pending cell's **membership** asserted rather than only its count, and a synthetic positive control carrying master's literal stale wording |
+| **Verified** | 13/13 · mutation harness **6 killed / 0 survived / 0 anchor-miss** · the four never-enumerated migrations added, so the leg is a hard zero rather than a tolerated gap |
+
+### The measurement
+
+[[F2-266]] found that `CLAUDE.md`'s migration line *said* it was gated and was not, and gated it —
+parsing exactly one spelling, `V1→V<head> packaged; next free V<next>** (<n> files`. Measured on
+`master` immediately before the repair:
+
+| statement | where | status |
+|---|---|---|
+| `V1→V387 packaged; next free V388 (375 files` | CLAUDE.md:127 | **gated** (F2-266) · current |
+| `head **V344**, so **V345–V384 are pending** … 40 files` | CLAUDE.md:140 | ungated · **stale by 3** |
+| `Flyway V1–V384 (OFF in dev)` | CLAUDE.md:198 | ungated · **stale by 3** |
+| `**375** files, V1–V387 … next free V388` | MEASURED_BASELINE §0 | gated · current |
+| `Pending the next jar: **43**` | MEASURED_BASELINE §7-B | gated (count) · current |
+| the same cell's *enumeration* of the pending set | MEASURED_BASELINE §7-B | **ungated** · 37 of 43 named |
+
+Both stale figures read **V384** — behind by exactly `V385`, `V386`, `V387`, the three migrations
+added *after* F2-266's leg landed. 🔑 **A gate whose population is one spelling of a fact leaves
+every other spelling free to rot, and the drift is measurable in units of "migrations added since the
+gate".**
+
+🔑🔑 **The gated copy being current is what makes the stale ones credible.** A reader who checks
+the packaged-head line, finds it right, and then reads the pending range forty lines up has no signal
+that the second sentence is three versions old. [[F2-198]]'s shape at a new depth — the invariant is
+real, its population is one spelling — and [[F2-215]]'s two-of-N, since F2-266's own javadoc says
+*"CLAUDE.md's migration line said it was gated, and it was not"* having looked at one line.
+
+### The sharper half: a gated count over an ungated membership
+
+`flywayBaselineArithmeticHolds` has always asserted that the *"Pending the next jar"* figure equals
+the number of files above the applied head, and on 2026-08-22 that was correctly **43**. The same
+cell enumerates the pending migrations one by one — and named **37**. `V359`, `V360`, `V365`, `V380`,
+`V386` and `V387` appeared **nowhere in the document at all**.
+
+🔑🔑 **A count and the enumeration it summarises are two artefacts, and gating the count makes the
+gap invisible precisely because the number is right.** A reader asking whether the pending set is
+described reads the total, finds it correct, and stops. This is the same relationship as
+[[F2-264]]'s catalogue-versus-reachability and [[F2-251]]'s coverage report: the verified artefact
+sits on top of the unverified one and vouches for it.
+
+All four never-named migrations were **read rather than inferred from their filenames** and are now
+enumerated — `V359` (grants the `PLATFORM_ADMIN` permission module, which existed with zero grants),
+`V360` (**disables** 43 operator-object automation rules that could never match, so the jar
+implementing the operator vocabulary does not arm them at deploy), `V365` (the 46 foreign keys and 11
+uniqueness guarantees a fresh install does not enforce) and `V380` ([[F2-255]]'s `AUDIT_LOG:WRITE`).
+
+### The instrument bug that would have failed on correct code
+
+My first draft of the membership leg used the class's own `valueCell()` helper, and it reported **14**
+missing where **4** were. This document's prose contains literal `|` characters — vocabulary listings
+such as `HIGH | MEDIUM | LOW` — so splitting the row on the delimiter truncates the logical cell at
+**15,754 of ~34,000** characters, and every version named after the first embedded pipe read as
+absent.
+
+⚠ It **over**-reports, so it fails loudly rather than hiding an omission — the safe direction. But a
+gate that fails on correct code is the one failure a gate must never have ([[F2-214]]), so the leg
+reads the whole row and says why. That read is deliberately permissive: a version named in a
+neighbouring column would count. Acceptable, because the claim is only that a pending migration is
+*named somewhere in this row*, and a newly added version will not appear there by accident.
+
+⚠ The mutation that reinstates `valueCell()` is one of the six, so the truncation cannot come back
+silently.
+
+### Verification
+
+Six mutations, all killed: reverting each ungated CLAUDE.md figure to its stale value, un-naming one
+pending migration, breaking each of the two new detectors so it cannot match, and reinstating the
+truncating helper. The two detector-breaking mutations are the load-bearing ones — a pattern that
+stops matching reports a clean tree, which is the failure mode this whole class exists for, so both
+new detectors are also run against master's **literal stale wording** in a synthetic control and
+required *not* to match text that merely mentions Flyway.
+
 ## F2-272 · Four privacy registers were each bilingual for every text column but one
 
 | | |
