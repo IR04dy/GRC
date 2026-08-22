@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.entity.ProcessDependency;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
+import com.tss.grc.module.bcm.service.BiaObjectives;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
 import com.tss.grc.module.bcm.repository.ProcessDependencyRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -31,8 +32,13 @@ import java.util.*;
  *
  * 1. Build a reverse adjacency map: {@code upstreamProcessId → [consumers]}.
  * 2. BFS from the failed process. Track depth from the source.
- * 3. For each reached process, look up the lowest MTPD/RTO from
- *    {@code BiaRecord.findByProcessId(...)} (use first-found ordering).
+ * 3. For each reached process, look up its authoritative BIA via
+ *    {@link BiaRecordRepository#authoritativeByProcess} — the lowest stated
+ *    MTPD. ⚠ This line read "(use first-found ordering)" until F2-282 and the
+ *    code never did that: it has always preferred the lowest MTPD. The comment
+ *    understated the code, which is the safe direction to be wrong in, and it
+ *    is corrected rather than deleted because the ordering is the whole reason
+ *    a process with two BIAs gets a defensible answer.
  * 4. Classify reach time by depth-weighted heuristic:
  *    direct dependents = 1h, second-level = 4h, third-level = 8h,
  *    deeper = 24h. (No latency data on edges yet — Slice 9-A is the v1
@@ -72,17 +78,12 @@ public class DependencyCascadeService {
                 "Critical process not found in tenant: " + failedProcessId);
         }
 
-        // BIAs per process — pick the most-conservative MTPD/RTO per process.
-        Map<Long, BiaRecord> biaByProcess = new HashMap<>();
-        for (BiaRecord b : bias.findByProcessIdIn(new ArrayList<>(processById.keySet()))) {
-            BiaRecord cur = biaByProcess.get(b.getProcessId());
-            if (cur == null
-                || (b.getMtpdHours() != null
-                    && (cur.getMtpdHours() == null
-                        || b.getMtpdHours() < cur.getMtpdHours()))) {
-                biaByProcess.put(b.getProcessId(), b);
-            }
-        }
+        // F2-282: one predicate. This loop used to live here, a second copy lived in
+        // BcmBoardPackService and a THIRD in MtpdInheritanceService picked the latest
+        // BIA by assessmentDate instead of the lowest MTPD — two orderings and three
+        // null behaviours for one question, agreeing only by coincidence on live data.
+        Map<Long, BiaRecord> biaByProcess = BiaObjectives.authoritativeByProcess(
+            bias.findByProcessIdIn(new ArrayList<>(processById.keySet())));
 
         // Reverse adjacency: upstream → [direct consumers]
         Map<Long, List<ProcessDependency>> consumersOf = new HashMap<>();
@@ -121,6 +122,11 @@ public class DependencyCascadeService {
             BiaRecord b = biaByProcess.get(pid);
             Integer mtpd = b == null ? null : b.getMtpdHours();
             Integer rto  = b == null ? null : b.getRtoHours();
+            // F2-282: 4 of 8 processes resolve to an UNAPPROVED BIA, and for Core
+            // Banking Operations that is an IN_PROGRESS row stating 1h over an
+            // APPROVED one stating 72h. Which figure is the real tolerance is an
+            // owner decision, so the status is disclosed rather than acted on.
+            String mtpdSourceStatus = b == null ? null : b.getStatus();
             Integer threshold = mtpd != null ? mtpd : rto;
 
             boolean breached = threshold != null && reachHour >= threshold;
@@ -134,6 +140,7 @@ public class DependencyCascadeService {
                 depth,
                 reachHour,
                 mtpd, rto,
+                mtpdSourceStatus,
                 breached,
                 round2(confidence)
             ));
@@ -217,6 +224,12 @@ public class DependencyCascadeService {
         int reachHour,                          // hour the cascade lands
         Integer mtpdHours,                      // nullable
         Integer rtoHours,                       // nullable
+        /**
+         * F2-282 — the approval status of the BIA these objectives came from.
+         * Disclosed because 4 of 8 processes resolve to an unapproved record and a
+         * reader cannot otherwise tell a ratified tolerance from a draft.
+         */
+        String mtpdSourceStatus,                // nullable
         boolean breached,                       // reachHour ≥ MTPD (or RTO)
         double confidence                       // 0..1 — drops with depth
     ) {}

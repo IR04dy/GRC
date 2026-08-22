@@ -21,6 +21,7 @@ import com.tss.grc.module.bcm.mtpd_inheritance.repository.MtpdInheritanceAssessm
 import com.tss.grc.module.bcm.mtpd_inheritance.repository.MtpdInheritanceFindingRepository;
 import com.tss.grc.module.bcm.mtpd_inheritance.repository.ProcessVendorDependencyRepository;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
+import com.tss.grc.module.bcm.service.BiaObjectives;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
 import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.capa.service.CapaTaskService;
@@ -48,7 +49,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Slice 10-E — Vendor MTPD inheritance compute engine.
@@ -232,22 +232,23 @@ public class MtpdInheritanceService {
                     .ifPresent(p -> processByid.put(p.getId(), p));
             }
         }
-        // Latest BIA-record MTPD per process id (entity has no @Where so we filter manually).
+        // F2-282: this was the OUTLIER of three hand-rolled copies. It picked the
+        // most recent BIA by assessmentDate where the cascade and the board pack both
+        // pick the lowest MTPD, and it filtered nulls only AFTER selecting — so when
+        // the latest record left MTPD blank this process lost its MTPD entirely even
+        // though an older record stated one, and the vendor gap silently became
+        // unmeasurable. All three now ask the same predicate. Verified: the two rules
+        // coincide on every live row in dev and prod, so this changes no finding
+        // today; what it removes is the divergence.
+        // (The old comment here said the entity "has no @Where so we filter
+        // manually" — F2-279 added @Where(is_deleted = 0), and the manual filter it
+        // described never existed.)
         if (!processByid.isEmpty()) {
-            List<BiaRecord> bias = biaRepo.findByProcessIdIn(new ArrayList<>(processByid.keySet()));
-            // Group by process, pick the row with the most recent assessmentDate (or createdAt as tiebreaker).
-            Map<Long, BiaRecord> latestBia = bias.stream()
-                .collect(Collectors.toMap(
-                    BiaRecord::getProcessId,
-                    b -> b,
-                    (a, b) -> {
-                        LocalDate da = a.getAssessmentDate() != null ? a.getAssessmentDate() : LocalDate.MIN;
-                        LocalDate db = b.getAssessmentDate() != null ? b.getAssessmentDate() : LocalDate.MIN;
-                        return db.isAfter(da) ? b : a;
-                    }));
-            latestBia.forEach((pid, bia) -> {
-                if (bia.getMtpdHours() != null) mtpdByProcess.put(pid, bia.getMtpdHours());
-            });
+            BiaObjectives.authoritativeByProcess(
+                    biaRepo.findByProcessIdIn(new ArrayList<>(processByid.keySet())))
+                .forEach((pid, bia) -> {
+                    if (bia.getMtpdHours() != null) mtpdByProcess.put(pid, bia.getMtpdHours());
+                });
         }
 
         // 4. Preload vendors + latest ACCEPTED attestation per vendor.

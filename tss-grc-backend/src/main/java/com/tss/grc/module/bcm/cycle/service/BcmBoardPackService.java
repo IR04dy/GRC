@@ -12,6 +12,7 @@ import com.tss.grc.module.bcm.entity.BcmExercise;
 import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.repository.BcmExerciseRepository;
+import com.tss.grc.module.bcm.service.BiaObjectives;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
 import com.tss.grc.module.evidence.repository.EvidenceRequestRepository;
@@ -99,19 +100,18 @@ public class BcmBoardPackService {
         Map<Long, CriticalProcess> byId = new HashMap<>();
         for (CriticalProcess p : all) byId.put(p.getId(), p);
 
-        List<BiaRecord> rows = bias.findByProcessIdIn(new ArrayList<>(byId.keySet()));
-        // For each process keep the smallest MTPD BIA (most-critical).
-        Map<Long, BiaRecord> bestPerProcess = new HashMap<>();
-        for (BiaRecord b : rows) {
-            if (b.getMtpdHours() == null) continue;
-            BiaRecord cur = bestPerProcess.get(b.getProcessId());
-            if (cur == null || (cur.getMtpdHours() != null && b.getMtpdHours() < cur.getMtpdHours())) {
-                bestPerProcess.put(b.getProcessId(), b);
-            }
-        }
+        // F2-282: one predicate, shared with DependencyCascadeService and
+        // MtpdInheritanceService. This copy skipped a null-MTPD row outright, so a
+        // process whose only BIA left MTPD blank was absent from the board pack
+        // rather than present with no objective; the shared rule prefers a row that
+        // states an MTPD and the filter below is what keeps such a process out of a
+        // ranking ordered BY that number.
+        Map<Long, BiaRecord> bestPerProcess = BiaObjectives.authoritativeByProcess(
+            bias.findByProcessIdIn(new ArrayList<>(byId.keySet())));
 
         return bestPerProcess.values().stream()
-            .sorted(Comparator.comparingInt(b -> b.getMtpdHours() == null ? Integer.MAX_VALUE : b.getMtpdHours()))
+            .filter(b -> b.getMtpdHours() != null)
+            .sorted(Comparator.comparingInt(BiaRecord::getMtpdHours))
             .limit(5)
             .map(b -> {
                 CriticalProcess p = byId.get(b.getProcessId());

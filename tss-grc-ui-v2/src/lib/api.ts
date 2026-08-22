@@ -2060,6 +2060,23 @@ export interface CascadeImpactRow {
   reachHour: number;             // band the cascade lands in (1/4/8/24)
   mtpdHours?: number | null;
   rtoHours?: number | null;
+  /**
+   * F2-282 — the approval status of the BIA record these objectives came from
+   * (`APPROVED` | `UNDER_REVIEW` | `IN_PROGRESS` | `DRAFT`; the column has no
+   * CHECK, so treat the vocabulary as open).
+   *
+   * On the wire because a process can carry several BIAs and the platform picks
+   * one — the lowest stated MTPD, now via a single shared predicate rather than
+   * the three hand-rolled loops that disagreed. Measured 2026-08-22 in dev and
+   * prod: **4 of 8 processes resolve to an unapproved record**, and for
+   * `Core Banking Operations` (CRITICAL) the winner is an `IN_PROGRESS` row
+   * stating MTPD 1h over an `APPROVED` one stating 72h.
+   *
+   * Which of those is the organisation's real tolerance is an owner decision, so
+   * this is disclosed and never acted on — a reader must be able to tell a
+   * ratified recovery objective from a draft.
+   */
+  mtpdSourceStatus?: string | null;
   breached: boolean;             // reachHour >= MTPD (or RTO)
   confidence: number;            // 0..1, drops with depth
 }
