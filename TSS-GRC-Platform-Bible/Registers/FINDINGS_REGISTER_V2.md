@@ -2551,7 +2551,7 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 
 | | |
 |---|---|
-| **Status** | 🟢 CLOSED 2026-08-22 (`SHA_PLACEHOLDER`) |
+| **Status** | 🟢 CLOSED 2026-08-22 (`b55db727`) |
 | **Severity** | **P3** — no runtime effect, but a stale pending-migration range is an input to a deployment decision, and reusing a taken version number is a Flyway checksum failure on the deployed server |
 | **Found by** | updating the migration census for V388 as [[F2-272]]'s docs step, and finding two of the three CLAUDE.md figures already three versions behind |
 | **Fix** | three new legs on `MeasuredBaselineFreshnessTest`: both ungated CLAUDE.md restatements parsed and asserted, the pending cell's **membership** asserted rather than only its count, and a synthetic positive control carrying master's literal stale wording |
