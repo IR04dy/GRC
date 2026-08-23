@@ -34,8 +34,26 @@ public class BcmPlan {
     @Column(name = "version", length = 50)
     private String version;
 
+    /**
+     * DRAFT | UNDER_REVIEW | APPROVED | INVOKED | ARCHIVED (see {@code BcmService}).
+     *
+     * <p>F2-298 — deliberately NOT initialised, and this is the FIFTH instance of the same
+     * residue. {@code PUT /api/v1/bcm/legacy-plans/{id}} binds this entity, and F2-234/F2-296
+     * made {@code BcmService#updatePlan} tolerate an ECHO of the stored status and refuse a
+     * CHANGE. With {@code = "DRAFT"} here, a body that OMITTED status deserialised to "DRAFT",
+     * so the refusal fired on every plan that was not already DRAFT and answered 400 naming a
+     * transition the caller never asked for — the same misleading diagnostic F2-297 found on
+     * {@code BcpPlan}, one register over.
+     *
+     * <p>F2-238 removed this initialiser from {@code CrisisEvent}, {@code Issue} and
+     * {@code BcmBiaAssessment}; F2-297 found the fourth on {@code BcpPlan}; this is the fifth.
+     * {@code BcmService#createPlan} already owns the default through
+     * {@code ServerOwnedState.requireInitial} with {@code INITIAL_PLAN_STATUS}, so the
+     * initialiser was pure residue on create and a refusal on update. The column is NOT NULL and
+     * the create writes it — do not restore it.
+     */
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "DRAFT";
+    private String status;
 
     @Column(name = "next_review_date")
     private LocalDate nextReviewDate;
