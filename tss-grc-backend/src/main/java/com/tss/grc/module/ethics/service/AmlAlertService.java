@@ -3,6 +3,7 @@ package com.tss.grc.module.ethics.service;
 import com.tss.grc.common.reference.ReferenceCodeMint;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ethics.dto.AssignAnalystRequest;
 import com.tss.grc.module.ethics.entity.AmlAlert;
@@ -18,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,6 +62,40 @@ public class AmlAlertService {
         .orElseThrow(() -> new IllegalStateException(
             "the AML alert machine has no state with no incoming edge, so every state is "
           + "reachable and a create cannot be held to an initial one"));
+
+    /**
+     * The analyst's conclusion about an alert. F2-289.
+     *
+     * <p>Two tokens, and they are the two this service's own transition branches already default
+     * to — not a vocabulary chosen here. {@code ethics.aml_alerts} had <b>zero</b> CHECK constraints
+     * of any kind, so before V393 the column was narrowed by nothing at all and
+     * {@code body.get("disposition").toString()} stored whatever arrived at three sites.
+     *
+     * <p>⚠ It is deliberately <b>not</b> reconciled with {@link KycService#HIT_DISPOSITION}, which
+     * governs {@code ethics.screening_hits.disposition} over the same word. Those two registers hold
+     * disjoint near-synonyms ({@code TRUE_POSITIVE} against {@code TRUE_MATCH}) and F2-288 filed
+     * collapsing them as an owner decision, because it changes what the platform reports to the
+     * Saudi FIU. Inventing a third, merged vocabulary here would be that defect (F2-196).
+     */
+    static final ClosedVocabulary DISPOSITION = ClosedVocabulary.of(
+        "disposition", "CK_aml_alerts_disposition", "TRUE_POSITIVE", "FALSE_POSITIVE");
+
+    /**
+     * F2-289 — the alert's severity band, closed because {@link #analytics()} buckets by an
+     * <b>inclusion list</b> of exactly these four tokens.
+     *
+     * <p>{@link #applyEditable} writes this column straight from an entity-bound PUT, so a caller
+     * could store {@code SEVERE} and the alert would then be invisible to the {@code bySeverity}
+     * KPI and carry no tone on the register (F2-197's shape). Every stored value in both databases
+     * is already a member, so {@code require} cannot break a request that works today (F2-182).
+     *
+     * <p>⚙ {@code alert_type} is deliberately left open beside it: 10 distinct values are stored and
+     * <b>no vocabulary for it is declared anywhere</b> — no reader's inclusion list, no dropdown, no
+     * CHECK — so constraining it would mean inventing one (F2-183's rule about
+     * {@code consumer.complaint.subcategory}, recorded as a decision rather than an absence).
+     */
+    static final ClosedVocabulary SEVERITY = ClosedVocabulary.of(
+        "severity", "CK_aml_alerts_severity", "LOW", "MEDIUM", "HIGH", "CRITICAL");
 
     @Transactional
     public AmlAlert create(AmlAlert req) {
@@ -196,34 +230,13 @@ public class AmlAlertService {
         if (!allowed.contains(target))
             throw new IllegalArgumentException("Cannot transition from " + a.getStatus() + " to " + target);
         switch (target) {
-            case "CLEARED" -> {
-                a.setDisposition(body.get("disposition") != null ? body.get("disposition").toString() : "FALSE_POSITIVE");
-                a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-                // F2-223 — the decision-maker is the authenticated principal. KycService#disposition,
-                // in this same package and over the same concept, already does exactly this and
-                // says why: "An AML disposition with no decider is not a disposition." Here the
-                // client filled it from a window.prompt(), and `?? ''` on Cancel meant the STR
-                // filed with the Saudi FIU could be attributed to the empty string.
-                a.setDecidedByName(CurrentActor.username());
-                a.setDecidedAt(LocalDateTime.now());
-            }
-            case "ESCALATED" -> {
-                a.setDisposition(body.get("disposition") != null ? body.get("disposition").toString() : "TRUE_POSITIVE");
-                a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-            }
+            case "CLEARED"   -> recordDisposition(a, body, "FALSE_POSITIVE");
+            case "ESCALATED" -> recordDisposition(a, body, "TRUE_POSITIVE");
             case "STR_FILED" -> {
                 a.setStrFiled(true);
                 a.setStrReference(body.get("strReference") != null ? body.get("strReference").toString() : null);
                 a.setStrFiledAt(LocalDateTime.now());
-                a.setDisposition(body.get("disposition") != null ? body.get("disposition").toString() : "TRUE_POSITIVE");
-                a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-                // F2-223 — the decision-maker is the authenticated principal. KycService#disposition,
-                // in this same package and over the same concept, already does exactly this and
-                // says why: "An AML disposition with no decider is not a disposition." Here the
-                // client filled it from a window.prompt(), and `?? ''` on Cancel meant the STR
-                // filed with the Saudi FIU could be attributed to the empty string.
-                a.setDecidedByName(CurrentActor.username());
-                if (a.getDecidedAt() == null) a.setDecidedAt(LocalDateTime.now());
+                recordDisposition(a, body, "TRUE_POSITIVE");
             }
             case "CLOSED" -> { /* keep all decision metadata as-is */ }
             default -> { /* no-op */ }
@@ -232,19 +245,70 @@ public class AmlAlertService {
         return repo.save(a);
     }
 
+    /**
+     * The <b>only</b> writer of an AML alert's decision tuple — disposition, notes, decider, clock.
+     *
+     * <p>F2-289. Before this, the reaction lived inline in the {@code switch} above and reached
+     * <b>two of its three</b> decision branches: {@code CLEARED} and {@code STR_FILED} each stamped
+     * {@code decidedByName} and {@code decidedAt}, and {@code ESCALATED} — which records a
+     * {@code TRUE_POSITIVE} disposition, i.e. the analyst's conclusion that a monitored transaction
+     * is genuinely suspicious — stamped neither. Since {@code ESCALATED → CLOSED} is a declared edge
+     * and {@code CLOSED} keeps decision metadata as-is, an alert could be escalated as a confirmed
+     * true positive and closed with <b>no decider recorded anywhere, permanently</b>. The Escalate
+     * control is offered on the register for every {@code INVESTIGATING} alert, and three real
+     * alerts sit in that state in both databases; 0 rows are {@code ESCALATED}, so this was latent
+     * and reachable from the platform's own screen (F2-182 — reachability is a fact about today).
+     *
+     * <p>🔑🔑 <b>Why nobody saw it: the comment explaining the mechanism was byte-identical in the
+     * two branches that HAD it, and the third sat between them.</b> Repetition reads as a rule, so a
+     * reader scrolling the switch met the attribution twice and the gap once — and the duplicated
+     * comment's own worked example was <i>"the STR filed with the Saudi FIU"</i>, i.e. one of the two
+     * branches it appeared in. F2-215's two-of-N, sharpened: <b>a comment duplicated across the
+     * branches that have a mechanism is stronger evidence of coverage than one stated once.</b>
+     *
+     * <p>🔑 And F2-223 is the slice that added the attribution — to two of the three branches. Same
+     * shape as F2-287's headline: <b>the slice that establishes a rule is the worst-placed slice to
+     * apply it to its own leftovers</b>, because the branch it did not touch is the one its new
+     * comment makes look finished.
+     *
+     * <p>⚠ <b>All four columns move together, latest decision wins.</b> {@code STR_FILED} used to
+     * preserve an existing {@code decidedAt} while overwriting {@code decidedByName}
+     * unconditionally, which is F2-223's split waiting for a second decision: the name from
+     * decision 2 beside the clock from decision 1. The only two-disposition path the machine allows
+     * is {@code ESCALATED → STR_FILED}, and because {@code ESCALATED} wrote no clock the old
+     * conditional always fired — so this is behaviour-identical on every reachable path today and
+     * removes the split. Nothing is lost: {@code str_filed_at} records when the STR was filed.
+     *
+     * <p>⚠ {@code requireUsername}, never {@code username()}: this method stamps the clock from the
+     * server, which is the service declaring that <b>it</b> is the recorder of the act, so a blank
+     * attribution beside a real timestamp would read as an attribution (F2-236, whose javadoc states
+     * exactly this rule).
+     */
+    private void recordDisposition(AmlAlert a, Map<String, Object> body, String fallback) {
+        Object raw = body.get("disposition");
+        a.setDisposition(raw != null ? DISPOSITION.require(raw.toString()) : fallback);
+        a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
+        a.setDecidedByName(CurrentActor.requireUsername("an AML disposition"));
+        a.setDecidedAt(LocalDateTime.now());
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> analytics() {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Object> out = new HashMap<>();
         out.put("total", repo.countByOrganisationId(org));
 
+        // F2-289 — DERIVED from the machine and the vocabulary, never a second typed list. These
+        // two loops were a third and fourth copy of vocabularies this file already declares, and an
+        // inclusion list over a column nothing constrained is how F2-196's defect starts: a token
+        // nobody remembered is silently absent from the KPI rather than chased.
         Map<String, Long> byStatus = new HashMap<>();
-        for (String s : List.of("OPEN","INVESTIGATING","CLEARED","ESCALATED","STR_FILED","CLOSED"))
+        for (String s : TRANSITIONS.keySet())
             byStatus.put(s, repo.countByOrganisationIdAndStatus(org, s));
         out.put("byStatus", byStatus);
 
         Map<String, Long> bySeverity = new HashMap<>();
-        for (String s : List.of("LOW","MEDIUM","HIGH","CRITICAL"))
+        for (String s : SEVERITY.tokens())
             bySeverity.put(s, repo.countByOrganisationIdAndSeverity(org, s));
         out.put("bySeverity", bySeverity);
 
@@ -292,7 +356,9 @@ public class AmlAlertService {
      */
     private void applyEditable(AmlAlert t, AmlAlert s) {
         if (s.getAlertType()           != null) t.setAlertType(s.getAlertType());
-        if (s.getSeverity()            != null) t.setSeverity(s.getSeverity());
+        // F2-289 — closed because analytics() buckets by an inclusion list of exactly these four
+        // tokens, so a severity outside them is invisible to the KPI strip rather than merely odd.
+        if (s.getSeverity()            != null) t.setSeverity(SEVERITY.require(s.getSeverity()));
         if (s.getRuleId()              != null) t.setRuleId(s.getRuleId());
         if (s.getRuleName()            != null) t.setRuleName(s.getRuleName());
         if (s.getTitleEn()             != null) t.setTitleEn(s.getTitleEn());

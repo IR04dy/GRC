@@ -98,7 +98,12 @@ class ClosedVocabularyPinTest {
         // `KycService#applyConfirmedMatch` DISPATCHES on, so a vocabulary that silently stopped
         // being compared here would be a confirmed sanctions match that escalates nothing.
         "CK_screening_hits_disposition", "CK_screening_hits_list_source",
-        "CK_kyc_subjects_risk_rating");
+        "CK_kyc_subjects_risk_rating",
+        // F2-289 — V393, the ethics AML *transaction-monitoring* register's first constraints.
+        // `CK_aml_alerts_status` is deliberately NOT here: its vocabulary is the TRANSITIONS map
+        // itself, so declaring a ClosedVocabulary for it would be a second copy of the machine
+        // (F2-196). StateMachineColumnMirrorTest checks that one against the map by reflection.
+        "CK_aml_alerts_disposition", "CK_aml_alerts_severity");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")
