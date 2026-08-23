@@ -98,6 +98,79 @@ class BcmServiceTest {
         return b;
     }
 
+    // ─── F2-298: the status guard on a PARTIAL put ────────────────────
+    //
+    // updatePlan had NO test of any kind before this, which is not the same as a path somebody
+    // decided was safe (F2-248). The route is a full-replace PUT that binds the entity, and
+    // F2-234/F2-296 made it tolerate an ECHO of the stored status and refuse a CHANGE — correct,
+    // and while BcmPlan#status carried `= "DRAFT"` an OMITTED status deserialised to "DRAFT" and
+    // was therefore read as a change, so every plan that was not already DRAFT refused a partial
+    // body with a 400 naming a transition the caller had never asked for.
+
+    @Test
+    void updatePlan_partialBodyWithNoStatusIsAcceptedOnAnApprovedPlan() {
+        BcmPlan stored = plan("APPROVED");
+        when(planRepo.findById(ID)).thenReturn(Optional.of(stored));
+        when(planRepo.save(any(BcmPlan.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BcmPlan patch = new BcmPlan();
+        patch.setPlanNameEn("Renamed while approved");
+
+        BcmPlan saved = service.updatePlan(ID, patch);
+
+        assertThat(saved.getPlanNameEn()).isEqualTo("Renamed while approved");
+        assertThat(saved.getStatus())
+            .as("an omitted status must leave the stored state alone, not be read as a request to "
+                + "move the plan back to the initial state")
+            .isEqualTo("APPROVED");
+    }
+
+    @Test
+    void updatePlan_theEntityDoesNotDefaultStatusSoAnOmittedOneIsGenuinelyAbsent() {
+        // The structural half, pinned here as well as in NeverFiringNullGuardContractTest: if the
+        // initialiser returns, the test above starts failing for a reason that reads like a service
+        // bug rather than an entity one.
+        assertThat(new BcmPlan().getStatus())
+            .as("BcmPlan#status must NOT be initialised — createPlan owns the default through "
+                + "ServerOwnedState.requireInitial, and an initialiser makes an omitted status "
+                + "indistinguishable from a caller naming the initial state")
+            .isNull();
+    }
+
+    @Test
+    void updatePlan_anEchoOfTheStoredStatusIsToleratedEvenInADifferentCase() {
+        // bcm.bcm_plans has no CHECK on status and the column collates case-insensitively, so
+        // 'approved' IS the stored value as far as the database is concerned (F2-296).
+        BcmPlan stored = plan("APPROVED");
+        when(planRepo.findById(ID)).thenReturn(Optional.of(stored));
+        when(planRepo.save(any(BcmPlan.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BcmPlan patch = new BcmPlan();
+        patch.setPlanNameEn("Echoed");
+        patch.setStatus("approved");
+
+        assertThat(service.updatePlan(ID, patch).getStatus())
+            .as("an echo is tolerated, and the STORED canonical spelling is what survives")
+            .isEqualTo("APPROVED");
+    }
+
+    @Test
+    void updatePlan_aStatedDifferentStatusIsStillRefusedAndNamesTheLifecycleRoutes() {
+        BcmPlan stored = plan("APPROVED");
+        when(planRepo.findById(ID)).thenReturn(Optional.of(stored));
+
+        BcmPlan patch = new BcmPlan();
+        patch.setStatus("DRAFT");
+
+        assertThatThrownBy(() -> service.updatePlan(ID, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            // The information the refusal must carry, never its phrasing (F2-296: a message has
+            // several fragments and asserting any one makes the whole wording load-bearing).
+            .hasMessageContaining("APPROVED")
+            .hasMessageContaining("DRAFT")
+            .hasMessageContaining("submit-for-review");
+    }
+
     // ─── Plan lifecycle: happy path ──────────────────────────────────
 
     @Test

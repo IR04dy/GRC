@@ -958,6 +958,15 @@ class NeverFiringNullGuardContractTest {
             new Moved("CorrectiveAction", "priority", "setPriority", "CorrectiveActionService", "create"),
             new Moved("GhgEmissionRecord", "coveragePercent", "setCoveragePercent", "GhgCreateRequest", "toEntity"),
             new Moved("NdiComplianceAssessment", "complianceStatus", "setComplianceStatus", "NdiComplianceAssessmentService", "startForCycle"),
+            // F2-297 / F2-298 — the two initialisers F2-238's sweep did not reach, because their
+            // guard is CONJUNCTIVE and measure()'s pattern needs the null test to be the whole
+            // condition (see noConjunctiveRefusalSitsOverAnInitialisedField). ⚠ F2-297 removed the
+            // BcpPlan one and did NOT register it here, which is exactly what this map exists to
+            // catch: a removed initialiser whose create path does not own the default turns a
+            // silent refusal into a 500 on a NOT NULL column, and nothing else in the tree would
+            // notice under ddl-auto=none. Both creates own it through ServerOwnedState.requireInitial.
+            new Moved("BcpPlan", "status", "setStatus", "BcpPlanService", "create"),
+            new Moved("BcmPlan", "status", "setStatus", "BcmService", "createPlan"),
             new Moved("NdiFrameworkItem", "mandatory", "setMandatory", "NdiFrameworkItemService", "create"),
             new Moved("NdiFrameworkItem", "priority", "setPriority", "NdiFrameworkItemService", "create"),
             new Moved("NdiFrameworkItem", "status", "setStatus", "NdiFrameworkItemService", "create"),
@@ -1796,6 +1805,170 @@ class NeverFiringNullGuardContractTest {
             .as("a synthetic corpus keyed by bare simple names must pass through unchanged, or every "
                 + "self-test in this class starts asserting a different label from the live tree")
             .isEqualTo("SyntheticService");
+    }
+
+    // ── F2-298: the CONJUNCTIVE form, which this class's own pattern cannot see ──────────────
+
+    /**
+     * A conjunctive null guard whose other conjunct compares the request against the LOADED ROW.
+     *
+     * <p>⚠⚠ {@link #measure} requires a {@code )} immediately after {@code null} — the null test
+     * must be the <b>entire</b> condition — so
+     * {@code if (req.getStatus() != null && !sameState(req.getStatus(), existing.getStatus()))}
+     * is outside its population <b>by construction</b>. That is not a bug in {@code measure}: it
+     * is why F2-238's member list did not name {@code BcpPlan} (F2-297) or {@code BcmPlan}
+     * (F2-298), and it is F2-198's shape where the narrowing is <b>how much of the {@code if} the
+     * null test occupies</b>. This class was a hard zero over both of them.
+     *
+     * <p>🔑 <b>The discriminator is what the OTHER conjunct compares against, and it had to be
+     * read rather than guessed.</b> F2-297 measured the raw conjunctive shape at 4 sites; reading
+     * them gives 1 real and 3 refuted, and a widening that ignored the difference would have
+     * failed on correct code — the one thing a gate must never do (F2-214):
+     *
+     * <ul>
+     *   <li><b>real</b> — the other conjunct reads the loaded row, so an initialiser makes the
+     *       REFUSAL fire on every row not already in the initial state, and the 400 names a
+     *       transition the caller never asked for ({@code BcmService#updatePlan}, F2-298);</li>
+     *   <li><b>refuted</b> — no row is loaded at all, so it is a CREATE, and there an initialiser
+     *       makes a vocabulary VALIDATION always <i>run</i>, which is stronger rather than weaker
+     *       ({@code ConsentRecordService#grant}, two fields);</li>
+     *   <li><b>refuted</b> — the other conjunct compares against a CONSTANT vocabulary rather than
+     *       the row, and the service normalises to upper case before testing it — the idiom
+     *       CLAUDE.md names as the pattern to copy — with no guarded lifecycle route anywhere on
+     *       the register to bypass ({@code DetectionRuleService#save}).</li>
+     * </ul>
+     *
+     * <p>So the leg is scoped to the row-comparing form. It ships as a <b>hard zero with no
+     * exemption map</b>, which is safe for the same reason {@code measure}'s is: removing the
+     * initialiser and letting the create path own the default is always available, so there is no
+     * correct code for it to fail on.
+     */
+    static Set<String> conjunctiveRowComparisons(Map<String, String> serviceSources,
+                                                 Map<String, Map<String, String>> inits) {
+        Set<String> out = new TreeSet<>();
+        for (var entry : serviceSources.entrySet()) {
+            String service = label(entry.getKey(), serviceSources.keySet());
+            String src = ServerStampedFieldContractTest.stripComments(entry.getValue());
+            String pkg = pkgOf(entry.getValue());
+            for (ServerStampedFieldContractTest.Method m
+                     : ServerStampedFieldContractTest.publicMethods(src)) {
+                Map<String, String> ptypes =
+                    ServerStampedFieldContractTest.requestParamTypes(m.params());
+                for (var p : ptypes.entrySet()) {
+                    Map<String, String> declared = initialisersFor(inits, pkg, p.getValue());
+                    if (declared == null) continue;
+                    // Same narrowing as measure(): on a create, writing the initialiser is what is
+                    // meant to happen, and a validation that always runs is not a defect.
+                    if (!loadsARowOf(m.body(), p.getValue())) continue;
+                    String row = loadedLocalOf(m.body(), p.getValue());
+                    if (row == null) continue;
+                    Matcher g = Pattern.compile("if\\s*\\(\\s*" + Pattern.quote(p.getKey())
+                        + "\\s*\\.\\s*(?:get|is)([A-Z]\\w*)\\s*\\(\\s*\\)\\s*!=\\s*null\\s*&&"
+                        + "([^{;]*)").matcher(m.body());
+                    while (g.find()) {
+                        String f = Character.toLowerCase(g.group(1).charAt(0))
+                            + g.group(1).substring(1);
+                        if (!declared.containsKey(f)) continue;
+                        // the other conjunct must read the LOADED ROW, not a constant vocabulary
+                        if (!Pattern.compile("\\b" + Pattern.quote(row)
+                                + "\\s*\\.\\s*(?:get|is)[A-Z]").matcher(g.group(2)).find()) continue;
+                        out.add(service + "#" + m.name() + " :: " + p.getValue() + "#" + f);
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Name of the local this method loaded a row of {@code type} into, or null.
+     *
+     * <p>⚠⚠ The receiver is OPTIONAL, and getting that wrong made this whole leg vacuous on the
+     * live tree. The first draft demanded {@code \w+\s*\.\s*(?:get|find|…)} — a receiver dot —
+     * and {@code BcmService#updatePlan} loads its row with a bare {@code getPlan(id)}, so
+     * {@link #loadedLocalOf} returned null, the site was skipped, and the hard zero above passed
+     * <b>with the defect still in the tree</b>. 🔑 <b>The synthetic self-test passed too, because
+     * I had written its fixture to match my regex rather than the real code</b> — a positive
+     * control written against the shape you imagine certifies nothing (F2-208). Only restoring the
+     * initialiser and re-running against the real tree found it. The bare-call form is a
+     * must-match case in the self-test below for exactly that reason.
+     */
+    static String loadedLocalOf(String body, String type) {
+        Matcher m = Pattern.compile("\\b" + Pattern.quote(type) + "\\s+(\\w+)\\s*=\\s*"
+            + "(?:\\w+\\s*\\.\\s*)?(?:get|find|require|load|fetch)\\w*\\s*\\(").matcher(body);
+        return m.find() ? m.group(1) : null;
+    }
+
+    @Test
+    void noConjunctiveRefusalSitsOverAnInitialisedField() {
+        assertThat(conjunctiveRowComparisons(liveServicesByFqn(), liveInitialisers()))
+            .as("F2-298 — a conjunctive null guard that compares the request against the LOADED ROW, "
+                + "over a field the entity INITIALISES, refuses every row that is not already in "
+                + "the initial state and answers 400 naming a transition the caller never asked "
+                + "for. measure() cannot see this shape (its pattern needs the null test to be the "
+                + "whole condition), which is why F2-238's sweep missed BcpPlan and BcmPlan. Remove "
+                + "the initialiser and let the create path own the default.")
+            .isEmpty();
+    }
+
+    @Test
+    void theConjunctiveDetectorFiresOnThePreFixShapeAndNotOnItsNeighbours() {
+        // A positive control carrying the literal pre-fix shape, and the two refuted neighbours,
+        // because a green reading over a fixed tree is indistinguishable from a rotted regex
+        // (F2-195). All three are synthetic: the live tree is expected to be empty.
+        Map<String, Map<String, String>> inits = Map.of(
+            "p.Thing", Map.of("status", "\"DRAFT\""));
+
+        // ⚠ The row is loaded with a BARE call and the guard SPANS TWO LINES, because that is what
+        // BcmService#updatePlan actually looks like. The first draft of this fixture used
+        // `repo.getThing(id)` on one line — a shape I invented — and it passed while the leg was
+        // vacuous against the live tree (see loadedLocalOf). A control has to carry the shape that
+        // EXISTS.
+        String preFix = "package p; class S {\n"
+            + "  public Thing update(Long id, Thing req) {\n"
+            + "    Thing existing = getThing(id);\n"
+            + "    if (req.getStatus() != null\n"
+            + "            && !ServerOwnedState.sameState(req.getStatus(), existing.getStatus()))\n"
+            + "      throw new IllegalArgumentException(\"no\");\n"
+            + "    return repo.save(existing);\n"
+            + "  }\n"
+            + "}\n";
+        assertThat(conjunctiveRowComparisons(Map.of("S", preFix), inits))
+            .as("the literal pre-fix shape — bare loader call, guard wrapped across two lines — "
+                + "must be found, or this leg is decoration")
+            .containsExactly("S#update :: Thing#status");
+
+        String withReceiver = preFix.replace("getThing(id)", "repo.getThing(id)");
+        assertThat(conjunctiveRowComparisons(Map.of("S", withReceiver), inits))
+            .as("and the receiver-bearing form must be found too — both spellings occur in the tree")
+            .containsExactly("S#update :: Thing#status");
+
+        String vocabulary = "package p; class S {\n"
+            + "  public Thing update(Long id, Thing req) {\n"
+            + "    Thing existing = repo.getThing(id);\n"
+            + "    if (req.getStatus() != null && !STATUSES.contains(req.getStatus().toUpperCase()))\n"
+            + "      throw new IllegalArgumentException(\"no\");\n"
+            + "    return repo.save(existing);\n"
+            + "  }\n"
+            + "}\n";
+        assertThat(conjunctiveRowComparisons(Map.of("S", vocabulary), inits))
+            .as("a conjunct comparing against a CONSTANT vocabulary is a validation, not a "
+                + "refusal-against-stored — DetectionRuleService#save is exactly this and is "
+                + "correct, so flagging it would fail on working code (F2-214)")
+            .isEmpty();
+
+        String create = "package p; class S {\n"
+            + "  public Thing grant(Thing body) {\n"
+            + "    if (body.getStatus() != null && !STATUSES.contains(body.getStatus()))\n"
+            + "      throw new IllegalArgumentException(\"no\");\n"
+            + "    body.setId(null);\n"
+            + "    return repo.save(body);\n"
+            + "  }\n"
+            + "}\n";
+        assertThat(conjunctiveRowComparisons(Map.of("S", create), inits))
+            .as("a CREATE loads no row, and there an initialiser makes a validation always RUN — "
+                + "ConsentRecordService#grant is exactly this and is correct")
+            .isEmpty();
     }
 
 

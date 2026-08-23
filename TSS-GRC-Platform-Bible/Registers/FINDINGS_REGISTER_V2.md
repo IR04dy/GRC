@@ -15219,6 +15219,95 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-298 — the fifth instance of one initialiser, and the gate population boundary that let four of them recur
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — a **latent-hazard closure, not a defect discovery**, and saying which is the point ([[F2-283]]). `BcmPlan#status` carried `= "DRAFT"` and `PUT /api/v1/bcm/legacy-plans/{id}` binds the entity, so a body that omitted `status` deserialised to "DRAFT", was read as a request to move the plan back, and answered **400 *"A BCM plan's status is not editable here (APPROVED → DRAFT)"*** — naming a transition the caller never asked for. **API-reachable only**: the screen echoes the stored status (see below). Same `BCM:WRITE` on the create, the PUT and every lifecycle route, so no privilege escalation ([[F2-219]]'s shape). |
+| **Registers** | `bcm.bcm_plans` — **8 live rows, DRAFT ×5 / APPROVED ×3, zero CHECKs on `status`, 0 non-canonical case**, identical in dev and prod. So **3 of 8 could not take a partial body.** |
+| **Standards** | ISO 22301 (the BCM plan lifecycle the refusal defers to) |
+| **Found by** | Executing [[F2-297]]'s own filing — *"looks like a live twin; **measure it, do not assume**"* — and re-deriving it first ([[F2-221]]). The measurement refuted half of it and confirmed the other half. |
+| **Verification** | suite **4654 → 4660/0/0**; gates green; probe **12/12 post-fix** as `compliance`, never `admin`, against a plan it planted itself ([[F2-206]]); **pre-fix control 10/12** with exactly the two partial-body legs failing and the other ten passing identically |
+
+### The filing said "measure it", and the measurement went both ways
+
+**REFUTED — it is not screen-reachable.** `BcmPage`'s plan form seeds its edit modal through
+`planToReq`, which copies `status: p.status`, and `FormModal` submits its whole seeded state — so
+the screen **echoes** the stored status, and F2-296 made this route tolerate an echo. That is the
+same reason F2-292's disclosure register survived: the form round-trips the field.
+🔑 **Recording the refutation is the result** ([[F2-283]]) — it stops the next reader re-deriving
+it, and it is why this is a latent-hazard closure rather than the live twin the filing suspected.
+
+**CONFIRMED — the hazard is real, API-reachable, and the FIFTH instance of one residue.**
+[[F2-238]] removed this initialiser from `CrisisEvent`, `Issue` and `BcmBiaAssessment`;
+[[F2-297]] found the fourth on `BcpPlan`; this is the fifth. `createPlan` already owned the
+default through `ServerOwnedState.requireInitial`, so the initialiser was pure residue on create
+and a refusal on update — exactly as on `BcpPlan`, one register over.
+
+### Why four of them recurred: a population boundary at the shape of the *condition*
+
+`NeverFiringNullGuardContractTest` exists for precisely this defect and [[F2-294]] promoted it to
+an invariant — and it was a **hard zero over `BcpPlan` and `BcmPlan` both**, because `measure()`'s
+pattern needs a `)` immediately after `null`, so the null test must be the **whole** condition,
+and both guards are **conjunctive**. F2-297 filed the widening rather than doing it, because the
+raw conjunctive shape matched **4 sites that had to be read first**. Read, they are **1 real and
+3 refuted**, and the discriminator is mechanical — *what the other conjunct compares against*:
+
+| site | verdict | why |
+|---|---|---|
+| `BcmService#updatePlan` | **REAL** | compares against the **loaded row**, so an initialiser makes the REFUSAL fire on every non-initial row |
+| `ConsentRecordService#grant` ×2 | refuted | a **create** (loads no row); its conjuncts are vocabulary **validations**, and an initialiser makes them always *run* — stronger, not weaker |
+| `DetectionRuleService#save` | refuted | compares against a **constant vocabulary** and normalises to upper case first — the idiom CLAUDE.md names as the pattern to copy — with no guarded lifecycle route on the register to bypass |
+
+So the new leg is scoped to the **row-comparing** form: it finds the real site and **not** the two
+refuted ones, because a gate that fails on correct code trains the next reader to edit the
+assertion ([[F2-214]]). Hard zero, **no exemption map** — removing the initialiser and letting the
+create own the default is always available, so there is no correct code for it to fail on.
+
+### ⚠⚠ My synthetic self-test passed while that leg was vacuous on the live tree
+
+`loadedLocalOf` demanded a **receiver** (`repo.getX(...)`). `BcmService#updatePlan` loads its row
+with a bare `getPlan(id)`, so the site was skipped, **the new hard zero passed with the defect
+still in the tree** — and the synthetic fixture passed too, because I had written it to match my
+regex rather than the real code. Only restoring the initialiser and re-running against the real
+tree found it, and it then named exactly `BcmService#updatePlan :: BcmPlan#status`.
+🔑 **A positive control written against the shape you imagine certifies nothing** ([[F2-208]]).
+The bare-call form and the two-line guard wrap are must-match cases now, with the
+receiver-bearing form as a second one.
+
+### Two things the probe corrected about my model of the defect
+
+* A body carrying only `planNameEn` answers **400 *"A required field was not supplied"*** —
+  `plan_type` and `version` are **NOT NULL** and this full-replace PUT writes them
+  unconditionally, so the status guard is never reached. "Partial" here therefore has to mean
+  *every editable field except the lifecycle one*, which is what a client editing the record's
+  data actually sends. 🔑 **The probe found the shape of the request the defect needs; reading
+  alone had given me a body the column refuses first.**
+* `updatePlan` had **no test of any kind** before this, which is not the same as a path somebody
+  decided was safe ([[F2-248]]).
+
+### Registered in the declared-removal map — including F2-297's own omission
+
+`everyRemovedInitialiserHasAWriterOnTheCreatePath` now holds **both** `BcpPlan` (F2-297, which
+removed an initialiser and did **not** register it — exactly what that map exists to catch) and
+`BcmPlan`. A removed initialiser whose create path does not own the default turns a silent
+refusal into a **500 on a NOT NULL column**, and nothing else in the tree would notice under
+`ddl-auto=none`.
+
+### Filed
+
+* **`bcm.bcm_plans` has zero CHECK constraints on `status`** — cheaper now that this slice
+  touched the writers, but the vocabulary (`DRAFT | UNDER_REVIEW | APPROVED | INVOKED |
+  ARCHIVED`) lives only in `BcmService`, and [[F2-183]]'s rule is that the constraint and its
+  writers land in one commit.
+* **The full-replace PUT itself.** `updatePlan` writes five fields unconditionally, so a client
+  must send all of them or lose the ones it omits — [[F2-213]]'s structural root, and
+  `FullReplaceUpdateContractTest` already carries this route in `DERIVED_IGNORED_FIELDS`. A
+  purpose-built request record per endpoint would make the whole family unrepresentable.
+* **Two plan registers for one concept** (`bcm.bcm_plans` legacy, `bcm.bcp_plans` canonical),
+  unchanged from [[F2-234]]'s filing and now with a fifth shared defect between them.
+
 ## F2-297 — a census that names its members and gives them no verdicts is a list nobody reads, and four of these seven were copies of the rule the slice that filed them had just shared
 
 | | |
