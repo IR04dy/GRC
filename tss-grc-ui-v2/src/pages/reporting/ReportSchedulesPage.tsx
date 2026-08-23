@@ -39,11 +39,18 @@ const FORMAT_OPTIONS = [
   { value: 'PPTX', label: 'PowerPoint (board-pack only)' },
 ];
 const LANGUAGE_OPTIONS = [{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }];
+// F2-293 — must stay in step with `ReportSchedulerService.SUPPORTED_CADENCES`, which is the set the
+// scheduler can compute a next run for and which the write boundary now refuses anything outside.
+// SEMIANNUAL was missing here AND from the scheduler's switch while the register stored it on a live
+// row, so the semi-annual BCM readiness report was rescheduled daily — and this select could not
+// express the cadence its own row held. `ReportCadenceContractTest` reads this file and fails the
+// build if the two lists disagree.
 const CADENCE_OPTIONS = [
-  { value: 'DAILY',     label: 'Daily' },
-  { value: 'WEEKLY',    label: 'Weekly' },
-  { value: 'MONTHLY',   label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly' },
+  { value: 'DAILY',      label: 'Daily' },
+  { value: 'WEEKLY',     label: 'Weekly' },
+  { value: 'MONTHLY',    label: 'Monthly' },
+  { value: 'QUARTERLY',  label: 'Quarterly' },
+  { value: 'SEMIANNUAL', label: 'Semi-annual' },
 ];
 
 const STATUS_TONE: Record<string, BadgeTone> = {

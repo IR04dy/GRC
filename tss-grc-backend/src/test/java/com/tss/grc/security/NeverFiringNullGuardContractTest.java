@@ -244,12 +244,12 @@ class NeverFiringNullGuardContractTest {
         // CLOSED_BY_F2_292 so a revert FAILS rather than being absorbed back into a tolerated total.
         "FrameworkAnchorService#updateMapping :: PolicyDocumentFrameworkMapping#satisfaction",
         "OrganisationSettingsService#update :: OrganisationSettings#carbonOffsetCapPct",
-        "OrganisationSettingsService#update :: OrganisationSettings#climateScenarioWeightsStrict",
-        "ReportScheduleService#update :: ReportSchedule#cadence",
-        "ReportScheduleService#update :: ReportSchedule#format",
-        "ReportScheduleService#update :: ReportSchedule#isActive",
-        "ReportScheduleService#update :: ReportSchedule#language",
-        "ReportScheduleService#update :: ReportSchedule#timeOfDay");
+        // ⚠ F2-293 removed the five `ReportScheduleService#update :: ReportSchedule#…` entries that
+        // stood below this one — cadence, format, isActive, language and timeOfDay. They are in
+        // CLOSED_BY_F2_293 so a revert FAILS rather than being absorbed back into a tolerated
+        // total. They were the first member of this list found to be SCREEN-reachable:
+        // `ReportSchedulesPage#togglePause` sends `{ isActive: !s.isActive }` and nothing else.
+        "OrganisationSettingsService#update :: OrganisationSettings#climateScenarioWeightsStrict");
 
     /**
      * The nine pairs F2-291 closed. Held by name so a revert cannot pass as a shrinking work list:
@@ -273,6 +273,24 @@ class NeverFiringNullGuardContractTest {
     private static final Set<String> CLOSED_BY_F2_292 = Set.of(
         "DisclosureService#update :: Disclosure#status",
         "DisclosureService#update :: Disclosure#currency");
+
+    /**
+     * The five pairs F2-293 closed — the first member of {@link #WORK_LIST} that was reachable from
+     * the platform's own screen rather than only through the API.
+     *
+     * <p>{@code ReportSchedulesPage} holds two update call sites: {@code submitForm}, whose body is
+     * {@code {...values}} seeded from {@code reqFromDto}'s {@code {...s}} and therefore echoes every
+     * field back, and {@code togglePause}, whose body is {@code { isActive: !s.isActive }} and
+     * nothing else. So one page was simultaneously safe and destructive, and clicking Pause or
+     * Resume on a scheduled regulatory report rewrote its format, language, cadence and delivery
+     * time. 🔑 F2-283's screen-reachable / API-reachable distinction is per CALL SITE, not per page.
+     */
+    private static final Set<String> CLOSED_BY_F2_293 = Set.of(
+        "ReportScheduleService#update :: ReportSchedule#cadence",
+        "ReportScheduleService#update :: ReportSchedule#format",
+        "ReportScheduleService#update :: ReportSchedule#isActive",
+        "ReportScheduleService#update :: ReportSchedule#language",
+        "ReportScheduleService#update :: ReportSchedule#timeOfDay");
 
     // ── the derivation ───────────────────────────────────────────────────────
 
@@ -793,7 +811,22 @@ class NeverFiringNullGuardContractTest {
             // `currency` is the mirror case and was closed anyway: 0 of 18 rows differ from "SAR",
             // so what made it harmless was the DATA and not the code (F2-182).
             new Moved("Disclosure", "status", "setStatus", "DisclosureService", "create"),
-            new Moved("Disclosure", "currency", "setCurrency", "DisclosureService", "create"));
+            new Moved("Disclosure", "currency", "setCurrency", "DisclosureService", "create"),
+            // ── F2-293 — the first SCREEN-reachable member of this population ────────────
+            // `ReportSchedulesPage#togglePause` sends `{ isActive: !s.isActive }`, so one click on
+            // Pause or Resume rewrote four columns of a scheduled regulatory report. Probed live as
+            // `compliance`: XLSX/ar/QUARTERLY/22:00 became PDF/en/WEEKLY/06:00, while cadenceAnchor
+            // and nameAr survived — the two guarded fields with no initialiser, i.e. the control.
+            // Measured over 11 live rows, identical in dev and prod: cadence differs on 10,
+            // language on 9 (nine of these reports are Arabic — house rule 7), timeOfDay on 9,
+            // format on 1. isActive differs on 0, so the field the filing ranked sharpest was the
+            // one the screen's own caller always sends — and a machine caller omitting it RESUMED a
+            // paused report, which manufactures an assurance rather than losing a fact.
+            new Moved("ReportSchedule", "format", "setFormat", "ReportScheduleService", "create"),
+            new Moved("ReportSchedule", "language", "setLanguage", "ReportScheduleService", "create"),
+            new Moved("ReportSchedule", "cadence", "setCadence", "ReportScheduleService", "create"),
+            new Moved("ReportSchedule", "timeOfDay", "setTimeOfDay", "ReportScheduleService", "create"),
+            new Moved("ReportSchedule", "isActive", "setIsActive", "ReportScheduleService", "create"));
 
         Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
@@ -1221,11 +1254,23 @@ class NeverFiringNullGuardContractTest {
                 + "\\s*\\(\\s*\\)\\s*!=\\s*null.*");
             if (!inline) helperOnly++;
         }
+        // ⚠ F2-293 re-measured this floor 8 -> 5, and the reason matters: all five members it
+        // closed (`ReportScheduleService#update`, whose guards live in a private `apply`) were
+        // helper-only, so the population fell BECAUSE of the fix rather than because the detector
+        // rotted. F2-213's rule — a population that falls after a fix is not automatically rot, but
+        // it is always worth asking which — and the answer is recorded here rather than the number
+        // being quietly edited.
+        //
+        // ⚠⚠ This floor has a shape problem in its future: WORK_LIST is what it counts, so when the
+        // work list reaches zero this count is zero too and the leg becomes vacuous (F2-219: an
+        // anti-vacuity floor must change shape when its figure reaches zero). At that point the
+        // load-bearing assertions are the two mechanism checks below, which do not depend on the
+        // count — do not simply lower this to 0.
         assertThat(helperOnly)
             .as("members whose guard is NOT in the public method, i.e. members only the one-hop "
                 + "helper follow can see. Delete the follow and every one of these disappears, "
                 + "which is what made this gate's hard zero look like a finished sweep")
-            .isGreaterThanOrEqualTo(8);
+            .isGreaterThanOrEqualTo(5);
 
         // And the mechanism itself resolves, in the two shapes the tree uses.
         assertThat(ServerStampedFieldContractTest.helperNullGuardedFields(
@@ -1297,6 +1342,7 @@ class NeverFiringNullGuardContractTest {
     void theEthicsAndKycConsequenceFlagsStayClosed() {
         Set<String> closed = new TreeSet<>(CLOSED_BY_F2_291);
         closed.addAll(CLOSED_BY_F2_292);
+        closed.addAll(CLOSED_BY_F2_293);
         assertThat(measure(liveServices(), liveInitialisers()))
             .as("a reverted fix must FAIL rather than be absorbed by the work list")
             .doesNotContainAnyElementsOf(closed);
