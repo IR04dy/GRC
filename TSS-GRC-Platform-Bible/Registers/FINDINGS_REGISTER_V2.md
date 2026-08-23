@@ -15219,6 +15219,73 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-309 — immutable + not unique means a duplicate is PERMANENT
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — the other half of [[F2-306]]–[[F2-308]], and a consequence those slices created. Nine tenant-scoped unique indexes; latent everywhere (0 duplicates today) but unrepairable once it happened. |
+| **Registers** | `ethics.cases`, `ethics.disclosures`, `ndi.gap`, `ndi.corrective_action`, `compliance.audit_engagements`, `change_mgmt.change_requests`, `ndi.improvement_plan`, `ndi.report_definition`, `compliance.controls` |
+| **Standards** | The references a NAZAHA investigation, an NDMO gap review, an IIA engagement and a CAB record each cite |
+| **Found by** | Asking [[F2-267]]'s unique-index question of what F2-306–F2-308 had just built |
+| **Verification** | V396 applied **twice** to dev, idempotent; nine indexes unique, enabled, correctly filtered; a duplicate refused live by name; suite **4698 → 4699/0/0** |
+
+### The question gave the opposite answer to the one that established it
+
+[[F2-267]] asked *"is a duplicate storable?"* of ten caller-named references and found **9 of 10**
+already carried a unique index — so caller-naming was a naming question rather than a defect. Asked
+of the nine registers F2-306–F2-308 made immutable, **8 of 9 have none at all**; only
+`compliance.policies` did.
+
+🔑 **And the combination is worse than either half:**
+
+```
+immutable + not unique  =  a duplicate is PERMANENT
+```
+
+**Before F2-306 a collision could be renamed away. After it, the guard protecting the reference is
+exactly what prevents the repair.** So this is the other half of my own three previous slices — the
+kind of consequence that only surfaces if you ask a question of the **result** rather than of the
+code you were about to change.
+
+### Three deliberate properties of V396
+
+* **Tenant-scoped**, keyed `(organisation_id, code)`. A global unique index would let one tenant's
+  reference block another from using the same string — a multi-tenancy defect dressed up as
+  strictness (V385's rule).
+* **Filtered** on the eight nullable columns. SQL Server treats NULLs as **equal** for uniqueness,
+  so a plain index would permit at most **one** code-less row per tenant, refusing a state the
+  column's own nullability allows. `compliance.controls.code` is NOT NULL, so its filter is omitted
+  **deliberately rather than by oversight**.
+* **A pre-flight that names the offending rows.** A bare *"duplicate key"* sends the reader nowhere,
+  and this file blocks every later migration until resolved ([[F2-299]]).
+
+Measured in **both** databases before writing ([[F2-183]]): 0 duplicate groups, 0 NULL codes. So no
+`WITH NOCHECK` and nothing to reconcile — and F2-183's sequence holds in the right order for once,
+because the **writers were closed first**, across three slices.
+
+### The gate asserts the pairing, not a count
+
+Every register whose reference is frozen must have a tenant-scoped unique index declared in the
+migration corpus. ⚙ The two views cannot be derived from each other — a Java field name does not give
+you a column name — so they are linked by **arithmetic**, and adding a guarded site without an index
+makes the counts diverge.
+
+### Two smaller lessons
+
+* **`RAISERROR` arguments must be constants or variables, never function calls**, so `NCHAR(10)`
+  cannot be passed as a substitution. Build the message into a variable first.
+* `core.autocrlf=true` here stores **LF** in the object database and checks out **CRLF**, so
+  LF-in-blob with CRLF-in-worktree is normal rather than drift. That sharpens [[F2-301]]'s note:
+  `SchemaContractRatchetTest` was notable precisely because it had *escaped* that normalisation.
+
+### Filed
+
+* The **eleventh and twelfth** frozen references (`ethics.cases`, `ethics.disclosures`) are covered
+  here; nothing mints any of the twelve, so all remain **caller-named at birth** — [[F2-172]](d)'s
+  question, still a separate slice.
+* V396 joins the **52** migrations pending the deployed server's next jar.
+
 ## F2-308 — the last five kind-1 renames, and a reset claim of mine that was false
 
 | | |

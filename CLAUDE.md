@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V395 packaged; next free V396** (383 files; ⚠ this line said "V1→V295 / next free
+— **V1→V396 packaged; next free V397** (384 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V395 are pending** the
-next jar — 51 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V396 are pending** the
+next jar — 52 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V395 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V396 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,11 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **IMMUTABLE + NOT UNIQUE MEANS A DUPLICATE IS PERMANENT, AND THE GUARD THAT PROTECTS THE REFERENCE IS WHAT PREVENTS THE REPAIR** (F2-309, measured 2026-08-24). Asking [[F2-267]]'s unique-index question of what [[F2-306]]–[[F2-308]] had just built gave the **opposite** answer to the one that established it: there **9 of 10** caller-named references already carried a unique index, so caller-naming was a naming question rather than a defect; here **8 of 9** registers whose reference those slices made immutable had **none at all**. 🔑 **Before the reference was frozen a collision could be renamed away; afterwards it cannot.** So the pair is the unit of work — and this is the kind of consequence that only surfaces if you ask a question of the **RESULT** rather than of the code you were about to change.
+  ⚙ **Three properties of such an index are deliberate, not stylistic.** **Tenant-scoped** `(organisation_id, code)`: a global unique index lets one tenant's reference block another from using the same string, a multi-tenancy defect dressed up as strictness (V385). **Filtered** where the column is nullable: SQL Server treats NULLs as **EQUAL** for uniqueness, so a plain index permits at most **ONE** code-less row per tenant, refusing a state the column's own nullability allows — and where the column is NOT NULL the filter is redundant and its absence should be stated so a reader does not read it as an oversight. **A pre-flight that NAMES the offending rows**: a bare *"duplicate key"* sends the reader nowhere, and a failing migration blocks every later one ([[F2-299]]).
+  ⚠ **And F2-183's sequence held in the right order for once**: the writers were closed first, across three slices, so the constraint could not turn today's silently-stored junk into a violation. Measured in **both** databases before writing — 0 duplicate groups, 0 NULL codes — so no `WITH NOCHECK`.
+  ⚠ **`RAISERROR` arguments must be constants or variables, never function calls.** `RAISERROR(N'…%s%s', 16, 1, NCHAR(10), @offenders)` fails with *"Incorrect syntax near 'NCHAR'"*. Build the whole message into a variable and pass it as one `%s`.
+  ⚙ **`core.autocrlf=true` in this repo stores LF in the object database and checks out CRLF**, so a working copy that is CRLF against an LF blob is **normal, not drift** — which sharpens [[F2-301]]'s note: `SchemaContractRatchetTest` was notable precisely because it had ESCAPED that normalisation and was LF in the worktree too. Compare a file against its own blob before calling a warning a defect.
 - ⚠⚠ **BEFORE CLAIMING AN UNCONDITIONAL WRITE "CLEARS" A FIELD, READ THE REQUEST TYPE — A `@NotBlank` ON A `@Valid @RequestBody` REFUSES THE OMISSION BEFORE THE SERVICE IS ENTERED** (F2-308, measured 2026-08-24). Closing [[F2-307]]'s filed remainder, two of the five wrote the code unconditionally and I wrote that a body omitting it therefore cleared it. **False for `ComplianceService`:** `ControlRequest.code` is `@NotBlank`, so an omitted code is a **400 from bean validation** (probed) and the unconditional write was never a reset — only a rename vector. 🔑 **[[F2-182]]'s recorded blind spot, a guard living in a DTO annotation, which no setter-site scan can see** — and the claim was wrong in the direction that makes a finding look bigger.
   ⚠ **And the one where the reset WAS expressible is on a DARK method.** `PolicyService#update` binds the entity and `@Column(nullable = false)` is not a bean-validation annotation, so an omitted code would have reached a NOT NULL column — but the method has **no controller** ([[F2-187]]'s `DarkServiceMethodTest` holds that whole legacy write lifecycle, retired for `PolicyManagementService#transition`). **A latent-hazard closure, and saying which you have is the point** ([[F2-283]]). ⚙ Both comments were corrected **in place** rather than quietly softened, because a stale claim about what a guard prevents is the input to somebody's next estimate.
   ⚙ **The mint question settled all five the same way** ([[F2-307]]'s rule): exactly one write of the code each, the caller's, so nothing mints any of them and `requireImmutableReference` fits. Census **38 → 33**, and the kind-1 sweep is complete as far as that census can see. **Eleven codes are now immutable-once-set and every one is still caller-named at BIRTH** — [[F2-172]](d)'s separate question.
