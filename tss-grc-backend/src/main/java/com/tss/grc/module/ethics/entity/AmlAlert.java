@@ -98,14 +98,41 @@ public class AmlAlert {
     @Column(name = "period_to")
     private LocalDate periodTo;
 
-    // F2-286 — the column is insertable = false, so the DATABASE refuses a caller's value
-    // and the create hands back the instance Jackson bound: without this the response
-    // echoed a value the row does not carry, and only a re-fetch showed the truth. This
-    // says the mapping refuses it, not that the caller should never state it — where the
-    // caller should, the fix is to make the column insertable (F2-286 did that for
-    // ethics.screening_hits.screened_at, whose value nothing could ever state).
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-    @Column(name = "first_detected_at", nullable = false, insertable = false, updatable = false)
+    /**
+     * When the transaction-monitoring engine first <b>detected</b> the suspicious activity —
+     * the start of the FIU reporting clock, and the anchor the seed used for every
+     * {@code sla_due_at} in this register (detection + 30 days on all 10 live rows in both
+     * databases).
+     *
+     * <p>F2-287 — it was {@code insertable = false}, which refuses <em>Hibernate</em> and not
+     * just the caller (F2-286), so the column could only ever hold {@code sysutcdatetime()} at
+     * the instant the row was inserted. F2-286 filed that as an owner decision — <i>"enabling
+     * it means widening applyEditable, a product call"</i> — and both halves of that premise
+     * were wrong:
+     *
+     * <ul>
+     *   <li><b>The mechanism.</b> {@code applyEditable} is shared by {@code create} and
+     *       {@code update}, and this column is {@code updatable = false}. A write there would
+     *       compile, run on the update path, and change nothing — and the census of that shape
+     *       in this tree is <b>zero</b>, so the filed fix would have created the first
+     *       instance of it. The write belongs on the create path alone.</li>
+     *   <li><b>The ownership.</b> This alert "surfaces from the bank's TM engine" (see the
+     *       class javadoc), so the detection time is <em>received from outside</em> —
+     *       [[F2-268]]'s third kind, which F2-209 already settles: received and recorded, or
+     *       absent. Not a product decision.</li>
+     * </ul>
+     *
+     * <p>🔑 The precision was the tell in the other direction too. F2-286 identified
+     * {@code screened_at} as default-filled because every value was a microsecond instant in
+     * an insert-shaped batch; here <b>0 of 10</b> rows carry sub-second precision, <b>0</b>
+     * equal {@code created_at}, and there are 8 distinct round business times — the signature
+     * of a value somebody <em>stated</em>.
+     *
+     * <p>Still {@code updatable = false}: a detection time is stated once. Because the mapping
+     * refuses a change, {@code update} must not appear to accept one either — it takes an echo
+     * and refuses a different value (F2-231/F2-234).
+     */
+    @Column(name = "first_detected_at", nullable = false, updatable = false)
     private LocalDateTime firstDetectedAt;
 
     /**
