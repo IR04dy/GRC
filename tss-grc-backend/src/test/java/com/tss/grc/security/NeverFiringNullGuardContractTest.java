@@ -179,12 +179,91 @@ class NeverFiringNullGuardContractTest {
      * page happens to build are nineteen defects waiting for a second caller, and the fix makes the
      * hazard <em>absent</em> rather than latent (F2-213's rule).
      *
-     * <p>Keep it empty. There is no correct code for a hard zero here to fail on: an entity-bound
-     * partial update whose omitted key must mean "leave it alone" cannot also declare an
-     * initialiser, and where a default is genuinely wanted the create path is always available to
-     * own it — which is what {@link #everyRemovedInitialiserHasAWriterOnTheCreatePath} enforces.
+     * <p>⚠⚠ <b>F2-291 — IT WAS NOT ZERO. TWO STACKED NARROWINGS IN THIS CLASS'S OWN DERIVATION WERE
+     * HIDING 42 SITES, AND THE EMPTY INVARIANT ABOVE READ AS A FINISHED SWEEP.</b>
+     * <ol>
+     *   <li>{@link #measure} walked {@link ServerStampedFieldContractTest#publicMethods} only, and
+     *       the house idiom is {@code update(id, body)} delegating to a private
+     *       {@code apply(target, src)} that holds every null guard — so the whole idiom was outside
+     *       the population by construction. F2-198's shape at an access modifier, for the third time
+     *       in this family: F2-237 recorded it against the SIBLING gate, F2-231 built that gate a
+     *       one-hop private-helper follow, and this gate never inherited it (F2-190) although it
+     *       already imports three helpers from the same class.</li>
+     *   <li>The "did it load a row?" test was the name vocabulary {@code get|find\w*}, and the
+     *       ethics and KYC services call their loader {@code require(id)} — so every update method
+     *       in those modules read as a create. F2-217's headline, and F2-278 had already measured
+     *       this exact limitation on the sibling gate's {@code loadsARow} and found it harmless
+     *       THERE, so the limit was known, filed against one gate, and never asked of this one.</li>
+     * </ol>
+     *
+     * <p>What they hid, both probed live at HTTP 200: {@code EthicsCaseService#apply} resetting a
+     * whistleblowing case's severity, intake channel and <b>anonymity flag</b>, and
+     * {@code KycService#apply} resetting {@code isSanctioned} / {@code riskRating} /
+     * {@code eddRequired} — the flags F2-288 armed one slice earlier so that {@code approve()} could
+     * refuse a sanctioned subject, which it then did not.
+     *
+     * <p>So this is F2-205's case and not F2-204's: <b>the question was right and the ANSWER was
+     * under-measured, so the number moves and says so.</b> A hard zero over a population the
+     * instrument cannot see is the most reassuring possible artefact. The nine pairs F2-291 fixed
+     * are gone; the remaining 33 ride here as a decrease-only work list with <b>no reasons
+     * attached</b> (F2-188 measured what happens otherwise: five claims, five false), to be read and
+     * closed the way F2-238/239/240 closed the first population — ordered by reach, entity by
+     * entity. Do not write 33 reasons.
      */
-    private static final Set<String> WORK_LIST = Set.of();
+    private static final Set<String> WORK_LIST = Set.of(
+        // ⚠ this first entry was missing from the draft: my extraction grepped the gate's own
+        // output for lines starting with whitespace + a quote, and AssertJ puts the FIRST element
+        // of a list on the `["…` line. A 33-member answer where 34 exist reads exactly like a
+        // complete sweep — the same failure mode this slice is about, in the harness reading it.
+        "AmlAlertService#update :: AmlAlert#currency",
+        "AmlAlertService#update :: AmlAlert#severity",
+        "AuditEngagementService#update :: AuditEngagement#findingsCount",
+        "AuditEngagementService#update :: AuditEngagement#status",
+        "AuditLifecycleService#updateAnnualPlan :: AnnualPlan#budgetHours",
+        "AuditLifecycleService#updateWorkingPaper :: WorkingPaper#hours",
+        "BcmCycleService#updateGovernance :: BcmGovernanceRecord#policyVersion",
+        "BcmRemediationService#updateCapa :: BcmCorrectiveAction#priority",
+        "BcmRemediationService#updateCapa :: BcmCorrectiveAction#progressPercent",
+        "BcmSettingsService#update :: BcmSettings#capaOverdueGraceDays",
+        "BcmSettingsService#update :: BcmSettings#evidenceExpiryWarningDays",
+        "BcmSettingsService#update :: BcmSettings#exerciseFrequencyMonthsCritical",
+        "BcmSettingsService#update :: BcmSettings#exerciseFrequencyMonthsDefault",
+        "BcmSettingsService#update :: BcmSettings#regulatoryImportStatus",
+        "BcmSettingsService#update :: BcmSettings#riskMatrixImpactMax",
+        "BcmSettingsService#update :: BcmSettings#riskMatrixLikelihoodMax",
+        "BcmSettingsService#update :: BcmSettings#rpoCriticalHours",
+        "BcmSettingsService#update :: BcmSettings#rpoWarningHours",
+        "BcmSettingsService#update :: BcmSettings#rtoCriticalHours",
+        "BcmSettingsService#update :: BcmSettings#rtoWarningHours",
+        "ChangeManagementService#update :: ChangeRequest#changeType",
+        "ControlLibraryService#updateControl :: Control#automationLevel",
+        "ControlLibraryService#updateControl :: Control#controlType",
+        "CrisisCommsService#updateTemplate :: CrisisCommsTemplate#version",
+        "DisclosureService#update :: Disclosure#currency",
+        "DisclosureService#update :: Disclosure#status",
+        "FrameworkAnchorService#updateMapping :: PolicyDocumentFrameworkMapping#satisfaction",
+        "OrganisationSettingsService#update :: OrganisationSettings#carbonOffsetCapPct",
+        "OrganisationSettingsService#update :: OrganisationSettings#climateScenarioWeightsStrict",
+        "ReportScheduleService#update :: ReportSchedule#cadence",
+        "ReportScheduleService#update :: ReportSchedule#format",
+        "ReportScheduleService#update :: ReportSchedule#isActive",
+        "ReportScheduleService#update :: ReportSchedule#language",
+        "ReportScheduleService#update :: ReportSchedule#timeOfDay");
+
+    /**
+     * The nine pairs F2-291 closed. Held by name so a revert cannot pass as a shrinking work list:
+     * the members of {@link #WORK_LIST} are tolerated, and one of these coming back must FAIL.
+     */
+    private static final Set<String> CLOSED_BY_F2_291 = Set.of(
+        "EthicsCaseService#update :: EthicsCase#severity",
+        "EthicsCaseService#update :: EthicsCase#intakeChannel",
+        "EthicsCaseService#update :: EthicsCase#isAnonymous",
+        "KycService#update :: KycSubject#riskRating",
+        "KycService#update :: KycSubject#isPep",
+        "KycService#update :: KycSubject#isSanctioned",
+        "KycService#update :: KycSubject#cddLevel",
+        "KycService#update :: KycSubject#eddRequired",
+        "KycService#update :: KycSubject#status");
 
     // ── the derivation ───────────────────────────────────────────────────────
 
@@ -275,24 +354,44 @@ class NeverFiringNullGuardContractTest {
         return best == null ? null : inits.get(best);
     }
 
-    /** {@code Service#method :: Entity#field} for every never-firing guard. */
+    /**
+     * {@code Service#method :: Entity#field} for every never-firing guard.
+     *
+     * <p>⚠⚠ <b>F2-291 — the guard is usually not IN the public method.</b> This walked
+     * {@link ServerStampedFieldContractTest#publicMethods} only, and the house idiom in this
+     * codebase is {@code update(id, body)} delegating to a private {@code apply(target, src)} that
+     * holds all twenty-odd null guards — so the entire idiom sat outside the population by
+     * construction and {@link #WORK_LIST} was an empty invariant over it. F2-198's shape at an
+     * access modifier, and the third time this family has been bitten by exactly that narrowing:
+     * F2-237 recorded it for {@code EvidenceItemService#transitionStatus} against the SIBLING gate,
+     * which then grew a one-hop follow in F2-231 that this gate never inherited (F2-190) — although
+     * it already imports three other helpers from that same class.
+     *
+     * <p>What it hid: {@code EthicsCaseService#apply} resetting a whistleblowing case's severity,
+     * intake channel and <b>anonymity flag</b>, and {@code KycService#apply} resetting
+     * {@code isSanctioned} / {@code riskRating} / {@code eddRequired} — the flags F2-288 had armed
+     * one slice earlier so that {@code approve()} could refuse a sanctioned subject. Both probed
+     * live at HTTP 200.
+     */
     static Set<String> measure(Map<String, String> serviceSources,
                                Map<String, Map<String, String>> inits) {
         Set<String> out = new TreeSet<>();
         for (var entry : serviceSources.entrySet()) {
             String service = entry.getKey();
             String src = ServerStampedFieldContractTest.stripComments(entry.getValue());
+            String pkg = pkgOf(entry.getValue());
+            Map<String, Set<String>> helpers =
+                ServerStampedFieldContractTest.helperNullGuardedFields(src);
             for (ServerStampedFieldContractTest.Method m
                      : ServerStampedFieldContractTest.publicMethods(src)) {
                 Map<String, String> ptypes =
                     ServerStampedFieldContractTest.requestParamTypes(m.params());
                 for (var p : ptypes.entrySet()) {
-                    Map<String, String> declared =
-                        initialisersFor(inits, pkgOf(entry.getValue()), p.getValue());
+                    Map<String, String> declared = initialisersFor(inits, pkg, p.getValue());
                     if (declared == null) continue;
                     // It must LOAD a row of that type. On a create, writing the initialiser is
                     // exactly what is meant to happen, so the guard being decorative costs nothing.
-                    if (!m.body().matches("(?s).*\\b(get|find\\w*)\\s*\\(.*")) continue;
+                    if (!loadsARowOf(m.body(), p.getValue())) continue;
                     Matcher g = Pattern.compile("if\\s*\\(\\s*" + Pattern.quote(p.getKey())
                         + "\\s*\\.\\s*(?:get|is)([A-Z]\\w*)\\s*\\(\\s*\\)\\s*!=\\s*null\\s*\\)")
                         .matcher(m.body());
@@ -303,9 +402,81 @@ class NeverFiringNullGuardContractTest {
                         }
                     }
                 }
+                // ── the one-hop private helper (F2-291) ────────────────────────────────────────
+                // Attributed to the PUBLIC method, because that is the route a caller reaches and
+                // the scope a fix has to reason about. Only a helper this method actually calls
+                // with one of its own request-typed parameters counts: a helper called with two
+                // server values guards nothing of the caller's (F2-231's rule on the write side).
+                for (var h : helpers.entrySet()) {
+                    if (!callsHelperWithRequest(m.body(), h.getKey(), ptypes.keySet())) continue;
+                    for (String tf : h.getValue()) {
+                        String type = tf.substring(0, tf.indexOf('#'));
+                        String f = tf.substring(tf.indexOf('#') + 1);
+                        if (!loadsARowOf(m.body(), type)) continue;
+                        if (ServerStampedFieldContractTest.CLOSED_AT_THE_WIRE.contains(f)) continue;
+                        Map<String, String> declared = initialisersFor(inits, pkg, type);
+                        if (declared != null && declared.containsKey(f)) {
+                            out.add(service + "#" + m.name() + " :: " + type + "#" + f);
+                        }
+                    }
+                }
             }
         }
         return out;
+    }
+
+    /**
+     * Does {@code body} declare a local of {@code type} that came from somewhere other than
+     * {@code new} — i.e. did this method LOAD a row?
+     *
+     * <p>⚠⚠ <b>F2-291 — this was a NAME vocabulary and it was the second of two stacked narrowings.</b>
+     * The test was {@code body.matches(".*\\b(get|find\\w*)\\s*\\(.*")}, and the ethics and KYC
+     * services name their loader {@code require(id)} — so every one of their update methods read as
+     * a create and the whole module was outside the population. F2-217's headline: a census keyed on
+     * a list of names measures the list. ⚠ F2-278 had already recorded this exact limitation for the
+     * sibling gate's {@code loadsARow} ({@code get|mustGet|find*|load*|fetch*}, blind to
+     * {@code frameworks.require(...)}) and MEASURED that porting it changed nothing THERE — so the
+     * limit was known, filed against one gate, and never asked of this one.
+     *
+     * <p>Structural instead of lexical, and the discriminator is F2-213's: a create builds its row
+     * ({@code new T()}) and an update loads one, so "declares a local of T not from a constructor"
+     * needs no vocabulary and cannot be defeated by naming the loader something new.
+     *
+     * <p>⚠⚠ <b>And the save's OWN RESULT is not a load — F2-213 recorded that exact detector bug and
+     * this method's first draft reproduced it.</b> {@code ChangeRequest saved = changeRepo.save(c);}
+     * made {@code ChangeManagementService#create} read as a method that had loaded a row, so a
+     * create appeared in the population; F2-213's first draft counted the same shape and reported
+     * 41 sites, nearly all creates. Naming a trap does not exempt you from it. Both shapes are
+     * must-not-match cases in {@link #theLoadTestIsStructuralAndNotAVocabulary}.
+     */
+    static boolean loadsARowOf(String body, String type) {
+        Matcher m = Pattern.compile("\\b" + Pattern.quote(type) + "\\s+\\w+\\s*=\\s*([^;]*);")
+            .matcher(body);
+        while (m.find()) {
+            String rhs = m.group(1).trim();
+            if (rhs.startsWith("new ") || rhs.startsWith("new\t")) continue;
+            if (rhs.matches("(?s).*\\.\\s*save(All)?\\s*\\(.*")) continue;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Does {@code body} call {@code helper} passing one of {@code requestParams}?
+     *
+     * <p>The argument test is what keeps a shared helper attributed to the routes that actually
+     * hand it caller data. Written as a scan of the call's own argument list rather than of the
+     * whole body, because {@code apply(} appears in more than one method of most of these services.
+     */
+    static boolean callsHelperWithRequest(String body, String helper, Set<String> requestParams) {
+        Matcher call = Pattern.compile("\\b" + Pattern.quote(helper) + "\\s*\\(([^;]*?)\\)\\s*;")
+            .matcher(body);
+        while (call.find()) {
+            for (String arg : call.group(1).split(",")) {
+                if (requestParams.contains(arg.trim())) return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, String> liveServices() {
@@ -538,7 +709,28 @@ class NeverFiringNullGuardContractTest {
             // field the entity initialised, i.e. a NEW never-firing guard. Roughly two in ten of a
             // slice's own claims fall on first run (F2-188/F2-192/F2-204/F2-211); this one fell to
             // the instrument the same slice was extending.
-            new Moved("VendorAssessment", "status", "setStatus", "TprmService", "createAssessment"));
+            new Moved("VendorAssessment", "status", "setStatus", "TprmService", "createAssessment"),
+            // ── F2-291 — the population the two narrowings above were hiding ─────────────────
+            // Both registers are entity-bound on POST and PUT, both name their loader require(id),
+            // and both hold every null guard in a private apply(target, src). The ethics three were
+            // probed resetting a CRITICAL, in-person, ANONYMOUS whistleblowing case to
+            // MEDIUM/HOTLINE/attributable; the KYC five were probed clearing a confirmed OFAC_SDN
+            // match so that approve() — which refuses a sanctioned subject, and had just refused
+            // this one — answered 200.
+            new Moved("EthicsCase", "severity", "setSeverity", "EthicsCaseService", "create"),
+            new Moved("EthicsCase", "intakeChannel", "setIntakeChannel", "EthicsCaseService", "create"),
+            new Moved("EthicsCase", "isAnonymous", "setIsAnonymous", "EthicsCaseService", "create"),
+            // `status` is not copied by apply (F2-22b(v) moved it to transition), but its
+            // initialiser made requireLifecycleIsNotBodySet read an OMITTED status as a request to
+            // move the case back to INTAKE — a 400 naming a state the caller never sent, and the
+            // refusal that held the three resets above shut for the 28 of 30 cases past INTAKE.
+            new Moved("EthicsCase", "status", "setStatus", "EthicsCaseService", "create"),
+            new Moved("KycSubject", "riskRating", "setRiskRating", "KycService", "create"),
+            new Moved("KycSubject", "isPep", "setIsPep", "KycService", "create"),
+            new Moved("KycSubject", "isSanctioned", "setIsSanctioned", "KycService", "create"),
+            new Moved("KycSubject", "cddLevel", "setCddLevel", "KycService", "create"),
+            new Moved("KycSubject", "eddRequired", "setEddRequired", "KycService", "create"),
+            new Moved("KycSubject", "status", "setStatus", "KycService", "create"));
 
         Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
@@ -907,5 +1099,119 @@ class NeverFiringNullGuardContractTest {
             }
             """;
         assertThat(measure(Map.of("WidgetService", honest), inits)).isEmpty();
+    }
+
+    // ── F2-291 ───────────────────────────────────────────────────────────────
+
+    /**
+     * The load test must be a SHAPE, not a list of loader names — and a save's own result is not a
+     * load.
+     *
+     * <p>Both halves are here because both were wrong once. The vocabulary {@code get|find\w*} put
+     * every {@code require(id)}-shaped service outside the population (F2-217), and the first
+     * structural draft counted {@code T saved = repo.save(c);} as a load, which is the detector bug
+     * F2-213 recorded and put a create into the work list.
+     */
+    @Test
+    void theLoadTestIsStructuralAndNotAVocabulary() {
+        assertThat(loadsARowOf("EthicsCase c = require(id); apply(c, req);", "EthicsCase"))
+            .as("the loader is named `require` in two whole modules — a name vocabulary cannot see it")
+            .isTrue();
+        assertThat(loadsARowOf("Widget w = mustGetOrThrow(id);", "Widget")).isTrue();
+        assertThat(loadsARowOf("Widget w = this.repo.findByIdAndOrganisationId(id, org).get();", "Widget"))
+            .isTrue();
+        assertThat(loadsARowOf("EthicsCase c = new EthicsCase(); apply(c, req);", "EthicsCase"))
+            .as("a create builds its row, so writing the initialiser there is the point")
+            .isFalse();
+        assertThat(loadsARowOf("ChangeRequest c = new ChangeRequest();\n"
+                             + "ChangeRequest saved = changeRepo.save(c);", "ChangeRequest"))
+            .as("⚠ F2-213's detector bug: the save's OWN RESULT is not evidence a row was loaded, "
+                + "and counting it reported ChangeManagementService#create as a defect site")
+            .isFalse();
+        assertThat(loadsARowOf("List<Widget> all = repo.saveAll(xs);", "Widget")).isFalse();
+    }
+
+    /**
+     * The one-hop private-helper follow is load-bearing, not decorative.
+     *
+     * <p>Asserted by MEASUREMENT rather than by argument (F2-192): the guards for these members are
+     * not in the public method at all, so if the follow were removed the population would collapse
+     * back to the empty invariant that read as a finished sweep for three slices.
+     */
+    @Test
+    void theOneHopHelperFollowIsLoadBearing() {
+        Map<String, String> services = liveServices();
+        Map<String, Map<String, String>> inits = liveInitialisers();
+
+        int helperOnly = 0;
+        for (String member : WORK_LIST) {
+            String service = member.substring(0, member.indexOf('#'));
+            String method = member.substring(member.indexOf('#') + 1, member.indexOf(" :: "));
+            String field = member.substring(member.lastIndexOf('#') + 1);
+            String src = services.get(service);
+            assertThat(src).as("work-list member names a service that must exist: " + member).isNotNull();
+            String stripped = ServerStampedFieldContractTest.stripComments(src);
+            String body = methodBody(stripped, method);
+            assertThat(body).as("work-list member names a method that must exist: " + member).isNotNull();
+            boolean inline = body.matches("(?s).*\\.\\s*(?:get|is)"
+                + Character.toUpperCase(field.charAt(0)) + field.substring(1)
+                + "\\s*\\(\\s*\\)\\s*!=\\s*null.*");
+            if (!inline) helperOnly++;
+        }
+        assertThat(helperOnly)
+            .as("members whose guard is NOT in the public method, i.e. members only the one-hop "
+                + "helper follow can see. Delete the follow and every one of these disappears, "
+                + "which is what made this gate's hard zero look like a finished sweep")
+            .isGreaterThanOrEqualTo(8);
+
+        // And the mechanism itself resolves, in the two shapes the tree uses.
+        assertThat(ServerStampedFieldContractTest.helperNullGuardedFields(
+                ServerStampedFieldContractTest.stripComments(services.get("DisclosureService"))))
+            .as("`apply` is the house name")
+            .containsKey("apply");
+        assertThat(ServerStampedFieldContractTest.helperNullGuardedFields(
+                ServerStampedFieldContractTest.stripComments(services.get("AmlAlertService"))))
+            .as("`applyEditable` is the other one, and a helper-NAME list would have missed it")
+            .containsKey("applyEditable");
+        assertThat(callsHelperWithRequest("apply(c, req);", "apply", Set.of("req")))
+            .as("attribution needs the CALL to pass caller data — a helper called with two server "
+                + "values guards nothing of the caller's (F2-231's rule on the write side)")
+            .isTrue();
+        assertThat(callsHelperWithRequest("apply(c, existing);", "apply", Set.of("req"))).isFalse();
+    }
+
+    /**
+     * The nine pairs F2-291 closed must stay closed, in BOTH directions.
+     *
+     * <p>A tolerated {@link #WORK_LIST} entry and a fixed field are indistinguishable from a count,
+     * so these are named: the entity must declare no initialiser for them (or the guard in
+     * {@code apply} goes back to firing on every request and resetting a live row), and the measured
+     * population must not contain them (or the fix has been reverted while the work list absorbed it).
+     */
+    @Test
+    void theEthicsAndKycConsequenceFlagsStayClosed() {
+        assertThat(measure(liveServices(), liveInitialisers()))
+            .as("a reverted fix must FAIL rather than be absorbed by the work list")
+            .doesNotContainAnyElementsOf(CLOSED_BY_F2_291);
+
+        Map<String, Map<String, String>> inits = liveInitialisers();
+        Map<String, String> ethics =
+            initialisersFor(inits, "com.tss.grc.module.ethics.service", "EthicsCase");
+        Map<String, String> kyc =
+            initialisersFor(inits, "com.tss.grc.module.ethics.service", "KycSubject");
+        if (ethics != null) {
+            assertThat(ethics.keySet())
+                .as("EthicsCase must not initialise these: on an entity-bound PUT an initialiser "
+                    + "makes an omitted key indistinguishable from a stated value, and `isAnonymous` "
+                    + "is what protects a whistleblower")
+                .doesNotContain("severity", "intakeChannel", "isAnonymous", "status");
+        }
+        if (kyc != null) {
+            assertThat(kyc.keySet())
+                .as("KycSubject must not initialise the flags F2-288 armed — an omitted key cleared "
+                    + "a confirmed OFAC match and approve() then permitted the subject")
+                .doesNotContain("riskRating", "isPep", "isSanctioned", "cddLevel", "eddRequired",
+                                "status");
+        }
     }
 }

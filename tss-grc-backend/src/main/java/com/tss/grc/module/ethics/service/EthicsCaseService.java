@@ -74,9 +74,18 @@ public class EthicsCaseService {
         c.setOrganisationId(TenantContext.getCurrentTenant());
         requireLifecycleIsNotBodySet(c, req, true);
         apply(c, req);
-        if (c.getStatus()        == null) c.setStatus("INTAKE");
+        // F2-291 — these four now actually fire. `EthicsCase` used to give severity, intakeChannel,
+        // status and isAnonymous field initialisers, so `c` already carried every one of them before
+        // this line was reached and all three tests below were dead: the values were right, and the
+        // same initialisers made `apply`'s null guards never fire on the UPDATE path, where they
+        // reset a live row. The create path is where a default belongs (F2-238), and
+        // `NeverFiringNullGuardContractTest#everyRemovedInitialiserHasAWriterOnTheCreatePath` pins
+        // this method as the writer for all four, because the columns are NOT NULL and a create
+        // that stops setting one turns a silent reset into a 500.
+        if (c.getStatus()        == null) c.setStatus(EthicsCaseLifecycle.INITIAL);
         if (c.getSeverity()      == null) c.setSeverity("MEDIUM");
         if (c.getIntakeChannel() == null) c.setIntakeChannel("HOTLINE");
+        if (c.getIsAnonymous()   == null) c.setIsAnonymous(false);
         EthicsCase saved = caseRepo.save(c);
         emit(saved);
         return saved;
@@ -330,6 +339,17 @@ public class EthicsCaseService {
      * (ii) that <b>the UI is what falsifies a "just refuse the caller's value" fix</b>, so: an
      * unchanged value is ignored, a different one is refused and names the endpoint that owns it.
      *
+     * <p>⚠⚠ <b>F2-291 — that paragraph was right about a PRESENT value and had no vocabulary for an
+     * ABSENT one, which is the half that was broken.</b> {@code EthicsCase} gave {@code status} the
+     * field initialiser {@code "INTAKE"}, and this endpoint binds the entity — so a body that never
+     * mentioned {@code status} arrived carrying INTAKE, and for the 28 of 30 live cases past INTAKE
+     * this method refused the whole update with <em>"Case N is at TRIAGE and cannot be moved to
+     * INTAKE by an update"</em>: a diagnostic naming a state the caller never sent (probed live,
+     * HTTP 400). The reasoning above is why the ECHO had to keep working; nothing here noticed that
+     * an omission was indistinguishable from an echo of the wrong value. The initialiser is gone and
+     * {@code create()} owns the initial state, so an omitted status now means <em>leave it
+     * alone</em> — and the echo tolerance the paragraph above argues for is unchanged.
+     *
      * <p>(READ_ONLY on the entity would also have tolerated the echo, and is the right tool for a
      * field the UI merely round-trips — it is what tranches (ii)–(iv) used. It is wrong <em>here</em>
      * because {@code status} must still be settable on the way in for an integration that legitimately
@@ -337,7 +357,7 @@ public class EthicsCaseService {
      * a case. F2-44's rule: say so.)
      */
     private void requireLifecycleIsNotBodySet(EthicsCase current, EthicsCase src, boolean isCreate) {
-        String curStatus  = isCreate ? "INTAKE" : current.getStatus();
+        String curStatus  = isCreate ? EthicsCaseLifecycle.INITIAL : current.getStatus();
         String curOutcome = isCreate ? null     : current.getOutcome();
 
         if (src.getStatus() != null && !src.getStatus().equals(curStatus)) {

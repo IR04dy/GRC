@@ -100,6 +100,19 @@ public final class EthicsCaseLifecycle {
     /** Sorted, so a repository query's parameter order is stable and diffable. */
     public static final List<String> TERMINAL_LIST;
 
+    /**
+     * The status a newly filed case starts in — the mirror of {@link #TERMINAL}, computed rather
+     * than typed: the one state that is a key and never a target.
+     *
+     * <p>F2-291 made this worth deriving. It has two readers now — {@code create()}'s default and
+     * {@code requireLifecycleIsNotBodySet}'s create-side comparison — and while it was a literal
+     * they were two copies of one fact, which is the shape F2-217 measured (a default and a
+     * vocabulary that can disagree). The static block THROWS if the machine ever admits two roots
+     * or none, because a silently-chosen root would make "a new case starts here" depend on
+     * iteration order (F2-197's shape at a lifecycle).
+     */
+    public static final String INITIAL;
+
     static {
         Set<String> mentioned = new TreeSet<>(ALLOWED.keySet());
         ALLOWED.values().forEach(mentioned::addAll);
@@ -111,10 +124,16 @@ public final class EthicsCaseLifecycle {
         }
         TERMINAL = Set.copyOf(dead);
         TERMINAL_LIST = List.copyOf(dead);
-    }
 
-    /** The status a newly filed case starts in. */
-    public static final String INITIAL = "INTAKE";
+        Set<String> targets = new TreeSet<>();
+        ALLOWED.values().forEach(targets::addAll);
+        Set<String> roots = new TreeSet<>(ALLOWED.keySet());
+        roots.removeAll(targets);
+        if (roots.size() != 1) throw new IllegalStateException(
+            "EthicsCaseLifecycle must have exactly one state that is never a transition target, "
+            + "because that is the state a newly filed case starts in. Found: " + roots);
+        INITIAL = roots.iterator().next();
+    }
 
     /**
      * The taxonomy the platform <em>reports</em> {@code ethics.cases.category} in.

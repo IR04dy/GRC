@@ -15219,6 +15219,155 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-291 — a hard-zero invariant whose population was `publicMethods`, over a codebase whose house idiom is a private `apply(target, src)` helper
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`6a6f017c`) |
+| **Severity** | P1 — a KYC subject with a confirmed OFAC SDN sanctions match was **approved for business** by an edit that changed only its name, and a whistleblowing case was **de-anonymised** the same way. Live, probed, identical in dev and prod |
+| **Registers** | `ethics.cases` (30 live rows), `ethics.kyc_subjects` (16), both byte-identical in dev and prod |
+| **Standards** | NAZAHA / the Saudi Whistleblower Protection Law; FATF R.12 and SAMA AML/CFT for the PEP and sanctions flags |
+| **Found by** | executing [[F2-290]]'s filing of `intake_channel` and re-deriving it first ([[F2-221]]) — which **refuted the filing's figure** and, while reading the writers, found the mechanism one level up |
+| **Verification** | live probe **7/12 and 5/11 pre-fix**, **12/12 and 11/11 post-fix**, as `compliance` and never `admin`; gate control **7 of 12 legs discriminate**, the other 5 named as pins, self-tests and measurements ([[F2-225]]); mutations **13 killed / 0 survived / 0 anchor-miss**; backend **4583 -> 4595/0/0**, frontend 818/818, `tsc` clean; both databases back at 30 / 16 / 12 with zero probe residue |
+
+### The defect
+
+`EthicsCaseController` and `KycController` bind their **entity** on POST and PUT. Jackson
+deserialises an omitted key into `new T()`, so a field initialiser is indistinguishable from a value
+the caller stated — and both services copy under `if (src.getX() != null)`, which an initialiser
+makes true on **every** request. A partial `PUT` was therefore a full replace with the initialisers.
+
+Probed live as `compliance` (which holds `COMPLIANCE:WRITE`, the permission on every one of these
+routes, so **there is no privilege escalation here** — the object-level state was the only control):
+
+* `PUT /api/v1/ethics/cases/{id} {"titleEn": "…"}` on a case at INTAKE → **200**, and
+  `severity` CRITICAL → **MEDIUM**, `intake_channel` IN_PERSON → **HOTLINE**, `is_anonymous`
+  TRUE → **FALSE**. The reporter's name and email columns sit two fields above that flag.
+* `PUT /api/v1/ethics/kyc/{id} {"fullName": "…"}` → **200**, and `is_sanctioned` TRUE → **FALSE**,
+  `risk_rating` PROHIBITED → **STANDARD**, `edd_required` TRUE → **FALSE**, `cdd_level`
+  ENHANCED → **STANDARD**. `POST /{id}/approve` then answered **200** and stored `APPROVED`,
+  with the screening hit still on the register reading `TRUE_MATCH`.
+
+🔑🔑 **The KYC half defeats the control [[F2-288]] armed one slice earlier.** `approve()` has always
+refused a sanctioned subject; F2-288 was the slice that made anything write the flag it reads. That
+flag was then cleared by the adjacent route, under the same permission — and F2-288's own gate leg
+says `apply()` *"legitimately copies all four flags because the subject form lets an operator flag a
+PEP or a sanctioned party by hand."* True of a **full-echo** form. **The initialiser is what made a
+legitimate copy a reset**, and F2-288 read that method, scoped a gate leg around it, and could not
+see it.
+
+### 🔑🔑 The instrument finding: two stacked narrowings, and the hard zero read as a finished sweep
+
+`NeverFiringNullGuardContractTest` exists for exactly this defect. F2-237 opened it at 50 sites,
+F2-238/239/240 took it to **0**, and F2-240 promoted it from a decreasing work list to an
+**invariant** with the words *"Keep it empty. There is no correct code for a hard zero here to fail
+on."* It was green over **42 sites**.
+
+1. **`measure()` walked `publicMethods` only.** The house idiom in this codebase is
+   `update(id, body)` delegating to a private `apply(target, src)` that holds every null guard, so
+   the whole idiom was outside the population **by construction**. [[F2-198]]'s shape at an access
+   modifier — and the **third** time this family has been bitten by that exact narrowing: [[F2-237]]
+   recorded it for `EvidenceItemService#transitionStatus` against the **sibling** gate,
+   [[F2-231]] then built that gate a one-hop private-helper follow and documented it at length, and
+   this gate never inherited it ([[F2-190]]) although it already imports `stripComments`,
+   `publicMethods` and `requestParamTypes` **from that same class**.
+2. **The "did it load a row?" test was a name vocabulary**, `get|find\w*` — and the ethics and KYC
+   services call their loader `require(id)`, so every update method in those modules read as a
+   *create*, where writing the initialiser is exactly what is meant to happen. [[F2-217]]'s headline.
+   ⚠ [[F2-278]] had already recorded this precise limitation for the sibling gate's `loadsARow`
+   (`get|mustGet|find*|load*|fetch*`, *"it cannot see `frameworks.require(...)`"*) and **measured
+   that porting it changed nothing there** — so the limit was known, filed against one gate, and
+   never asked of this one.
+
+Neither narrowing alone would have hidden these two registers; both together did. The load test is
+now **structural** — a local of the entity's type initialised from something that is not `new` —
+which needs no vocabulary and cannot be defeated by naming a loader something new.
+
+⚠⚠ **And the first structural draft reproduced [[F2-213]]'s recorded detector bug**:
+`ChangeRequest saved = changeRepo.save(c);` made a **create** read as a method that had loaded a
+row, and F2-213's own first draft counted the same shape and reported 41 sites, nearly all creates.
+Naming a trap does not exempt you from it. Both shapes are must-not-match cases in the self-test.
+
+### The fix
+
+[[F2-238]]'s established remedy: **remove the initialiser, own the default on the create path.**
+Ten fields across two entities, with `everyRemovedInitialiserHasAWriterOnTheCreatePath` asserting
+the (entity, field, writer, method) quadruple in both directions — every one of these columns is
+NOT NULL, so a create that stops setting one turns a silent reset into a 500, and nothing else in
+the tree can see that under `ddl-auto=none`.
+
+⚠ **`EthicsCase#status` was not a reset, it was a REFUSAL, and it was holding the others shut.**
+`apply` never copies `status` ([[F2-22b]](v) moved it to `transition()`), but
+`requireLifecycleIsNotBodySet` compares the body's value against the stored one — so with
+`= "INTAKE"` a body that omitted `status` looked like a request to move the case **back**, and a
+partial PUT on a case at TRIAGE answered **400 "Case 50 is at TRIAGE and cannot be moved to INTAKE
+by an update"**, naming a state the caller never sent. 🔑 That refusal is also why the three resets
+were live on only the **2 of 30** cases at INTAKE: **fixing the obviously-wrong refusal alone would
+have detonated the resets on all 30** ([[F2-203]]: a latent defect in a path is held shut by
+whatever else is broken around it). The two halves had to land together.
+
+⚠ The method's javadoc is corrected rather than deleted. It reasons carefully about why a **present**
+value must be tolerated (*"`EthicsPage`'s edit modal seeds itself with `reqFromDto(c) = { ...c }`"* —
+verified, and `FormModal` submits its whole seeded state, so the edit form really does echo) and had
+**no vocabulary for an ABSENT one**. [[F2-184]]'s shape: the paragraph answers the question a reader
+was about to ask.
+
+⚙ `EthicsCaseLifecycle.INITIAL` is now **derived** — the one state that is a key and never a target,
+with the static block throwing if the machine ever admits two roots or none. It gained a second
+reader in this slice (the create default and the create-side comparison), and two copies of one fact
+is the shape [[F2-217]] measured.
+
+### What is filed rather than fixed
+
+The corrected population is **34 remaining sites**, held as a decrease-only work list with **no
+reasons attached** ([[F2-188]] measured what happens otherwise: five claims, five false). They are
+to be read and closed the way F2-238/239/240 closed the first population — ordered by reach, entity
+by entity. **Do not write 34 reasons.** The nine pairs this slice fixed are held separately by name,
+so a revert FAILS rather than being absorbed by a tolerated list.
+
+Sharpest unread members, by what the initialiser ASSERTS ([[F2-238]]'s ordering):
+`AuditEngagementService#update :: AuditEngagement#findingsCount` (resets an IIA engagement's finding
+count to **0** — and [[F2-278]] already filed that field for a different reason);
+`DisclosureService#update :: Disclosure#status` (a conflict-of-interest disclosure reverts to
+**DRAFT**); `ChangeManagementService#update :: ChangeRequest#changeType` (an **EMERGENCY** change
+becomes **NORMAL**); `ReportScheduleService#update :: ReportSchedule#isActive` (resets to **true**,
+so a paused regulator report starts sending again); the nine `BcmSettingsService#update` thresholds.
+
+### ⚠ My own errors, all caught by running something
+
+* **The em-dash trap, in PowerShell this time.** Windows PowerShell 5.1 reads a script file as ANSI
+  unless it carries a BOM, so a UTF-8 em-dash in a comment became three bytes it could not parse and
+  the whole kill script failed to compile with five cascading errors pointing at unrelated lines.
+  [[F2-271]] recorded the same trap for a Python patch script; **a PowerShell script must be pure
+  ASCII.**
+* **My extraction of the gate's own output dropped the first element of the list.** AssertJ prints
+  the first member of a set on the `["…` line, and my grep asked for lines starting with whitespace
+  and a quote — so a 34-member population read as 33, which is exactly the failure mode this slice
+  is about, in the harness reading it. The gate refused it; the count came from the gate.
+* **The `mvn` launcher is on D:**, and the Bash cwd drifts after a `cd` in an earlier command, so
+  `sed`/`grep` against a relative path failed with a misleading usage error. Use absolute paths.
+
+### ⚙ Filed
+
+* The **34-site** work list above.
+* **[[F2-290]]'s `intake_channel` figure was wrong in one direction.** Re-derived: `CHANNEL_OPTIONS`
+  offers **16** values, the register stores **13**, they intersect in **4** (`HOTLINE`, `EMAIL`,
+  `IN_PERSON`, `WEB_FORM`, 17 of 30 rows). So the 9 stored-and-not-offered is right and the
+  "6 offered-never-stored" is **12**. Still display-only: nothing counts the column, `list()` has no
+  channel filter, and the register cell renders the raw token through `.replace(/_/g, ' ')` — so 9
+  of 13 stored values appear as unlabelled English words on an Arabic-primary UI (house rule 7).
+* **`KycService#apply` copies `status` at all**, so a caller who *sends* a status still overwrites
+  the lifecycle — [[F2-22b]](v)'s defect, which `EthicsCaseService` has a guard for and this register
+  never got. Deciding whether an operator may set a KYC status directly is not a side effect of
+  removing an initialiser.
+* `ethics.cases` and `ethics.kyc_subjects` both still have **zero CHECK constraints**; `cddLevel` is
+  copied unvalidated where `riskRating` goes through a `ClosedVocabulary`. Cheap now that this slice
+  touched both writers ([[F2-183]]), and blocked on [[F2-290]]'s finding that 11 of 30 ethics rows
+  already hold statuses outside the machine.
+* Neither register's edit form offers a control for the flags it round-trips (`isAnonymous`,
+  `isSanctioned`), so they are settable only at creation or through the API — [[F2-278]]'s
+  frozen-field shape, and offering them is a product change.
+
 ## F2-290 — three artefacts answered "is this case still open?", and the one that emits a board pack was the narrowest of the three
 
 | | |
@@ -15356,8 +15505,14 @@ nothing was already silently asserting a mock.
   unconstrained columns" when most of the schema is constrained.
 * **`intake_channel` holds 9 values the dropdown does not offer** (`PORTAL`, `HR_DIRECT`,
   `WHISTLEBLOWER_HOTLINE`, `ACCOUNTING_REVIEW`, `ANALYTICS`, `SCREENING`,
-  `TRANSACTION_MONITORING`, `INTERNAL_AUDIT`, `MANAGER_REPORT`) and the dropdown offers 6 the
-  register has never stored. Nothing counts that column, so it is display-only today —
+  `TRANSACTION_MONITORING`, `INTERNAL_AUDIT`, `MANAGER_REPORT`) and the dropdown offers **12**
+  the register has never stored. ⚠ **Corrected by [[F2-291]], which re-derived this before
+  executing it ([[F2-221]]):** this said *"the dropdown offers 6 the register has never
+  stored"*. `CHANNEL_OPTIONS` declares **16** values and the register stores **13**; they
+  intersect in **4** (`HOTLINE`, `EMAIL`, `IN_PERSON`, `WEB_FORM`, 17 of 30 rows), so the 9
+  stored-and-not-offered stands and the other side is 12. The register cell also renders the
+  raw token through `.replace(/_/g, ' ')`, so those 9 appear as unlabelled English words on
+  an Arabic-primary UI (house rule 7). Nothing counts that column, so it is display-only today —
   [[F2-180]]'s shape in both directions.
 * **`substantiated` is not stable across the lifecycle** — the figure falls when a substantiated
   case is closed, and recording the verdict durably needs a column. **Owner decision.**
