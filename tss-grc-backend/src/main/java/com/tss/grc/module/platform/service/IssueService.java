@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -167,6 +168,26 @@ public class IssueService {
      * automatically and demands {@code resolution} be set on the patch when
      * moving to RESOLVED or CLOSED.
      */
+    /**
+     * The register's declared edges, in ONE place.
+     *
+     * <p>⚠⚠ F2-304 — this was an inline {@code switch}, and its refusal is the one that shows why
+     * [[F2-303]]'s grep found five of eleven: the message sat on a <b>continuation line</b>
+     * ({@code new IllegalArgumentException(} then {@code "Illegal transition: "}), so a pattern
+     * anchored on {@code IllegalArgumentException("Illegal} could never match it. 🔑 <b>Wording was
+     * only half the reason a single-line grep under-counted; a line break is the other half.</b>
+     *
+     * <p>Terminal states are declared with an empty set so the terminal set is derivable rather than
+     * typed a second time ([[F2-196]]), and a refusal from one says {@code allowed: []}.
+     */
+    static final Map<String, Set<String>> TRANSITIONS = Map.of(
+        "OPEN",        Set.of("IN_PROGRESS", "BLOCKED", "RESOLVED", "CANCELLED"),
+        "IN_PROGRESS", Set.of("BLOCKED", "RESOLVED", "CANCELLED"),
+        "BLOCKED",     Set.of("IN_PROGRESS", "RESOLVED", "CANCELLED"),
+        "RESOLVED",    Set.of("CLOSED", "IN_PROGRESS"),
+        "CLOSED",      Set.of(),
+        "CANCELLED",   Set.of());
+
     @Transactional
     public Issue transition(Long id, String toStatus, String resolution) {
         Issue issue = get(id);
@@ -174,17 +195,8 @@ public class IssueService {
             throw new IllegalArgumentException("status must be one of " + STATUSES);
 
         String from = issue.getStatus();
-        boolean ok = switch (from) {
-            case "OPEN"        -> Set.of("IN_PROGRESS", "BLOCKED", "RESOLVED", "CANCELLED").contains(toStatus);
-            case "IN_PROGRESS" -> Set.of("BLOCKED", "RESOLVED", "CANCELLED").contains(toStatus);
-            case "BLOCKED"     -> Set.of("IN_PROGRESS", "RESOLVED", "CANCELLED").contains(toStatus);
-            case "RESOLVED"    -> Set.of("CLOSED", "IN_PROGRESS").contains(toStatus);
-            case "CLOSED"      -> false;
-            case "CANCELLED"   -> false;
-            default            -> false;
-        };
-        if (!ok) throw new IllegalArgumentException(
-            "Illegal transition: " + from + " → " + toStatus);
+        Set<String> allowed = TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(toStatus)) throw new IllegalTransitionException(from, toStatus, allowed);
 
         if ("RESOLVED".equals(toStatus) || "CLOSED".equals(toStatus)) {
             if (resolution == null || resolution.isBlank())

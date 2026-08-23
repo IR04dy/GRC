@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ServerOwnedState;
@@ -114,8 +115,11 @@ public class EthicsCaseService {
     public EthicsCase transition(Long id, String target, Map<String, Object> body) {
         EthicsCase c = require(id);
         Set<String> allowed = EthicsCaseLifecycle.allowedTargets(c.getStatus());
+        // F2-304 — `allowed` is right there and the old refusal threw it away, answering a
+        // 400 that named only the rejected move. A known token from the wrong state is a
+        // CONFLICT, and IllegalTransitionException carries the set into a 409 ProblemDetail.
         if (!allowed.contains(target))
-            throw new IllegalArgumentException("Cannot transition from " + c.getStatus() + " to " + target);
+            throw new IllegalTransitionException(c.getStatus(), target, allowed);
 
         switch (target) {
             case "TRIAGE" -> {

@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
@@ -169,9 +170,12 @@ class EthicsCaseServiceTest {
         // CLOSED is a terminal sink — no more transitions allowed
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("CLOSED")));
 
+        // F2-304 — 409, and CLOSED is a terminal sink so the refusal says `allowed: []` rather
+        // than leaving the caller to guess that nothing is available.
         assertThatThrownBy(() -> service.transition(ID, "INVESTIGATION", Map.of()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Cannot transition from CLOSED");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("CLOSED")
+            .hasMessageContaining("allowed: []");
     }
 
     @Test
@@ -179,7 +183,8 @@ class EthicsCaseServiceTest {
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("DISMISSED")));
 
         assertThatThrownBy(() -> service.transition(ID, "TRIAGE", Map.of()))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("allowed: []");
     }
 
     @Test
@@ -187,8 +192,10 @@ class EthicsCaseServiceTest {
         // Must go through TRIAGE first
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("INTAKE")));
 
+        // and here the allowed set is NOT empty, so the refusal must name the way through.
         assertThatThrownBy(() -> service.transition(ID, "INVESTIGATION", Map.of()))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("TRIAGE");
     }
 
     @Test
@@ -197,7 +204,7 @@ class EthicsCaseServiceTest {
         when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("NO_VIOLATION")));
 
         assertThatThrownBy(() -> service.transition(ID, "REMEDIATION", Map.of()))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(IllegalTransitionException.class);
     }
 
     // ─── Tenant scope ────────────────────────────────────────────────

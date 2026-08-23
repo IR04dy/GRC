@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.reference.ReferenceCodeMint;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
@@ -233,8 +234,11 @@ public class AmlAlertService {
     public AmlAlert transition(Long id, String target, Map<String, Object> body) {
         AmlAlert a = require(id);
         Set<String> allowed = TRANSITIONS.getOrDefault(a.getStatus(), Set.of());
+        // F2-304 — `allowed` is right there and the old refusal threw it away, answering a
+        // 400 that named only the rejected move. A known token from the wrong state is a
+        // CONFLICT, and IllegalTransitionException carries the set into a 409 ProblemDetail.
         if (!allowed.contains(target))
-            throw new IllegalArgumentException("Cannot transition from " + a.getStatus() + " to " + target);
+            throw new IllegalTransitionException(a.getStatus(), target, allowed);
         switch (target) {
             case "CLEARED"   -> recordDisposition(a, body, "FALSE_POSITIVE");
             case "ESCALATED" -> recordDisposition(a, body, "TRUE_POSITIVE");
