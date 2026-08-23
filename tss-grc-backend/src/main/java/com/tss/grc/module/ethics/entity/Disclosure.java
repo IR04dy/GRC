@@ -79,14 +79,34 @@ public class Disclosure {
     @Column(name = "monetary_value", precision = 18, scale = 2)
     private BigDecimal monetaryValue;
 
+    // ⚠⚠ F2-292 removed `= "SAR"`. LATENT, and closed anyway: all 18 live rows in both databases
+    // hold SAR, so what made it harmless was the DATA and not the code (F2-182). `DisclosureService`
+    // owns the default on the create path.
     @Column(name = "currency", length = 3)
-    private String currency = "SAR";
+    private String currency;
 
     @Column(name = "occurred_on")
     private LocalDate occurredOn;
 
+    // ⚠⚠ F2-292 removed `= "DRAFT"`. `DisclosureController` binds this entity on PUT, so Jackson
+    // deserialised an omitted `status` into this initialiser, `apply`'s
+    // `if (src.getStatus() != null)` was true on EVERY request, and a partial update reverted the
+    // disclosure to DRAFT. Probed live: a body carrying only `titleEn` returned 200 and stored
+    // DRAFT over APPROVED. 18 of 18 live rows in dev and prod hold a non-DRAFT status — APPROVED 11,
+    // REVIEW 4, SUBMITTED 2, REJECTED 1 — so every one of them was destroyable this way.
+    //
+    // ⚠ API-REACHABLE, NOT SCREEN-REACHABLE, and saying which is the point (F2-283). `EthicsPage`'s
+    // disclosure form declares no status field, but `reqFromDto` spreads the whole DTO into the edit
+    // modal, so the screen's PUT ECHOED the stored status and those 18 rows survived. The reachable
+    // caller is anything that sends a genuinely partial body — which is what the client's own
+    // `Partial<DisclosureDto>` type invites, and where machine callers live (F2-179). That echo is
+    // also why the fix must TOLERATE one rather than refuse the field outright (F2-214).
+    //
+    // 🔑 APPROVED, RECUSED and MITIGATED are TERMINAL in `DisclosureService.TRANSITIONS`, so the
+    // reset escaped a terminal state by a route the machine cannot see — and `DRAFT → SUBMITTED`
+    // exists, so the whole NAZAHA / SAMA review cycle became re-runnable on a decided disclosure.
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "DRAFT";
+    private String status;
 
     @Column(name = "decision", length = 40)
     private String decision;
