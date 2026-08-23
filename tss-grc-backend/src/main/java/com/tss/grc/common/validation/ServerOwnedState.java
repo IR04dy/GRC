@@ -82,13 +82,141 @@ public final class ServerOwnedState {
      */
     public static String requireInitial(String supplied, String initial, String register,
                                         String route) {
-        if (supplied == null || supplied.isBlank() || supplied.equals(initial)) {
+        return requireInitial(supplied, initial, register, route, "status");
+    }
+
+    /**
+     * F2-296 — as {@link #requireInitial(String, String, String, String)}, naming the field the
+     * caller actually sent.
+     *
+     * <p>⚠⚠ <b>The 4-argument form hard-coded {@code "status: "}, and three callers do not write a
+     * field called {@code status}</b> — {@code BcmComplianceMappingService} sets
+     * {@code complianceStatus}, {@code ContinuityStrategyService} {@code approvalStatus},
+     * {@code ControlLibraryService} {@code workflowStatus}. So a caller who sent
+     * {@code approvalStatus=APPROVED} to {@code POST /api/v1/bcm/strategies} read a 400 whose first
+     * token named {@code status}: a field that request does not carry and the DTO does not declare.
+     * F2-210's shape — a diagnostic that sends the reader somewhere wrong — in the message of the
+     * primitive built to send them somewhere right.
+     *
+     * <p>🔑 <b>That is the recorded reason the fourth copy of this rule exists.</b>
+     * {@code BcmCycleService.requireInitialState}'s own javadoc documents its {@code field}
+     * parameter as <i>"the field name, so the message names what the caller actually sent"</i> — so
+     * the divergence had a cause, written down, in the copy. A primitive that cannot express what a
+     * caller needs is a primitive callers route around (F2-190).
+     *
+     * <p>⚠ <b>Comparison is case-INSENSITIVE, and that is a widening.</b> Every column this guards
+     * collates {@code Latin1_General_100_CI_AS_SC_UTF8}, so a bare {@code equals} is not a
+     * comparison (F2-179): {@code 'planned'} was refused with a 400 while the column would have
+     * stored it verbatim. It now returns the CANONICAL {@code initial}, so the boundary normalises
+     * on write rather than refusing a spelling the database accepts — the same rule
+     * {@code ClosedVocabulary.require} follows, and the reasoning
+     * {@code DisclosureService.requireStatusIsNotBodySet} had already written down for the update
+     * half while this create half kept a bare equals (F2-215's two-of-N, across one question).
+     *
+     * @param field the request field being guarded, so the 400 names what the caller sent
+     */
+    public static String requireInitial(String supplied, String initial, String register,
+                                        String route, String field) {
+        if (supplied == null || supplied.isBlank() || same(supplied, initial)) {
             return initial;
         }
         throw new IllegalArgumentException(
-            "status: " + register + " is created in " + initial + ". '" + supplied + "' has to be "
+            field + ": " + register + " is created in " + initial + ". '" + supplied + "' has to be "
             + "reached through " + route + ", which checks the state machine and records who made "
-            + "the change. Send status=" + initial + ", or omit it.");
+            + "the change. Send " + field + "=" + initial + ", or omit it.");
+    }
+
+    /**
+     * F2-296 — the UPDATE half: a lifecycle field an update may <b>echo</b> and may not
+     * <b>change</b>.
+     *
+     * <p>This rule was written twice before it was written once. {@code DisclosureService} and
+     * {@code EthicsCaseService} each hand-rolled it — same module, same package — and
+     * {@code compliance.audit_engagements} had no copy at all, so its entity-bound {@code PUT}
+     * copied whatever status the caller sent, with <b>no vocabulary check and no direction check</b>,
+     * beside an {@code /advance} route that is explicitly forward-only. F2-294 closed that
+     * register's create and filed it as having <i>"closed its only open writers"</i>; the update was
+     * still open, which is why the third register needed the rule and not a third copy of it.
+     *
+     * <h2>Why an echo has to be tolerated</h2>
+     *
+     * <p>Every one of these screens seeds its edit modal from the row — {@code engagementToReq(e)}
+     * carries {@code status: e.status}, {@code reqFromDto(c)} spreads the whole DTO — and the form
+     * submits its whole seeded state. None of the three forms offers a status INPUT, so the value
+     * arriving is always the stored one. Refusing a present value therefore breaks the screen that
+     * works today, which is the one failure a fix must never have (F2-214); refusing a CHANGE is the
+     * whole point, because that is the unguarded transition.
+     *
+     * <p>Silently dropping a change instead would answer 200 to a caller who asked to move the
+     * record, which is worse than refusing (F2-44, F2-184's shape at a response).
+     *
+     * <h2>Case-insensitively, for the reason the two copies disagreed about</h2>
+     *
+     * <p>{@code DisclosureService} compared through a {@code normalise} helper and explained why:
+     * the column collates CI and the table carries <b>zero CHECK constraints</b>, so
+     * {@code 'approved'} is storable and a bare equals would refuse an echo differing only in case.
+     * {@code EthicsCaseService}, in the same package, used a bare {@code equals} on both
+     * {@code status} and {@code outcome}. 🔑 <b>The later slice reasoned the question out, applied
+     * the answer to its own copy, and left the sibling's — F2-215's two-of-N, where the reasoning is
+     * visibly present in the module and covers one of the two files.</b> Measured 2026-08-23: 0
+     * non-canonical values across all four guarded columns in dev and prod, so the disagreement was
+     * <b>latent</b> — a fact about today, not a property of the control (F2-182).
+     *
+     * @param supplied what arrived on the request; {@code null} or blank means "not stated"
+     * @param current  the value on the loaded row — or the register's initial state on a create,
+     *                 or {@code null} for a field a create may not state at all
+     * @param field    the request field, so the 400 names what the caller sent
+     * @param record   how to refer to the record in the message, id included where there is one
+     *                 ("Engagement 7", "a new ethics case")
+     * @param route    the endpoint that CAN perform this move, and what it records
+     * @param allowed  optional trailing sentence naming the legal targets from {@code current};
+     *                 {@code null} to omit it
+     * @throws IllegalArgumentException naming the field, both states, and the route that owns the
+     *         move
+     */
+    public static void requireUnchanged(String supplied, String current, String field,
+                                        String record, String route, String allowed) {
+        if (supplied == null || supplied.isBlank() || same(supplied, current)) {
+            return;
+        }
+        // ⚠ The wording is the two hand-rolled copies' wording, deliberately. Both are asserted by
+        // tests (EntityBoundPartialUpdateTest, EthicsCaseServiceTest) and a caller's integration may
+        // be matching on it, so extracting a shared rule must not silently reword the 400 it emits:
+        // that would be a behaviour change smuggled into a de-duplication.
+        throw new IllegalArgumentException(
+            field + ": " + record
+            + (current == null || current.isBlank()
+                ? " has no " + field + " yet and an update cannot set one"
+                : " is at " + current + " and cannot be moved to " + supplied + " by an update")
+            + ". That move goes through " + route + "."
+            + (allowed == null || allowed.isBlank() ? "" : " " + allowed));
+    }
+
+    /**
+     * Case-insensitive, blank-tolerant comparison of two stored lifecycle tokens.
+     *
+     * <p>Not {@code equalsIgnoreCase} on the raw values: a stored token can carry surrounding
+     * whitespace, and every caller here is comparing a request value against a column value.
+     */
+    private static boolean same(String a, String b) {
+        return normalise(a).equals(normalise(b));
+    }
+
+    /**
+     * F2-296 — the same comparison, exposed for the create halves that keep their own message.
+     *
+     * <p>It is public so that a caller which cannot use {@link #requireInitial} (because its 400 text
+     * is asserted, or because it refuses for a second reason as well) still does not hand-roll a
+     * {@code trim().toUpperCase()} helper. Two of those existed before this slice and they disagreed
+     * with a third bare {@code equals} — which is how a rule ends up with three implementations and
+     * no owner (F2-177).
+     */
+    public static boolean sameState(String a, String b) {
+        return same(a, b);
+    }
+
+    private static String normalise(String s) {
+        return s == null ? "" : s.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     /**
@@ -122,8 +250,15 @@ public final class ServerOwnedState {
         if (supplied == null || supplied.isBlank()) {
             return initial;
         }
-        if (creatable.contains(supplied)) {
-            return supplied;
+        // F2-296 — matched case-insensitively and returned in its CANONICAL spelling, for the same
+        // reason as requireInitial and requireUnchanged. Leaving this one case-sensitive while its
+        // two siblings normalise would ship F2-215's two-of-N inside the class whose whole subject
+        // is "one question, one answer" — and the caller's own column collates CI, so a bare
+        // contains() would refuse a spelling the database stores (F2-179).
+        for (String member : creatable) {
+            if (same(supplied, member)) {
+                return member;
+            }
         }
         throw new IllegalArgumentException(
             "status: " + register + " is created in " + new TreeSet<>(creatable) + ". '" + supplied

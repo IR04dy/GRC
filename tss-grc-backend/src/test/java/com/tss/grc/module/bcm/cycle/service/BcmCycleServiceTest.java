@@ -187,8 +187,15 @@ class BcmCycleServiceTest {
 
         assertThatThrownBy(() -> service.createCycle(body))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("created at DRAFT")
-            .hasMessageContaining("status=APPROVED")
+            // F2-296 — these assert the INFORMATION the refusal has to carry, not its phrasing.
+            // They were `"created at DRAFT"` + `"status=APPROVED"`, which were fragments of this
+            // service's own private copy of the rule; the shared primitive says the same things in
+            // its own words and adds the remedy ("Send status=DRAFT, or omit it"). A test that pins
+            // a wording makes the wording load-bearing, and the wording is the one part of a
+            // diagnostic that should be free to improve.
+            .hasMessageContaining("status")
+            .hasMessageContaining("DRAFT")
+            .hasMessageContaining("APPROVED")
             // the refusal has to say where to go instead, or it is just an obstacle
             .hasMessageContaining("/cycles/{id}/transition");
     }
@@ -200,7 +207,8 @@ class BcmCycleServiceTest {
 
         assertThatThrownBy(() -> service.createCycle(body))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("status=UNDER_REVIEW");
+            .hasMessageContaining("status")
+            .hasMessageContaining("UNDER_REVIEW");
     }
 
     @Test void cycle_createdAtDraftWhetherOrNotTheBodySaysSo() {
@@ -227,7 +235,11 @@ class BcmCycleServiceTest {
 
         assertThatThrownBy(() -> service.createGovernance(body))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("approvalStatus=ACTIVE")
+            // F2-296 — the field name is the load-bearing half here: this register's create guards
+            // `approvalStatus`, and until this slice the shared primitive hard-coded "status: " in
+            // its message, which is the recorded reason this service hand-rolled its own copy.
+            .hasMessageContaining("approvalStatus")
+            .hasMessageContaining("ACTIVE")
             .hasMessageContaining("/governance/{id}/transition");
     }
 

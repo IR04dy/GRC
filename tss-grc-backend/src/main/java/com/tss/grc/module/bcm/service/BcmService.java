@@ -113,7 +113,13 @@ public class BcmService {
         // was the only control and the update sat beside it without one (F2-219's shape).
         // An ECHO is accepted so a form that round-trips the row still works; a CHANGE is not
         // (F2-231: the refusal cannot break a request that was not performing a transition).
-        if (req.getStatus() != null && !req.getStatus().equals(existing.getStatus()))
+        // ⚠⚠ F2-296 — this was the FOURTH hand-rolled copy of that rule, and its bare `equals` is
+        // the defect DisclosureService had already reasoned out: `bcm.bcm_plans` has no CHECK on
+        // status and the column collates CI, so a stored 'approved' would make the screen's own echo
+        // read as a CHANGE and the update would be refused (F2-179). Latent — 0 non-canonical rows —
+        // but what made it harmless was the data, not the code (F2-182).
+        if (req.getStatus() != null
+                && !ServerOwnedState.sameState(req.getStatus(), existing.getStatus()))
             throw new IllegalArgumentException(
                 "A BCM plan's status is not editable here (" + existing.getStatus() + " → "
                 + req.getStatus() + "). Use submit-for-review / approve / invoke / restore, "

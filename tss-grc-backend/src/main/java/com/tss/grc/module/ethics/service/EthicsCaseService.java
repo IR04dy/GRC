@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ethics.EthicsCaseLifecycle;
 import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
@@ -360,19 +361,35 @@ public class EthicsCaseService {
         String curStatus  = isCreate ? EthicsCaseLifecycle.INITIAL : current.getStatus();
         String curOutcome = isCreate ? null     : current.getOutcome();
 
-        if (src.getStatus() != null && !src.getStatus().equals(curStatus)) {
+        // ⚠⚠ F2-296 — these two comparisons were bare `equals` while DisclosureService, in this
+        // package, compared through a `normalise` helper and carried a paragraph explaining why:
+        // both columns collate Latin1_General_100_CI_AS_SC_UTF8 and `ethics.cases` has ZERO CHECK
+        // constraints, so 'triage' is storable and a bare equals would refuse an echo differing
+        // only in case — F2-291's "an omission is indistinguishable from an echo of the wrong
+        // value", one notch over. The reasoning was reached, written down and not carried next door
+        // (F2-215). Latent: 0 non-canonical values on either column in dev or prod (2026-08-23),
+        // which is a fact about today and not a property of the control (F2-182).
+        if (!isCreate) {
+            ServerOwnedState.requireUnchanged(
+                src.getStatus(), curStatus, "status", "Case " + current.getId(),
+                "POST /api/v1/ethics/cases/" + current.getId() + "/transition, which enforces the"
+                + " chain and stamps triagedAt / investigationStarted / investigationEnded /"
+                + " closureDate",
+                "Allowed from " + curStatus + ": " + new java.util.TreeSet<>(
+                    EthicsCaseLifecycle.allowedTargets(curStatus)) + ".");
+        } else if (src.getStatus() != null && !ServerOwnedState.sameState(src.getStatus(), curStatus)) {
+            // The create half keeps its own phrasing — EthicsCaseServiceTest asserts "starts at
+            // INTAKE", and rewording a 400 inside a de-duplication is a behaviour change nobody
+            // asked for. Only the comparison is shared.
             throw new IllegalArgumentException(
-                (isCreate
-                    ? "A new ethics case starts at INTAKE (received: " + src.getStatus() + ")."
-                    : "Case " + current.getId() + " is at " + curStatus + " and cannot be moved to "
-                      + src.getStatus() + " by an update.")
-                + " Status changes go through POST /api/v1/ethics/cases/"
-                + (isCreate ? "{id}" : current.getId()) + "/transition, which enforces the chain and"
-                + " stamps triagedAt / investigationStarted / investigationEnded / closureDate."
+                "A new ethics case starts at INTAKE (received: " + src.getStatus() + ")."
+                + " Status changes go through POST /api/v1/ethics/cases/{id}/transition, which"
+                + " enforces the chain and stamps triagedAt / investigationStarted /"
+                + " investigationEnded / closureDate."
                 + " Allowed from " + curStatus + ": " + new java.util.TreeSet<>(
                     EthicsCaseLifecycle.allowedTargets(curStatus)) + ".");
         }
-        if (src.getOutcome() != null && !src.getOutcome().equals(curOutcome)) {
+        if (src.getOutcome() != null && !ServerOwnedState.sameState(src.getOutcome(), curOutcome)) {
             throw new IllegalArgumentException(
                 (isCreate ? "A new ethics case has no outcome" : "The outcome of case "
                     + current.getId() + " is not editable")

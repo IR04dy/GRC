@@ -80,7 +80,7 @@ public class BcmComplianceMappingService {
         // succeeds today starts failing. All 412 rows in dev and prod are NOT_ASSESSED.
         body.setComplianceStatus(ServerOwnedState.requireInitial(
             body.getComplianceStatus(), INITIAL_COMPLIANCE_STATUS, "a BCM compliance mapping",
-            "POST /api/v1/bcm/compliance/{id}/assess"));
+            "POST /api/v1/bcm/compliance/{id}/assess", "complianceStatus"));
         // assessCompliance()'s stamps. A mapping created carrying an assessment date and an
         // assessor's name is a record of an assessment that was never made.
         body.setAssessedAt(null);

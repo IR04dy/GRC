@@ -59,12 +59,16 @@ public class AuditEngagementService {
         AuditEngagement e = new AuditEngagement();
         e.setOrganisationId(TenantContext.getCurrentTenant());
         apply(e, req);
-        // ⚠⚠ F2-294 — this default was DEAD CODE: `apply` copies the request's status and
+        // ⚠⚠ F2-294 — this default was DEAD CODE: `apply` copied the request's status and
         // the entity initialised it to "PLANNED", so `e.getStatus()` was never null. The
         // consequence was not only that the default never ran — it is that `apply` copying
         // a status the caller CHOSE let a create land in any state at all, skipping
         // `POST /{id}/advance` which is the declared route for that move (F2-292's
         // dead-default finding, same shape, different register).
+        // ⚙ F2-296 moved the status out of `apply` entirely, so this line is the ONLY writer on the
+        // create path and `update`'s guard is the only writer on the update path. While `apply` still
+        // copied it, this call read `req.getStatus()` and the line above it wrote the same value —
+        // two writers of one field, where the second happened to win.
         e.setStatus(ServerOwnedState.requireInitial(
             req.getStatus(), INITIAL_STATUS, "an audit engagement",
             "POST /api/v1/compliance/audit-engagements/{id}/advance"));
@@ -75,11 +79,41 @@ public class AuditEngagementService {
         return repo.save(e);
     }
 
+    /**
+     * F2-296 — an update may ECHO the status and may not CHANGE it.
+     *
+     * <p>{@code CompliancePage}'s edit modal has <b>no status input</b> among its fourteen fields,
+     * and {@code engagementToReq(e)} carries {@code status: e.status}, so the screen's PUT always
+     * echoes the stored value. Refusing a present value would break the form that works today
+     * (F2-214); refusing a CHANGE is the point, because {@link #advance} is forward-only and this
+     * route was the register's only reverse edge.
+     *
+     * <p>Probed live as {@code compliance} — the same {@code COMPLIANCE:WRITE} guards the create, the
+     * PUT and {@code /advance} alike, so there was no privilege escalation: the object-level machine
+     * was the only control and this route sat beside it without one (F2-219's shape).
+     */
     @Transactional
     public AuditEngagement update(Long id, AuditEngagement req) {
         AuditEngagement e = require(id);
+        ServerOwnedState.requireUnchanged(
+            req.getStatus(), e.getStatus(), "status", "Engagement " + id,
+            "POST /api/v1/compliance/audit-engagements/" + id + "/advance, which walks the ladder"
+            + " forward only and stamps the stage date",
+            "Allowed from " + e.getStatus() + ": " + forwardTargets(e.getStatus()) + ".");
         apply(e, req);
         return repo.save(e);
+    }
+
+    /**
+     * The states {@link #advance} would accept from {@code current} — everything strictly after it
+     * in {@link #STATUS_ORDER}, because that method refuses {@code to <= from}.
+     *
+     * <p>Derived from the ladder rather than typed, so a diagnostic cannot promise a move the
+     * machine would refuse (F2-196's rule: never restate a vocabulary a machine already declares).
+     */
+    private static List<String> forwardTargets(String current) {
+        int from = STATUS_ORDER.indexOf(current);
+        return from < 0 ? List.of() : STATUS_ORDER.subList(from + 1, STATUS_ORDER.size());
     }
 
     @Transactional
@@ -148,7 +182,14 @@ public class AuditEngagementService {
         if (src.getClosureDate()          != null) target.setClosureDate(src.getClosureDate());
         if (src.getNextFollowupDate()     != null) target.setNextFollowupDate(src.getNextFollowupDate());
         if (src.getScopeSummary()         != null) target.setScopeSummary(src.getScopeSummary());
-        if (src.getStatus()               != null) target.setStatus(src.getStatus());
+        // ⚠⚠ F2-296 — `status` is NOT copied here. It belongs to `advance` and `scheduleFollowUp`.
+        // F2-294 removed the entity's `= "PLANNED"` initialiser, which stopped a PARTIAL body
+        // resetting the engagement — and left this line, so a body that STATED a status still
+        // performed an arbitrary transition, with no vocabulary check and no direction check, past
+        // an `advance` that is explicitly forward-only. That is why F2-294's filing saying this
+        // slice "closed its only open writers" was wrong: the create was closed and the update was
+        // not, and the CHECK it recommended on that basis would have been added over an open writer
+        // (F2-183). `create` and `update` each guard it now.
         if (src.getFindingsCount()        != null) target.setFindingsCount(src.getFindingsCount());
     }
 
