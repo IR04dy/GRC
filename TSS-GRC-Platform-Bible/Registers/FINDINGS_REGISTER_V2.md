@@ -15219,6 +15219,84 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-306 — a reference the caller can RENAME, and a census scoped to creates could not see it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — two governance references renameable after the fact, and a **42-site population nobody had measured** because the existing census is scoped to create paths. |
+| **Registers** | `ethics.cases` (`case_code`), `ethics.disclosures` (`disclosure_code`) |
+| **Standards** | NAZAHA / Saudi Whistleblower Protection Law (the case code an investigation cites); SAMA conflict-of-interest disclosure |
+| **Found by** | [[F2-302]]'s filing that `gapCode` is caller-writable on create **and** update, generalised |
+| **Verification** | suite **4690 → 4697/0/0**; the Java gate and the throwaway measurement agree at 42 |
+
+### The population was outside the instrument by construction
+
+`ClientSuppliedReferenceRatchetTest`'s business-reference leg is scoped to `CREATE_ISH`, a verb list
+where **`update` is deliberately absent** because that leg's claim is *"a reference is chosen when a
+record is born"*. 🔑 **So the rename question was never in its population — and renaming is arguably
+the sharper harm: the record already exists, an auditor may already cite the code, and the citation
+breaks silently.**
+
+### Measured: 42 update-path sites across 34 services, in three kinds
+
+Only **one** kind is a defect, which is why the census ships with no per-site verdicts ([[F2-188]]):
+
+1. **The record's own identifier** — `setEngagementCode`, `setChangeCode`, `setCaseCode`,
+   `setDisclosureCode`, `setGapCode`, `setPlanCode`, `setReportCode`. Renaming one breaks every
+   citation of it.
+2. **A pointer to another record** — `setEvidenceRef` (nine sites), `setClauseRef`, `setSourceRef`,
+   `setContractRef`. Correcting which clause a finding maps to is **legitimate**, and refusing it
+   would fail on working usage ([[F2-214]]). Whether the pointer *resolves* is a different question
+   ([[F2-242]], [[F2-252]]).
+3. **An outside authority's reference** — `setSamaLicenceRef`, `setSamaNonObjectionRef`,
+   `setBoardResolutionReference`, `setFilingArtifactReference`. Caller-supplied is **correct**: a
+   reference only an authority can issue is received and recorded, or absent ([[F2-209]],
+   [[F2-269]]), and the server may not mint it either.
+
+### The two closed, and why they were closeable together
+
+Both are in `ethics` and both are reached through an `apply(target, src)` helper **shared by create
+and update**, with **nothing minting either code** — so a caller named it at birth and could rename
+it afterwards. [[F2-292]] had already filed the disclosure one.
+
+### The primitive gained an expression rather than the callers routing around it
+
+`requireUnchanged` is the right mechanism and the wrong sentence. Its wording is lifecycle-flavoured
+— *"is at X and cannot be moved to Y by an update. That move goes through ⟨route⟩"* — and is
+deliberately frozen, because its own comment records that two tests assert it and a caller's
+integration may match on it. For a reference every clause is wrong: a code is not *"moved to"*
+another code, and there is **no route**, because the reference is fixed once assigned. 🔑 **Naming a
+route that does not exist is [[F2-302]]'s defect, in this same primitive** — so
+`requireImmutableReference` was added rather than hand-rolled at two call sites ([[F2-190]]).
+
+Settable while absent, immutable once set: that shape covers the create and the update in one place
+with no flag threaded through the shared helper, and is **stronger** than an update-only guard
+because it also stops a second write on any other path. An echo is accepted case-insensitively,
+because the ethics edit form round-trips the whole record and refusing that would break the screen
+that works today ([[F2-296]], [[F2-231]]).
+
+### DisclosureService had no test class at all
+
+A path with no test is not a path somebody decided was safe ([[F2-248]]).
+`ReferenceRenameContractTest` covers the rule in both directions, including that the refusal must
+**not** name a route.
+
+### One measurement error of mine
+
+Subtracting guarded sites **per method** reported **39** where the answer is **42**. Both `apply`
+helpers also write `setClauseRef` and `setRegulatorReference` — kinds 2 and 3, which must stay
+counted — so the subtraction has to be **per field**. 🔑 **An over-subtraction reads exactly like
+progress.**
+
+### Filed
+
+* The **40 remaining sites**, with the three-kind framework but no per-site verdicts. `setGapCode`
+  ([[F2-302]]'s filing) and `setEngagementCode` are the readiest kind-1 members — the latter matters
+  more than it looks, because [[F2-203]] measured **five disjoint engagement code spaces** already.
+* Nothing mints `case_code` or `disclosure_code` at all, so both are still **caller-named at
+  birth** — [[F2-172]](d)'s question, and a separate slice from the rename.
+
 ## F2-305 — three lifecycle diagrams documented the happy path while the machines allowed more
 
 | | |
