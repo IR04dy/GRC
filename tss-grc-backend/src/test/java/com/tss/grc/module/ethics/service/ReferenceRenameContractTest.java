@@ -178,4 +178,85 @@ class ReferenceRenameContractTest {
             %s""".formatted(String.join("\n            ", missing)))
             .isEmpty();
     }
+
+    /**
+     * F2-309 — a reference this platform makes IMMUTABLE must also be UNIQUE per tenant.
+     *
+     * <h4>Why the pair matters more than either half</h4>
+     *
+     * Asking [[F2-267]]'s question of F2-306..F2-308's result gave the <b>opposite</b> answer to the
+     * one F2-267 got: there 9 of 10 candidates already carried a unique index, so caller-naming was a
+     * naming question rather than a defect. Here <b>8 of 9 had none at all</b>. And that combination
+     * is worse than either half:
+     *
+     * <pre>   immutable + not unique  =  a duplicate is PERMANENT</pre>
+     *
+     * 🔑 <b>Before F2-306 a collision could be renamed away; after it, the guard that protects the
+     * reference is exactly what prevents the repair.</b> V396 adds the nine indexes — tenant-scoped,
+     * because a globally-unique code index would let one tenant's reference block another's, and
+     * filtered on the eight nullable columns, because SQL Server treats NULLs as equal for
+     * uniqueness so a plain index would permit at most ONE code-less row per tenant.
+     *
+     * <p>⚙ This is the schema-side view of the same set {@link #everyClosedSiteStillCallsThePrimitive
+     * WithItsOwnField} holds in Java terms. Neither derives from the other — a Java field name does
+     * not give you a column name — so the two are linked by ARITHMETIC instead: the number of
+     * declared indexes must equal the number of guarded sites plus the one register that already had
+     * uniqueness before this work ({@code compliance.policies}, {@code IX_policy_code_org}). Add a
+     * guarded site without an index and the counts diverge.
+     */
+    @Test
+    void everyImmutableReferenceIsAlsoUniquePerTenant() throws java.io.IOException {
+        java.nio.file.Path dir = java.nio.file.Paths.get(
+            "src", "main", "resources", "db", "migration", "sqlserver").toAbsolutePath().normalize();
+        assertThat(java.nio.file.Files.isDirectory(dir)).as("migration folder at %s", dir).isTrue();
+
+        // (schema.table, code column) — the registers whose reference F2-306..F2-308 froze.
+        java.util.Map<String, String> frozen = new java.util.LinkedHashMap<>();
+        frozen.put("ethics.cases", "case_code");
+        frozen.put("ethics.disclosures", "disclosure_code");
+        frozen.put("ndi.gap", "gap_code");
+        frozen.put("ndi.corrective_action", "action_code");
+        frozen.put("compliance.audit_engagements", "engagement_code");
+        frozen.put("change_mgmt.change_requests", "change_code");
+        frozen.put("ndi.improvement_plan", "plan_code");
+        frozen.put("ndi.report_definition", "report_code");
+        frozen.put("compliance.controls", "code");
+
+        StringBuilder corpus = new StringBuilder();
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.list(dir)) {
+            for (java.nio.file.Path p : walk.filter(f -> f.toString().endsWith(".sql")).toList()) {
+                corpus.append(java.nio.file.Files.readString(p)).append('\n');
+            }
+        }
+        String sql = corpus.toString();
+
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, String> e : frozen.entrySet()) {
+            // a UNIQUE index on that table, keyed organisation_id first, covering the code column
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "CREATE\\s+UNIQUE\\s+INDEX\\s+\\w+\\s+ON\\s+" + java.util.regex.Pattern.quote(e.getKey())
+                + "\\s*\\(\\s*organisation_id\\s*,\\s*" + java.util.regex.Pattern.quote(e.getValue())
+                + "\\s*\\)", java.util.regex.Pattern.CASE_INSENSITIVE);
+            if (!p.matcher(sql).find()) {
+                missing.add(e.getKey() + " (" + e.getValue() + ")");
+            }
+        }
+
+        assertThat(missing).as("""
+            A reference this platform makes IMMUTABLE has no tenant-scoped unique index.
+
+            immutable + not unique = a duplicate is PERMANENT: before the reference was frozen a             collision could be renamed away, and afterwards the guard protecting it is exactly what             prevents the repair.
+
+            Declare `CREATE UNIQUE INDEX ... ON <schema>.<table> (organisation_id, <code>)` —             tenant-scoped, because a global index would let one tenant's reference block another's,             and filtered on `WHERE <code> IS NOT NULL` if the column is nullable, because SQL Server             treats NULLs as equal for uniqueness.
+
+            %s""".formatted(missing))
+            .isEmpty();
+
+        // Arithmetic linking this schema-side view to the Java-side site map: nine frozen registers
+        // declared here, and the site map holds ten sites in nine files (NdiGapService holds two).
+        assertThat(frozen).as(
+            "The frozen-register list and the guarded-site map must move together. If a site was "
+            + "added or removed, one of these two lists is now stale.")
+            .hasSize(9);
+    }
 }
