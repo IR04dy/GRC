@@ -15219,6 +15219,156 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-290 — three artefacts answered "is this case still open?", and the one that emits a board pack was the narrowest of the three
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`d7362902`) |
+| **Severity** | P2 — the misconduct / whistleblowing caseload was reported as **10 open where 26 are open**, on the analytics panel and in the board-pack PDF and PPTX. Live, not latent, and identical in dev and prod |
+| **Register** | `ethics.cases` (30 live rows, byte-identical in dev and prod) |
+| **Standards** | NAZAHA, the Saudi Whistleblower Protection Law, SAMA AML/CFT for the financial-crime categories; the figure is rendered into the board pack a board reads |
+| **Found by** | executing [[F2-289]]'s filing of *"the rest of the `ethics` schema's unconstrained columns"* and re-deriving it first ([[F2-221]]) — which **refuted the filing's framing** and pointed one level up, at the readers |
+| **Verification** | live probe **11/11 pre-fix · 13/13 post-fix** as `auditor` and `compliance`, never `admin`; gate control **6 of 11 legs discriminate**, the other 5 named as pins and measurements ([[F2-225]]); mutation harness **12 killed / 0 survived / 0 anchor-miss**, each by the leg named for it; backend **4567 → 4583 / 0 / 0**, frontend 818/818, `tsc` clean |
+
+### The defect
+
+Three artefacts answered whether an ethics case is still open. No two agreed. Measured
+2026-08-23, identically in dev and the deployed database — 30 live cases, 4 terminal, so **26
+open**:
+
+| reader | predicate | answer |
+|---|---|---|
+| `EthicsPage` (the client) | complement of `{CLOSED, DISMISSED}` | **26** ← the only correct one |
+| `EthicsCaseService.analytics()` | inclusion list of **five** open states | **10** |
+| `BoardPackAggregateService.ethics()` | inclusion list of **three** | **10** ← **emits a document** |
+
+The third is printed by `BoardPackService` into the board-pack **PDF** and by
+`BoardPackPptxService` into the **PPTX**, in both languages, as `"Cases: 30 · Open 10 · …"`. So the
+register screen showed 26 open beside a board pack reporting 10, for the same tenant, at the same
+moment.
+
+The two server answers coincide **only because `REMEDIATION` and `ESCALATED` hold no rows today**,
+so their disagreement with each other is latent while the understatement is live. Say which is
+which ([[F2-283]]).
+
+### 🔑🔑 The client was right and the server was wrong, twice
+
+[[F2-205]]'s question — *"how many things read this status, and **which of them is the server?**"* —
+with the answer **inverted**. There the server was authoritative and five clients had drifted;
+here the two server readers were the drifted ones, and the narrowest of the three is the one whose
+figure **leaves the platform**. 🔑 **"Which of them is the server?" is a question about
+authority, not about correctness — and this register is the counter-example that stops the two being
+conflated.**
+
+### 🔑 Why an inclusion list is the defect and not a style
+
+`ethics.cases` has **no CHECK constraint** on `status`, and it holds `INVESTIGATING` (8 rows) and
+`TRIAGED` (3) — near-synonyms of two declared states — so **11 of 30 rows were invisible to every
+bucket**. An inclusion list silently drops every token nobody remembered; the complement of a
+declared terminal set counts it as open, so it is **chased rather than excused**, which for a
+misconduct caseload is the safe direction: under-reporting the open caseload is the finding an
+examiner writes up. [[F2-196]]'s rule, unapplied at three sites in a module [[F2-289]] had just
+worked in.
+
+Same shape one column over: `byCategory` looped a 13-token list while the register holds 17
+categories, so `AML` (2), `POLICY_BREACH`, `GIFTS_HOSPITALITY`, `ABUSE_OF_OFFICE` and
+`DATA_PRIVACY` — **6 of 30 rows** — were in no bucket and in no dropdown.
+
+### ⚠⚠ The derivation had to read edge-emptiness, not key-absence
+
+`EthicsCaseLifecycle.TERMINAL` is derived from `ALLOWED` as *the states with no outgoing edges*.
+[[F2-196]]'s `DsrCaseLifecycle` derives it as *mentioned minus keys*, which is correct **there**
+because that machine omits its terminal states from the map entirely. This machine gives them an
+explicit empty entry — so **the same reading returns an EMPTY terminal set here, and an empty
+terminal set makes every case open and `closed` permanently zero**.
+
+🔑 **Copying a derivation copies its convention.** The wrong reading fails in the reassuring
+direction (a bigger "open" number on a register where bigger was the correction), so
+`theDerivationReadsEdgeEmptinessNotKeyAbsence` asserts the counter-factual explicitly: the
+key-absence answer **must** be empty on this machine, and edge-emptiness **must** still find both
+states. A negative control that does not actually break the thing proves nothing ([[F2-197]]).
+
+### ⚠ Where the predicate lives — and the two recorded rules that pull against each other
+
+The obvious placement is `EthicsCaseLifecycle` imported by `module/reporting`, which is an ADR-002
+inversion `ModuleGraphRatchetTest` refuses. [[F2-196]] established the answer: put it behind a
+**repository default method** the out-of-module caller already imports, because a caller that
+cannot name a status cannot invent its own idea of open. But [[F2-282]] established the opposite
+hazard — **a Mockito mock does not execute default methods**, so a decision on one is a decision
+every mocking test silently loses.
+
+🔑 **The reconciliation is the split, and it is worth stating because the two rules read as
+contradictory:** the **decision** (which states are terminal) is a pure static, so it is mock-immune
+and unit-tested; the **query** (count the rows not in that set) is the repository default, because
+it must touch the database and holds no judgement — it names the constant and delegates. Checked
+rather than assumed: no existing test mocks `EthicsCaseRepository` and calls `analytics()`, so
+nothing was already silently asserting a mock.
+
+### ⚠ What was deliberately NOT changed
+
+* **`substantiated`** stays a two-token status sum. That is a narrower question, not a restatement
+  ([[F2-250]]) — a case in REMEDIATION is still a substantiated one. `outcome` was checked as a
+  durable alternative and **refuted**: it holds the *remediation* result (`POLICY_UPDATE`, 1 of 30
+  rows), not a verdict, so there is no column to count instead and inventing one to make the figure
+  stable would be [[F2-196]]'s own defect. Consequence stated rather than glossed: the count falls
+  when a substantiated case is closed.
+* **The client's tile**, which was the correct reader. It is now **pinned**, because a later slice
+  reconciling three figures would align it *downward* — the two server readers were the lower ones.
+* **The board pack's `amlSuspicion`** stays `AML_SUSPICION` only, reporting 1 where 3 rows are
+  AML-categorised. Treating `AML` as a synonym is a semantic judgement about a customer's register.
+* **No migration.** Adding a CHECK to either column would refuse the 11 + 6 rows that already
+  exist ([[F2-183]]), and one admitting both spellings would *bless* the synonyms.
+* **The 11 stuck rows stay stuck**, and `EthicsCaseLifecycleTest` asserts it, so nobody reads this
+  disclosure as having closed [[F2-221]]'s finding. They are now **counted and surfaced**, which is
+  what lets an owner see the population the decision is about.
+
+### ⚠ My own errors, all caught by running something
+
+* **My harness reported "THE CONTROL DID NOT FIRE — the gate is vacuous" while six legs were
+  failing.** The failure-name regex was guessed rather than read off surefire's real output, and the
+  harness's own message then accused the gate. 🔑 **A harness that cannot read its own output reads
+  exactly like a broken gate** ([[F2-257]]'s shape, in the instrument rather than the gate). Dump
+  the log and derive the names from it.
+* **My revert guard fired on correct code**: it asserted `countOpen` was absent from master's
+  `BoardPackAggregateService`, and master contains `findingRepo.countOpenByOrganisationId` — an
+  audit-findings method for a different register. 🔑 **A guard whose token also occurs innocently
+  rejects the fix and leaves the defect** ([[F2-267]], verbatim, in a revert script).
+* **The `mvn` launcher path**: guessed as `C:\Sources\…` where it is on **D:**. Recorded by
+  [[F2-288]] and repeated anyway.
+* **The escape-collapse landmine on an inline `py -c` inside Bash** — a Windows path's backslashes
+  collapsed into a `SyntaxError`. The rule is recorded and names heredocs; **it applies to any inline
+  script carrying escapes**, and the remedy is the Write tool.
+* **Both new files landed LF in a CRLF tree** and git warned it would convert them, which would mean
+  the bytes the gate was verified against are not the bytes that ship. Normalised before merge;
+  fifth instance of the line-ending trap in this lineage.
+
+### ⚙ Filed
+
+* **The 11 `INVESTIGATING` / `TRIAGED` rows and the 6 out-of-taxonomy categories** — near-synonyms
+  of declared values, so collapsing them rewrites live rows in two real databases. **Owner
+  decision** ([[F2-183]]/[[F2-196]]/[[F2-203]]). Now measured and disclosed on screen rather than
+  inferred from a total that does not add up.
+* **`ethics.cases` has zero CHECK constraints** over 8 stored statuses, 17 categories and 13 intake
+  channels — and the schema is otherwise well constrained (**17 CHECKs**, including a
+  CHECK-constrained `status` vocabulary on `whistleblower_case`, *the same concept*). So this is
+  [[F2-196]]'s two-registers-for-one-concept shape with the constrained half being the one the UI
+  does **not** drive, and [[F2-289]]'s filing understated it by saying "the rest of the schema's
+  unconstrained columns" when most of the schema is constrained.
+* **`intake_channel` holds 9 values the dropdown does not offer** (`PORTAL`, `HR_DIRECT`,
+  `WHISTLEBLOWER_HOTLINE`, `ACCOUNTING_REVIEW`, `ANALYTICS`, `SCREENING`,
+  `TRANSACTION_MONITORING`, `INTERNAL_AUDIT`, `MANAGER_REPORT`) and the dropdown offers 6 the
+  register has never stored. Nothing counts that column, so it is display-only today —
+  [[F2-180]]'s shape in both directions.
+* **`substantiated` is not stable across the lifecycle** — the figure falls when a substantiated
+  case is closed, and recording the verdict durably needs a column. **Owner decision.**
+* **The board pack's `amlSuspicion` / `briberyOrKickback` / `retaliation`** are three more
+  category-token selections; they are legitimate narrower questions, and the AML one under-reports
+  by two thirds for the synonym reason above.
+* `mockEthics.ts`'s `ETHICS_ANALYTICS` corpus buckets `OUTCOME`, `BRIBERY_KICKBACK`,
+  `HARASSMENT_DISCRIMINATION` and `IP_DATA_THEFT` — **tokens the server can never produce**. A
+  `Record<string, number>` admits any key, so [[F2-211]]'s corpus gate cannot see it by
+  construction.
+
 ## F2-289 — the decider was recorded on TWO of one switch's THREE decision branches, and the comment explaining it was duplicated in the two that had it
 
 | | |
