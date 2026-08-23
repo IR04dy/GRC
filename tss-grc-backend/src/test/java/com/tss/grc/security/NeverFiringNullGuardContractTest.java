@@ -967,6 +967,12 @@ class NeverFiringNullGuardContractTest {
             // notice under ddl-auto=none. Both creates own it through ServerOwnedState.requireInitial.
             new Moved("BcpPlan", "status", "setStatus", "BcpPlanService", "create"),
             new Moved("BcmPlan", "status", "setStatus", "BcmService", "createPlan"),
+            // F2-300 — the sixth. Unlike BcpPlan/BcmPlan this one was a RESET, not a refusal:
+            // updateExercise wrote the status unconditionally, so an omitted status arrived as the
+            // entity's "SCHEDULED" and silently moved a COMPLETED exercise back. The create owns
+            // the default as a DEFAULT rather than through requireInitial, because recording an
+            // exercise run offline — created straight into COMPLETED with its date — is legitimate.
+            new Moved("BcmExercise", "status", "setStatus", "BcmService", "createExercise"),
             new Moved("NdiFrameworkItem", "mandatory", "setMandatory", "NdiFrameworkItemService", "create"),
             new Moved("NdiFrameworkItem", "priority", "setPriority", "NdiFrameworkItemService", "create"),
             new Moved("NdiFrameworkItem", "status", "setStatus", "NdiFrameworkItemService", "create"),

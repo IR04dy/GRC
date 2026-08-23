@@ -298,6 +298,133 @@ class BcmServiceTest {
         verify(planRepo, never()).deleteById(any());
     }
 
+    // ─── F2-300: an exercise may not be COMPLETED without an execution date ──
+    //
+    // completeExercise owns the pair (status = COMPLETED, executedDate = today). The
+    // entity-bound create and the entity-bound full-replace PUT wrote both fields
+    // independently and unconditionally, so either could produce a COMPLETED exercise
+    // with no execution date — and the date is the evidence an ISO 22301 / NCEMA
+    // reviewer reads to accept that the exercise took place. Screen-reachable: the BCM
+    // page's status select offers COMPLETED with executedDate as a separate optional field.
+
+    @Test
+    void createExercise_completedWithNoExecutionDateIsRefusedAndNamesTheCompleteRoute() {
+        BcmExercise req = new BcmExercise();
+        req.setExerciseNameEn("Tabletop");
+        req.setStatus("COMPLETED");
+
+        assertThatThrownBy(() -> service.createExercise(req))
+            .isInstanceOf(IllegalArgumentException.class)
+            // The information the refusal must carry, never its phrasing (F2-296).
+            .hasMessageContaining("executedDate")
+            .hasMessageContaining("COMPLETED")
+            .hasMessageContaining("/complete");
+    }
+
+    @Test
+    void createExercise_completedWithAnExecutionDateIsAccepted() {
+        when(exerciseRepo.save(any(BcmExercise.class))).thenAnswer(inv -> inv.getArgument(0));
+        BcmExercise req = new BcmExercise();
+        req.setExerciseNameEn("Tabletop");
+        req.setStatus("COMPLETED");
+        req.setExecutedDate(LocalDate.of(2026, 5, 1));
+
+        assertThat(service.createExercise(req).getExecutedDate())
+            .as("supplying the date is a legitimate way to record an exercise run offline")
+            .isEqualTo(LocalDate.of(2026, 5, 1));
+    }
+
+    @Test
+    void createExercise_aNonCompletedStatusNeedsNoExecutionDate() {
+        // The leg that stops this becoming a gate that fails on correct usage (F2-214):
+        // SCHEDULED/PLANNED are ordinary data entry and this register has no state machine.
+        when(exerciseRepo.save(any(BcmExercise.class))).thenAnswer(inv -> inv.getArgument(0));
+        BcmExercise req = new BcmExercise();
+        req.setExerciseNameEn("Planned walkthrough");
+        req.setStatus("SCHEDULED");
+
+        assertThat(service.createExercise(req).getStatus()).isEqualTo("SCHEDULED");
+    }
+
+    @Test
+    void updateExercise_settingCompletedWithNoExecutionDateIsRefused() {
+        when(exerciseRepo.findById(ID)).thenReturn(Optional.of(exercise("SCHEDULED")));
+        BcmExercise patch = new BcmExercise();
+        patch.setExerciseNameEn("Tabletop");
+        patch.setStatus("COMPLETED");
+
+        assertThatThrownBy(() -> service.updateExercise(ID, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("executedDate")
+            .hasMessageContaining("/complete");
+    }
+
+    @Test
+    void updateExercise_aPartialBodyPreservesBothHalvesOfACompletedExercise() {
+        // ⚠ My first draft of this leg asserted a 400 here, because executedDate was written
+        // unconditionally and a partial body nulled it. That would have been a gate failing on
+        // CORRECT usage — renaming a completed exercise is legitimate — which is exactly the trap
+        // F2-297 and F2-298 were about. Both fields are null-guarded now, so "omitted" means
+        // "leave alone" and the pair moves together.
+        BcmExercise stored = exercise("COMPLETED");
+        stored.setExecutedDate(LocalDate.of(2026, 3, 9));
+        when(exerciseRepo.findById(ID)).thenReturn(Optional.of(stored));
+        when(exerciseRepo.save(any(BcmExercise.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BcmExercise patch = new BcmExercise();
+        patch.setExerciseNameEn("Renamed");
+        // status and executedDate deliberately omitted
+
+        BcmExercise saved = service.updateExercise(ID, patch);
+        assertThat(saved.getExerciseNameEn()).isEqualTo("Renamed");
+        assertThat(saved.getStatus())
+            .as("an omitted status must not reset a COMPLETED exercise — the entity's "
+                + "'SCHEDULED' initialiser used to make that silent (F2-238's reset shape)")
+            .isEqualTo("COMPLETED");
+        assertThat(saved.getExecutedDate())
+            .as("and an omitted execution date must not clear the evidence the exercise ran")
+            .isEqualTo(LocalDate.of(2026, 3, 9));
+    }
+
+    @Test
+    void updateExercise_theEntityDoesNotDefaultStatusSoAnOmittedOneIsGenuinelyAbsent() {
+        assertThat(new BcmExercise().getStatus())
+            .as("BcmExercise#status must NOT be initialised — createExercise owns the default, and "
+                + "an initialiser makes an omitted status indistinguishable from a caller naming "
+                + "SCHEDULED, which is what silently reset completed exercises")
+            .isNull();
+    }
+
+    @Test
+    void updateExercise_keepingBothHalvesIsAccepted() {
+        BcmExercise stored = exercise("COMPLETED");
+        stored.setExecutedDate(LocalDate.of(2026, 3, 9));
+        when(exerciseRepo.findById(ID)).thenReturn(Optional.of(stored));
+        when(exerciseRepo.save(any(BcmExercise.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BcmExercise patch = new BcmExercise();
+        patch.setExerciseNameEn("Renamed");
+        patch.setStatus("COMPLETED");
+        patch.setExecutedDate(LocalDate.of(2026, 3, 9));
+
+        BcmExercise saved = service.updateExercise(ID, patch);
+        assertThat(saved.getExerciseNameEn()).isEqualTo("Renamed");
+        assertThat(saved.getExecutedDate()).isEqualTo(LocalDate.of(2026, 3, 9));
+    }
+
+    @Test
+    void updateExercise_theGuardIsCaseInsensitiveOnTheStatusToken() {
+        // bcm.bcm_exercises has no CHECK on status and the column collates case-insensitively,
+        // so 'completed' IS the completed state as far as the database is concerned (F2-179).
+        when(exerciseRepo.findById(ID)).thenReturn(Optional.of(exercise("SCHEDULED")));
+        BcmExercise patch = new BcmExercise();
+        patch.setStatus("completed");
+
+        assertThatThrownBy(() -> service.updateExercise(ID, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("executedDate");
+    }
+
     // ─── Exercise programme ──────────────────────────────────────────
 
     @Test
