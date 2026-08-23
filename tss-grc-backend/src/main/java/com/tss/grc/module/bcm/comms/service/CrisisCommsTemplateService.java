@@ -227,29 +227,34 @@ public class CrisisCommsTemplateService {
      *   RETIRED           → IN_REVIEW
      * </pre>
      */
-    static void guardTransition(String from, String to) {
-        boolean ok = switch (Objects.requireNonNullElse(from, "")) {
-            case "DRAFT"             -> "IN_REVIEW".equals(to);
-            case "IN_REVIEW"         -> Set.of("APPROVED_BY_LEGAL", "DRAFT").contains(to);
-            case "APPROVED_BY_LEGAL" -> Set.of("APPROVED_BY_CISO", "IN_REVIEW").contains(to);
-            case "APPROVED_BY_CISO"  -> Set.of("RETIRED", "IN_REVIEW").contains(to);
-            case "RETIRED"           -> "IN_REVIEW".equals(to);
-            default                  -> false;
-        };
-        if (!ok) {
-            throw new IllegalTransitionException(from, to, allowedFrom(from));
-        }
-    }
+    /**
+     * The register's declared edges, in ONE place.
+     *
+     * <p>⚠⚠ F2-303 — this machine was written THREE times in this file: the javadoc {@code <pre>}
+     * block above, {@code guardTransition}'s {@code switch}, and a second {@code switch} in an
+     * {@code allowedFrom} helper that existed only so the refusal could name the legal targets.
+     * They agreed, and <b>nobody was maintaining that</b> ([[F2-177]]) — and the two switches were
+     * written in different FORMS ({@code "IN_REVIEW".equals(to)} against
+     * {@code Set.of("IN_REVIEW")}), which is what makes a drift between them hard to see in a diff.
+     *
+     * <p>🔑 This file was the one member of its family whose refusal already named the moves it
+     * would accept, and it paid for that with a duplicate. The other four passed nothing, so the
+     * fix and the duplication had the same cause: <b>an inline switch cannot be asked what it
+     * allows</b>.
+     */
+    static final Map<String, Set<String>> TRANSITIONS = Map.of(
+        "DRAFT",             Set.of("IN_REVIEW"),
+        "IN_REVIEW",         Set.of("APPROVED_BY_LEGAL", "DRAFT"),
+        "APPROVED_BY_LEGAL", Set.of("APPROVED_BY_CISO", "IN_REVIEW"),
+        "APPROVED_BY_CISO",  Set.of("RETIRED", "IN_REVIEW"),
+        "RETIRED",           Set.of("IN_REVIEW"));
 
-    private static Set<String> allowedFrom(String from) {
-        return switch (Objects.requireNonNullElse(from, "")) {
-            case "DRAFT"             -> Set.of("IN_REVIEW");
-            case "IN_REVIEW"         -> Set.of("APPROVED_BY_LEGAL", "DRAFT");
-            case "APPROVED_BY_LEGAL" -> Set.of("APPROVED_BY_CISO", "IN_REVIEW");
-            case "APPROVED_BY_CISO"  -> Set.of("RETIRED", "IN_REVIEW");
-            case "RETIRED"           -> Set.of("IN_REVIEW");
-            default                  -> Set.of();
-        };
+    static void guardTransition(String from, String to) {
+        Set<String> allowed = TRANSITIONS.getOrDefault(
+            Objects.requireNonNullElse(from, ""), Set.of());
+        if (!allowed.contains(to)) {
+            throw new IllegalTransitionException(from, to, allowed);
+        }
     }
 
     private static void validate(TemplateRequest req) {

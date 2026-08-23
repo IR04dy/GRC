@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -172,9 +173,14 @@ class CrisisEventServiceTest {
         CrisisEvent e = event(2, "DETECTED");
         when(events.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(e));
 
+        // F2-303 — 409, naming the three moves a DETECTED crisis has. Before this the operator
+        // was told only which move was rejected.
         assertThatThrownBy(() -> service.transition(1L, "CLOSED"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Illegal transition");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("ASSESSING")
+            .hasMessageContaining("ACTIVATED")
+            .hasMessageContaining("CANCELLED");
     }
 
     @Test void transition_CLOSED_requiresRootCauseAndLessons() {

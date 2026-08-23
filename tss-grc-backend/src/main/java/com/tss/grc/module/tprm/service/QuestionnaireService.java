@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -168,16 +169,25 @@ public class QuestionnaireService {
         return templates.save(t);
     }
 
+    /**
+     * The register's declared edges, in ONE place. F2-303 — this was an inline
+     * {@code switch} of {@code Set.of(...).contains(...)}, so the legal-target list was not
+     * derivable at runtime and the refusal below could only say which move was rejected, never
+     * which moves would be accepted. Terminal states are present with an <b>empty</b> set rather
+     * than omitted, so the terminal set is derivable from the machine instead of typed out a
+     * second time ([[F2-196]]).
+     */
+    static final Map<String, Set<String>> TEMPLATE_TRANSITIONS = Map.of(
+        "DRAFT",    Set.of("ACTIVE", "ARCHIVED"),
+        "ACTIVE",   Set.of("ARCHIVED"),
+        "ARCHIVED", Set.of());
+
     @Transactional
     public QuestionnaireTemplate transitionTemplate(Long id, String to) {
         QuestionnaireTemplate t = getTemplate(id);
         String from = t.getStatus();
-        boolean ok = switch (from) {
-            case "DRAFT"    -> "ACTIVE".equals(to) || "ARCHIVED".equals(to);
-            case "ACTIVE"   -> "ARCHIVED".equals(to);
-            default         -> false;
-        };
-        if (!ok) throw new IllegalArgumentException("Illegal template transition " + from + " → " + to);
+        Set<String> allowed = TEMPLATE_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) throw new IllegalTransitionException(from, to, allowed);
         if ("ACTIVE".equals(to)) {
             int qCount = questions.findByOrganisationIdAndTemplateIdOrderBySequenceOrderAsc(org(), id).size();
             if (qCount == 0) throw new IllegalArgumentException("Cannot activate a template with no questions");

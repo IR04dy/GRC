@@ -1,5 +1,6 @@
 package com.tss.grc.module.change_mgmt.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.exception.ChangeAuthorityNotConfiguredException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.util.SaudiWorkdayUtil;
@@ -1873,10 +1874,21 @@ public class ChangeManagementService {
         // client could set any status (e.g. DRAFT→CLOSED) skipping the state machine.
     }
 
+    /**
+     * ⚠⚠ F2-303 — the sharpest member of that finding's family, and the one a grep for
+     * {@code IllegalArgumentException("Illegal} could not see, because this message was phrased
+     * "Cannot transition from". 🔑 <b>A detector keyed on the spelling you have already seen
+     * returns a smaller population, which reads exactly like a cleaner tree</b> — the gate found it
+     * by scanning for any transition-mentioning message instead.
+     *
+     * <p>The machine here was already declared and already read with {@code getOrDefault}, so
+     * {@code allowed} sat in a local on the line above and the refusal <b>discarded it</b>: an HTTP
+     * 400 naming the rejected move and not the accepted ones, one step from the set it needed.
+     */
     private void guard(ChangeRequest c, String target) {
         Set<String> allowed = NORMAL_TRANSITIONS.getOrDefault(c.getStatus(), Set.of());
         if (!allowed.contains(target))
-            throw new IllegalArgumentException("Cannot transition from " + c.getStatus() + " to " + target);
+            throw new IllegalTransitionException(c.getStatus(), target, allowed);
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.tss.grc.module.change_mgmt.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 
 import com.tss.grc.common.tenant.TenantContext;
@@ -293,8 +294,10 @@ class ChangeManagementServiceTest {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("DRAFT", "NORMAL")));
 
         assertThatThrownBy(() -> service.transition(CHANGE_ID, "IMPLEMENTING", new HashMap<>()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Cannot transition from DRAFT to IMPLEMENTING");
+            // F2-303 - a refused transition is a 409 naming the moves the machine would accept.
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("DRAFT");
     }
 
     @Test
@@ -302,8 +305,10 @@ class ChangeManagementServiceTest {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CLOSED", "NORMAL")));
 
         assertThatThrownBy(() -> service.transition(CHANGE_ID, "DRAFT", new HashMap<>()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Cannot transition from CLOSED");
+            // F2-303 - a refused transition is a 409 naming the moves the machine would accept.
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("CLOSED");
     }
 
     @Test
@@ -311,7 +316,10 @@ class ChangeManagementServiceTest {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CANCELLED", "NORMAL")));
 
         assertThatThrownBy(() -> service.transition(CHANGE_ID, "DRAFT", new HashMap<>()))
-            .isInstanceOf(IllegalArgumentException.class);
+            // F2-303 - CANCELLED is terminal, so the refusal is a 409 whose allowed set is
+            // empty and SAYS so. The old assertion checked only the type.
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("allowed: []");
     }
 
     // ─── Tenant scope ────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.regulatory.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.regulatory.entity.AuthorityDocument;
 import com.tss.grc.module.platform.regulatory.entity.AuthorityDocumentCitation;
@@ -115,8 +116,12 @@ class AuthorityDocumentServiceTest {
         AuthorityDocument d = doc("X", "DRAFT");
         when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(d));
 
+        // F2-303 — 409, and it names ACTIVE as the only move a DRAFT instrument has, which is
+        // what makes "no jumping" actionable rather than merely enforced.
         assertThatThrownBy(() -> service.transition(1L, "SUPERSEDED", 2L))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Illegal transition");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("ACTIVE");
     }
 
     @Test void delete_activeRefused() {

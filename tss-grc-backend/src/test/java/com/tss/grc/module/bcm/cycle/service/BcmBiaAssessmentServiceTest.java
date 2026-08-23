@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.BcmBiaAssessment;
 import com.tss.grc.module.bcm.cycle.repository.BcmBiaAssessmentRepository;
@@ -234,9 +235,13 @@ class BcmBiaAssessmentServiceTest {
     @Test void transition_ARCHIVEDfromARCHIVED_rejected() {
         BcmBiaAssessment b = bia("ARCHIVED");
         when(repo.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(b));
+        // F2-303 — a refused transition is a CONFLICT with the machine's state (409), not
+        // malformed input (400), and the refusal must name what it would have accepted. ARCHIVED is
+        // terminal, so the allowed set is empty and the message says so rather than staying silent.
         assertThatThrownBy(() -> service.transition(1L, "DRAFT"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Illegal");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("allowed: []");
     }
 
     @Test void transition_legalApprovalLoop_CHANGES_REQUIRED_to_DRAFT() {

@@ -1,5 +1,7 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import java.util.Map;
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -293,6 +295,23 @@ public class BcpPlanService {
 
     // ─── State machine ───────────────────────────────────────────
 
+    /**
+     * The register's declared edges, in ONE place. F2-303 — this was an inline
+     * {@code switch} of {@code Set.of(...).contains(...)}, so the legal-target list was not
+     * derivable at runtime and the refusal below could only say which move was rejected, never
+     * which moves would be accepted. Terminal states are present with an <b>empty</b> set rather
+     * than omitted, so the terminal set is derivable from the machine instead of typed out a
+     * second time ([[F2-196]]).
+     */
+    static final Map<String, Set<String>> TRANSITIONS = Map.of(
+        "DRAFT",        Set.of("UNDER_REVIEW", "CANCELLED"),
+        "UNDER_REVIEW", Set.of("APPROVED", "DRAFT"),
+        "APPROVED",     Set.of("PUBLISHED", "DRAFT"),
+        "PUBLISHED",    Set.of("ARCHIVED", "SUPERSEDED"),
+        "ARCHIVED",     Set.of(),
+        "SUPERSEDED",   Set.of(),
+        "CANCELLED",    Set.of());
+
     @Transactional
     public BcpPlan transition(Long id, String toStatus, String actor) {
         BcpPlan p = get(id);
@@ -300,18 +319,9 @@ public class BcpPlanService {
             throw new IllegalArgumentException("status must be one of " + STATUSES);
 
         String from = p.getStatus();
-        boolean legal = switch (from) {
-            case "DRAFT"        -> Set.of("UNDER_REVIEW", "CANCELLED").contains(toStatus);
-            case "UNDER_REVIEW" -> Set.of("APPROVED", "DRAFT").contains(toStatus);
-            case "APPROVED"     -> Set.of("PUBLISHED", "DRAFT").contains(toStatus);
-            case "PUBLISHED"    -> Set.of("ARCHIVED", "SUPERSEDED").contains(toStatus);
-            case "ARCHIVED"     -> false;
-            case "SUPERSEDED"   -> false;
-            case "CANCELLED"    -> false;
-            default             -> false;
-        };
-        if (!legal)
-            throw new IllegalArgumentException("Illegal transition: " + from + " → " + toStatus);
+        Set<String> allowed = TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(toStatus))
+            throw new IllegalTransitionException(from, toStatus, allowed);
 
         LocalDateTime now = LocalDateTime.now();
         p.setStatus(toStatus);

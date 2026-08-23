@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.regulatory.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
@@ -155,20 +156,30 @@ public class AuthorityDocumentService {
         return documents.save(d);
     }
 
+    /**
+     * The register's declared edges, in ONE place. F2-303 — this was an inline
+     * {@code switch} of {@code Set.of(...).contains(...)}, so the legal-target list was not
+     * derivable at runtime and the refusal below could only say which move was rejected, never
+     * which moves would be accepted. Terminal states are present with an <b>empty</b> set rather
+     * than omitted, so the terminal set is derivable from the machine instead of typed out a
+     * second time ([[F2-196]]).
+     */
+    static final Map<String, Set<String>> TRANSITIONS = Map.of(
+        "DRAFT",      Set.of("ACTIVE"),
+        "ACTIVE",     Set.of("DEPRECATED", "SUPERSEDED"),
+        "DEPRECATED", Set.of("SUPERSEDED"),
+        "SUPERSEDED", Set.of());
+
     /** DRAFT → ACTIVE → DEPRECATED → SUPERSEDED; no jumping. */
     @Transactional
+
     public AuthorityDocument transition(Long id, String to, Long supersededById) {
         AuthorityDocument d = get(id);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Invalid target status: " + to);
         String from = d.getStatus();
-        boolean ok = switch (from) {
-            case "DRAFT"      -> "ACTIVE".equals(to);
-            case "ACTIVE"     -> "DEPRECATED".equals(to) || "SUPERSEDED".equals(to);
-            case "DEPRECATED" -> "SUPERSEDED".equals(to);
-            default           -> false;
-        };
-        if (!ok) throw new IllegalArgumentException("Illegal transition " + from + " → " + to);
+        Set<String> allowed = TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) throw new IllegalTransitionException(from, to, allowed);
         if ("SUPERSEDED".equals(to)) {
             if (supersededById == null)
                 throw new IllegalArgumentException("supersededById is required when transitioning to SUPERSEDED");
