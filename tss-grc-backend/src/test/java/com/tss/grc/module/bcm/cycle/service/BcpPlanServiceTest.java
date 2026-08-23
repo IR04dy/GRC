@@ -209,6 +209,73 @@ class BcpPlanServiceTest {
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("APPROVED");
     }
 
+    // ─── F2-297: the status guard on a PARTIAL patch ─────────
+    //
+    // ⚠ update_cannotEditApprovedPlan above builds exactly the patch that used to trip this
+    // defect — `new BcpPlan()` with only a title — and it passed anyway, because isLocked()
+    // fires FIRST on an APPROVED plan. The case that was broken is a plan that is NOT locked
+    // and NOT in the initial state, and no fixture reached it (F2-293's shape).
+
+    @Test void update_partialPatchOnAnUnderReviewPlanIsAcceptedRatherThanRefused() {
+        // The BCP Builder's edit form sends titleEn/titleAr/rto/rpo/mtpd/role/nextReviewDate and
+        // NO status. While BcpPlan#status carried `= "DRAFT"`, that body deserialised to "DRAFT",
+        // the guard read it as a request to move an UNDER_REVIEW plan back, and Save answered 400
+        // naming a state the form does not even offer.
+        when(plans.findByIdAndOrganisationId(7L, ORG_ID))
+            .thenReturn(Optional.of(plan("BCP", "UNDER_REVIEW")));
+        BcpPlan patch = new BcpPlan();
+        patch.setTitleEn("Renamed while under review");
+
+        BcpPlan saved = service.update(7L, patch);
+
+        assertThat(saved.getTitleEn()).isEqualTo("Renamed while under review");
+        assertThat(saved.getStatus())
+            .as("an omitted status must leave the stored state alone, not reset it to the initial")
+            .isEqualTo("UNDER_REVIEW");
+    }
+
+    @Test void update_theEntityDoesNotDefaultStatusSoAnOmittedOneIsGenuinelyAbsent() {
+        // The structural half of the fix, asserted directly: if the initialiser comes back, the
+        // test above starts failing for a reason that reads like a service bug rather than an
+        // entity one, so pin the entity's own behaviour.
+        assertThat(new BcpPlan().getStatus())
+            .as("BcpPlan#status must NOT be initialised — the create owns the default through "
+                + "ServerOwnedState.requireInitial, and an initialiser makes an omitted status "
+                + "indistinguishable from a caller naming the initial state")
+            .isNull();
+    }
+
+    @Test void update_anEchoOfTheStoredStatusIsToleratedEvenInADifferentCase() {
+        // bcm.bcp_plans.status collates case-insensitively, so 'under_review' IS the stored value
+        // as far as the database is concerned. The hand-rolled bare equals read it as a change.
+        when(plans.findByIdAndOrganisationId(7L, ORG_ID))
+            .thenReturn(Optional.of(plan("BCP", "UNDER_REVIEW")));
+        BcpPlan patch = new BcpPlan();
+        patch.setTitleEn("Echoed"); patch.setStatus("under_review");
+
+        BcpPlan saved = service.update(7L, patch);
+
+        assertThat(saved.getStatus())
+            .as("an echo is tolerated, and the STORED canonical spelling is what survives")
+            .isEqualTo("UNDER_REVIEW");
+    }
+
+    @Test void update_aStatedDifferentStatusIsStillRefusedAndNamesTheRouteNotAJavaMethod() {
+        when(plans.findByIdAndOrganisationId(7L, ORG_ID))
+            .thenReturn(Optional.of(plan("BCP", "UNDER_REVIEW")));
+        BcpPlan patch = new BcpPlan();
+        patch.setStatus("APPROVED");
+
+        assertThatThrownBy(() -> service.update(7L, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            // The information the refusal must carry, never its phrasing (F2-296: a message has
+            // several fragments and asserting any one makes the whole wording load-bearing).
+            .hasMessageContaining("status")
+            .hasMessageContaining("UNDER_REVIEW")
+            .hasMessageContaining("APPROVED")
+            .hasMessageContaining("/api/v1/bcm/plans/7/transition");
+    }
+
     @Test void editSection_rejectedOnLockedPlan() {
         BcpSection s = new BcpSection();
         s.setId(99L); s.setOrganisationId(ORG_ID); s.setPlanId(7L); s.setSectionKey("overview");

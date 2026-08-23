@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.tcfd.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
@@ -125,8 +126,12 @@ public class TcfdItemService {
         // leaving the review clock stale and writing only a generic "updated" audit row —
         // F2-188/F2-191's shape: a duplicated transition agrees with the original on the row and
         // differs on the parts nothing asserts.
+        // F2-297 — same one-line fix as the CmaDisclosureService mirror, and fixed in both on
+        // purpose: F2-231 already recorded that closing one instance of a shape in this pair is not
+        // closing the shape. A case-variant echo would read as a CHANGE, stamping an IFRS S2 review
+        // that never happened and writing a TRANSITION audit row for a move that never occurred.
         boolean statusChanged = req.getDisclosureStatus() != null
-            && !req.getDisclosureStatus().equals(priorStatus);
+            && !ServerOwnedState.sameState(req.getDisclosureStatus(), priorStatus);
         if (statusChanged) markReviewed(cur, req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);

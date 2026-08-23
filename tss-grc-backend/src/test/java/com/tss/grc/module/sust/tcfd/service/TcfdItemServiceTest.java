@@ -232,6 +232,41 @@ class TcfdItemServiceTest {
     }
 
     /**
+     * F2-297 — and neither is an echo in a DIFFERENT CASE, which is where F2-231's fix carried
+     * F2-179's defect. {@code sust.tcfd_item.disclosure_status} collates case-insensitively, so
+     * {@code 'under_review'} IS the stored value; a bare {@code equals} read it as a CHANGE, and
+     * the consequence is the unsafe direction of this family — {@code markReviewed} would stamp an
+     * IFRS S2 review that never happened and the audit row would record a TRANSITION that never
+     * occurred. Latent (0 non-canonical values in dev or prod), so what made it harmless was the
+     * data and not the code (F2-182); the mirror in {@code CmaDisclosureService} took the same fix
+     * in the same commit, because F2-231 already recorded that closing one of this pair is not
+     * closing the shape.
+     */
+    @Test
+    void update_echoingTheSameStatusInADifferentCaseIsStillNotAReview() {
+        TcfdItem cur = item();
+        cur.setEvidenceRef("EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(i -> i.getArgument(0));
+
+        TcfdItem req = new TcfdItem();
+        req.setTitleEn("Resilience under climate scenarios (reworded)");
+        req.setDisclosureStatus("under_review");          // the same value, differently spelled
+
+        TcfdItem saved = service.update(9L, req);
+
+        assertThat(saved.getLastReviewedAt())
+            .as("a case variant of the stored status is the stored status, so the review clock "
+                + "must not move and no review may be manufactured")
+            .isEqualTo(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(org.mockito.ArgumentMatchers.eq("UPDATE"),
+                          org.mockito.ArgumentMatchers.eq("TcfdItem"),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /**
      * ⚠⚠ A CHANGE is. {@code update} performing the classification change {@code transition} performs
      * must do what {@code transition} does — stamp the review clock through the one shared writer and
      * record a TRANSITION naming from and to. F2-188/F2-191: a duplicated transition agrees with the

@@ -40,8 +40,9 @@ public class IssueService {
 
     private static final Set<String> STATUSES = Set.of(
         "OPEN", "IN_PROGRESS", "BLOCKED", "RESOLVED", "CLOSED", "CANCELLED");
-    /** F2-220 — the state an issue is CREATED in. update() already refuses to change status
-     *  ("Use transition() to change status"); the create did not. */
+    /** F2-220 — the state an issue is CREATED in. update() already refuses to change status; the
+     *  create did not. F2-297 moved that refusal onto {@code ServerOwnedState.requireUnchanged},
+     *  so it no longer says "Use transition() to change status" — it names the route. */
     private static final String INITIAL_STATUS = "OPEN";
     private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
@@ -129,8 +130,13 @@ public class IssueService {
     @Transactional
     public Issue update(Long id, Issue patch) {
         Issue existing = get(id);
-        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
-            throw new IllegalArgumentException("Use transition() to change status");
+        // F2-297 — one of four hand-rolled copies of the rule F2-296 shared; see BcpPlanService
+        // #update for why the copy was wrong in three ways.
+        ServerOwnedState.requireUnchanged(
+            patch.getStatus(), existing.getStatus(), "status", "Issue " + id,
+            "POST /api/v1/issues/" + id + "/transition, which walks the machine and emits the"
+            + " lifecycle event for the move",
+            null);
         if (patch.getTitleEn()          != null) existing.setTitleEn(patch.getTitleEn());
         if (patch.getTitleAr()          != null) existing.setTitleAr(patch.getTitleAr());
         if (patch.getDescription()      != null) existing.setDescription(patch.getDescription());

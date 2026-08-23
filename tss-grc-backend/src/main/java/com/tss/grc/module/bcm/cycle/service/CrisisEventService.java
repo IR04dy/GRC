@@ -355,8 +355,16 @@ public class CrisisEventService {
         CrisisEvent existing = get(id);
         if ("CLOSED".equals(existing.getStatus()) || "CANCELLED".equals(existing.getStatus()))
             throw new IllegalArgumentException("Cannot edit a " + existing.getStatus() + " crisis event");
-        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
-            throw new IllegalArgumentException("Use transition() to change status");
+        // F2-297 — one of four hand-rolled copies of the rule F2-296 shared; see BcpPlanService
+        // #update for why the copy was wrong in three ways. F2-238 removed this entity's status
+        // initialiser, so an omitted status genuinely arrives as null here and a partial PATCH is
+        // no longer refused; what the shared primitive adds is case-insensitive echo tolerance and
+        // a message naming the route instead of a Java method.
+        ServerOwnedState.requireUnchanged(
+            patch.getStatus(), existing.getStatus(), "status", "Crisis event " + id,
+            "POST /api/v1/bcm/crisis-events/" + id + "/transition, which walks the NCEMA"
+            + " lifecycle and records who moved it",
+            null);
 
         if (patch.getTitleEn()              != null) existing.setTitleEn(patch.getTitleEn());
         if (patch.getTitleAr()              != null) existing.setTitleAr(patch.getTitleAr());

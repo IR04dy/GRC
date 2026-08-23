@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.bcm.cycle.entity.BcmBiaAssessment;
 import com.tss.grc.module.bcm.cycle.repository.BcmBiaAssessmentRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -145,8 +146,16 @@ public class BcmBiaAssessmentService {
             "ARCHIVED".equals(existing.getApprovalStatus()))
             throw new IllegalArgumentException(
                 "Cannot edit a " + existing.getApprovalStatus() + " BIA — reopen via transition first");
-        if (patch.getApprovalStatus() != null && !patch.getApprovalStatus().equals(existing.getApprovalStatus()))
-            throw new IllegalArgumentException("Use transition() to change status");
+        // F2-297 — one of four hand-rolled copies of the rule F2-296 shared; see BcpPlanService
+        // #update for why the copy was wrong in three ways. The field name matters here: the copy's
+        // message said "status" while this request carries approvalStatus, so the 400 named a field
+        // the caller had not sent — the same defect F2-296 found in the primitive itself.
+        ServerOwnedState.requireUnchanged(
+            patch.getApprovalStatus(), existing.getApprovalStatus(), "approvalStatus",
+            "BIA assessment " + id,
+            "POST /api/v1/bcm/bia-assessments/" + id + "/transition, which walks the approval"
+            + " ladder and enforces RTO <= MTPD before APPROVED",
+            null);
 
         // Patch what was supplied
         if (patch.getCycleId()                != null) existing.setCycleId(patch.getCycleId());

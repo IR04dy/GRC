@@ -198,8 +198,19 @@ public class BcpPlanService {
         if (isLocked(existing.getStatus()))
             throw new IllegalArgumentException(
                 "Cannot edit a " + existing.getStatus() + " plan — reopen via transition first");
-        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
-            throw new IllegalArgumentException("Use transition() to change status");
+        // F2-297 — was a hand-rolled copy of the rule F2-296 shared: tolerate an ECHO of the
+        // stored status (the edit form round-trips the record) and refuse a CHANGE, which belongs
+        // to transition(). Three things were wrong with the copy. The bare equals could not see
+        // that the column collates case-insensitively, so a case-variant echo read as a change and
+        // was refused (F2-179 — latent, 0 non-canonical values in either database). The message
+        // named a JAVA METHOD a caller cannot call rather than the route (F2-210). And it sat over
+        // an entity field initialised to "DRAFT", so an omitted status arrived as "DRAFT" and the
+        // comparison fired for every plan that was neither DRAFT nor locked — see BcpPlan#status.
+        ServerOwnedState.requireUnchanged(
+            patch.getStatus(), existing.getStatus(), "status", "Plan " + id,
+            "POST /api/v1/bcm/plans/" + id + "/transition, which walks the lifecycle and snapshots"
+            + " the version being approved",
+            null);
 
         if (patch.getTitleEn()           != null) existing.setTitleEn(patch.getTitleEn());
         if (patch.getTitleAr()           != null) existing.setTitleAr(patch.getTitleAr());
