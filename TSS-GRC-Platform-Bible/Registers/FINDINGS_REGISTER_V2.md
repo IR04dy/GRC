@@ -14890,3 +14890,138 @@ proves the control reverted exactly what it meant to.
 - `ethics.screening_hits` has **no CHECK constraint** on `list_source` or `disposition`, and
   `ethics.kyc_subjects.full_name` has an `*_ar` sibling the create does not require (house rule
   7).
+
+---
+
+## F2-287 · A gate's population can be scoped by the HTTP VERB — and the slice that discovers a rule is the worst-placed slice to apply it to its own leftovers
+
+| | |
+|---|---|
+| **Status** | 🟢 CLOSED 2026-08-23 (`78def62f`) |
+| **Severity** | **P3** — `ethics.aml_alerts.first_detected_at` is *when the TM engine detected the suspicious activity*, the start of the FIU reporting clock. It was `insertable = false`, which refuses **Hibernate** as well as the caller, so the column could only ever hold `sysutcdatetime()` at the instant the row was inserted — while `AmlAlertRepository` orders the whole register by it. Probed live: a stated detection time was discarded in silence and the create's response reported `null` |
+| **Found by** | executing [[F2-286]]'s own filing and disbelieving it ([[F2-221]]) — and finding that the gate F2-286 shipped is scoped to `@PostMapping` |
+| **Fix** | `first_detected_at` becomes **insertable** (still `updatable = false`), `AmlAlertService.create` supplies the clock when the caller does not and refuses a future detection time, and `update` **echo-guards** it — the mapping refuses a change, so the wire must not appear to accept one · new `UpdateRefusedColumnWireContractTest` (the verb mirror, census asserted) and `AmlDetectionTimeTest` |
+| **Verified** | live probe **14/14 post-fix**, pre-fix control **6/6 fire**, `javap`-verified in both directions · **9 of 13** test legs discriminate · backend **4523/0/0** |
+
+### The instrument finding
+
+`RefusedColumnWireContractTest.population()` — shipped by F2-286 the day before — reads:
+
+```java
+if (col == null || col.insertable()) continue;
+```
+
+…over entities bound by a `@PostMapping @RequestBody`. So its claim, *"a column the mapping
+refuses must not be accepted at the wire"*, is scoped to the **INSERT half**. The mirror is
+`updatable = false` on an entity bound by a `@PutMapping`/`@PatchMapping`: the caller sends
+the field, Hibernate omits the column from the UPDATE, and nothing happens.
+
+🔑 **F2-198's shape again — the invariant is real and its population is a mechanism. Here the
+narrowing is neither a filename, an allow-list, a module name nor an `extends` clause: it is
+which VERB the slice was looking at.** Measured: **40** `updatable = false` fields on
+update-bound entities outside `ServerOwnedFieldsModule`'s nine, **28** of which Jackson
+accepts and silently discards.
+
+### F2-286 filed its own remaining member on a premise that was wrong twice
+
+Its filing read: *"`ethics.aml_alerts.first_detected_at` is still `insertable = false` … **not**
+the same defect, because the column holds **8 distinct real business dates** across 10 rows …
+and enabling it means widening `applyEditable`, a product call."*
+
+The measurement was **right** — confirmed in both databases: 8 distinct values, **0 of 10** with
+sub-second precision, **0** equal to `created_at`, and the seed derived every `sla_due_at` from
+it at exactly +30 days. 🔑 **That is F2-286's own tell running the other way: a column of round
+business times was STATED by somebody, and one of microsecond insert-instants was DEFAULTED.**
+
+Both halves of the *blocker* were wrong.
+
+- ⚠⚠ **The mechanism.** `applyEditable` is called by `create` **and** `update`, and the column
+  is `updatable = false` — so a write there would compile, run on the update path and change
+  nothing. Measured over the whole tree: **no service writes an `updatable = false` column on a
+  row it loaded**, so the filed fix would have created the **first instance** of that shape.
+- ⚠⚠ **The ownership.** The entity's own javadoc says the alert *"surfaces from the bank's TM
+  engine"*, so the detection time is **received from outside** — [[F2-268]]'s third kind, which
+  [[F2-209]] already settles: received and recorded, or absent. Not a product decision.
+
+🔑🔑 **The slice that discovers a rule is the worst-placed slice to apply it to its own
+leftovers, because the leftover gets filed with the reasoning that was current while the rule
+was still forming.**
+
+### The pre-fix control refuted my own description of the defect, and the correction is sharper
+
+I predicted the control would show the create's response **echoing** the caller's value
+(F2-285's shape). It reports **`null`** — because F2-286 had already closed the echo with
+`@JsonProperty(access = READ_ONLY)` while leaving the field unstatable.
+
+🔑 **An HONEST response over a DEFAULTED column is what makes this defect invisible: nothing
+contradicts anything.** F2-285's version at least left a discrepancy a re-fetch would expose.
+Here the wire truthfully said *"I am not telling you"* about a value the caller had just
+supplied and the column had silently replaced.
+
+### 0 of 4, and the cause was my own instrument twice over
+
+The `updatable = false`-written-on-a-loaded-row census reported **4 candidates and all 4 were
+creates**:
+
+- ⚠⚠ **A per-FILE map keyed on a variable name keeps only the last assignment.** A service
+  reuses `e` / `c` in every method, so `create`'s `new AuditEngagement()` was overwritten by
+  `transition`'s `repo.findBy…`. **This is [[F2-286]]'s patch-script bug one artefact over** —
+  *a map keyed on a name keeps only the LAST entry* — and it manufactures a fully-formed
+  finding on a create path. Resolve origins inside the enclosing method.
+- ⚠⚠ **A fallback for an unresolved type reintroduces exactly the ambiguity the resolution
+  removed.** After keying the entity off the file's **imports**, an
+  `if (fqcn not in population) fall back to the simple name` branch put `audit_eng`'s service
+  against `compliance.entity.AuditEngagement` again — and `audit_eng`'s own twin declares
+  `externalId` as a plain `String(64)`, so it was never in the population at all. Third
+  instance of [[F2-222]]/[[F2-278]]'s twin trap in two slices, and the first caused by the fix
+  for it. **It fails in the confident direction: a finding naming the wrong table.**
+
+### Three more instrument errors, all of mine
+
+- ⚠⚠ **A member regex that CONSUMES its leading `;` cannot match two consecutive single-line
+  members, so it skips every other one.** It reported **210** `updatable = false` fields on a
+  tree holding **424** — almost exactly half — and this codebase's house style puts `@Column`
+  and the field on one line, several in a row. 🔑 **A smaller population reads exactly like a
+  clean tree.** Use a lookbehind. The residual after fixing it was **420 + 2 on `BaseEntity`**,
+  which accounts for all 422 in entity files (the other 2 are in **comments** in two services).
+- ⚠ **A method-signature regex of the obvious shape backtracks catastrophically** — modifiers,
+  then a lazy type class that also matches whitespace, then the name — and hung a whole-tree
+  scan past 120 s. Anchor it to the line.
+- ⚠ **The CRLF trap, and the heredoc trap, in one slice.** A patch script's anchors were written
+  with `\n` against a CRLF tree and matched **0**; then a `<<'PY'` heredoc collapsed `\\n` into a
+  real newline inside a Python string literal and produced a `SyntaxError`. Both are recorded in
+  CLAUDE.md and I hit both anyway. **Use the Write/Edit tools for file content; normalise an
+  anchor to the target file's own line endings.**
+
+### Which legs discriminate
+
+**9 of 13**, measured against the reverted tree rather than argued. The four that do not are
+the two census/anti-vacuity **measurements** (correctly — they are not claims about this fix)
+and the two update-path **tolerance** legs, which cannot fail before the echo guard exists:
+before it, an echo is trivially accepted and an omission trivially leaves the value alone.
+
+### Filed
+
+- ⚠⚠ **`externalId` is NOT one of `ServerOwnedFieldsModule`'s nine**, so on an entity-bound
+  POST a caller can send it and Jackson binds it. Census: **75** entities with an `externalId`
+  bound by a `@PostMapping @RequestBody`, **68 OPEN** (7 refused by the mapping). Most are
+  immune because the service mints over the top — but **`ClientSuppliedReferenceRatchetTest`
+  cannot see any of them either way**: its key is a `setExternalId(...)` call inside a `create*`
+  method, and an entity-bound POST has no setter call at all, because Jackson writes the field.
+  F2-198's shape on the reference ratchet, and [[F2-172]](d)'s family. **No verdicts** — the
+  narrowing is *does the create overwrite it*, which is a reading job ([[F2-188]]).
+- The **28**-member update-verb census, dominated 27-to-1 by `externalId`, is a decrease-only
+  figure in the new gate rather than a work list: a field the caller may send on a PUT and the
+  server discards is [[F2-214]]'s shape, i.e. mild.
+- `ethics.aml_alerts` has **zero CHECK constraints**, so `severity`, `alert_type`,
+  `disposition` and `status` are narrowed only by Java — and `status` by `ServerOwnedState`
+  alone. Cheap now that this slice touched the register's writers ([[F2-183]]).
+- `amlApi.create` and `amlApi.update` have **no call sites**, so this register has no create or
+  edit screen; the fix is live for an integration and latent for the UI, which is where this
+  family lives ([[F2-179]]). Note [[F2-214]]'s warning: a dark client reads as an invitation to
+  build the screen.
+- `first_detected_at` is rendered by **no page**, and `AmlAlertDto` declares it — so the wire
+  carries a value nothing shows ([[F2-198]]'s shape). `sla_due_at` likewise, with **no server
+  computation anywhere** ([[F2-268]]'s standing filing).
+- `subject_name_ar` is **absent from the production table**: V391 is one of the 47 pending
+  migrations, so that is the deployment gap and not a defect.
