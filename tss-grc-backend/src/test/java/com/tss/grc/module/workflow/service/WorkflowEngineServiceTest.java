@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.workflow.entity.*;
 import com.tss.grc.module.workflow.repository.*;
@@ -226,15 +227,26 @@ class WorkflowEngineServiceTest {
     }
 
     @Test
-    void executeTransition_unknown_action_throws_IllegalArgument() {
+    /**
+     * F2-304 — renamed. The old name asserted the old contract ({@code throws_IllegalArgument}),
+     * which is the strongest form of a test pinning the thing being changed: a reader trusts the
+     * name before the body.
+     */
+    void executeTransition_unavailableAction_isAConflictNamingTheAvailableOnes() {
         WorkflowInstance i = instance(S_DRAFT, ORG_ID);
         when(instanceRepo.findById(INST_ID)).thenReturn(Optional.of(i));
         when(transitionRepo.findByDefinitionIdAndFromStateIdAndActionCode(DEF_ID, S_DRAFT, "bogus"))
             .thenReturn(Optional.empty());
 
+        // The engine is data-driven, so `allowed` is the set of action codes the current state
+        // offers — queried only on the refusal path.
+        when(transitionRepo.findByDefinitionIdAndFromStateIdOrderBySortOrder(DEF_ID, S_DRAFT))
+            .thenReturn(List.of());
+        when(stateRepo.findById(S_DRAFT)).thenReturn(Optional.empty());
+
         assertThatThrownBy(() -> service.executeTransition(INST_ID, "bogus", 99L, null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("No transition 'bogus'");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("bogus");
 
         verify(instanceRepo, never()).save(any());
         verify(logRepo, never()).save(any());

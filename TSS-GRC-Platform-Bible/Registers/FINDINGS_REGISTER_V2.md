@@ -15219,6 +15219,74 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-304 — the six filed refusals split four ways, and one was never a transition refusal at all
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — the tail of [[F2-303]]: five refusals converted from a 400 that named nothing to a 409 that names the available moves, and one **reclassified** as a required-field refusal where 400 is correct. |
+| **Registers** | `ethics.aml_alerts`, `ethics.disclosures`, `ethics.cases`, `platform.issues`, `workflow.instances` |
+| **Standards** | — (the platform's own refusal contract) |
+| **Found by** | Executing [[F2-303]]'s census of six unread sites |
+| **Verification** | suite **4688 → 4689/0/0**; probe **6/6**, showing `409` with `allowed: []` on both converted registers |
+
+### Reading them was the whole value, because they split four ways
+
+A count could not have ranked these, which is exactly why the census shipped with the honest reason
+*"not yet read"* rather than six manufactured ones ([[F2-188]]).
+
+* **Three had `allowed` already in a local and threw it away** — `AmlAlertService`,
+  `DisclosureService`, `EthicsCaseService`. One-line fixes, and the same shape as
+  `ChangeManagementService.guard`: the set the refusal needed was on the line above. ⚙
+  `EthicsCaseService` gets it from a declared `EthicsCaseLifecycle` **class**, which is why my
+  "declared machine" detector reported False for it — a detector artefact, not a fact about the code.
+* **One was an inline switch with no declared map** (`IssueService`), and its refusal explains the
+  under-count that made F2-303 file this at all: 🔑 **the message sat on a CONTINUATION LINE**, so a
+  pattern anchored on `IllegalArgumentException("Illegal` could never match it. **Wording was only
+  half the reason a single-line grep found five of eleven; a line break is the other half.**
+* **One was a different shape, in the platform's workflow engine** — adopted by 14 modules.
+  `executeTransition` refuses an action code with no row for the instance's current state: a conflict
+  rather than malformed input, and the available action codes were **already queryable** via
+  `findByDefinitionIdAndFromStateIdOrderBySortOrder`. It names them now. ⚠ The repurposing is stated
+  rather than quiet: this machine is **data-driven**, so its next states are reached *by action
+  code*, and `to`/`allowed` carry actions where `IllegalTransitionException`'s javadoc describes
+  states. Both lookups sit inside `orElseThrow`, so they run only on the refusal path.
+* **One is not a transition refusal at all.** *"supersededById is required when transitioning to
+  SUPERSEDED"* is a **required-field** refusal, and 400 is the right answer for a missing field. The
+  gate's pattern over-matches it — 🔑 **a fact about the pattern rather than about the code.**
+
+### Why that one is a named exemption rather than a narrowed pattern
+
+Narrowing on the word *"required"* would silently exempt every future message containing it. So the
+exemption is named, and a new leg keeps it honest **in both directions**: the message must still
+match the pattern (a rewording or deletion forces the entry out — [[F2-199]]'s rule that an exemption
+for something not in the population reads exactly like one for something that is), and the file's
+*real* lifecycle refusal must still be the typed 409. The point of the exemption is that this file
+has **both kinds**, and only one of them is a 400.
+
+### Six test assertions pinned the old contract, and one was pinned by its NAME
+
+`executeTransition_unknown_action_throws_IllegalArgument` — 🔑 **the strongest form of a test locking
+in the thing being changed, because a reader trusts the name before the body.** All six now assert
+the new **capability** rather than the new type: that the refusal names the moves available,
+including `allowed: []` from a terminal state and `TRIAGE` where the way through is not empty.
+
+### Two probe corrections, and one is a permission fact worth recording
+
+The ethics body key is **`target`**, resolved from `EthicsCaseController` rather than guessed. And
+`compliance` is **403** on `/api/v1/issues` — `PLATFORM:WRITE` is held by one role with **zero active
+users**, which [[F2-238]] already recorded, so that register is reachable in dev only by `admin`.
+That leg therefore runs as `admin` **with the reason stated**, because it tests data semantics and
+not authorization, and `admin` proves nothing about the latter. A separate leg asserts the 403 so the
+lockout is measured rather than worked around silently.
+
+### Filed
+
+* **`platform.issues` is administrator-only in dev** — `PLATFORM:WRITE` has one holder role with no
+  active users. F2-238 filed it; this slice re-confirmed it live and it is unchanged.
+* One error of mine: I guessed `WorkflowState::getStateCode` and the field is `code`. The compiler
+  caught it — resolve an accessor from the entity, never from the shape of the name.
+
 ## F2-303 — a refusal that cannot name what it would accept, and a grep that found five of eleven
 
 | | |

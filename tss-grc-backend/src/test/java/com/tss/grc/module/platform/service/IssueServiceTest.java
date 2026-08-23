@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.entity.Issue;
@@ -81,9 +82,11 @@ class IssueServiceTest {
         Issue i = issue("CLOSED");
         when(repo.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(i));
 
+        // F2-304 — 409, and CLOSED is terminal so the allowed set is empty and SAYS so.
         assertThatThrownBy(() -> service.transition(1L, "OPEN", null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Illegal transition");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("allowed: []");
     }
 
     @Test void transition_RESOLVED_requiresResolution() {

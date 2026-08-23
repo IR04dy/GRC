@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.workflow.entity.*;
 import com.tss.grc.module.workflow.repository.*;
@@ -158,10 +159,28 @@ public class WorkflowEngineService {
             .filter(x -> x.getOrganisationId().equals(org))
             .orElseThrow(() -> new EntityNotFoundException("Workflow instance not found: " + instanceId));
 
+        // F2-304 — a well-formed request for an action that is not available from where the
+        // instance stands is a CONFLICT, not malformed input, and the caller needs to know which
+        // actions ARE available. This machine is data-driven (rows in workflow.transitions), so its
+        // next states are reached BY ACTION CODE: `to` is the action requested and `allowed` is the
+        // set of action codes the current state offers, which the sort-ordered finder already
+        // returns. That repurposing is deliberate and stated, because IllegalTransitionException's
+        // javadoc describes `to`/`allowed` as states.
+        //
+        // The lookups sit inside orElseThrow, so they run only on the refusal path.
         WorkflowTransition tr = transitionRepo
             .findByDefinitionIdAndFromStateIdAndActionCode(i.getDefinitionId(), i.getCurrentStateId(), actionCode)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "No transition '" + actionCode + "' available from current state of instance " + instanceId));
+            .orElseThrow(() -> new IllegalTransitionException(
+                stateRepo.findById(i.getCurrentStateId())
+                    .map(WorkflowState::getCode)
+                    .orElse("state#" + i.getCurrentStateId()),
+                actionCode,
+                transitionRepo
+                    .findByDefinitionIdAndFromStateIdOrderBySortOrder(
+                        i.getDefinitionId(), i.getCurrentStateId())
+                    .stream()
+                    .map(WorkflowTransition::getActionCode)
+                    .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))));
 
         Long fromStateId = i.getCurrentStateId();
         i.setCurrentStateId(tr.getToStateId());

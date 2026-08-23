@@ -85,6 +85,7 @@ class TransitionRefusalContractTest {
         "module/bcm/cycle/service/CrisisEventService.java",                "TRANSITIONS",
         "module/platform/regulatory/service/AuthorityDocumentService.java", "TRANSITIONS",
         "module/tprm/service/QuestionnaireService.java",                   "TEMPLATE_TRANSITIONS",
+        "module/platform/service/IssueService.java",                       "TRANSITIONS",
         "module/bcm/comms/service/CrisisCommsTemplateService.java",        "TRANSITIONS"));
 
     private static final Path MAIN = Paths.get("src", "main", "java").toAbsolutePath().normalize();
@@ -104,21 +105,36 @@ class TransitionRefusalContractTest {
      * like a cleaner tree.</b> One of them is a SECOND refusal inside
      * {@code AuthorityDocumentService}, a file that slice had already converted.
      *
-     * <p>Six are left <b>unread</b>. Each needs its own machine examined — whether it has a declared
-     * map to name, whether its refusal is even a lifecycle refusal — and writing six reasons for
-     * code nobody has opened is precisely the failure [[F2-188]] measured, where five claims were
-     * written fluently and all five were false. The reason here is the honest one: not yet read.
+     * <p>⚠⚠ [[F2-304]] read all six, and they split <b>four</b> ways — which is why the census
+     * shipped with no verdicts rather than six manufactured ones ([[F2-188]]):
      *
-     * <p>The destination is zero. {@code IllegalTransitionException} is always available, so there
-     * is no correct code standing in the way — only reading.
+     * <ul>
+     *   <li><b>Three</b> had {@code allowed} already in a local and <b>threw it away</b>
+     *       ({@code AmlAlertService}, {@code DisclosureService}, {@code EthicsCaseService}) — one-line
+     *       fixes, and the same shape as {@code ChangeManagementService.guard} before it.</li>
+     *   <li><b>One</b> was an inline switch with no declared map ({@code IssueService}), and its
+     *       refusal is the one that explains the under-count: the message sat on a <b>continuation
+     *       line</b>, so a pattern anchored on {@code IllegalArgumentException("Illegal} could never
+     *       match it. 🔑 Wording was only half the reason a single-line grep found five of eleven.</li>
+     *   <li><b>One</b> was a different SHAPE: {@code WorkflowEngineService} refuses an action code
+     *       that has no row for the instance's current state. A conflict, and the available action
+     *       codes were already queryable — so the platform's engine, adopted by 14 modules, now
+     *       names them.</li>
+     *   <li><b>One is not a transition refusal at all</b> and stays a 400 — see the map below. The
+     *       pattern over-matches it, which is a fact about the pattern rather than about the code.</li>
+     * </ul>
+     *
+     * <p>So the enforceable destination was never "zero refusals matching this pattern"; it is
+     * "zero refusals matching it that are actually lifecycle refusals". One entry remains, named.
      */
     private static final Map<String, String> UNREAD_BARE_REFUSALS = Map.of(
-        "module/ethics/service/AmlAlertService.java",                       "not yet read",
-        "module/ethics/service/DisclosureService.java",                     "not yet read",
-        "module/ethics/service/EthicsCaseService.java",                     "not yet read",
-        "module/platform/regulatory/service/AuthorityDocumentService.java", "not yet read — a SECOND refusal in a file F2-303 converted",
-        "module/platform/service/IssueService.java",                        "not yet read",
-        "module/workflow/service/WorkflowEngineService.java",               "not yet read");
+        "module/platform/regulatory/service/AuthorityDocumentService.java",
+        "NOT a transition refusal — F2-304 read it. \"supersededById is required when transitioning "
+        + "to SUPERSEDED\" is a REQUIRED-FIELD refusal that merely mentions transitioning, and 400 "
+        + "is the right answer for a missing field. This entry exists because the pattern above is "
+        + "scoped to any transition-mentioning message, which over-matches here; narrowing it on the "
+        + "word \"required\" would silently exempt every future message containing it, so the "
+        + "exemption is named instead and the leg below keeps it honest.");
 
     @Test
     void noServiceRefusesATransitionWithoutNamingWhatItWouldAccept() throws IOException {
@@ -164,6 +180,34 @@ class TransitionRefusalContractTest {
 
             %s""".formatted(String.join("\n            ", newOnes)))
             .isEmpty();
+    }
+
+    /**
+     * The one exemption stays honest in both directions: the message must still match the pattern —
+     * so a reworded or deleted message forces the entry out — and it must still be the
+     * required-field refusal the reason claims, not a lifecycle refusal that drifted into it.
+     */
+    @Test
+    void theOneExemptionIsStillTheRequiredFieldRefusalItClaimsToBe() throws IOException {
+        String rel = "module/platform/regulatory/service/AuthorityDocumentService.java";
+        String code = GuardExpressions.stripComments(services().get(rel));
+
+        assertThat(BARE_TRANSITION_REFUSAL.matcher(code).find()).as(
+            "The exempted message no longer matches the pattern, so the exemption describes nothing. "
+            + "Delete the UNREAD_BARE_REFUSALS entry — an exemption for something not in the "
+            + "population reads exactly like one for something that is (F2-199).")
+            .isTrue();
+
+        assertThat(code).as(
+            "The exemption's reason says this is a REQUIRED-FIELD refusal, which is why 400 is "
+            + "correct. If that message is gone, the reason is stale and the site needs re-reading.")
+            .contains("supersededById is required when transitioning to SUPERSEDED");
+
+        // and the file's real lifecycle refusal must still be the typed one F2-303 converted
+        assertThat(code).as(
+            "This file's actual transition refusal must remain the typed 409 — the point of the "
+            + "exemption is that the file has BOTH kinds, and only one of them is a 400.")
+            .contains("new IllegalTransitionException(from, to, allowed)");
     }
 
     /** The floor, so the ban above cannot pass by matching nothing. */
