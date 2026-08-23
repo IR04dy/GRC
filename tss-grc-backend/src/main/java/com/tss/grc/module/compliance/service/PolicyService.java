@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.Policy;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
@@ -64,7 +65,23 @@ public class PolicyService {
     @Transactional
     public Policy update(Long id, Policy req) {
         Policy p = get(id);
-        p.setCode(req.getCode());
+        // ⚠ F2-308 — this wrote the caller's value unconditionally, and unlike its sibling in
+        // ComplianceService the reset really was expressible here: `update` binds the Policy ENTITY,
+        // and @Column(nullable = false) is not a bean-validation annotation, so an omitted code would
+        // have reached a NOT NULL column.
+        //
+        // ⚙ But it is a LATENT-hazard closure, not a live one, and saying which is the point
+        // (F2-283): `PolicyService#update` has NO CONTROLLER. F2-187's DarkServiceMethodTest holds
+        // this whole legacy write lifecycle as dark, retired in favour of
+        // PolicyManagementService#transition, which RegChangePolicyController names. Nothing can
+        // reach this method today — which is a fact about today, not a property of the guard.
+        ServerOwnedState.requireImmutableReference(
+            req.getCode(), p.getCode(), "code",
+            "Policy " + (p.getId() == null ? "(new)" : p.getId()),
+            "Omit code, or send the value already recorded.");
+        if (req.getCode() != null && p.getCode() == null) {
+            p.setCode(req.getCode());
+        }
         p.setTitleEn(req.getTitleEn());
         p.setTitleAr(req.getTitleAr());
         p.setVersion(req.getVersion());

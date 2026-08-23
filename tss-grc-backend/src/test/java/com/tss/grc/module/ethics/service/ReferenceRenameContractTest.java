@@ -131,6 +131,14 @@ class ReferenceRenameContractTest {
         sites.put("ndi/gap/service/NdiGapService.java", "GapCode");
         sites.put("compliance/service/AuditEngagementService.java", "EngagementCode");
         sites.put("change_mgmt/service/ChangeManagementService.java", "ChangeCode");
+        // F2-308 — the last five. Two of them (ComplianceService, PolicyService) wrote the
+        // caller's value UNCONDITIONALLY, so an omitted code also cleared it; the guard's
+        // settable-while-absent shape closed that reset for free.
+        sites.put("ndi/plan/service/NdiImprovementPlanService.java", "PlanCode");
+        sites.put("ndi/reports/service/NdiReportService.java", "ReportCode");
+        sites.put("bcm/service/CrisisCommsService.java", "Code");
+        sites.put("compliance/service/ComplianceService.java", "Code");
+        sites.put("compliance/service/PolicyService.java", "Code");
 
         java.util.List<String> missing = new java.util.ArrayList<>();
         for (java.util.Map.Entry<String, String> e : sites.entrySet()) {
@@ -145,6 +153,8 @@ class ReferenceRenameContractTest {
                 missing.add(e.getKey() + " — no longer calls requireImmutableReference");
                 continue;
             }
+            // The getter checked is the TARGET entity's, not the request's: ComplianceService
+            // binds a record (req.code()) while its entity still exposes getCode().
             if (!code.contains("get" + e.getValue() + "()")) {
                 missing.add(e.getKey() + " — no longer reads get" + e.getValue() + "()");
             }
