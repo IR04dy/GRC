@@ -69,9 +69,24 @@ public class BcpPlan {
     @Column(name = "plan_owner_id")      private Long   planOwnerId;
     @Column(name = "response_team_role", length = 100) private String responseTeamRole;
 
-    /** DRAFT | UNDER_REVIEW | APPROVED | PUBLISHED | ARCHIVED | SUPERSEDED | CANCELLED */
+    /**
+     * DRAFT | UNDER_REVIEW | APPROVED | PUBLISHED | ARCHIVED | SUPERSEDED | CANCELLED
+     *
+     * <p>F2-297 — deliberately NOT initialised. This field carried {@code = "DRAFT"}, and because
+     * {@code PATCH /api/v1/bcm/plans/{id}} binds this entity, an omitted {@code status} arrived as
+     * "DRAFT" rather than null — indistinguishable from a caller asking to move the plan back. The
+     * guard in {@code BcpPlanService#update} therefore fired on every plan that was not already
+     * DRAFT and not already locked, so the BCP Builder's edit form — which sends no status at all —
+     * answered 400 "Use transition() to change status" naming a state its form does not offer.
+     *
+     * <p>F2-238 removed exactly this initialiser from {@code CrisisEvent}, {@code Issue} and
+     * {@code BcmBiaAssessment} — the three PATCH-bound siblings of this one — and left this fourth.
+     * The create path already owns the default through {@code ServerOwnedState.requireInitial} with
+     * {@code BcpPlanService.INITIAL_STATUS} (F2-220), so the initialiser was pure residue on create
+     * and a refusal on update. Do not restore it: the column is NOT NULL and the create writes it.
+     */
     @Column(nullable = false, length = 20)
-    private String status = "DRAFT";
+    private String status;
 
     @Column(name = "current_version", nullable = false)
     private Integer currentVersion = 1;

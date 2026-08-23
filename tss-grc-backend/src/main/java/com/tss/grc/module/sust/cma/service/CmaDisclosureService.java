@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.cma.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
@@ -118,8 +119,16 @@ public class CmaDisclosureService {
         // classification change transition() performs while leaving the review clock stale.
         // Fixed here as well as in the mirror on purpose: this class is the one TcfdItemService's
         // javadoc says it mirrors, and closing one instance of a shape is not closing the shape.
+        // F2-297 — F2-179's defect INSIDE F2-231's fix, and it fails in the opposite direction from
+        // the four refusal sites this slice converted. There a case-variant echo was wrongly
+        // REFUSED, which is merely a false 400; here a case-variant echo would read as a CHANGE, so
+        // markReviewed() would stamp a review that never happened and the audit row below would
+        // record a TRANSITION that never occurred — on a CMA Article 92 disclosure register.
+        // Latent (0 non-canonical values in either database), so what made it harmless is the data
+        // and not the code (F2-182). sameState() is public for exactly this: the comparison is
+        // shared, the refusal is not, because this route must keep accepting the field.
         boolean statusChanged = req.getDisclosureStatus() != null
-            && !req.getDisclosureStatus().equals(priorStatus);
+            && !ServerOwnedState.sameState(req.getDisclosureStatus(), priorStatus);
         if (statusChanged) markReviewed(cur, req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);

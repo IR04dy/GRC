@@ -134,11 +134,16 @@ export function CrisisRoomPage() {
   }
 
   // ── Edit the crisis-event record (PATCH — partial null-means-keep) ─────
-  // Status is owned by transition(); the PATCH body must echo the current
-  // status because the endpoint binds a JPA entity whose status field
-  // defaults to "DETECTED" — an omitted status would otherwise trip the
-  // server's "Use transition() to change status" guard. The server also
-  // refuses edits on CLOSED / CANCELLED events, so the affordance is gated.
+  // Status is owned by transition(), and the PATCH body echoes the current status.
+  // ⚠ That echo is no longer REQUIRED and this comment used to say it was: it described
+  // an entity whose status field defaulted to "DETECTED", so an omitted status arrived as
+  // "DETECTED" and tripped the server's guard. F2-238 removed that initialiser, so an
+  // omitted status now arrives as null and a genuinely partial PATCH is accepted; F2-297
+  // then routed the guard through ServerOwnedState.requireUnchanged, which tolerates an
+  // echo case-insensitively and names the route in its refusal. The echo is kept because
+  // it is harmless and the form round-trips the record anyway — but do not reintroduce it
+  // elsewhere on the belief that the server needs it. The server does still refuse edits
+  // on CLOSED / CANCELLED events, so that affordance is gated.
   const editFields: FieldDef[] = [
     { key: 'titleEn', kind: 'text', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)' },
     { key: 'titleAr', kind: 'text', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },

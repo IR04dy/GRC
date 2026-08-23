@@ -323,6 +323,36 @@ class CmaDisclosureServiceTest {
         verify(audit).log(eq("UPDATE"), eq("CmaDisclosure"), any(), anyString());
     }
 
+    /**
+     * F2-297 — and neither is an echo in a DIFFERENT CASE. This test exists because the mutation
+     * harness predicted its absence: F2-231 fixed this pair in both services and tested only the
+     * TCFD half, so reverting the CMA half SURVIVED. {@code sust.cma_disclosure.disclosure_status}
+     * collates case-insensitively, so {@code 'under_review'} IS the stored value; a bare
+     * {@code equals} read it as a change, and {@code markReviewed} would then stamp a CMA
+     * Article 92 review that never happened while the audit row recorded a TRANSITION that never
+     * occurred. Latent (0 non-canonical values in dev or prod), so the data is what made it
+     * harmless and not the code (F2-182).
+     */
+    @Test
+    void update_echoingTheSameStatusInADifferentCaseIsStillNotAReview() {
+        CmaDisclosure cur = disclosure("UNDER_REVIEW", "EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(i -> i.getArgument(0));
+
+        CmaDisclosure req = new CmaDisclosure();
+        req.setTitleEn("Test disclosure (reworded)");
+        req.setDisclosureStatus("under_review");          // the same value, differently spelled
+
+        CmaDisclosure saved = service.update(5L, req);
+
+        assertThat(saved.getLastReviewedAt())
+            .as("a case variant of the stored status is the stored status, so no review may be "
+                + "manufactured and the clock must not move")
+            .isEqualTo(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(eq("UPDATE"), eq("CmaDisclosure"), any(), anyString());
+    }
+
     @Test
     void update_changingTheStatusStampsTheReviewClockAndLogsATransition() {
         CmaDisclosure cur = disclosure("UNDER_REVIEW", "EV-1");

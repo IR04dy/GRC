@@ -72,7 +72,16 @@ class ServerOwnedStateContractTest {
     private static final Set<String> GUARDS_ITS_UPDATE = Set.of(
         "AuditEngagementService",   // F2-296 — the live one: the register's only reverse edge
         "DisclosureService",        // F2-292 — NAZAHA conflict-of-interest disclosures
-        "EthicsCaseService"         // F2-291 — whistleblowing / misconduct cases (status + outcome)
+        "EthicsCaseService",        // F2-291 — whistleblowing / misconduct cases (status + outcome)
+        // F2-297 — the four hand-rolled copies F2-296's own census listed by name and left unread.
+        // Each carried the correct RULE (tolerate an echo, refuse a change) with three defects: a
+        // bare equals against a CI-collated column, a message naming a Java method a caller cannot
+        // call, and — on BcpPlanService — an entity initialiser that made the guard fire on every
+        // row not already in the initial state.
+        "BcpPlanService",           // F2-297 — the live one: BCP Builder could not save a plan
+        "CrisisEventService",       // F2-297 — NCEMA crisis events
+        "IssueService",             // F2-297 — the platform issue register
+        "BcmBiaAssessmentService"   // F2-297 — approvalStatus, and the message said "status"
     );
 
     // ── the shared rule is shared ────────────────────────────────────────────────────────────────
@@ -152,12 +161,23 @@ class ServerOwnedStateContractTest {
         // either entry naming the other. Lowered in the same commit as the sweep (house rule 3: a
         // ceiling left high after a fix makes a tolerated member indistinguishable from a reviewed
         // one). None of the services in GUARDS_ITS_UPDATE is in this list, which is the ban working.
+        // ⚠ F2-297 read all seven and took this 7 → 1. The reading is the whole value, because the
+        // seven split THREE ways and a count could not rank any of them: FOUR were hand-rolled
+        // copies of the rule this class shares (converted, and now in GUARDS_ITS_UPDATE above); TWO
+        // are deliberate F2-231 change-detection branches that must KEEP accepting the field and so
+        // must never be converted — they took `sameState` instead, because there a case-variant echo
+        // read as a CHANGE and stamped a review that never happened, the opposite failure direction
+        // from the four; and ONE is NdiGapService#updateGap, which writes the caller's status
+        // unconditionally and has no transition route and no machine to bypass — F2-221's shape,
+        // narrowed today only by a CHECK on ndi.gap.status, so the remaining question is whether
+        // that vocabulary permits a JUMP past the service's three derivations, which is a direction
+        // a CHECK cannot see (F2-296) and a reading nobody has done.
         assertThat(sites)
             .as("F2-296 census — each is a service comparing a request-side lifecycle getter "
                 + "against a non-literal. Read before closing: a comparison against the CURRENT row "
                 + "is this slice's defect, and a comparison against a target inside a transition is "
                 + "the machine doing its job. Sites: %s", sites)
-            .hasSizeLessThanOrEqualTo(7);
+            .hasSizeLessThanOrEqualTo(1);
         assertThat(sites)
             .as("and none of them may be a service that already guards its update through the "
                 + "primitive — if one appears here it has grown a second, disagreeing comparison")

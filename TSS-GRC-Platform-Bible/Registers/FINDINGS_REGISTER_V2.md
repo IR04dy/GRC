@@ -15219,6 +15219,184 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-297 — a census that names its members and gives them no verdicts is a list nobody reads, and four of these seven were copies of the rule the slice that filed them had just shared
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P2 — live and **screen-reachable**. The BCP Builder's "Edit plan" form sends `titleEn`/`titleAr`/`rtoHours`/`rpoHours`/`mtpdHours`/`responseTeamRole`/`nextReviewDate` and **no status**; `PATCH /api/v1/bcm/plans/{id}` binds the entity, whose `status` field carried `= "DRAFT"`, so an omitted status arrived as "DRAFT" and the guard read it as a request to move the plan back. Clicking **Save** on any plan that was neither DRAFT nor already locked answered **400 "Use transition() to change status"** — naming a state the form does not offer. Same `BCM:WRITE` on create, PATCH and `/transition`, so no privilege escalation: the object-level guard was the only control ([[F2-219]]'s shape). |
+| **Registers** | `bcm.bcp_plans` (10 rows, 1 `UNDER_REVIEW` — the affected state — in **both** databases), `bcm.crisis_events` (7), `platform.issues` (13), `bcm.bia_assessments` (8), `sust.cma_disclosure` (91), `sust.tcfd_item` (85), `ndi.gap` (18) |
+| **Standards** | ISO 22301 §8.4.2 (BCP), NCEMA (crisis events), CMA Article 92 / IFRS S2 (the two disclosure registers) |
+| **Found by** | Executing [[F2-296]]'s own filed 7-site census and **re-deriving it first** ([[F2-221]]) — the gate asserts a COUNT and prints nothing, so the sites came from a scan mirroring its detector, which agreed with it at 7. Reading each site with its enclosing method is what split them. |
+| **Verification** | full hermetic suite **4648 → 4654/0/0**; gate 10/10; live probe **15/15 post-fix** as `compliance`, never `admin`, against a plan it planted itself ([[F2-206]]); **pre-fix control 8/15**, reproducing the 400 on the BCP Builder's exact payload; `npx tsc --noEmit` clean |
+
+### The census had three buckets and a count could rank none of them
+
+`ServerOwnedStateContractTest.censusOfHandRolledLifecycleComparisons` shipped with F2-296 as a
+decrease-only work list of **7 services, deliberately with no verdicts** ([[F2-188]]) — and its own
+assertion message names the reading job: *"a comparison against the CURRENT row is this slice's
+defect, and a comparison against a target inside a transition is the machine doing its job."* A
+list of service names cannot settle that. The matched expression plus its enclosing method can, and
+it split **three** ways:
+
+**Bucket A — four hand-rolled copies of the rule F2-296 had just shared.** `BcpPlanService`,
+`CrisisEventService`, `IssueService` and `BcmBiaAssessmentService` each carried, byte for byte:
+
+```java
+if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
+    throw new IllegalArgumentException("Use transition() to change status");
+```
+
+The **rule** was right — tolerate an echo, refuse a change — and three things about the copy were
+not. The bare `equals` cannot see that these columns collate case-insensitively, so a case-variant
+echo read as a change and was refused ([[F2-179]]; **latent — 0 non-canonical values on all seven
+columns in both databases**, so what made it harmless was the data and not the code, [[F2-182]]).
+The message named a **Java method a caller cannot call** rather than the route ([[F2-210]]'s shape,
+and `BcmBiaAssessmentService`'s said `"status"` while its request carries `approvalStatus`, which is
+the very defect F2-296 found *inside the primitive*). And on `BcpPlanService` it sat over an
+initialised entity field, which is what made it live.
+
+🔑🔑 **F2-238 removed exactly that initialiser from the three PATCH-bound siblings and left the
+fourth.** Its own finding reads *"5 of 5 crisis events, 4 of 7 BIA assessments, 6 of 13 issues could
+not be PATCHed at all"* — and `BcpPlanController#update` is a `@PatchMapping` too, so this was
+squarely inside its declared population, not a boundary gap. [[F2-215]]'s two-of-N, at the widest
+range yet: **the remedy was applied three times, in the same module, and the fourth site kept the
+defect while every artefact around it looked finished.**
+
+**Bucket B — two deliberate [[F2-231]] change-detection branches that are CORRECT and must never be
+converted**, and the same bare `equals` inside them fails in the **opposite** direction.
+`CmaDisclosureService#update` and `TcfdItemService#update` legitimately accept `disclosureStatus`
+(F2-231 established why: the entity's field initialiser makes an omitted key indistinguishable from
+a real `UNDER_REVIEW`, so the ESG tab echoes it back) and route a *change* through `markReviewed` so
+the review clock and the audit row move together. But a case-variant echo read as a **change**, so
+`markReviewed` would stamp a CMA Article 92 / IFRS S2 review that never happened and the audit row
+would record a `TRANSITION` that never occurred. 🔑 **Bucket A's failure is a false 400 — annoying
+and safe. Bucket B's manufactures a governance record.** One line each: `sameState`, which is public
+for exactly this — the comparison is shared, the refusal is not.
+
+**Bucket C — one unconditional write, and BOTH of my first two readings of it were wrong.**
+`NdiGapService#updateGap` writes `if (body.getStatus() != null) g.setStatus(body.getStatus())`
+unconditionally and then publishes a `TRANSITION` audit row when the value differs.
+
+* I first called it *"a PUT that is a reverse edge past whatever the transition route enforces"*.
+  **Refuted:** that service has no `transition()` and no state machine at all — `setStatus` is
+  written on the update path and by three derivations, and its controller maps only
+  `/api/ndi/gaps`. There is no machine to bypass, so it is [[F2-221]]'s shape and not F2-296's.
+* I then measured `ndi.gaps` and got **TABLE ABSENT in both databases**, which reads exactly like
+  *the register does not exist*. **That was my own guessed table name** — `@Table(name = "gap")`,
+  singular. The recurring guessed-identifier landmine, one step from a filed false finding.
+  Resolved properly: **18 rows in both databases, a CHECK on `status` present, 0 non-canonical
+  case, storing only `OPEN` ×9 and `IN_PROGRESS` ×9.**
+
+So the arbitrary-string harm is **absent** there (the CHECK narrows it) and what remains is the
+question a CHECK cannot answer — whether that vocabulary permits a **jump** past the three
+derivations. Filed, unread, and the census ceiling is **7 → 1** so it cannot be lost.
+
+### The test that could have caught it built the exact triggering payload and passed
+
+`BcpPlanServiceTest.update_cannotEditApprovedPlan` constructs `new BcpPlan()` with only a title —
+**precisely the partial patch that tripped this defect** — and passed, because `isLocked()` fires
+first on an APPROVED plan. The case that was broken is a plan that is neither locked nor in the
+initial state, and no fixture reached it. [[F2-293]]'s shape: **an earlier check masking the one
+under test, in a fixture that otherwise looks like exactly the right coverage.**
+
+### The harness predicted a gap before it ran, because F2-231 had already recorded it
+
+My own comment on the CMA fix said F2-231 *"already recorded that closing one instance of a shape in
+this pair is not closing the shape"* — and F2-231's register entry records that reverting its CMA
+half **SURVIVED** because only the TCFD half had behaviour tests. I had added the case-variant test
+to TCFD only, so that mutation would have survived for the identical reason, two slices apart. The
+CMA test was written **before** the harness ran, and M6 is what proves it load-bearing.
+🔑 **A recorded failure mode is a prediction, and the cheapest time to act on it is before the
+harness tells you again.**
+
+### The stale claim was in the frontend, where no code-scoped gate can see it
+
+`CrisisRoomPage.tsx` carried a comment stating that the PATCH body **must** echo the current status
+*"because the endpoint binds a JPA entity whose status field defaults to `DETECTED`"*. F2-238 removed
+that initialiser, so the claim had been false ever since — and it is the kind of false claim that
+propagates, because it tells the next reader to keep a workaround forever ([[F2-184]]'s shape, in
+the place written to be read — [[F2-205]]). Corrected in place rather than deleted: the echo is
+harmless and the form round-trips the record, so what needed fixing was the *reason*. It was also
+the artefact that revealed the whole finding — the comment named the defect precisely, in a file
+nobody had reason to connect to a BCM service.
+
+### Why no gate caught it: the hard zero's population stops at the shape of the *condition*
+
+`NeverFiringNullGuardContractTest` exists for precisely this defect — `if (req.getX() != null)` on
+a field the entity initialises — and F2-294 promoted it to an **invariant** with the words *"Keep it
+empty. There is no correct code for a hard zero here to fail on."* It passed 15/15 both before and
+after this slice. Its guard pattern is:
+
+```
+if\s*\(\s*<param>\s*\.\s*(?:get|is)([A-Z]\w*)\s*\(\s*\)\s*!=\s*null\s*\)
+```
+
+which requires a `)` **immediately after `null`** — i.e. the null test must be the *entire*
+condition. All four bucket-A guards are **conjunctive** (`!= null && !…equals(…)`), so there is
+` && ` there instead and they are outside that gate's population **by construction**.
+🔑 **That is why F2-238's member list did not name `BcpPlan`: not an oversight, a population
+boundary at the shape of the condition** — [[F2-198]]'s shape, where the narrowing is neither a
+filename nor an allow-list nor a verb but **how much of the `if` the null test occupies**.
+
+⚠ **Widening it is NOT a free closure, which is why it is filed rather than done here.** Measured:
+the conjunctive shape over an initialised field of the parameter's own type matches **4 sites** —
+`BcmService#updatePlan` (`BcmPlan#status = "DRAFT"`), `ConsentRecordService#grant` (two fields) and
+`DetectionRuleService#save`. Two of those are plausibly legitimate create-or-update paths ([[F2-213]]
+already refuted `DetectionRuleService#save` for a different family), so widening surfaces a
+population that must be **read**, and manufacturing four reasons is [[F2-188]]'s failure mode.
+
+⚠⚠ **And my measuring scanner reproduced a bug that gate's own comment records fixing.** It reported
+**1 SIMPLE-shape site** — `CloudServiceService#update` over `CloudService#status = "ONBOARDING"` —
+against a gate that is a hard zero for that shape. The gate is right and my scan was wrong: I keyed
+initialised fields by **simple class name**, so the two `CloudService` entities (`module/cyber` and
+`module/outsourcing`) collapsed and the outsourcing one's initialiser was attributed to the cyber
+service. F2-238's own javadoc describes fixing exactly that, by fully-qualified name. 🔑 **CLAUDE.md's
+rule verbatim — before writing a scanner, read the scanner this repo already has — and the phantom
+is the reason the conjunctive figure of 4 is stated as "must be read" rather than as four defects.**
+
+### Errors of mine, each caught by running something
+
+* **My kill predicate was an `-or` whose first branch had no narrowing**, so a pattern meant to match
+  the dev JVM by its `-Djava.io.tmpdir` argument matched **every shell whose command line mentioned
+  that path** — including the harness's own wrappers — and, unlike the reporting version of this
+  mistake ([[F2-193]], [[F2-295]]), it **acted** on the over-match. The prod-port guard held (8676
+  was skipped and is alive), the repo and both databases were untouched, and the intended outcome
+  was reached by a sloppier route than intended. 🔑 **In a compound kill predicate every branch needs
+  the narrowing, not just the one you wrote last.**
+* **I nearly filed "TABLE ABSENT" as a finding** — see bucket C. Resolve a table from `@Table`, never
+  from a plausible plural.
+* **The `-Dtest=A+B` selector**, again: surefire wants a comma, and `A+B` produces `BUILD FAILURE`
+  with **no `Tests run:` line**, which is [[F2-255]]'s tell that nothing ran.
+
+### Filed
+
+* **`NdiGapService#updateGap`** — the last census member, unread: does `ndi.gap.status`'s CHECK
+  vocabulary permit a jump past the service's three derivations, and should that register have a
+  transition route at all?
+* ⚠⚠ **`bcm.bcm_plans` looks like a live twin of what this slice just fixed, and it needs its own
+  measurement.** `BcmPlan#status` is **still** `= "DRAFT"` (one entity class, so no simple-name
+  collapse — this hit is real), `PUT /api/v1/bcm/legacy-plans/{id}` binds the entity, and
+  [[F2-296]] made that route tolerate an ECHO and refuse a CHANGE — so a body omitting `status`
+  arrives as "DRAFT" and is refused on any plan not already in DRAFT, exactly as here. What is NOT
+  yet known is whether it is **screen-reachable**: `bcmApi.updatePlan` is called from `BcmPage`
+  with form `values`, and [[F2-293]]'s rule is that this question is **per call site**, so the
+  payload builder has to be read. It is also a `PUT` rather than a `PATCH`, where full-replace
+  semantics make "omitted means default" a defensible reading — the distinction [[F2-238]] used as
+  its slice boundary. **Do not assume it is the same defect; measure it.**
+* **Widening `NeverFiringNullGuardContractTest` to the conjunctive shape** — 4 sites to read, above.
+* **`bcm.bia_assessments.approval_status` has zero CHECK constraints in both databases** — now
+  cheaper, since this slice closed one of its writers, but the create path needs reading first
+  ([[F2-183]]: the constraint and its writers land in one commit).
+* **dev and prod disagree on two CHECKs** — `bcm.crisis_events.status` and `platform.issues.status`
+  are constrained in dev and not in prod, because those constraints sit inside the pending
+  **V345–V394** range. Recorded so nobody files it as a defect ([[F2-255]]'s reading).
+* **The four machines declare themselves as inline `switch` + `Set.of(...).contains(...)`**
+  ([[F2-284]]'s shape), so the legal-target list is not derivable at runtime and all four refusals
+  pass `null` for the `allowed` sentence. Converting those to a declared `Map<String, Set<String>>`
+  would let every refusal name the moves the machine would actually accept — a real improvement, and
+  one that must not be smuggled into a slice about something else.
+
 ## F2-296 — one question, four mechanisms, and the artefact that documents two of them describes them identically without noticing they are the same rule
 
 | | |
