@@ -136,7 +136,11 @@ public class NdiGapService {
      * is filed instead. That asymmetry is the reason this method is not simply "closure stamps a
      * date".
      */
-    private static void applyStatusAndCloseDate(NdiGap g, String next) {
+    private static void applyStatusAndCloseDate(NdiGap g, String requested) {
+        // Normalise BEFORE either branch tests it: the column is case-insensitively collated, so
+        // 'resolved' is accepted by ck_ndi_gap_status and would otherwise match neither RESOLVED
+        // nor NOT_CLOSED, skipping the stamp and the clear alike (F2-179, F2-302).
+        String next = NdiGap.STATUS.require(requested);
         g.setStatus(next);
         if (NdiGap.RESOLVED.equals(next)) {
             if (g.getActualCloseDate() == null) g.setActualCloseDate(LocalDate.now());
@@ -168,9 +172,14 @@ public class NdiGapService {
         if (body.getRiskId()        != null) { crossLink.validateRiskExists(body.getRiskId()); g.setRiskId(body.getRiskId()); }
         if (body.getNotes()         != null) g.setNotes(body.getNotes());
         NdiGap saved = gaps.save(g);
-        if (body.getStatus() != null && !body.getStatus().equals(prevStatus)) {
+        // Both sides are canonical here -- the setter above normalised the incoming value and
+        // everything stored went through the same primitive -- so `equals` is a real comparison
+        // rather than F2-179's trap. Without the normalisation a case-variant echo would read as a
+        // CHANGE and publish a TRANSITION audit row for a move that never happened, which is what
+        // F2-297 found on CmaDisclosureService and TcfdItemService.
+        if (body.getStatus() != null && !g.getStatus().equals(prevStatus)) {
             audit.publishTransition("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
-                prevStatus, body.getStatus(), "Gap status changed");
+                prevStatus, saved.getStatus(), "Gap status changed");
         } else {
             audit.publish("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
                 "UPDATE", "Gap updated");

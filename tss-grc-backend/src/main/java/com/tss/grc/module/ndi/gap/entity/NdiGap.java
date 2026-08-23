@@ -99,6 +99,30 @@ public class NdiGap {
      */
     public static final java.util.Set<String> NOT_CLOSED = java.util.Set.of("OPEN", "IN_PROGRESS");
 
+    /**
+     * The five tokens {@code ck_ndi_gap_status} admits, as the platform's own primitive so
+     * {@code ClosedVocabularyPinTest} mirrors them against the migration by reflection and no second
+     * hand-rolled list can drift from the constraint.
+     *
+     * <p>⚠⚠ F2-302 — this is here because the first draft of the pair rule compared with
+     * {@code RESOLVED.equals(next)} and {@code NOT_CLOSED.contains(next)}, both <b>case-sensitive
+     * against a case-INSENSITIVELY collated column</b>. The CHECK accepts {@code 'resolved'} and
+     * stores it verbatim ([[F2-179]]), so a lower-case status would have skipped <em>both</em>
+     * branches — neither stamping the close date nor clearing it — which is the F2-179 defect inside
+     * the fix written to remove a different one. Normalise on write rather than reaching for
+     * {@code equalsIgnoreCase}, which leaves the odd casing in the column and misses the frontend's
+     * label lookup ({@code gapStatusLabel} and {@code gapStatusTone} both compare exactly).
+     *
+     * <p>{@code require}, not {@code coerce}, by [[F2-182]]'s mechanical test: nothing coerces
+     * upstream and the CHECK is already refusing, so every value that succeeds today is a
+     * case-variant of a legal token and this cannot break a working request — it only turns a 547
+     * that names no field into a 400 that does.
+     */
+    public static final com.tss.grc.common.validation.ClosedVocabulary STATUS =
+        com.tss.grc.common.validation.ClosedVocabulary.of(
+            "status", "ck_ndi_gap_status",
+            "OPEN", "IN_PROGRESS", "RESOLVED", "ACCEPTED_RISK", "CLOSED");
+
     @PrePersist
     void onCreate() {
         if (createdAt == null)        createdAt = LocalDateTime.now();

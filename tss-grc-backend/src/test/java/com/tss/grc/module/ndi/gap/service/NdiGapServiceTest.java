@@ -315,4 +315,40 @@ class NdiGapServiceTest {
             .as("Exactly one place may stamp the close date from the clock.")
             .isEqualTo(1);
     }
+
+    /**
+     * The column collates case-insensitively, so {@code ck_ndi_gap_status} accepts 'resolved' and
+     * stores it verbatim. Before the vocabulary was declared, both branches of the pair rule
+     * compared exactly, so a lower-case status skipped the stamp AND the clear — F2-179's defect
+     * inside F2-302's own fix.
+     */
+    @Test
+    void updateGap_normalisesTheStatusSoThePairRuleStillFires() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("resolved");
+        NdiGap saved = service.updateGap(GAP_ID, patch);
+
+        assertThat(saved.getStatus()).as("stored canonically, not as the caller typed it")
+            .isEqualTo("RESOLVED");
+        assertThat(saved.getActualCloseDate()).as("and the pair still moved together")
+            .isEqualTo(LocalDate.now());
+    }
+
+    /** A token outside the CHECK's vocabulary becomes a 400 naming the field, not a 547. */
+    @Test
+    void updateGap_refusesAStatusTheColumnWouldRejectAnyway() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("TOTALLY_MADE_UP");
+
+        assertThatThrownBy(() -> service.updateGap(GAP_ID, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status");
+    }
 }
