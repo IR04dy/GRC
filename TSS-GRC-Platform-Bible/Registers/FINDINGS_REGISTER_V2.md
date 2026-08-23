@@ -15219,6 +15219,143 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-295 — the gate dropped three whole services rather than mis-attributing one, and the filing that recorded the hazard described the variant nobody was running
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`36384bd1`) |
+| **Severity** | P3 — a **latent-hazard closure, not a defect discovery** ([[F2-283]]). Three of the platform's 327 service sources were never scanned by a hard-zero security invariant; none holds a member of that invariant's defect family today, so nothing was live. The zero it was reporting is now the gate's own over the whole tree rather than over 324 files of it. |
+| **Instrument** | `NeverFiringNullGuardContractTest` — the gate F2-237 opened, F2-238/239/240 emptied, F2-240 promoted to an invariant, and F2-291 found green over 42 sites |
+| **Standards** | none directly — this is instrument integrity for the family that has produced [[F2-291]]'s KYC sanctions bypass, [[F2-292]]'s NAZAHA disclosure reset, [[F2-293]]'s regulator-report reset and [[F2-294]]'s 27-site sweep |
+| **Found by** | executing [[F2-292]]'s filed *"module-aware pairing for both source maps"* and re-deriving it first ([[F2-221]]) |
+| **Verification** | full hermetic suite **4633 → 4635/0/0**; gate **15/15**; mutations **9 killed / 0 survived / 0 anchor-miss / 0 did-not-compile**, plus one withdrawn as INVALID. No production code changed and no probe was run — there is nothing to probe. |
+
+### The filing was half already true, and its stated hazard was the wrong one
+
+[[F2-292]] filed *"the real fix is module-aware pairing on BOTH maps — key by fully-qualified name
+and pair a service with the entity in its own module."* Re-derived:
+
+- **The entity side has paired by module since [[F2-238]].** `measure()` derives `pkgOf` per entry
+  and `initialisersFor` picks the same-named entity whose package shares the longest prefix. That
+  half needed nothing.
+- **The service side keys on the file's SIMPLE name over a `.sorted()` walk.** So where two files
+  share a simple name the last path wins the `put` and **the other file is never scanned at all.**
+
+Four files today, three of them real services:
+
+| shadowed | kept |
+|---|---|
+| `module/audit_eng/service/AuditEngagementService.java` | `module/compliance/service/…` |
+| `module/board_pack/service/BoardPackService.java` | `module/reporting/service/…` |
+| `module/compliance/service/RegulatoryChangeService.java` | `module/regchange/service/…` |
+| `module/cyber/entity/CloudService.java` | `module/outsourcing/entity/…` |
+
+⚙ The fourth is an **entity**, which the `Service.java` suffix catches anyway — its presence in a
+map called *services* is its own small finding, and it is named in the assertion so nobody has to
+rediscover it.
+
+🔑🔑 **F2-292 measured the MERGE variant and its conclusion is right about merging and silent about
+the status quo.** That slice concatenated the colliding sources, watched one phantom finding appear
+naming the wrong table, reverted it and wrote *"the hazard is cross-attribution, not omission."*
+True of merging. **Under `put`, the loser's whole file is outside the population**, which is
+omission — and omission is the quiet direction, because a smaller population reads exactly like a
+cleaner tree.
+
+🔑 **Keying by fully-qualified name has neither failure mode.** Nothing is dropped, and a merged
+value would have defeated the entity pairing that already worked, because `pkgOf` of two
+concatenated files returns whichever `package` line comes first.
+
+### Why the assertion is about the denominator and not the site set
+
+The gate's own measurement over the now-complete population is **still empty**. That is a result
+([[F2-216]]) and it is only trustworthy *because* it now comes from the whole tree — [[F2-205]]'s
+rule that **a hard zero over a population the instrument cannot see is the most reassuring possible
+artefact.**
+
+So `theServiceMapScansEveryServiceSource` asserts:
+
+- the FQN map's size **equals** the `*Service.java` file count — nothing dropped, a hard zero;
+- the simple-name map is **exactly four short** — the drop is real, so a reader cannot mistake the
+  leg for decoration, and reverting `measure()`'s argument is what this catches;
+- the four shadowed paths **by name**, so a NEW collision fails the leg and forces the next reader
+  to ask whether the newly shadowed file holds a guard — the question nobody was in a position to
+  ask while three files were silently outside the population.
+
+⚠ **The reported LABEL stays the simple name**, module-qualified only when that simple name is
+declared twice. Qualifying unconditionally would rename all 38 `CLOSED_BY_F2_291/292/293/294`
+entries, and **a keying fix that renames what a reader has been told is held is indistinguishable
+from a slice that changed what those entries mean.** No ambiguous name produces a site today, so
+the ambiguous branch is unreachable from the live tree and is pinned against a synthetic corpus in
+**both** directions ([[F2-195]]: a branch nothing reaches is a branch nothing checks).
+
+### Three of my own errors, each caught by running something
+
+⚠⚠ **[[F2-274]]'s trap, in a slice written to close a keying hole.** Everything above tests the two
+**accessors** and none of it tests which one the measurement **calls** — so the production path
+could revert one argument with every size assertion green, and the site set cannot see it either,
+because the measured set is empty both ways. 🔑 **A leg that exercises a primitive says nothing
+about whether the code under review CALLS it.** A structural call-site ban was added, and the
+harness confirms it is the only leg that kills that mutation.
+
+⚠⚠ **That ban then matched its own assertion message.** It read comment-stripped source, and the
+assertions quote the very call shapes they are about — [[F2-193]]'s rule that **a detector which
+cannot tell a quotation from a claim forces every correction to paraphrase away its own evidence**,
+landing on a leg written after quoting it. String literals are stripped now.
+
+⚠⚠ **And the stripper's first draft INVERTED ITSELF.** Its own body contains `'"'` — a
+single-quoted double-quote — so the scanner toggled on it and **everything after that point was
+inverted**: real code blanked, string literals preserved. The tell was the *wrong half* of a pair of
+assertions failing, and only the leg's own count caught it. 🔑 **A stripper that mis-identifies one
+span does not degrade, it inverts** — the same family as [[F2-198]]'s two-pass comment stripper and
+[[F2-211]]'s branch order. Char literals are skipped now, with a pin carrying the exact shape.
+
+⚙ **No production code changed, and inventing some to justify the measurement would have been the
+error** ([[F2-284]]'s precedent). There is nothing to probe: the change is entirely to an
+instrument, and its verification is the mutation harness plus the unchanged zero over a wider
+population.
+
+⚙ **M1's first run was an ANCHOR MISS at 2 matches rather than a survivor** — two identical
+call-site lines, and replacing only the first is the point, so the harness declares `want=2`.
+Keeping *did-not-run* distinct from *survived* is what made that legible ([[F2-212]]).
+
+⚙ **`BUILD FAILURE` with no `Tests run:` line, from the working directory drifting to the repo
+root**, where there is no POM — [[F2-255]]'s tell, and the reason every `mvn` command in this
+programme carries the absolute path.
+
+### The other keyed map, closed rather than filed
+
+Shipping a slice about keying ambiguity that closes **one of two** keyed maps is [[F2-215]]'s
+two-of-N in exactly the shape this lineage keeps finding, so `liveWriters()` was closed here.
+
+Simple-name keying is **right** for it — it is a lookup map and a `Moved` record names its writer by
+simple name — but a lookup of an **ambiguous** name silently returns whichever path sorted last.
+[[F2-287]]'s rule: an unresolved ambiguity must never fall back to something confident, because an
+entry resolved against the wrong module reads exactly like one resolved against the right one. Three
+service simple names collide today and no held record names one, so the leg is a tripwire on the
+direction that fails confidently rather than loudly.
+
+⚠⚠ **And the harness found that leg was VACUOUS.** Blinding the detector **SURVIVED**, because
+*"collect the violations, assert the list empty"* produces an empty list whether it is working or
+dead — 🔑 **on a clean corpus an empty list is what a correct detector and a rotted one both
+return** ([[F2-250]]). Extracted as `ambiguousLookupsIn(code, ambiguousNames)` so the leg drives it
+over a **synthetic** corpus in both directions: it must flag `services.get("BoardPackService")` and
+must **not** flag `services.get("KycService")`, because a tripwire that fires on an unambiguous
+lookup fails on correct code ([[F2-214]]).
+
+### Filed
+
+⚠ `sources("Service.java")` matches by suffix, so two **entity** files named `CloudService.java` are
+in a map called *services*. Harmless — an entity declares no null guards, so it contributes nothing
+— and it means the map's name overstates its contents. Narrowing the glob to `/service/` packages
+would be a change to a shipped gate's population for no measured gain, so it is named in the
+assertion instead.
+
+⚠ `*Request.java` is **58 files with 58 distinct names**, so the writer half's collision hazard is
+absent by **data** rather than by construction — a fact about today ([[F2-182]]), which is why the
+tripwire above is keyed on the *service* collision set that is non-empty and asserted to stay so.
+
+---
+
 ## F2-294 — the remedy was already written at nine of these sites and could not run, and the third kind of member is one where deleting the initialiser would have been wrong
 
 | | |
