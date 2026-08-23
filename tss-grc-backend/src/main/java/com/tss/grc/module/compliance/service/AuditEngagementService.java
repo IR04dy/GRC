@@ -167,7 +167,15 @@ public class AuditEngagementService {
     }
 
     private void apply(AuditEngagement target, AuditEngagement src) {
-        if (src.getEngagementCode()       != null) target.setEngagementCode(src.getEngagementCode());
+        // F2-307 — settable at birth, fixed thereafter. Nothing mints this code, so a caller
+        // names it on create; renaming it afterwards would break anything already citing it.
+        ServerOwnedState.requireImmutableReference(
+            src.getEngagementCode(), target.getEngagementCode(), "engagementCode",
+            "Audit engagement " + (target.getId() == null ? "(new)" : target.getId()),
+            "Omit engagementCode, or send the value already recorded.");
+        if (src.getEngagementCode() != null && target.getEngagementCode() == null) {
+            target.setEngagementCode(src.getEngagementCode());
+        }
         if (src.getTitleEn()              != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()              != null) target.setTitleAr(src.getTitleAr());
         if (src.getAuditType()            != null) target.setAuditType(src.getAuditType());

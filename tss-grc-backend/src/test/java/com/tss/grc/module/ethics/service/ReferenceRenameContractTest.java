@@ -106,4 +106,66 @@ class ReferenceRenameContractTest {
         assertThat(new EthicsCase().getCaseCode()).isNull();
         assertThat(new Disclosure().getDisclosureCode()).isNull();
     }
+
+    /**
+     * F2-306/F2-307 — every closed site still calls the primitive, with the field it claims.
+     *
+     * <p>The rule's behaviour is unit-tested above. What that cannot see is whether a given SERVICE
+     * still routes through it: four of the six sites live in services with four different mock sets,
+     * and a behaviour test each would cost more than it proves. This leg is the proportionate
+     * instrument, and it is the one that catches a later slice quietly restoring a plain setter
+     * write — which is exactly how these sites came to exist, since every one of them was a
+     * one-line {@code if (src.getX() != null) target.setX(src.getX())}.
+     *
+     * <p>⚠ Asserted per (file, field), not by counting call sites: a count cannot see one site
+     * being replaced while another is added, and three of these files hold more than one reference
+     * setter, only some of which are this kind ([[F2-306]]'s per-field subtraction lesson).
+     */
+    @Test
+    void everyClosedSiteStillCallsThePrimitiveWithItsOwnField() throws java.io.IOException {
+        java.nio.file.Path main = java.nio.file.Paths.get("src", "main", "java", "com", "tss", "grc",
+                                                          "module").toAbsolutePath().normalize();
+        java.util.Map<String, String> sites = new java.util.LinkedHashMap<>();
+        sites.put("ethics/service/EthicsCaseService.java", "CaseCode");
+        sites.put("ethics/service/DisclosureService.java", "DisclosureCode");
+        sites.put("ndi/gap/service/NdiGapService.java", "GapCode");
+        sites.put("compliance/service/AuditEngagementService.java", "EngagementCode");
+        sites.put("change_mgmt/service/ChangeManagementService.java", "ChangeCode");
+
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, String> e : sites.entrySet()) {
+            java.nio.file.Path p = main.resolve(e.getKey());
+            if (!java.nio.file.Files.exists(p)) {
+                missing.add(e.getKey() + " — file not found");
+                continue;
+            }
+            String code = com.tss.grc.support.GuardExpressions.stripComments(
+                java.nio.file.Files.readString(p));
+            if (!code.contains("requireImmutableReference")) {
+                missing.add(e.getKey() + " — no longer calls requireImmutableReference");
+                continue;
+            }
+            if (!code.contains("get" + e.getValue() + "()")) {
+                missing.add(e.getKey() + " — no longer reads get" + e.getValue() + "()");
+            }
+        }
+
+        // NdiGapService holds TWO of these, so its file appears once above and must guard both.
+        java.nio.file.Path gap = main.resolve("ndi/gap/service/NdiGapService.java");
+        String gapCode = com.tss.grc.support.GuardExpressions.stripComments(
+            java.nio.file.Files.readString(gap));
+        long guards = gapCode.split("requireImmutableReference", -1).length - 1;
+        if (guards < 2) {
+            missing.add("ndi/gap/service/NdiGapService.java — guards " + guards
+                        + " reference(s), expected 2 (gapCode and actionCode)");
+        }
+
+        assertThat(missing).as("""
+            A closed rename site no longer routes through ServerOwnedState.requireImmutableReference.
+
+            Every one of these began as a one-line `if (src.getX() != null) target.setX(src.getX())`,             so restoring that shape is a single-line change that no behaviour test in the owning             service would notice. If a site was deliberately reopened, lower             ClientSuppliedReferenceRatchetTest's UPDATE_PATH_REFERENCE_WRITES in the same commit             and say why.
+
+            %s""".formatted(String.join("\n            ", missing)))
+            .isEmpty();
+    }
 }

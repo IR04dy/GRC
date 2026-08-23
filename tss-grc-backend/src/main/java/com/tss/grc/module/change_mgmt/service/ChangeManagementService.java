@@ -1,5 +1,6 @@
 package com.tss.grc.module.change_mgmt.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.exception.ChangeAuthorityNotConfiguredException;
 import com.tss.grc.common.tenant.TenantContext;
@@ -1842,7 +1843,15 @@ public class ChangeManagementService {
         // property F2-30's `@NotBlank` was protecting. `requireNotBlank` also serves `updateTask`.
         requireNotBlank("titleEn", src.getTitleEn());
         requireNotBlank("titleAr", src.getTitleAr());
-        if (src.getChangeCode()           != null) target.setChangeCode(src.getChangeCode());
+        // F2-307 — settable at birth, fixed thereafter. Nothing mints this code, so a caller
+        // names it on create; renaming it afterwards would break anything already citing it.
+        ServerOwnedState.requireImmutableReference(
+            src.getChangeCode(), target.getChangeCode(), "changeCode",
+            "Change request " + (target.getId() == null ? "(new)" : target.getId()),
+            "Omit changeCode, or send the value already recorded.");
+        if (src.getChangeCode() != null && target.getChangeCode() == null) {
+            target.setChangeCode(src.getChangeCode());
+        }
         if (src.getTitleEn()              != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()              != null) target.setTitleAr(src.getTitleAr());
         if (src.getDescriptionEn()        != null) target.setDescriptionEn(src.getDescriptionEn());
