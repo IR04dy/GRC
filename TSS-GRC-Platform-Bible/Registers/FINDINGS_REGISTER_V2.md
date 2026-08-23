@@ -15219,6 +15219,107 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-301 — a missing table errors; a confusably named one succeeds with the wrong rows
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — a **latent-hazard closure with a measured cost already paid.** No production code changes and no data defect: this slice adds the instrument that would have stopped [[F2-300]] drawing four wrong conclusions from `bcm.bcm_exercises`. Five tables have a name that shadows a table the platform maps, and **every one returns a different count from its twin**, so a lookup by name yields a plausible number rather than an error. |
+| **Registers** | The five shadows and their live twins, dev rows, identical in production: `bcm.bcm_exercises` **14** → `bcm.exercises` **13** · `compliance.compliance_assessments` **10** → `compliance.assessments` **4** · `compliance.compliance_findings` **18** → `compliance.findings` **41** · `workflow.workflow_definitions` **20** → `workflow.definitions` **6** · `workflow.workflow_instances` **14** → `workflow.instances` **12** |
+| **Standards** | — (an instrument over the schema contract) |
+| **Found by** | [[F2-300]]'s own measurement error, generalised: it filed the orphan as an open question, and the orphan's *disposition* was already recorded. Asking what was genuinely unmeasured gave the **hazard** rather than the status. |
+| **Verification** | suite **4672 → 4674/0/0**; mutation harness **6 killed / 0 survived / 0 anchor-miss**, two of them after correcting holes the first run found |
+
+### The disposition was recorded; the hazard was not
+
+`TABLE_DISPOSITION.md` has carried `bcm.bcm_exercises` since [[F2-141]] — *"no JPA mapping and no
+Java reference; the only writer is a seed script"* — and `SchemaContractRatchetTest`'s
+`BASELINE_NO_CODE_TABLES = 36` counts it. So F2-300's filing of it as *"dead schema to drop or a
+register somebody meant to keep"* was **redundant**, and that is corrected in this slice's docs
+rather than left to be re-derived.
+
+🔑 **What no artefact recorded is that the name is confusable.** A table that does not exist makes a
+query fail; a table with a name one segment away from the live one makes it **succeed with the wrong
+rows**. `compliance.compliance_findings` is the one to fear next: **18 rows against the live
+`compliance.findings`' 41**, so measuring the shadow under-reports an audit-findings register by more
+than half — wrong in the flattering direction, which is the half less likely to be questioned
+([[F2-210]]).
+
+### The shape alone is not the defect, which is why this is a named set and not a rule
+
+**54 mapped tables use the `<schema>_<thing>` shape with no bare twin at all** — `bcm.bcm_plans`,
+`cyber.cyber_controls`, `evidence.evidence_items` — so it is house style. What makes a pair dangerous
+is the shape *plus* exactly one side being unmapped. Of the six such pairs in the register:
+
+* **five** are these, prefixed side unmapped;
+* **none** runs the other way round with the prefixed side live;
+* **one has BOTH sides mapped** — `cyber.cyber_incidents` (26 rows, `module/cyber`) beside
+  `cyber.incidents` (48 rows, `module/incident`) — two entities in two modules over one concept.
+  That is [[F2-196]]'s shape and it is **filed, not fixed**: choosing which register is authoritative
+  changes what the platform reports about security incidents.
+
+Asserted **exactly** rather than as a ceiling, because a ceiling would let a new shadow in behind a
+dropped one and make a tolerated pair indistinguishable from a reviewed one (house rule 3).
+
+### Three instrument errors of mine, each caught by running something
+
+**(a) A source grep for `@Table` reported SEVEN pairs**, because it cannot see a `@JoinTable`:
+`iam.role_permissions` and `iam.user_roles` are mapped by `Role` and `User` and are not shadows at
+all. That is precisely the over-reporting `mappedTables()`'s own javadoc warns about, so the gate
+takes its population from **reflection**.
+
+**(b) Reading "unmapped" off the register as `jpa_files` being non-empty made all 471 rows read as
+mapped and the population ZERO** — `jpa_files` is a **count**, so `"0"` is a non-empty string.
+🔑 **A population of zero reads exactly like a clean tree**, and the only reason it was caught is
+that a control count printed beside it stayed non-zero.
+
+**(c) Line endings are a PER-FILE fact in this tree, not a repo-wide one.**
+`SchemaContractRatchetTest` is pure LF (1,259 bare LF, 0 CRLF) while both files [[F2-299]] and
+[[F2-300]] created are pure CRLF, so a patch script must **detect** rather than assume — an anchor
+written with the wrong separator matches nothing, and matching nothing reads exactly like the edit
+being unnecessary. Eighth instance of the line-ending trap in this lineage, and the first where the
+lesson is that the *tree* is mixed. ⚠ The attempt to teach the script that was an inline `py -c`,
+which mangled its own escape sequences, missed every replacement and **still printed `patched`** —
+the recorded heredoc landmine's dangerous mode, in which a script certifies a write it did not make.
+
+### The harness refuted a claim I had written into the gate
+
+**M3 and M6 both SURVIVED the first run, and both were my error rather than a gate hole**
+([[F2-206]]: a surviving mutant is a hole only if the mutated code is actually wrong).
+
+* **M3** widened `shadowOf` to strip the **first** segment rather than the schema name. The javadoc
+  claimed a looser rule *"reported all 34"* legitimate parent/child pairs. It does not — those 34
+  are mapped on **both** sides, and this gate's left side is always unmapped, so measured over
+  today's register a generic prefix/suffix rule and the narrow one return **the same five pairs**.
+  🔑 **My own earlier measurement had already printed that (LOOSE 5, TIGHT 5) and I wrote the
+  stronger claim anyway.** The narrowing is **prospective**; the javadoc says so now, and the only
+  thing carrying it is the synthetic corpus — to which a case was added that a leading-segment
+  widening actually fails, because `ml_model_audit` minus its first segment is `model_audit`, which
+  nothing maps, so the existing case kills a *trailing* widening and lets a *leading* one through.
+* **M6** dropped the no-bare-twin condition from the anti-vacuity floor, moving the count 54 → 55
+  against a floor of 40. 🔑 **[[F2-215]]'s rule from the other side: a floor is only worth having if
+  it sits above the largest WRONG answer, and here the wrong answer is HIGHER than the right one, so
+  no floor can separate them.** An upper bound was the obvious fix and would fail the day a
+  legitimate prefixed table is added; the **condition** is asserted instead —
+  `cyber.cyber_incidents` has a mapped bare twin, so it must never appear in the house-style set.
+
+### Filed
+
+* **`cyber.cyber_incidents` (26 rows) beside `cyber.incidents` (48 rows)** — both mapped, both live,
+  **same schema**, two entities in two modules for one concept, plus `cyber_lc.cyber_incidents` (10
+  rows, no server surface) which [[F2-204]] already filed. Three incident registers.
+  [[F2-196]]'s shape, and an **owner decision**: picking a winner changes what the platform reports
+  about security incidents, and [[F2-212]] and [[F2-281]] have both already done work on
+  `cyber.incidents` specifically.
+* **The five shadows themselves** remain — dropping a table in a customer database is not a side
+  effect of an instrument slice (house rule 6), and they are already counted in
+  `BASELINE_NO_CODE_TABLES`. What is new is that the *name* is now held, so a sixth cannot ship
+  quietly.
+* **The narrow rule cannot see a shadow that is not schema-prefixed** (`bcm.exercises_old` would
+  pass), and it is scoped that way deliberately because the loose form fails on 34 legitimate
+  parent/child pairs. Said out loud, because a hard assertion over a population the instrument
+  cannot see is the most reassuring possible artefact ([[F2-205]]).
+
 ## F2-300 — two tables differing by a prefix, one live and one orphaned, and the orphan sorts first in a name search
 
 | | |
@@ -15292,6 +15393,12 @@ select, so a refusal would break working usage ([[F2-214]]).
 * **`bcm.bcm_exercises`, the orphan** — 14 rows, no entity, no CHECKs, reachable by nothing. Either
   it is dead schema to drop or a register somebody meant to keep; both are owner decisions, and
   dropping a table in a customer database is not a side effect of a service fix.
+  ⚠ **Corrected by [[F2-301]]: this filing was redundant.** `TABLE_DISPOSITION.md` has recorded the
+  table since [[F2-141]] and `BASELINE_NO_CODE_TABLES = 36` counts it, so its *disposition* was never
+  the open question. What was genuinely unmeasured was the **name hazard** — that the shadow returns
+  14 rows where the live register has 13, so a lookup by name succeeds with the wrong data instead of
+  failing. 🔑 **A filing is worth checking against the instruments that already exist before it is
+  written**, which is [[F2-299]]'s lesson one artefact over.
 * **`bcm.bia_records.status` as free text**, above — needs a declared lifecycle before a constraint.
 * **`bcm.bia_records` has no transition route at all**, so its status is pure data entry while three
   services read the register ([[F2-282]]) — and F2-282 deliberately left those readers not
