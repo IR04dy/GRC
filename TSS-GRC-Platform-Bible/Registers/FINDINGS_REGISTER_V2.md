@@ -15219,6 +15219,84 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-300 — two tables differing by a prefix, one live and one orphaned, and the orphan sorts first in a name search
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — **two latent hazards closed, and a measurement error that produced four wrong conclusions.** `completeExercise` owns the pair *(status = COMPLETED, executedDate stamped from the clock)*; the entity-bound create and full-replace PUT wrote both fields independently and unconditionally, so either could produce a COMPLETED exercise with **no execution date** — the evidence an ISO 22301 / NCEMA reviewer reads to accept the exercise took place. And `BcmExercise#status` carried `= "SCHEDULED"`, so a partial PUT **silently reset a COMPLETED exercise**. Both reachable only by a partial-body caller, which `BcmPage`'s form is not — so latent, and saying so is the point ([[F2-283]]). |
+| **Registers** | `bcm.exercises` — **13 rows, COMPLETED ×12 / SCHEDULED ×1, three CHECK constraints, 0 COMPLETED without a date**, identical in dev and prod |
+| **Standards** | ISO 22301 §8.5 / NCEMA (the exercise programme the execution date evidences) |
+| **Found by** | Executing [[F2-299]]'s filing (*"`bia_records` and `bcm_exercises` have no CHECK and both take a caller's status"*) and re-deriving it ([[F2-221]]), which split the two registers apart and refuted half the premise. |
+| **Verification** | suite **4664 → 4672/0/0**; probe **12/12** as `compliance`, never `admin`; register restored to 13 rows with 0 tagged rows in either database |
+
+### The headline is my own measurement error, and it was the expensive part
+
+`BcmExercise` maps `@Table(name = "exercises")`. I measured **`bcm.bcm_exercises`** by name and drew
+four wrong conclusions: *zero CHECK constraints*, *a column default of `PLANNED`*, *`PLANNED` is a
+seed-only synonym of SCHEDULED*, and *2 COMPLETED rows with no execution date*. The real table has
+**three** CHECKs — including `CK_bcm_exer_status`, which admits exactly the four tokens the form
+offers — a status default of `SCHEDULED` matching the entity, and **zero** COMPLETED rows without a
+date. So there was no four-way disagreement, no synonym problem, and no live data defect.
+
+🔑🔑 **`bcm.bcm_exercises` is a V1-era orphan: no `@Entity` maps it**, 14 rows, zero CHECKs, holding
+a `PLANNED` status the real register's CHECK would refuse — while `DashboardService` correctly reads
+`bcm.exercises`. **Two tables differing by a prefix, one live and one orphaned, and the orphan sorts
+FIRST in a name search.** Third instance of the guessed-identifier landmine in this programme after
+[[F2-297]]'s `ndi.gaps` and [[F2-283]]'s `bcm.business_process`, and by far the most expensive,
+because **the wrong table answered every question plausibly** — a missing table gives an error, a
+*different* table gives data.
+
+⚠ It cost real residue too. The probe's cleanup matched the wrong table, so its first run left 3
+rows in `bcm.exercises`. The tell was the cleanup reporting **"deleted 0" against a register whose
+count had not moved**; re-pointed and re-run it deleted 3 and the register returned to 13.
+🔑 **A cleanup reporting zero against an unchanged count is not a clean register — it is a cleanup
+looking somewhere else.**
+
+### The guard placement needed correcting mid-slice, and the first version failed on correct usage
+
+With `executedDate` still written unconditionally, a partial edit of a COMPLETED exercise nulled the
+date and then tripped the new invariant — **a 400 on renaming a completed exercise**, which is
+exactly the trap [[F2-297]] and [[F2-298]] were about. Both fields are null-guarded now, so
+*omitted* means *leave alone* — the semantics this codebase's PUTs settled on — and the pair moves
+together. Clearing an execution date is therefore not expressible through the PUT, which is the
+right answer for the field that evidences the exercise happened. **The test asserting the old 400
+was rewritten rather than kept**, because it was asserting the wrong contract.
+
+### The reset half is the sixth instance of one family
+
+`= "SCHEDULED"` on an entity-bound update whose status write was unconditional is [[F2-238]]'s reset
+shape, after `CrisisEvent` / `Issue` / `BcmBiaAssessment` (F2-238), `BcpPlan` (F2-297) and `BcmPlan`
+(F2-298). It matters more than the row count suggests: **12 of the 13 live rows are COMPLETED**, so
+the population a partial PUT could reset is nearly the whole register. `createExercise` owns the
+default now — as a **default**, not `requireInitial`, because recording an exercise run offline
+(created straight into COMPLETED with its date) is legitimate and the create form offers the full
+select, so a refusal would break working usage ([[F2-214]]).
+
+### No migration, and two things deliberately not done
+
+* **No new CHECK**: `CK_bcm_exer_status` already constrains the column and already agrees with the
+  form. The invariant this slice adds — *COMPLETED implies an execution date* — is expressible as
+  `NOT (status = 'COMPLETED' AND executed_date IS NULL)` and is deliberately enforced in the service
+  instead, because a service refusal names the field **and** the `/complete` route ([[F2-180]])
+  where a 547 names neither.
+* **`bcm.bia_records` was left alone, and that is F2-183's rule rather than reticence.** It
+  genuinely has no CHECK and no machine — `createBia` sets no status at all, `updateBia` copies the
+  caller's unconditionally, and there is no transition route — so its status is free text. But
+  **nothing declares a vocabulary for it anywhere**, and the stored values (APPROVED 6 /
+  IN_PROGRESS 2 / UNDER_REVIEW 1 / DRAFT 1) are data rather than a declaration, so a CHECK there
+  would invent a lifecycle nobody designed — V375's `consumer.complaint.subcategory` precedent.
+
+### Filed
+
+* **`bcm.bcm_exercises`, the orphan** — 14 rows, no entity, no CHECKs, reachable by nothing. Either
+  it is dead schema to drop or a register somebody meant to keep; both are owner decisions, and
+  dropping a table in a customer database is not a side effect of a service fix.
+* **`bcm.bia_records.status` as free text**, above — needs a declared lifecycle before a constraint.
+* **`bcm.bia_records` has no transition route at all**, so its status is pure data entry while three
+  services read the register ([[F2-282]]) — and F2-282 deliberately left those readers not
+  consulting status, which is still the right call and still an owner decision.
+
 ## F2-299 — the vocabulary I documented one slice earlier had five tokens and the machine has four, and the citation is what made it credible
 
 | | |
