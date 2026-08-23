@@ -15219,6 +15219,98 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-299 — the vocabulary I documented one slice earlier had five tokens and the machine has four, and the citation is what made it credible
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — a **constraint closure with a documentation defect inside it**. `bcm.bcm_plans` had **zero CHECK constraints**, so `status` was narrowed only by `BcmService`'s five writers. No live defect: every writer is a literal from the machine or `ServerOwnedState.requireInitial`, so nothing reachable could store an out-of-vocabulary value. The defect is that **the artefact a reader would have written the constraint from was wrong.** |
+| **Registers** | `bcm.bcm_plans` — **10 rows in each database (8 live + 2 soft-deleted), DRAFT ×7 / APPROVED ×3, 0 NULLs, 0 non-canonical casings, 0 outside the four-token vocabulary** |
+| **Standards** | ISO 22301 (the plan lifecycle the CHECK's four tokens belong to) |
+| **Found by** | Executing [[F2-298]]'s own filing — *"zero CHECKs on `status`, cheapest now that the writers were touched"* — and re-deriving the writers first ([[F2-221]]) rather than trusting it. |
+| **Verification** | suite **4660 → 4664/0/0**; V395 applied **twice** to dev, idempotent, enabled and **trusted**, register unchanged; probe **12/12** as `compliance`, never `admin`, driving all four tokens through their real routes |
+
+### The headline: my own javadoc named a fifth state, and cited the file that does not have it
+
+`BcmPlan#status`'s javadoc read `DRAFT | UNDER_REVIEW | APPROVED | INVOKED | ARCHIVED (see
+BcmService)`. Measured: **`ARCHIVED` appears 0 times in `BcmService`, 0 times in its controller,
+0 times in `BcmPage.tsx`.** I wrote that line **one slice earlier** (F2-298) by copying the
+vocabulary of the *canonical* register, `BcpPlan`, which really does have ARCHIVED — along with
+PUBLISHED, SUPERSEDED and CANCELLED. So [[F2-234]]'s two-registers-for-one-concept hazard bit the
+**documentation** before it bit any code.
+
+🔑🔑 **The citation is what made it credible: *"see BcmService"* invites the reader not to look.**
+And it would have been load-bearing — **writing V395's CHECK from that line would have admitted a
+token no route can produce.** That is worse than [[F2-296]]'s *"a CHECK admitting today's values
+blesses the synonyms"*, because a token nothing writes makes the vocabulary look like **five**:
+a later reader counting the CHECK would conclude the machine has an archive state, and the one
+place that says otherwise is the code they were told they need not read.
+
+### The gate therefore derives the vocabulary instead of holding a list
+
+`BcmPlanStatusVocabularyTest` reads the **writers** — every `setStatus("LITERAL")` on a local of
+type `BcmPlan`, plus `INITIAL_PLAN_STATUS` by reflection — and asserts that set equals the tokens
+parsed out of V395 by `MigrationVocabularies`, **in both directions**:
+
+* a token the CHECK admits that no writer produces is a **blessed unreachable state** — the
+  ARCHIVED defect, and precisely what a hand-written list would not have caught, because the
+  hand-written list *was* the defect;
+* a token a writer produces that the CHECK refuses turns a legal transition into a **547** at run
+  time, which surfaces as a 409 naming no field ([[F2-230]]).
+
+⚠ **The scan is scoped by the RECEIVER's declared type, and that is not tidiness.** `BcmService`
+also writes `e.setStatus("COMPLETED")` on a `BcmExercise` and copies a caller's status onto a
+`BiaRecord`. A bare `setStatus\("([A-Z_]+)"\)` sweep of that file would have put **COMPLETED** in
+the plan's vocabulary and then demanded the CHECK admit it — a gate failing on correct code, the
+one thing a gate must never do ([[F2-214]]). Pinned against the live file, because that literal is
+really there and its presence is the whole reason the scoping exists.
+
+### F2-183's sequence, done in order for once
+
+That rule — *a constraint and its writers land in the same commit* — is why this could not have
+been done two slices ago and can be done now. [[F2-296]] gave the register an echo-tolerant,
+change-refusing guard on the entity-bound PUT; [[F2-298]] removed the `= "DRAFT"` initialiser that
+made that guard fire on every non-DRAFT plan. With those closed, **all five writers are literals
+or `requireInitial`**, and nothing outside `BcmService` writes the column (checked, not assumed).
+🔑 **F2-296's own finding was a filing that claimed this state of affairs before it was true; the
+difference here is that the claim was re-derived rather than quoted.**
+
+### Measured over ALL rows, because `ADD CONSTRAINT` verifies soft-deleted ones too
+
+**10 rows in each database, of which 2 are soft-deleted** — a live-only count would have reported
+8 and missed them. They happen to be DRAFT so nothing was at risk, but the method matters: a
+constraint does not respect `@Where(is_deleted = 0)`, and one out-of-vocabulary archived row would
+have failed Flyway and blocked every later migration on the deployed server ([[F2-183]]).
+
+### The migration's self-checks, and the one that is deliberately skippable
+
+V395 THROWs on: a pre-flight offender scan that **names the rows** (a bare *"constraint violated"*
+sends the reader nowhere and this file blocks every later migration until resolved); the
+constraint being missing, disabled, **or not trusted** (`is_not_trusted = 1` is what a
+`WITH NOCHECK` add leaves behind and looks identical to a verified constraint in any listing that
+only checks the name); all four tokens being accepted; and **`ARCHIVED` being refused** — a
+negative control, so a later hand-edit cannot widen the CHECK to match the prose this finding is
+about ([[F2-197]]).
+
+⚠ The last two probe an existing row inside a rolled-back transaction, so **on an empty table they
+verify nothing** — [[F2-183]]'s no-op-branch hazard. They are deliberately **not** made to fail
+there: a fresh install runs this before any plan exists, and requiring rows would be a migration
+asserting **tenant data** rather than its own writes, which is the check [[F2-260]] had to delete
+from V383 because it would have blocked the whole chain. What covers the empty case is the
+hermetic gate, which needs no rows at all.
+
+### Filed
+
+* **`bcm.bcp_plans`** — the canonical sibling — still has `ck_bcp_status`, so it is already
+  constrained; but its vocabulary is **seven** tokens against this register's four, for what the
+  platform presents as one concept. Reconciling them is [[F2-234]]'s filed owner decision and this
+  slice deliberately did not touch it: the point of the ARCHIVED finding is that the two
+  vocabularies are genuinely different, not that one is wrong.
+* **`bcm.bia_records` and `bcm.bcm_exercises` have no CHECK either**, and both take a caller's
+  status through `BcmService` (lines 313 and 375) — so unlike the plan register their writers are
+  **open**, and F2-183's rule says the constraint cannot go first. Reading those two writers is
+  the next unit of work here.
+
 ## F2-298 — the fifth instance of one initialiser, and the gate population boundary that let four of them recur
 
 | | |
