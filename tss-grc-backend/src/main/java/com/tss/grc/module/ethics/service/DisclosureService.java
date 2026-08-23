@@ -225,7 +225,16 @@ public class DisclosureService {
     }
 
     private void apply(Disclosure target, Disclosure src) {
-        if (src.getDisclosureCode()         != null) target.setDisclosureCode(src.getDisclosureCode());
+        // F2-306 - F2-292 filed this one and nobody had closed it. Same shape as the ethics case
+        // code: apply is shared by create and update, nothing mints it, so a conflict-of-interest
+        // disclosure's reference could be renamed after an auditor had cited it.
+        ServerOwnedState.requireImmutableReference(
+            src.getDisclosureCode(), target.getDisclosureCode(), "disclosureCode",
+            "Disclosure " + (target.getId() == null ? "(new)" : target.getId()),
+            "Omit disclosureCode, or send the value already recorded.");
+        if (src.getDisclosureCode()         != null && target.getDisclosureCode() == null) {
+            target.setDisclosureCode(src.getDisclosureCode());
+        }
         if (src.getDisclosureType()         != null) target.setDisclosureType(src.getDisclosureType());
         if (src.getTitleEn()                != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()                != null) target.setTitleAr(src.getTitleAr());

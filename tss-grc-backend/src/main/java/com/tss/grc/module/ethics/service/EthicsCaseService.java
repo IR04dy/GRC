@@ -297,7 +297,16 @@ public class EthicsCaseService {
     }
 
     private void apply(EthicsCase target, EthicsCase src) {
-        if (src.getCaseCode()           != null) target.setCaseCode(src.getCaseCode());
+        // F2-306 — `apply` is shared by create and update and NOTHING mints this code, so a
+        // caller both named it at birth and could rename it afterwards. A case code is what a NAZAHA
+        // or internal-audit reference cites; renaming it breaks the citation silently.
+        ServerOwnedState.requireImmutableReference(
+            src.getCaseCode(), target.getCaseCode(), "caseCode",
+            "Ethics case " + (target.getId() == null ? "(new)" : target.getId()),
+            "Omit caseCode, or send the value already recorded.");
+        if (src.getCaseCode()           != null && target.getCaseCode() == null) {
+            target.setCaseCode(src.getCaseCode());
+        }
         if (src.getTitleEn()            != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()            != null) target.setTitleAr(src.getTitleAr());
         if (src.getCategory()           != null) target.setCategory(src.getCategory());
