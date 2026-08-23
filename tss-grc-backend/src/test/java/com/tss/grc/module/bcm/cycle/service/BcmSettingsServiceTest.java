@@ -64,7 +64,14 @@ class BcmSettingsServiceTest {
     }
 
     @Test void update_rejectsWarningGreaterThanCritical() {
-        BcmSettings existing = new BcmSettings(); existing.setOrganisationId(ORG_ID);
+        // ⚠ F2-294 — `new BcmSettings()` used to be a complete row because the eleven NOT
+        // NULL tolerances were field initialisers. They moved to
+        // BcmSettingsService.defaults() (the initialisers made every null guard in update()
+        // fire, so a partial PATCH reset the tenant's whole tolerance set), and a fixture
+        // built from the bare constructor now describes a row that cannot exist in either
+        // database — validate() unboxes all eleven, so it NPEs before reaching the check
+        // under test. Naming defaults() says what the fixture means: a stored row.
+        BcmSettings existing = BcmSettingsService.defaults(); existing.setOrganisationId(ORG_ID);
         when(repo.findByOrganisationId(ORG_ID)).thenReturn(Optional.of(existing));
 
         BcmSettings patch = new BcmSettings();
@@ -75,7 +82,7 @@ class BcmSettingsServiceTest {
     }
 
     @Test void update_rejectsCriticalGreaterThanDefaultExerciseFreq() {
-        BcmSettings existing = new BcmSettings(); existing.setOrganisationId(ORG_ID);
+        BcmSettings existing = BcmSettingsService.defaults(); existing.setOrganisationId(ORG_ID);
         when(repo.findByOrganisationId(ORG_ID)).thenReturn(Optional.of(existing));
 
         BcmSettings patch = new BcmSettings();
@@ -87,7 +94,7 @@ class BcmSettingsServiceTest {
     }
 
     @Test void update_rejectsUnknownImportStatus() {
-        BcmSettings existing = new BcmSettings(); existing.setOrganisationId(ORG_ID);
+        BcmSettings existing = BcmSettingsService.defaults(); existing.setOrganisationId(ORG_ID);
         when(repo.findByOrganisationId(ORG_ID)).thenReturn(Optional.of(existing));
 
         BcmSettings patch = new BcmSettings();
@@ -98,7 +105,7 @@ class BcmSettingsServiceTest {
     }
 
     @Test void update_rejectsRiskMatrixOutOfRange() {
-        BcmSettings existing = new BcmSettings(); existing.setOrganisationId(ORG_ID);
+        BcmSettings existing = BcmSettingsService.defaults(); existing.setOrganisationId(ORG_ID);
         when(repo.findByOrganisationId(ORG_ID)).thenReturn(Optional.of(existing));
 
         BcmSettings patch = new BcmSettings();
@@ -109,7 +116,7 @@ class BcmSettingsServiceTest {
     }
 
     @Test void reset_restoresDefaultsAndClearsBlobs() {
-        BcmSettings existing = new BcmSettings(); existing.setOrganisationId(ORG_ID);
+        BcmSettings existing = BcmSettingsService.defaults(); existing.setOrganisationId(ORG_ID);
         existing.setRtoWarningHours(99);
         existing.setApprovalMatrixJson("{\"foo\":\"bar\"}");
         existing.setRegulatoryImportStatus("COMPLETE");

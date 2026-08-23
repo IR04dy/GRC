@@ -50,7 +50,11 @@ public class WorkingPaper {
 
     @Column(name = "controls_covered", columnDefinition = "NVARCHAR(MAX)") private String controlsCovered;
 
-    @Column(precision = 6, scale = 2) private BigDecimal hours = BigDecimal.ZERO;
+    // ⚠⚠ F2-294 removed `= BigDecimal.ZERO`. 12 of 12 live working papers carry real
+    // recorded hours (2.5 … 16.0) in both databases, so a partial body zeroed every IIA
+    // Standard 2330 time record in the register. `createWorkingPaper` saves the bound
+    // entity and now owns the default, because the column is NOT NULL.
+    @Column(precision = 6, scale = 2) private BigDecimal hours;
 
     @Column(name = "is_deleted", nullable = false) private Short isDeleted = 0;
 }

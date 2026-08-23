@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditEngagement;
 import com.tss.grc.module.compliance.repository.AuditEngagementRepository;
@@ -27,6 +28,16 @@ public class AuditEngagementService {
         "REPORTING", "MGMT_RESPONSE", "CLOSED", "FOLLOW_UP"
     );
 
+    /**
+     * F2-294 — DERIVED from {@link #STATUS_ORDER} rather than typed, so the state a create
+     * may land in and the ladder {@code advance} walks cannot drift apart (F2-217's rule:
+     * declare the initial state once and let both the default and the guard read it).
+     */
+    static final String INITIAL_STATUS = STATUS_ORDER.get(0);
+
+    /** F2-294 — {@code AuditEngagementRequest} does not declare this field at all. */
+    static final int DEFAULT_FINDINGS_COUNT = 0;
+
     private final AuditEngagementRepository repo;
 
     @Transactional(readOnly = true)
@@ -48,7 +59,19 @@ public class AuditEngagementService {
         AuditEngagement e = new AuditEngagement();
         e.setOrganisationId(TenantContext.getCurrentTenant());
         apply(e, req);
-        if (e.getStatus() == null) e.setStatus("PLANNED");
+        // ⚠⚠ F2-294 — this default was DEAD CODE: `apply` copies the request's status and
+        // the entity initialised it to "PLANNED", so `e.getStatus()` was never null. The
+        // consequence was not only that the default never ran — it is that `apply` copying
+        // a status the caller CHOSE let a create land in any state at all, skipping
+        // `POST /{id}/advance` which is the declared route for that move (F2-292's
+        // dead-default finding, same shape, different register).
+        e.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "an audit engagement",
+            "POST /api/v1/compliance/audit-engagements/{id}/advance"));
+        // NOT NULL with no create-path writer before this: `AuditEngagementRequest` does
+        // not declare the field at all, so the form could never send it and the guard in
+        // `update` fired with the initialiser's 0 on every request.
+        if (e.getFindingsCount() == null) e.setFindingsCount(DEFAULT_FINDINGS_COUNT);
         return repo.save(e);
     }
 

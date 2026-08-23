@@ -32,29 +32,42 @@ public class BcmSettings {
     private Long organisationId;
 
     // ── Recovery target thresholds (hours) ──
-    @Column(name = "rto_warning_hours",  nullable = false) private Integer rtoWarningHours  = 12;
-    @Column(name = "rto_critical_hours", nullable = false) private Integer rtoCriticalHours = 24;
-    @Column(name = "rpo_warning_hours",  nullable = false) private Integer rpoWarningHours  = 4;
-    @Column(name = "rpo_critical_hours", nullable = false) private Integer rpoCriticalHours = 12;
+    // ⚠⚠ F2-294 removed the initialiser from all ELEVEN settings on this entity. They are
+    // the ISO 22301 tolerances every BCM control compares against, and `update` guards
+    // each one with `if (patch.getX() != null)` over an entity-bound PATCH — so the
+    // initialisers made all eleven guards fire on every request and a genuine partial
+    // patch reset the tenant's whole tolerance set to the factory values.
+    // 0 of 1 rows differ in either database today, i.e. the single live row still holds the
+    // defaults — so what made this latent is that no tenant has TUNED their tolerances
+    // yet, which is the entire purpose of the settings page (F2-182: reachability is a
+    // fact about today, not a property of a control).
+    // 🔑 These initialisers were also the register's declared FACTORY DEFAULTS: `reset()`
+    // read `new BcmSettings()` field by field as its source of truth. So the declaration
+    // MOVED to `BcmSettingsService.DEFAULTS` rather than being deleted, and `getOrInit()`
+    // and `reset()` now name the same one.
+    @Column(name = "rto_warning_hours",  nullable = false) private Integer rtoWarningHours;
+    @Column(name = "rto_critical_hours", nullable = false) private Integer rtoCriticalHours;
+    @Column(name = "rpo_warning_hours",  nullable = false) private Integer rpoWarningHours;
+    @Column(name = "rpo_critical_hours", nullable = false) private Integer rpoCriticalHours;
 
     // ── Exercise frequency (months) ──
     @Column(name = "exercise_frequency_months_default",  nullable = false)
-    private Integer exerciseFrequencyMonthsDefault  = 12;
+    private Integer exerciseFrequencyMonthsDefault;
     @Column(name = "exercise_frequency_months_critical", nullable = false)
-    private Integer exerciseFrequencyMonthsCritical = 6;
+    private Integer exerciseFrequencyMonthsCritical;
 
     // ── Evidence + CAPA bookkeeping ──
     @Column(name = "evidence_expiry_warning_days", nullable = false)
-    private Integer evidenceExpiryWarningDays = 60;
+    private Integer evidenceExpiryWarningDays;
 
     @Column(name = "capa_overdue_grace_days", nullable = false)
-    private Integer capaOverdueGraceDays = 7;
+    private Integer capaOverdueGraceDays;
 
     // ── Risk matrix shape ──
     @Column(name = "risk_matrix_likelihood_max", nullable = false)
-    private Integer riskMatrixLikelihoodMax = 5;
+    private Integer riskMatrixLikelihoodMax;
     @Column(name = "risk_matrix_impact_max", nullable = false)
-    private Integer riskMatrixImpactMax = 5;
+    private Integer riskMatrixImpactMax;
 
     // ── Approval + notification rules (free-form JSON) ──
     @Column(name = "approval_matrix_json",  columnDefinition = "NVARCHAR(MAX)") private String approvalMatrixJson;
@@ -68,7 +81,7 @@ public class BcmSettings {
 
     /** PLACEHOLDER | PARTIAL | COMPLETE */
     @Column(name = "regulatory_import_status", nullable = false, length = 30)
-    private String regulatoryImportStatus = "PLACEHOLDER";
+    private String regulatoryImportStatus;
 
     @Column(name = "regulatory_import_notes", length = 1000)
     private String regulatoryImportNotes;

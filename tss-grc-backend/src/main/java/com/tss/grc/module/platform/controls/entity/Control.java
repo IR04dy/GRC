@@ -68,10 +68,20 @@ public class Control {
     private String descriptionAr;
 
     @Column(name = "control_type", nullable = false, length = 20)
-    private String controlType = "PREVENTIVE";
+    // ⚠⚠ F2-294 removed `= "PREVENTIVE"`. 15 of 32 live rows differ in both databases:
+    // the reset turns 9 DETECTIVE, 4 CORRECTIVE and 2 RECOVERY controls into PREVENTIVE,
+    // which misstates each one's position in the defence chain. `createControl` already
+    // defaulted AND vocabulary-checked it; the initialiser made both dead on the update.
+    // API-reachable only — `lib/controlLibrary.ts#updateControl` has NO call site, which
+    // is F2-214's invitation-to-build shape rather than a defence.
+    private String controlType;
 
     @Column(name = "automation_level", nullable = false, length = 20)
-    private String automationLevel = "MANUAL";
+    // ⚠ F2-294 removed `= "MANUAL"`. 12 of 32 rows differ — 4 AUTOMATED and 8 SEMI would
+    // read MANUAL, so this one errs PESSIMISTICALLY. 🔑 Directions are MIXED across this
+    // sweep (five flattering, four pessimistic), which is F2-196's rule that a reset has
+    // no direction until you look — do not assume the F2-193/F2-195/F2-205 bias.
+    private String automationLevel;
 
     @Column(length = 20)
     private String frequency;

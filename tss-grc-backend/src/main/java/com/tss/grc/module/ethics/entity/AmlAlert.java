@@ -43,8 +43,15 @@ public class AmlAlert {
     @Column(name = "alert_type", nullable = false, length = 50)
     private String alertType;
 
+    // ⚠⚠ F2-294 removed `= "MEDIUM"`. `AmlAlertService#update` guards this with
+    // `if (src.getSeverity() != null)`, and on an entity-bound PUT the initialiser made
+    // that guard true on EVERY request — so a partial body reset the severity of a SAMA
+    // AML/CFT alert. Measured identical in dev and prod over 10 live rows: 7 differ, and
+    // the reset DOWNGRADES three CRITICAL and three HIGH alerts to MEDIUM while promoting
+    // one LOW. `create` now owns the default (F2-238's remedy), so an omitted severity
+    // still lands MEDIUM and an omitted severity on an UPDATE leaves the stored band alone.
     @Column(name = "severity", nullable = false, length = 20)
-    private String severity = "MEDIUM";
+    private String severity;
 
     @Column(name = "rule_id", length = 100)
     private String ruleId;
@@ -89,8 +96,13 @@ public class AmlAlert {
     @Column(name = "aggregate_amount", precision = 18, scale = 2)
     private BigDecimal aggregateAmount;
 
+    // ⚠ F2-294 removed `= "SAR"`. The only NULLABLE column in this sweep, and the one
+    // whose create-path default was ALREADY WRITTEN — `create` ends
+    // `if (a.getCurrency() == null) a.setCurrency("SAR")`, which could never fire while
+    // this initialiser stood. 0 of 10 rows differ, so the reset was latent; the dead
+    // default is the finding (F2-292's shape, measured across a whole population here).
     @Column(name = "currency", length = 3)
-    private String currency = "SAR";
+    private String currency;
 
     @Column(name = "period_from")
     private LocalDate periodFrom;

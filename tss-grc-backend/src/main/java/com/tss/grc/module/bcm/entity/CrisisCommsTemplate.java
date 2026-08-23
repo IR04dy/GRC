@@ -54,8 +54,13 @@ public class CrisisCommsTemplate {
     @Column(name = "severity_band", length = 20)
     private String severityBand;
 
+    // ⚠ F2-294 removed `= "1.0"`. 0 of 5 rows differ, so latent by data. `createTemplate`
+    // was a bare `save(t)` on the bound entity with no default of its own, so the default
+    // moves there — the column is NOT NULL and the database DEFAULT does not rescue it,
+    // because the entity maps the column insertable and Hibernate names it in the INSERT
+    // and sends the explicit null (F2-240 measured exactly that).
     @Column(name = "version", nullable = false, length = 20)
-    private String version = "1.0";
+    private String version;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;

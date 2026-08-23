@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -107,6 +108,15 @@ public class AuditLifecycleService {
      * and the value it accepts cannot drift apart. Before this they were separate literals and only
      * the default existed.
      */
+    /**
+     * F2-294 — relocated from the entities' field initialisers. Both columns are NOT NULL
+     * and both creates save the BOUND entity, so these are load-bearing rather than tidy:
+     * without them an omitted key reaches the INSERT as null and 500s, which under
+     * {@code ddl-auto=none} nothing else in the tree would notice.
+     */
+    static final int        DEFAULT_BUDGET_HOURS = 0;
+    static final BigDecimal DEFAULT_WP_HOURS     = BigDecimal.ZERO;
+
     private static final String AP_INITIAL   = "DRAFT";
     private static final String WP_INITIAL   = "DRAFT";
     private static final String CAPA_INITIAL = "OPEN";
@@ -171,6 +181,10 @@ public class AuditLifecycleService {
         // them let a caller assert an Audit Committee approval that never happened.
         body.setAcApprovedBy(null);
         body.setAcApprovedAt(null);
+        // F2-294 — NOT NULL, and this create saves the bound entity, so the default the
+        // entity used to carry lives here now. Both live plans hold a real figure (4,800
+        // and 5,200 hours), which is what a partial PUT was zeroing.
+        if (body.getBudgetHours() == null) body.setBudgetHours(DEFAULT_BUDGET_HOURS);
         body.setLastUpdated(LocalDateTime.now());
         return annualPlans.save(body);
     }
@@ -245,6 +259,9 @@ public class AuditLifecycleService {
         // half that fix left open, and they carry the IIA Standard 2330 review attribution.
         body.setReviewer(null);
         body.setReviewedAt(null);
+        // F2-294 — NOT NULL. 12 of 12 live working papers carry real recorded hours, so a
+        // partial PUT zeroed every IIA Standard 2330 time record in the register.
+        if (body.getHours() == null) body.setHours(DEFAULT_WP_HOURS);
         if (body.getCreatedAt() == null) body.setCreatedAt(LocalDateTime.now());
         return workingPapers.save(body);
     }

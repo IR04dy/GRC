@@ -51,13 +51,23 @@ public class BcmCorrectiveAction {
 
     /** LOW | MEDIUM | HIGH | CRITICAL */
     @Column(nullable = false, length = 20)
-    private String priority = "MEDIUM";
+    // ⚠⚠ F2-294 removed `= "MEDIUM"`. `createCapa` already defaulted AND range-checked
+    // this; the initialiser made both dead on the update path. 6 of 10 live rows differ in
+    // both databases and the reset DOWNGRADES one CRITICAL and three HIGH ISO 22301
+    // corrective actions to MEDIUM — a reset in the flattering direction on a remediation
+    // register, which is what a BCM auditor sorts by.
+    private String priority;
 
     @Column(name = "due_date")
     private LocalDate dueDate;
 
     @Column(name = "progress_percent", nullable = false)
-    private Integer progressPercent = 0;
+    // ⚠⚠ F2-294 removed `= 0`. WIDEST OF THE 27: 10 of 10 live rows differ in both
+    // databases (10, 25, 50 and 80 per cent), so ANY partial body zeroed every corrective
+    // action's recorded remediation progress. `createCapa` already owned the default and
+    // the 0..100 range check, both unreachable while this stood. 🔑 A reset to 0 here
+    // ASSERTS that no remediation has happened, which is not the same as losing a number.
+    private Integer progressPercent;
 
     @Column(name = "evidence_id")
     private Long evidenceId;

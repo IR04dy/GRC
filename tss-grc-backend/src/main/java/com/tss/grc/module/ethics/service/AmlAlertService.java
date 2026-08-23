@@ -118,7 +118,13 @@ public class AmlAlertService {
         // updatable = false. Deliberately not in applyEditable: that helper is shared with
         // update, where the write would compile, run and change nothing.
         a.setFirstDetectedAt(detectionTime(req.getFirstDetectedAt()));
-        if (a.getCurrency() == null) a.setCurrency("SAR");
+        // F2-294 — both defaults now live here, on the create path, because the entity no
+        // longer carries them. The currency line is unchanged and was previously DEAD: the
+        // initialiser meant `a.getCurrency()` could never be null by the time it ran.
+        // `severity` is new: it is NOT NULL, so without this an omitted severity would
+        // reach the INSERT as null and 500.
+        if (a.getSeverity() == null) a.setSeverity(DEFAULT_SEVERITY);
+        if (a.getCurrency() == null) a.setCurrency(DEFAULT_CURRENCY);
         return repo.save(a);
     }
 
@@ -318,6 +324,18 @@ public class AmlAlertService {
         out.put("strFiled",   strs);
         return out;
     }
+
+    /**
+     * F2-294 — the two values {@code AmlAlert} used to carry as field initialisers.
+     *
+     * <p>They moved here because on an entity-bound PUT an initialiser makes
+     * {@code if (src.getSeverity() != null)} in {@link #applyEditable} true on every
+     * request, so a partial body reset the severity band of a SAMA AML/CFT alert rather
+     * than leaving it alone. {@code currency} is the same shape and its create-path
+     * default already existed — it simply could never fire.
+     */
+    static final String DEFAULT_SEVERITY = "MEDIUM";
+    static final String DEFAULT_CURRENCY = "SAR";
 
     private static final String ASSIGN_ROUTE =
         "POST /{id}/assign, which resolves the analyst in this tenant and derives the label";
