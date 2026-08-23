@@ -361,7 +361,7 @@ public class ControlLibraryService {
         // in dev (16 in prod) are APPROVED, so nothing distinguishes a reviewed one.
         body.setWorkflowStatus(ServerOwnedState.requireInitial(
             body.getWorkflowStatus(), INITIAL_ASSESSMENT_STATUS, "a control assessment",
-            "POST /api/v1/control-assessments/{id}/transition"));
+            "POST /api/v1/control-assessments/{id}/transition", "workflowStatus"));
         return assessments.save(body);
     }
 

@@ -89,7 +89,7 @@ public class ContinuityStrategyService {
         // with no recovery objective is the case its own guard comment names.
         body.setApprovalStatus(ServerOwnedState.requireInitial(
             body.getApprovalStatus(), INITIAL_APPROVAL_STATUS, "a continuity strategy",
-            "POST /api/v1/bcm/strategies/{id}/transition"));
+            "POST /api/v1/bcm/strategies/{id}/transition", "approvalStatus"));
         if (body.getImplementationStatus() != null && !IMPL_STATUSES.contains(body.getImplementationStatus()))
             throw new IllegalArgumentException("Invalid implementation status: " + body.getImplementationStatus());
         ContinuityStrategy saved = strategies.save(body);

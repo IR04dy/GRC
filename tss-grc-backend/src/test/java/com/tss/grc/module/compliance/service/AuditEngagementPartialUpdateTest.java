@@ -107,9 +107,64 @@ class AuditEngagementPartialUpdateTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("must advance forward only");
 
+        // ⚠⚠ F2-296 — the comment above states the general rule and this body sends NO STATUS AT
+        // ALL, so the case it claims to cover was never exercised. F2-294 removed the initialiser,
+        // which fixed the OMITTED half; `apply` kept copying a STATED one, so the PUT could still
+        // perform the exact move `advance` refuses. F2-293's shape — the one test that could have
+        // caught it picked the case where the principle already held — inside a single method whose
+        // comment asserts the whole rule. The stated-status leg is below.
         AuditEngagement body = new AuditEngagement();
         body.setScopeSummary("scope narrowed to the KSA estate");
         assertThat(service.update(7L, body).getStatus()).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void aPutThatStatesAnEarlierStatusIsRefusedAndNamesAdvance() {
+        when(repo.findById(7L)).thenReturn(Optional.of(stored()));
+
+        AuditEngagement body = new AuditEngagement();
+        body.setTitleEn("ISO 27001 recertification");
+        body.setStatus("PLANNED");
+
+        assertThatThrownBy(() -> service.update(7L, body))
+            .as("before F2-296 this answered 200 and walked a CLOSED IIA engagement back to "
+                + "PLANNED — the register's only reverse edge, on a route carrying the same "
+                + "COMPLIANCE:WRITE as the forward-only /advance it bypassed")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status:")
+            .hasMessageContaining("is at CLOSED")
+            .hasMessageContaining("cannot be moved to PLANNED by an update")
+            .hasMessageContaining("/advance");
+    }
+
+    @Test
+    void theRefusalNamesOnlyTheTargetsTheMachineWouldActuallyAccept() {
+        when(repo.findById(7L)).thenReturn(Optional.of(stored()));
+
+        AuditEngagement body = new AuditEngagement();
+        body.setStatus("FIELDWORK");
+
+        // CLOSED is index 6 of 8, so `advance` accepts FOLLOW_UP and nothing else. A diagnostic
+        // that listed the whole vocabulary would promise moves the machine refuses (F2-196: never
+        // restate a vocabulary a machine already declares) — the allowed set is derived from the
+        // ladder, so it cannot drift from what `advance` will do.
+        assertThatThrownBy(() -> service.update(7L, body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Allowed from CLOSED: [FOLLOW_UP]");
+    }
+
+    @Test
+    void aCaseVariantEchoIsToleratedBecauseTheColumnCollatesCaseInsensitively() {
+        when(repo.findById(7L)).thenReturn(Optional.of(stored()));
+
+        AuditEngagement body = new AuditEngagement();
+        body.setStatus("closed");
+
+        assertThat(service.update(7L, body).getStatus())
+            .as("`compliance.audit_engagements.status` is Latin1_General_100_CI_AS_SC_UTF8 and had "
+                + "no CHECK before V394, so 'closed' was storable and a bare equals would refuse an "
+                + "echo differing only in case (F2-179). The stored value is left CANONICAL.")
+            .isEqualTo("CLOSED");
     }
 
     @Test

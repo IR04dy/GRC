@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle;
 import com.tss.grc.module.bcm.cycle.entity.BcmGovernanceRecord;
 import com.tss.grc.module.bcm.cycle.repository.BcmAssessmentCycleRepository;
@@ -47,6 +48,14 @@ public class BcmCycleService {
         Set.of("DRAFT", "IN_PROGRESS", "UNDER_REVIEW", "APPROVED", "ARCHIVED");
     private static final Set<String> GOVERNANCE_STATUSES =
         Set.of("DRAFT", "UNDER_REVIEW", "CHANGES_REQUIRED", "APPROVED", "ACTIVE", "REVIEW_DUE", "ARCHIVED");
+
+    /**
+     * F2-296 — declared once each, because the create used to write the literal {@code "DRAFT"}
+     * TWICE per register (the guard's argument and the setter's) and F2-217's rule is that the state
+     * the server picks and the state it accepts must be one declaration.
+     */
+    static final String INITIAL_CYCLE_STATUS = "DRAFT";
+    static final String INITIAL_GOVERNANCE_STATUS = "DRAFT";
     private static final Set<String> REVIEW_FREQS =
         Set.of("ANNUAL", "SEMI_ANNUAL", "QUARTERLY", "ON_CHANGE");
 
@@ -138,8 +147,11 @@ public class BcmCycleService {
         // updateCycle() refuses to edit an APPROVED cycle, the forged record was then immutable
         // except by transition. Rejected rather than silently downgraded: F2-44 is the cost of
         // quietly dropping a field a caller sent.
-        requireInitialState(body.getStatus(), "DRAFT", "status", "/cycles/{id}/transition");
-        body.setStatus("DRAFT");
+        // F2-296 — was a FOURTH hand-rolled copy of this rule (`requireInitialState`), which existed
+        // because the shared primitive could not name the field. It can now.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_CYCLE_STATUS, "a BCM assessment cycle",
+            "POST /api/v1/bcm/cycles/{id}/transition", "status"));
         BcmAssessmentCycle saved = cycles.save(body);
         auditCycle(saved, "CREATE", null, saved.getStatus(),
             "BCM cycle created: " + saved.getCycleNameEn());
@@ -227,9 +239,9 @@ public class BcmCycleService {
         if (body.getPolicyVersion() == null) body.setPolicyVersion("1.0");
         // F2-22b(ii) — same bypass as createCycle: GOVERNANCE_STATUSES contains APPROVED and ACTIVE,
         // so a create could publish an approved BCM policy record without passing the review chain.
-        requireInitialState(body.getApprovalStatus(), "DRAFT", "approvalStatus",
-                            "/governance/{id}/transition");
-        body.setApprovalStatus("DRAFT");
+        body.setApprovalStatus(ServerOwnedState.requireInitial(
+            body.getApprovalStatus(), INITIAL_GOVERNANCE_STATUS, "a BCM governance record",
+            "POST /api/v1/bcm/governance/{id}/transition", "approvalStatus"));
         BcmGovernanceRecord saved = governance.save(body);
         auditGovernance(saved, "CREATE", null, saved.getApprovalStatus(),
             "Governance record created: " + saved.getPolicyTitleEn());
@@ -304,30 +316,25 @@ public class BcmCycleService {
 
     // ─── Helpers ───────────────────────────────────────────────────
 
-    /** A non-null committee link must reference a real committee in this org. */
     /**
-     * F2-22b(ii) — refuse a create that asks to start anywhere but the state machine's first state.
+     * F2-22b(ii) refused a create that asks to start anywhere but the state machine's first state,
+     * and F2-296 retired this copy of that rule in favour of
+     * {@link ServerOwnedState#requireInitial(String, String, String, String, String)}.
      *
-     * <p>Rejecting is deliberate. Silently forcing the initial state would be the F2-44 defect — a
-     * caller sends a field, gets a 200, and the value is gone with no explanation. Naming the
-     * transition endpoint in the message turns the refusal into instructions.
+     * <p>🔑 It existed for a reason its own javadoc recorded — <i>"the field name, so the message
+     * names what the caller actually sent"</i> — and the shared primitive hard-coded
+     * {@code "status: "}, so this register's {@code approvalStatus} create could not be guarded by it
+     * without emitting a 400 naming a field the caller never sent. <b>A primitive that cannot express
+     * what a caller needs is a primitive callers route around</b> (F2-190), and the divergence that
+     * follows is then invisible: two mechanisms, one question, and nobody maintaining the agreement
+     * (F2-177). The primitive takes a field name now.
      *
-     * @param requested what the request body asked for, or {@code null} to accept the default
-     * @param initial   the only state a new record may be created in
-     * @param field     the field name, so the message names what the caller actually sent
-     * @param transitionPath where the caller should go instead
+     * <p>⚙ Its javadoc was stacked ABOVE another one-liner that belonged to
+     * {@link #validateCommittee}, so that description was dead text — only the last of a run of
+     * javadoc comments attaches to the declaration. Restored to its own method here.
      */
-    private static void requireInitialState(String requested, String initial,
-                                           String field, String transitionPath) {
-        if (requested == null || initial.equals(requested)) {
-            return;
-        }
-        throw new IllegalArgumentException(
-            "A new record is created at " + initial + "; " + field + "=" + requested
-            + " was rejected because reaching that state has preconditions this endpoint does not "
-            + "check. Create it, then POST " + transitionPath + ".");
-    }
 
+    /** A non-null committee link must reference a real committee in this org. */
     private void validateCommittee(Long committeeId) {
         if (committeeId == null) return;
         committees.findByIdAndOrganisationId(committeeId, org()).orElseThrow(() ->

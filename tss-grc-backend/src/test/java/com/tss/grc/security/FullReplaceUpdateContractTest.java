@@ -984,6 +984,19 @@ class FullReplaceUpdateContractTest {
             + "CHANGE, because bcm.bcm_plans has no CHECK on status and every transition guard is "
             + "an equality test, so a PUT-driven DRAFT -> APPROVED skipped the machine entirely. "
             + "The field is on the wire so a form that round-trips the row keeps working.");
+        put("/api/v1/compliance/audit-engagements/{} :: status",
+            "BY DESIGN. F2-296 — the same shape as bcm/legacy-plans above, and finding the two "
+            + "described identically in this map WITHOUT either naming the other is what showed "
+            + "the rule had four hand-rolled sites across three modules (F2-215's two-of-N, in the "
+            + "artefact that documents them). `apply()` copied the caller's status with no "
+            + "vocabulary check and no direction check, past an `advance()` that is explicitly "
+            + "forward-only, so the PUT was this register's only reverse edge; F2-294 closed the "
+            + "create and filed the register as having 'closed its only open writers'. It now goes "
+            + "through ServerOwnedState.requireUnchanged: an ECHO is accepted because "
+            + "engagementToReq always sends one, a CHANGE is refused naming /advance. ⚠ Note this "
+            + "map's own vocabulary has no bucket for it — the field is neither a form input that "
+            + "does nothing nor an immutable the server ignores: it is CONSULTED and never written, "
+            + "which is a third kind, and calling it 'ignored' understates what the route does.");
         put("/api/v1/cyber/policies/{} :: policyCode",
             "BY DESIGN. The document-control code an auditor cites; CH-10 fixes it at creation and "
             + "PolicyManagementService writes it only when superseding a document into a new "

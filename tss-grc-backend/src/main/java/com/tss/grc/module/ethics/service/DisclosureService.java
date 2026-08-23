@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ethics.entity.Disclosure;
 import com.tss.grc.module.ethics.repository.DisclosureRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -134,35 +135,44 @@ public class DisclosureService {
      * (F2-214). A CHANGE is refused with a 400 naming the route that performs it, because silently
      * ignoring it would leave the caller believing the status moved (F2-184's shape at a response).
      *
-     * <p>Compared through {@link #normalise} rather than {@code equals}: this column is
+     * <p>Compared case-insensitively rather than by {@code equals}: this column is
      * {@code Latin1_General_100_CI_AS_SC_UTF8} and `ethics.disclosures` has <b>zero CHECK
      * constraints</b>, so {@code 'approved'} is storable and a bare equals would refuse an echo that
      * differs only in case (F2-179's family). Tolerating a case-variant echo and still refusing a
      * real change is the safe direction.
+     *
+     * <p>⚠⚠ <b>F2-296 — that paragraph was right, and it covered ONE of the two copies of this rule
+     * in this package.</b> {@code EthicsCaseService.requireLifecycleIsNotBodySet} compared
+     * {@code status} and {@code outcome} with a bare {@code equals} against columns with the same
+     * collation and no CHECK either, so the reasoning above was reached, written down, applied here
+     * and not carried next door — F2-215's two-of-N, where what stops the next reader asking is that
+     * the reasoning is visibly present in the module. Both delegate to
+     * {@link ServerOwnedState#requireUnchanged} now, and a gate refuses a hand-rolled third.
      */
     private void requireStatusIsNotBodySet(Disclosure current, Disclosure src, boolean isCreate) {
         if (src.getStatus() == null) return;
-        String cur = isCreate ? INITIAL_STATUS : current.getStatus();
-        if (normalise(src.getStatus()).equals(normalise(cur))) return;
+        if (!isCreate) {
+            // F2-296 — the comparison and the refusal are ServerOwnedState.requireUnchanged's now.
+            // This method hand-rolled them, and so did EthicsCaseService in the same package, and
+            // `compliance.audit_engagements` had no copy at all — one question, three answers, two
+            // of which disagreed about whether the comparison is case-sensitive.
+            String cur = current.getStatus();
+            ServerOwnedState.requireUnchanged(
+                src.getStatus(), cur, "status", "Disclosure " + current.getId(),
+                "POST /api/v1/ethics/disclosures/" + current.getId() + "/transition, which enforces"
+                + " the chain and stamps decision / decisionNotes / decidedByName / decidedAt",
+                "Allowed from " + cur + ": "
+                    + new java.util.TreeSet<>(TRANSITIONS.getOrDefault(cur, Set.of())) + ".");
+            return;
+        }
+        // The CREATE half keeps its own phrasing: it is `requireInitial`'s question, but its message
+        // is asserted by EntityBoundPartialUpdateTest ("starts at DRAFT") and rewording it inside a
+        // de-duplication would be a behaviour change nobody asked for. Filed with the measurement.
+        if (ServerOwnedState.sameState(src.getStatus(), INITIAL_STATUS)) return;
         throw new IllegalArgumentException(
-            (isCreate
-                ? "A new disclosure starts at " + INITIAL_STATUS + " (received: " + src.getStatus()
-                  + ")."
-                : "Disclosure " + current.getId() + " is at " + cur + " and cannot be moved to "
-                  + src.getStatus() + " by an update.")
-            + " Status changes go through POST /api/v1/ethics/disclosures/"
-            + (isCreate ? "{id}" : current.getId()) + "/transition, which enforces the chain and"
-            + " stamps decision / decisionNotes / decidedByName / decidedAt."
-            + (isCreate ? "" : " Allowed from " + cur + ": "
-                + new java.util.TreeSet<>(TRANSITIONS.getOrDefault(cur, Set.of())) + "."));
-    }
-
-    /**
-     * Case-insensitively normalise a stored status for comparison — the column collates CI and
-     * carries no CHECK, so a bare equals is not a comparison (F2-179).
-     */
-    private static String normalise(String status) {
-        return status == null ? "" : status.trim().toUpperCase(java.util.Locale.ROOT);
+            "A new disclosure starts at " + INITIAL_STATUS + " (received: " + src.getStatus() + ")."
+            + " Status changes go through POST /api/v1/ethics/disclosures/{id}/transition, which"
+            + " enforces the chain and stamps decision / decisionNotes / decidedByName / decidedAt.");
     }
 
     @Transactional
