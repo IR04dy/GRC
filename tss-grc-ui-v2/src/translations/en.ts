@@ -715,6 +715,8 @@ export const en = {
   ethicsOutcomeUnsubstantiated: 'Unsubstantiate',
   ethicsOutcomeNoViolation:   'No violation',
   ethicsEscalate:             'Escalate to regulator',
+  ethicsAnalyticsUndeclared: 'outside this taxonomy',
+  ethicsAnalyticsUndeclaredHint: 'Cases whose stored value is not one the platform declares, so no bar above can show them. They are still counted as open. Reconciling the register is an owner decision.',
   ethicsAnalyticsStatus:      'By Status',
   ethicsAnalyticsCategory:    'By Category',
   ethicsNoAnalytics:          'No analytics yet — log a few cases to see the breakdown.',

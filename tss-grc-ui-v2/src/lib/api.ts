@@ -372,7 +372,15 @@ export interface EthicsAnalyticsDto {
   total: number;
   byStatus: Record<string, number>;
   byCategory: Record<string, number>;
+  // `open` is the COMPLEMENT of the declared terminal set (EthicsCaseLifecycle.TERMINAL), so a
+  // status nobody has heard of counts as open. It was an inclusion list of five states and
+  // reported 10 of 26 (F2-290).
   open: number; closed: number; substantiated: number;
+  // How many rows carry a status / category the platform does not declare, and which therefore
+  // appear in NO bucket above. `ethics.cases` has no CHECK on either column: 11 and 6 rows in
+  // both databases today. Disclosed rather than dropped — the bars would otherwise not sum to
+  // `total` with nothing on screen saying why.
+  undeclaredStatus: number; undeclaredCategory: number;
 }
 export interface LinkedEthicsCaseView {
   linkId: number; linkType: string;

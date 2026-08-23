@@ -110,6 +110,7 @@ export const ETHICS_ANALYTICS: EthicsAnalyticsDto = {
     FRAUD: 2, IP_DATA_THEFT: 1, POLICY_VIOLATION: 1, RETALIATION: 1, GIFTS_HOSPITALITY: 1,
   },
   open: 5, closed: 3, substantiated: 4,
+  undeclaredStatus: 0, undeclaredCategory: 0,
 };
 
 // ── Disclosures (CoI / Gifts / Hospitality / Outside Business) ───────────

@@ -562,12 +562,34 @@ function AnalyticsPanel({ analytics, t }: { analytics: EthicsAnalyticsDto | null
           <Progress key={k} label={`${k.replace(/_/g, ' ')} · ${v}`} value={Math.round((v / max(analytics.byStatus)) * 100)}
                     tone={STATUS_TONE[k] === 'danger' ? 'danger' : STATUS_TONE[k] === 'success' ? 'success' : STATUS_TONE[k] === 'warning' ? 'accent' : 'primary'} />
         ))}
+        <Undeclared n={analytics.undeclaredStatus} t={t} />
       </Card>
       <Card title={t('ethicsAnalyticsCategory')} Icon={ListChecks}>
         {Object.entries(analytics.byCategory).filter(([, v]) => v > 0).map(([k, v]) => (
           <Progress key={k} label={`${k.replace(/_/g, ' ')} · ${v}`} value={Math.round((v / max(analytics.byCategory)) * 100)} tone="primary" />
         ))}
+        <Undeclared n={analytics.undeclaredCategory} t={t} />
       </Card>
+    </div>
+  );
+}
+
+/**
+ * F2-290 — the rows no bar above can show, because `ethics.cases` has no CHECK on `status` or
+ * `category` and holds near-synonyms of declared values (INVESTIGATING / TRIAGED, AML,
+ * POLICY_BREACH ...). Without this the bars silently fail to sum to the total.
+ *
+ * Rendered only when the server reports a non-zero count, and `typeof n === 'number'` rather than
+ * `!n` so a real 0 is a measured zero rather than a missing figure (F2-197). No button is offered:
+ * reconciling the stored vocabulary rewrites live rows in two databases and is the owner's call.
+ */
+function Undeclared({ n, t }: { n: number; t: (k: string) => string }) {
+  if (typeof n !== 'number' || n <= 0) return null;
+  return (
+    <div className="ethics-analytics-undeclared" role="status"
+         title={t('ethicsAnalyticsUndeclaredHint')}
+         aria-label={t('ethicsAnalyticsUndeclaredHint')}>
+      {`${n} · ${t('ethicsAnalyticsUndeclared')}`}
     </div>
   );
 }

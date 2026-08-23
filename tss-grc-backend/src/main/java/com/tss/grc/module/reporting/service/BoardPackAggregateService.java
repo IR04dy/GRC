@@ -341,9 +341,13 @@ public class BoardPackAggregateService {
     private BoardPackAggregate.Ethics ethics(Long org) {
         return new BoardPackAggregate.Ethics(
             caseRepo.countByOrganisationId(org),
-            caseRepo.countByOrganisationIdAndStatus(org, "INTAKE")
-                + caseRepo.countByOrganisationIdAndStatus(org, "TRIAGE")
-                + caseRepo.countByOrganisationIdAndStatus(org, "INVESTIGATION"),
+            // F2-290 — was INTAKE + TRIAGE + INVESTIGATION, a three-token inclusion list, so this
+            // slide and this PDF line reported 10 open misconduct cases where 26 were open (dev and
+            // prod alike): SUBSTANTIATED, NO_VIOLATION and the 11 rows holding a status the machine
+            // does not declare were all silently absent, and so were REMEDIATION and ESCALATED,
+            // which analytics() at least counted. "Open" is the complement of the declared terminal
+            // set, asked of the repository so no reader can hold its own idea of it (F2-196).
+            caseRepo.countOpen(org),
             caseRepo.countByOrganisationIdAndStatus(org, "SUBSTANTIATED")
                 + caseRepo.countByOrganisationIdAndStatus(org, "REMEDIATION"),
             caseRepo.countByOrganisationIdAndCategory(org, "BRIBERY")
