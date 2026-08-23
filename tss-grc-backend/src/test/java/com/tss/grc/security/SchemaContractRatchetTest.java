@@ -224,6 +224,57 @@ class SchemaContractRatchetTest {
     private static final int BASELINE_NO_CODE_TABLES = 36;
 
     /**
+     * F2-301 — the five tables whose <b>name</b> shadows a table this platform maps: the schema's
+     * own name prefixed onto a table that schema already has, so {@code bcm.bcm_exercises} sits
+     * beside the live {@code bcm.exercises}. Shadow on the left, the register really read on the
+     * right.
+     *
+     * <h4>Why a name is worth a gate of its own</h4>
+     *
+     * The {@link #BASELINE_NO_CODE_TABLES} ratchet above already counts all five — their
+     * <em>disposition</em> has been recorded in {@code TABLE_DISPOSITION.md} since F2-141. What
+     * nothing recorded is the <b>hazard</b>: a table that does not exist makes a query fail, and a
+     * table with a confusable name makes it <b>succeed with the wrong rows</b>. Every one of the
+     * five returns a different count from its twin — 14/13, 10/4, 18/41, 20/6, 14/12 (dev, and
+     * identical in production) — so a lookup by name yields a plausible number rather than an error.
+     *
+     * <p>🔑 <b>Measured cost, not a hypothetical:</b> F2-300 measured {@code bcm.bcm_exercises} by
+     * name, got 14 rows and three CHECK constraints back, and drew <b>four wrong conclusions</b>
+     * about a register whose entity maps {@code bcm.exercises}. The orphan sorts FIRST in a name
+     * search. {@code compliance.compliance_findings} is the one to fear next: 18 rows against the
+     * live {@code compliance.findings}' 41, so measuring the shadow under-reports an audit-findings
+     * register by more than half — wrong in the flattering direction.
+     *
+     * <h4>The shape alone is not the defect, which is why this is a named set</h4>
+     *
+     * <b>54 mapped tables use the same schema-prefix shape with no bare twin at all</b>
+     * ({@code bcm.bcm_plans}, {@code cyber.cyber_controls}, {@code evidence.evidence_items} …), so
+     * it is house style. What makes a pair dangerous is the shape <em>plus</em> exactly one side
+     * being unmapped. Of the six such pairs in the register, five are these, one has <b>both</b>
+     * sides mapped ({@code cyber.cyber_incidents} 26 rows beside {@code cyber.incidents} 48 — two
+     * entities in two modules over one concept, F2-196's shape, filed as an owner decision), and
+     * <b>none</b> runs the other way round with the prefixed side live.
+     *
+     * <p>Asserted <b>exactly</b> rather than as a ceiling: a new shadow must fail, and a resolved
+     * one must be deleted from here in the same commit, because a ceiling would let a new shadow in
+     * behind a dropped one and make a tolerated pair indistinguishable from a reviewed one
+     * (house rule 3).
+     */
+    private static final Map<String, String> NAME_SHADOWS = Map.of(
+        "bcm.bcm_exercises",                 "bcm.exercises",
+        "compliance.compliance_assessments", "compliance.assessments",
+        "compliance.compliance_findings",    "compliance.findings",
+        "workflow.workflow_definitions",     "workflow.definitions",
+        "workflow.workflow_instances",       "workflow.instances");
+
+    /**
+     * Anti-vacuity for {@link #theShadowRuleIgnoresTheHouseStylePrefix}: the schema-prefix shape is
+     * used legitimately 54 times. If this scan ever sees a handful, the prefix test broke and the
+     * "it is only a defect when one side is unmapped" narrowing would be asserted over nothing.
+     */
+    private static final int MIN_LEGITIMATE_PREFIXED_TABLES = 40;
+
+    /**
      * Anti-vacuity for the two hard gates: 88 tables are created by migrations above the baseline
      * today. If this scan ever sees a handful, the {@code CREATE TABLE} parse or the version filter
      * broke, and both gates would report a clean zero over an empty population — the direction a
@@ -596,6 +647,131 @@ class SchemaContractRatchetTest {
                                 .map(e -> e.getKey() + "  " + e.getValue())
                                 .reduce((a, b) -> a + "\n            " + b).orElse("")))
             .isLessThanOrEqualTo(BASELINE_NO_CODE_TABLES);
+    }
+
+    /**
+     * F2-301 — every unmapped table whose name shadows a mapped one is declared in
+     * {@link #NAME_SHADOWS}, in both directions.
+     *
+     * <p>The population is derived, never listed: the register supplies the tables, reflection over
+     * the compiled {@code @Table}/{@code @JoinTable}/{@code @CollectionTable} annotations supplies
+     * the mappings, and the pair is formed by the prefix rule. ⚠ A source grep for {@code @Table}
+     * alone reported <b>seven</b> pairs here, because it cannot see a {@code @JoinTable}:
+     * {@code iam.role_permissions} and {@code iam.user_roles} are mapped by {@code Role} and
+     * {@code User} and are not shadows at all. That is the same over-reporting the
+     * {@link #mappedTables()} javadoc warns about, so the population comes from reflection.
+     */
+    @Test
+    void everyNameShadowingAMappedTableIsDeclared() throws IOException {
+        Map<String, String> mapped = mappedTables();
+        Map<String, String> found = new TreeMap<>();
+
+        for (String[] f : registerRows()) {
+            String schema = f[0].trim().toLowerCase(Locale.ROOT);
+            String table = f[1].trim().toLowerCase(Locale.ROOT);
+            String shadow = shadowOf(schema, table, mapped.keySet());
+            if (shadow != null && !mapped.containsKey(key(schema, table))) {
+                found.put(key(schema, table), shadow);
+            }
+        }
+
+        assertThat(found).as("""
+            The set of tables whose NAME shadows a mapped table has changed.
+
+            A table that does not exist makes a query FAIL; one with a confusable name makes it             SUCCEED with the wrong rows, which is why this is asserted separately from the             BASELINE_NO_CODE_TABLES count that already includes all five.
+
+            If an entry APPEARED: something shipped `<schema>_<thing>` into a schema that already             has `<thing>`. Rename it, or map it — do not leave two confusable names, because the             next reader measuring by name will get the wrong one (F2-300 did).
+
+            If an entry VANISHED: the shadow was dropped or mapped. Delete it from NAME_SHADOWS in             the same commit — that is the gate working.
+
+            derived: %s
+            declared: %s""".formatted(found, NAME_SHADOWS))
+            .containsExactlyInAnyOrderEntriesOf(NAME_SHADOWS);
+    }
+
+    /**
+     * The narrowing is the whole instrument: {@code <schema>_<thing>} is <b>house style</b>, used by
+     * 54 mapped tables with no bare twin, so a rule that fired on the shape alone would fail on
+     * correct code — the one failure a gate must never have. It fires only when the prefixed table
+     * is unmapped and its bare twin is mapped.
+     *
+     * <p>⚠ The mutation harness refuted this leg's first claim, which said a looser prefix rule
+     * "reported all 34" legitimate parent/child pairs. It does not: those 34 are <b>mapped on both
+     * sides</b>, and this gate's left side is always unmapped — so measured over today's register a
+     * generic prefix/suffix rule and this narrow one return the <b>same five pairs</b>. The
+     * narrowing is therefore <b>prospective</b>, and the only thing carrying it is the synthetic
+     * corpus below. 🔑 A widening that cannot change today's answer still fails silently on the
+     * first table that does not follow house style, and on a clean tree a rule that matches nothing
+     * and a rule that is correct produce the same green.
+     */
+    @Test
+    void theShadowRuleIgnoresTheHouseStylePrefix() {
+        Set<String> mapped = Set.of("bcm.exercises", "ai_governance.ml_model", "cyber.incidents");
+
+        // must match: the schema's own name prefixed onto a table that schema maps
+        assertThat(shadowOf("bcm", "bcm_exercises", mapped)).isEqualTo("bcm.exercises");
+
+        // must NOT match: a parent/child pair, where the prefix is not the schema name. That is the
+        // shape 34 legitimate register pairs have, and a looser prefix/suffix rule reported all 34.
+        assertThat(shadowOf("ai_governance", "ml_model_audit", mapped)).isNull();
+        // must NOT match: a bare table whose prefixed sibling is the mapped one. No such case exists
+        // today (measured 0), and the rule must not invent one by matching backwards.
+        assertThat(shadowOf("cyber", "incidents", mapped)).isNull();
+        // must NOT match: prefixed, but the bare twin is not a table anything maps.
+        assertThat(shadowOf("bcm", "bcm_plans", mapped)).isNull();
+        // must NOT match: a prefix that is NOT this schema's own name. Only this case fails a rule
+        // that strips the first segment rather than the schema name — the harness showed the
+        // ml_model_audit case above kills a TRAILING widening and lets a LEADING one through,
+        // because `ml_model_audit` minus its first segment is `model_audit`, which nothing maps.
+        assertThat(shadowOf("cyber", "socops_incidents", mapped)).isNull();
+
+        // …and the legitimate population it deliberately ignores is large, so the narrowing is
+        // load-bearing rather than decorative.
+        Map<String, String> real = mappedTables();
+        Set<String> housePrefix = real.keySet().stream()
+            .filter(k -> {
+                int dot = k.indexOf('.');
+                String schema = k.substring(0, dot);
+                String table = k.substring(dot + 1);
+                return table.startsWith(schema + "_")
+                    && !real.containsKey(key(schema, table.substring(schema.length() + 1)));
+            })
+            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+
+        assertThat(housePrefix.size()).as(
+            "Mapped tables using the `<schema>_<thing>` shape with no bare twin: %d. This is the "
+            + "population the shadow rule must never flag. If it collapsed, the prefix test broke "
+            + "and everyNameShadowingAMappedTableIsDeclared is checking almost nothing.",
+            housePrefix.size())
+            .isGreaterThanOrEqualTo(MIN_LEGITIMATE_PREFIXED_TABLES);
+
+        // ⚠ That floor alone cannot see the no-bare-twin condition being dropped: without it the
+        // count goes 54 -> 55, so the WRONG answer is HIGHER than the right one and no floor can
+        // separate them (F2-215's rule, arriving from the other side — a floor is only worth having
+        // if it sits above the largest wrong answer, and here it cannot). Assert the condition
+        // itself: cyber.cyber_incidents is mapped AND has a mapped bare twin, so it is the one
+        // prefixed table that must never be counted as house style. An upper bound would have been
+        // the obvious fix and would fail the day a legitimate prefixed table is added.
+        assertThat(housePrefix).as(
+            "cyber.cyber_incidents has a mapped bare twin (cyber.incidents), so it is not an "
+            + "instance of the no-twin house style. Finding it here means the no-bare-twin "
+            + "condition was dropped and this floor is measuring the wrong population.")
+            .doesNotContain("cyber.cyber_incidents");
+    }
+
+    /**
+     * {@code schema.table} of the mapped twin this table's name could be mistaken for, or
+     * {@code null}. The rule is deliberately the narrow one — the schema's own name prefixed onto a
+     * table the same schema maps — and never a generic prefix/suffix variant, which matches 34
+     * legitimate parent/child pairs ({@code ml_model_audit} beside {@code ml_model}).
+     */
+    private static String shadowOf(String schema, String table, Set<String> mappedKeys) {
+        String prefix = schema + "_";
+        if (!table.startsWith(prefix)) {
+            return null;
+        }
+        String bare = table.substring(prefix.length());
+        return bare.isEmpty() || !mappedKeys.contains(key(schema, bare)) ? null : key(schema, bare);
     }
 
     /**
