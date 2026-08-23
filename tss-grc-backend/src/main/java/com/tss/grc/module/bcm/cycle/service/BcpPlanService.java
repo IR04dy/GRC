@@ -27,11 +27,19 @@ import java.util.*;
  * BCP / DRP plan builder service — audit T1.4b.
  *
  * <h3>Plan lifecycle</h3>
+ * <p>⚠ F2-305 — this documented <b>8 of the 9 edges</b> {@code TRANSITIONS} allows; the one it
+ * omitted is {@code APPROVED -> DRAFT}, a reopen of an approved plan. Written as a complete table
+ * that {@code TransitionRefusalContractTest} parses and compares against {@code TRANSITIONS}
+ * edge-for-edge, so it cannot drift again.
+ *
  * <pre>
- *   DRAFT ──> UNDER_REVIEW ──> APPROVED ──> PUBLISHED ──> ARCHIVED
- *     │            │                                          ↑
- *     ↓            ↓                                          │
- *   CANCELLED   DRAFT (reopen)         PUBLISHED ──> SUPERSEDED (newer wins)
+ *   DRAFT        -> UNDER_REVIEW | CANCELLED
+ *   UNDER_REVIEW -> APPROVED | DRAFT
+ *   APPROVED     -> PUBLISHED | DRAFT
+ *   PUBLISHED    -> ARCHIVED | SUPERSEDED
+ *   ARCHIVED     -> (terminal)
+ *   SUPERSEDED   -> (terminal)
+ *   CANCELLED    -> (terminal)
  * </pre>
  *
  * <h3>Section catalogue (ISO 22301 §8.4.2)</h3>

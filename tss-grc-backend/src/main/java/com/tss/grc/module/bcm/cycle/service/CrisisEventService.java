@@ -24,12 +24,21 @@ import java.util.*;
  * Crisis Event service — independent audit Tier-1 fix.
  *
  * <h3>State machine</h3>
+ * <p>⚠ F2-305 — this documented <b>7 of the 11 edges</b> {@code TRANSITIONS} allows, and the four
+ * it omitted are the ones a reader most needs: {@code DETECTED -> ACTIVATED} (a crisis obvious on
+ * sight, skipping assessment), {@code ASSESSING -> CANCELLED}, {@code ACTIVATED -> RECOVERED}, and
+ * {@code CONTAINED -> ACTIVATED} — the machine's only backwards edge, a <b>re-escalation</b> of a
+ * crisis that was contained and then worsened. Written as a complete table that
+ * {@code TransitionRefusalContractTest} parses and compares against {@code TRANSITIONS}.
+ *
  * <pre>
- *   DETECTED ─┬─> ASSESSING ─> ACTIVATED ─> CONTAINED ─> RECOVERED ─> CLOSED
- *             └─> CANCELLED                                              ↑
- *                                                                       │
- *                                              from ASSESSING ──────────┘
- *                                              (if it turned out to be small)
+ *   DETECTED  -> ASSESSING | ACTIVATED | CANCELLED
+ *   ASSESSING -> ACTIVATED | CLOSED | CANCELLED
+ *   ACTIVATED -> CONTAINED | RECOVERED
+ *   CONTAINED -> RECOVERED | ACTIVATED
+ *   RECOVERED -> CLOSED
+ *   CLOSED    -> (terminal)
+ *   CANCELLED -> (terminal)
  * </pre>
  * <ul>
  *   <li>{@code DETECTED}     — event logged, severity not yet confirmed</li>
