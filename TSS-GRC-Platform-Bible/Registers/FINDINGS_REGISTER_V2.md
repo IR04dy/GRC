@@ -15219,6 +15219,177 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-296 — one question, four mechanisms, and the artefact that documents two of them describes them identically without noticing they are the same rule
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P2 — live. A CLOSED external-audit engagement could be walked back to PLANNED through the entity-bound `PUT`, past an `advance()` that is explicitly forward-only; and any string ≤40 chars could be stored on a NOT NULL column with **zero** CHECK constraints. Same `COMPLIANCE:WRITE` on the create, the PUT and `/advance`, so no privilege escalation: the object-level machine was the only control and this route sat beside it without one ([[F2-219]]'s shape). |
+| **Registers** | `compliance.audit_engagements` (12 live rows, dev = prod) · `ethics.cases` · `ethics.disclosures` · `bcm.bcm_plans` |
+| **Standards** | IIA Standards 2200/2300 (engagement planning and performance) — the register records where an external audit has got to |
+| **Found by** | executing [[F2-294]]'s filed *"`compliance.audit_engagements` still has zero CHECKs on `status` — cheap now that this slice closed its only open writers"* and re-deriving it first ([[F2-221]]) |
+| **Verification** | full hermetic suite **4635 → 4648/0/0**; new gate 10/10; live probe as `compliance`, never `admin`, against a planted row |
+
+### The filed premise was wrong, and it was wrong in the direction that mattered
+
+F2-294 recommended this CHECK **on the strength of having closed the register's writers**. Re-derived,
+`apply()` still read:
+
+```java
+if (src.getStatus() != null) target.setStatus(src.getStatus());
+```
+
+with **no vocabulary check and no direction check**. F2-294 removed the entity's `= "PLANNED"`
+initialiser, which genuinely fixed the *omitted*-status half — a partial body now means *leave it
+alone* — and left this line, so a body that **stated** a status still performed an arbitrary
+transition.
+
+🔑🔑 **That is precisely the sequence [[F2-183]] warns about**: adding a CHECK to a column whose
+writer is still open converts silently-stored junk into a constraint violation. Executing the filing
+as written would have shipped the constraint over an open writer, on the authority of a sentence the
+same slice wrote about itself.
+
+⚠ **And a CHECK could not have closed it anyway.** `CLOSED → PLANNED` is made of two legal members,
+so V394 refuses nothing about it. The reverse edge is closed by the Java guard, in the same commit —
+[[F2-183]]'s rule one noun over: there the CHECK could not see **case**, here it cannot see
+**direction**, and a migration that adds it and stops leaves the defect intact *while appearing to
+guard it*.
+
+### One question, four mechanisms
+
+*May the caller name the lifecycle state?* The CREATE half has had a shared answer since [[F2-218]]
+(`ServerOwnedState.requireInitial`, 28 call sites). The UPDATE half had none:
+
+| register | update-side rule | comparison |
+|---|---|---|
+| `ethics.disclosures` | hand-rolled ([[F2-292]]) | through a `normalise` helper — **case-insensitive** |
+| `ethics.cases` | hand-rolled ([[F2-291]]) | bare `equals` on `status` **and** `outcome` |
+| `bcm.bcm_plans` | hand-rolled ([[F2-234]]) | bare `equals` |
+| `compliance.audit_engagements` | **none at all** | — |
+
+🔑 **`DisclosureService` carries a paragraph explaining why a bare equals is not a comparison** — the
+column collates `Latin1_General_100_CI_AS_SC_UTF8`, the table has no CHECK, so `'approved'` is
+storable and a bare equals would refuse an echo differing only in case ([[F2-179]]). The reasoning was
+reached, written down, applied to its own copy, and **not carried next door in the same package.**
+[[F2-215]]'s two-of-N, where what stops the next reader asking is that the reasoning is *visibly
+present in the module*.
+
+🔑🔑 **The fourth site was found by my own new census, and it was already documented.**
+`FullReplaceUpdateContractTest.DERIVED_IGNORED_FIELDS` carried
+`/api/v1/bcm/legacy-plans/{} :: status` with a reason in these very terms — *"F2-234 made this route
+accept an ECHO of the stored status and refuse a CHANGE … so a PUT-driven DRAFT → APPROVED skipped
+the machine entirely"* — and this slice's fix made the audit-engagement entry appear beside it,
+**described identically, with neither naming the other.** The artefact that documents the rule twice
+is where you can see it is one rule.
+
+⚠ **The case-sensitivity half is LATENT and was closed anyway.** Measured 2026-08-23 over both
+databases: **0 non-canonical values** on all four guarded columns (`ethics.cases.status` 30 rows,
+`.outcome` 1 of 30 non-null, `ethics.disclosures.status` 18, `compliance.audit_engagements.status`
+12). What made three of the four harmless was the **data, not the code** ([[F2-182]]).
+
+### The create-side fourth copy, and the reason it existed
+
+`BcmCycleService.requireInitialState` was a fourth mechanism for the *create* half, and its own
+javadoc documents its `field` parameter as *"the field name, so the message names what the caller
+actually sent"* — while the shared primitive hard-coded `"status: "`.
+
+⚠⚠ **So three of that primitive's own callers were emitting a 400 naming a field the request never
+carried**: `BcmComplianceMappingService` writes `complianceStatus`, `ContinuityStrategyService`
+`approvalStatus`, `ControlLibraryService` `workflowStatus`. A caller who sent
+`approvalStatus=APPROVED` to `POST /api/v1/bcm/strategies` read a message whose first token was
+`status`. [[F2-210]]'s shape — a diagnostic that sends the reader somewhere wrong — **in the message of
+the primitive built to send them somewhere right.**
+
+🔑 **A primitive that cannot express what a caller needs is a primitive callers route around**
+([[F2-190]]), and the divergence that follows is invisible: two mechanisms, one question, nobody
+maintaining the agreement ([[F2-177]]). The primitive takes a field name now, the fourth copy is
+retired, and `requireCreatable` was normalised too — leaving one of three siblings case-sensitive
+would have shipped F2-215's two-of-N *inside the class whose whole subject is one-question-one-answer*.
+
+### The test that could have caught it asserted the rule and exercised the case where it held
+
+`AuditEngagementPartialUpdateTest.aPartialBodyCannotUndoTheForwardOnlyMachineFromEitherEnd` opens
+with the comment *"the PUT must not be able to do what `advance` is written to forbid"*, asserts that
+`advance` refuses a backwards move — and then sends a body with **no status at all**. Its sibling
+`anEchoOfTheStoredStatusIsStillAccepted` covered the echo. **The case in between — an explicit,
+different status on the PUT — was never exercised.**
+
+🔑 [[F2-293]]'s shape: *the one test that could have caught the reset picked the fields where the
+principle held.* Here it is inside a **single method whose comment states the whole rule**, which is
+the strongest form of it — the reader has been told the rule is tested.
+
+### Four of my own errors, each caught by running something
+
+⚠⚠ **(a) My ban leg fired on the platform's own recommended idiom: 5 of 5 false positives.** Its
+first draft banned any `private normalise*()` containing `toUpperCase` in a service, and caught
+`ExerciseObserverService` — which CLAUDE.md names as **"the pattern to copy"** for F2-179 —
+`BcpBinderService.normaliseLanguage`, `ExerciseRuntimeService`, `CyberAssessmentService` and
+`VulnerabilitySlaComputeService`. 🔑 **Those helpers canonicalise an INPUT; the defect is comparing a
+REQUEST value against a STORED one.** A leg keyed on the helper measured the house idiom rather than
+the defect. Rescoped to the shape of the claim, with the recommended idiom as an explicit
+must-not-match control ([[F2-214]], [[F2-206]]).
+
+⚠⚠ **(b) I grepped ONE fragment of a message and concluded it was free to change.** Searching for
+`"was rejected because reaching"` returned nothing, so I converted `BcmCycleService` — and three
+tests failed on `"status=UNDER_REVIEW"`, `"approvalStatus=ACTIVE"` and `"created at DRAFT"`. 🔑 **A
+message has several fragments and asserting any one of them makes the whole wording load-bearing.**
+Fixed by re-pointing those assertions at the *information* the refusal must carry rather than its
+phrasing — the wording is the one part of a diagnostic that should stay free to improve.
+
+⚠ **(c) The census ceiling was a prediction.** I wrote 6; the detector returned **8**; converting the
+fourth site took it to **7**. [[F2-195]]: a baseline lifted from a guess is worse than none, because it
+looks measured. Lowered in the same commit as the sweep (house rule 3).
+
+⚠ **(d) Both new files landed LF in a CRLF tree** — sixth instance in this lineage. Every one of the
+17 touched files is now verified CRLF with zero bare LF, because the bytes a green build verified must
+be the bytes that ship.
+
+### What the gate asserts
+
+`ServerOwnedStateContractTest` (10 legs, hermetic):
+
+- the services guarding a lifecycle update through the shared rule, **exactly** — so a register that
+  stops calling it fails, and a new one has to be added, which is the moment a reader is forced to ask
+  whether its own update is an unguarded transition route;
+- none of them hand-rolls the comparison (hard zero — `sameState` and `requireUnchanged` are both
+  available, so there is no correct code for it to fail on);
+- a **census with no verdicts** ([[F2-188]]) of services still comparing a request-side lifecycle
+  getter against a non-literal, decrease-only at 7 — some will be legitimate branch tests inside a
+  transition, which is a reading job a regex cannot adjudicate ([[F2-182]]);
+- no service declares its own create-side initial-state guard (the retired fourth copy);
+- every `requireInitial` call whose setter is not `setStatus` **names its field**, with an
+  anti-vacuity floor on the site scan;
+- all three entry points compare case-insensitively and return the **canonical** spelling;
+- V394's CHECK admits **exactly** `STATUS_ORDER`, read by reflection against the migration SQL —
+  constraining to the 7 states that happen to be stored would refuse `FOLLOW_UP`, which
+  `scheduleFollowUp()` writes, i.e. [[F2-180]]'s defect;
+- and a self-test driving every detector over the literal pre-fix and post-fix shapes, including the
+  comma-inside-a-string-literal case, because counting one as an argument separator would report a
+  4-argument call as compliant — the quiet direction.
+
+### Filed
+
+⚠ **`FullReplaceUpdateContractTest`'s vocabulary has no bucket for what this route now does.** Its map
+is *"either a form input that silently does nothing, or a deliberate immutable"*, and `status` here is
+neither: it is **consulted and never written**. Calling it *ignored* understates the route. Recorded in
+the entry rather than papered over.
+
+⚠ The **7-site census**, with no verdicts — read each before closing; a comparison against the CURRENT
+row is this slice's defect and one against a target inside a transition is the machine doing its job.
+
+⚠ `ethics.cases` and `ethics.disclosures` still have **zero CHECK constraints** ([[F2-290]], [[F2-292]]
+filed both); `bcm.bcm_plans` likewise ([[F2-234]]). All three are now cheaper, since this slice closed
+or shared their status writers — but `ethics.cases` is blocked on [[F2-289]]/[[F2-290]]'s finding that
+**11 of 30 rows already hold a status the register's own machine does not declare**, so a CHECK
+admitting today's values would bless the synonyms.
+
+⚠ `AuditEngagementRequest` still declares no `findingsCount` while `apply()` copies it, so the field
+is settable through the entity-bound route and by nothing else ([[F2-278]] filed it as FROZEN from the
+other direction, and the sibling register derives the same figure from its linked finding ids —
+[[F2-197]]: a computed count is not a measured one).
+
+---
+
 ## F2-295 — the gate dropped three whole services rather than mis-attributing one, and the filing that recorded the hazard described the variant nobody was running
 
 | | |
