@@ -708,6 +708,8 @@ export const ar = {
   ethicsOutcomeUnsubstantiated: 'عدم إثبات',
   ethicsOutcomeNoViolation:   'لا توجد مخالفة',
   ethicsEscalate:             'تصعيد للجهة التنظيمية',
+  ethicsAnalyticsUndeclared: 'خارج هذا التصنيف',
+  ethicsAnalyticsUndeclaredHint: 'قضايا تحمل قيمة غير معلنة في المنصة، لذا لا يمكن لأي شريط أعلاه إظهارها. وتُحسب مع القضايا المفتوحة. توحيد قيم السجل قرار يرجع إلى الجهة المالكة.',
   ethicsAnalyticsStatus:      'حسب الحالة',
   ethicsAnalyticsCategory:    'حسب الفئة',
   ethicsNoAnalytics:          'لا توجد تحليلات بعد — سجّل عدة قضايا لرؤية البيان.',

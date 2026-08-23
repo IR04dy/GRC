@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ethics.EthicsCaseLifecycle;
 import com.tss.grc.module.ethics.dto.CaseActionRequest;
 import com.tss.grc.module.ethics.entity.CaseAction;
 import com.tss.grc.module.ethics.entity.CaseLink;
@@ -39,18 +40,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class EthicsCaseService {
 
-    private static final Map<String, Set<String>> TRANSITIONS = Map.of(
-        "INTAKE",          Set.of("TRIAGE", "DISMISSED", "ESCALATED"),
-        "TRIAGE",          Set.of("INVESTIGATION", "DISMISSED", "ESCALATED"),
-        "INVESTIGATION",   Set.of("SUBSTANTIATED", "UNSUBSTANTIATED", "NO_VIOLATION", "ESCALATED", "DISMISSED"),
-        "SUBSTANTIATED",   Set.of("REMEDIATION", "ESCALATED", "CLOSED"),
-        "UNSUBSTANTIATED", Set.of("CLOSED"),
-        "NO_VIOLATION",    Set.of("CLOSED"),
-        "REMEDIATION",     Set.of("CLOSED"),
-        "ESCALATED",       Set.of("CLOSED"),
-        "DISMISSED",       Set.of(),
-        "CLOSED",          Set.of()
-    );
+    // F2-290 — the machine moved to EthicsCaseLifecycle, which is now its ONE declaration and
+    // which DERIVES the terminal set from it (a state with no outgoing edges). It had to move
+    // because three artefacts answered "is this case still open?" and no two agreed: the client
+    // with the correct complement of {CLOSED, DISMISSED}, this service's analytics() with a
+    // five-token inclusion list, and BoardPackAggregateService with a three-token one that prints
+    // "Open N" into a board-pack PDF and PPTX. Measured 26 open, both server readers said 10.
 
     private final EthicsCaseRepository caseRepo;
     private final CaseActionRepository actionRepo;
@@ -108,7 +103,7 @@ public class EthicsCaseService {
     @Transactional
     public EthicsCase transition(Long id, String target, Map<String, Object> body) {
         EthicsCase c = require(id);
-        Set<String> allowed = TRANSITIONS.getOrDefault(c.getStatus(), Set.of());
+        Set<String> allowed = EthicsCaseLifecycle.allowedTargets(c.getStatus());
         if (!allowed.contains(target))
             throw new IllegalArgumentException("Cannot transition from " + c.getStatus() + " to " + target);
 
@@ -250,33 +245,40 @@ public class EthicsCaseService {
         Map<String, Object> out = new HashMap<>();
         out.put("total", caseRepo.countByOrganisationId(org));
 
+        // F2-290 — both bucket loops are DERIVED from the module's one declaration. They were
+        // typed inclusion lists, so a state or category nobody remembered was silently absent from
+        // the chart rather than chased, and neither column carries a CHECK constraint.
         Map<String, Long> byStatus = new HashMap<>();
-        for (String s : List.of("INTAKE","TRIAGE","INVESTIGATION","SUBSTANTIATED",
-                                "UNSUBSTANTIATED","NO_VIOLATION","REMEDIATION",
-                                "ESCALATED","DISMISSED","CLOSED"))
+        for (String s : EthicsCaseLifecycle.STATES)
             byStatus.put(s, caseRepo.countByOrganisationIdAndStatus(org, s));
         out.put("byStatus", byStatus);
 
         Map<String, Long> byCategory = new HashMap<>();
-        for (String c : List.of("BRIBERY","KICKBACK","CONFLICT_OF_INTEREST","FRAUD",
-                                "THEFT","HARASSMENT","DISCRIMINATION","RETALIATION",
-                                "DATA_MISUSE","AML_SUSPICION","POLICY_VIOLATION",
-                                "SAFETY","OTHER"))
+        for (String c : EthicsCaseLifecycle.CATEGORY_TAXONOMY)
             byCategory.put(c, caseRepo.countByOrganisationIdAndCategory(org, c));
         out.put("byCategory", byCategory);
 
-        long open = byStatus.getOrDefault("INTAKE", 0L)
-                  + byStatus.getOrDefault("TRIAGE", 0L)
-                  + byStatus.getOrDefault("INVESTIGATION", 0L)
-                  + byStatus.getOrDefault("REMEDIATION", 0L)
-                  + byStatus.getOrDefault("ESCALATED", 0L);
-        long closed = byStatus.getOrDefault("CLOSED", 0L)
-                    + byStatus.getOrDefault("DISMISSED", 0L);
-        long substantiated = byStatus.getOrDefault("SUBSTANTIATED", 0L)
-                           + byStatus.getOrDefault("REMEDIATION", 0L);
-        out.put("open", open);
-        out.put("closed", closed);
-        out.put("substantiated", substantiated);
+        // "Open" is the COMPLEMENT of the declared terminal set, and it is asked of the repository
+        // so that this service and BoardPackAggregateService cannot answer it differently (F2-196).
+        // It was INTAKE+TRIAGE+INVESTIGATION+REMEDIATION+ESCALATED, which answered 10 of 26.
+        out.put("open",   caseRepo.countOpen(org));
+        out.put("closed", caseRepo.countClosed(org));
+
+        // Deliberately narrower and NOT a restatement of a vocabulary: "substantiated" is a
+        // finding, so a case in REMEDIATION is still a substantiated one (F2-250's distinction).
+        // It is a status question by necessity — `outcome` records the REMEDIATION result
+        // (POLICY_UPDATE ...), not the verdict, so there is no durable column to count instead and
+        // inventing one to make this figure stable would be F2-196's own defect. Consequence,
+        // stated rather than glossed: the count falls when a substantiated case is CLOSED.
+        out.put("substantiated", caseRepo.countByOrganisationIdAndStatus(org, "SUBSTANTIATED")
+                               + caseRepo.countByOrganisationIdAndStatus(org, "REMEDIATION"));
+
+        // The rows no bucket above can show: 11 statuses (INVESTIGATING, TRIAGED) and 6 categories
+        // in both databases today. Surfaced rather than left to be inferred from a total that does
+        // not add up, because an unrecognised value on a misconduct register must be chased, not
+        // excused — and collapsing the synonyms rewrites live rows, which is the owner's call.
+        out.put("undeclaredStatus",   caseRepo.countWithUndeclaredStatus(org));
+        out.put("undeclaredCategory", caseRepo.countWithUndeclaredCategory(org));
         return out;
     }
 
@@ -348,7 +350,7 @@ public class EthicsCaseService {
                 + (isCreate ? "{id}" : current.getId()) + "/transition, which enforces the chain and"
                 + " stamps triagedAt / investigationStarted / investigationEnded / closureDate."
                 + " Allowed from " + curStatus + ": " + new java.util.TreeSet<>(
-                    TRANSITIONS.getOrDefault(curStatus, Set.of())) + ".");
+                    EthicsCaseLifecycle.allowedTargets(curStatus)) + ".");
         }
         if (src.getOutcome() != null && !src.getOutcome().equals(curOutcome)) {
             throw new IllegalArgumentException(

@@ -319,6 +319,17 @@
   color: var(--ink-3);
 }
 
+/* F2-290 - the count of rows no bar in the chart above can show, because ethics.cases has no
+   CHECK on status or category and holds near-synonyms of declared values. Muted, not red: the
+   register is not broken, the platform simply does not declare those words, and reconciling them
+   rewrites live rows. cursor:help matches the F2-248 / F2-249 disclosures on this page. */
+.ethics-analytics-undeclared {
+  margin-top: var(--sp-3);
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: help;
+}
+
 /* F2-248 — see changes.css: same disclosure, same reasoning, on the ethics case timeline. */
 .ethics-action-timeline-unverified {
   font-size: 11px;
