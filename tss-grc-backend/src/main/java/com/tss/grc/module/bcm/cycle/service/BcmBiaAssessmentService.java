@@ -27,9 +27,21 @@ import java.util.*;
  * BIA Assessment service — independent audit Tier-1 fix.
  *
  * <h3>Lifecycle</h3>
+ * <p>⚠ F2-305 — this was an ASCII-art happy path documenting <b>6 of the 11 edges</b>
+ * {@code TRANSITIONS} allows. A reader consulting a diagram to learn what is legal got a narrower
+ * answer than the machine, which is F2-303's defect one layer out: there the refusal could not name
+ * the moves, here the documentation did not. Written as a complete table in the form
+ * {@code CrisisCommsTemplateService} uses, which {@code TransitionRefusalContractTest} parses and
+ * compares against {@code TRANSITIONS} edge-for-edge (F2-191's precedent), so this block is the
+ * specification rather than a second copy nobody maintains.
+ *
  * <pre>
- *   DRAFT → UNDER_REVIEW ─┬─> APPROVED → ACTIVE → ARCHIVED
- *                         └─> CHANGES_REQUIRED → DRAFT (loop)
+ *   DRAFT            -> UNDER_REVIEW | ARCHIVED
+ *   UNDER_REVIEW     -> APPROVED | CHANGES_REQUIRED | DRAFT
+ *   CHANGES_REQUIRED -> DRAFT | UNDER_REVIEW
+ *   APPROVED         -> ACTIVE | CHANGES_REQUIRED
+ *   ACTIVE           -> ARCHIVED | CHANGES_REQUIRED
+ *   ARCHIVED         -> (terminal)
  * </pre>
  *
  * <h3>Rules locked here (spec §E)</h3>

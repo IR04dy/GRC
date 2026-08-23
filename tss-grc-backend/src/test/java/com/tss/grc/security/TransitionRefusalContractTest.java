@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -307,6 +308,152 @@ class TransitionRefusalContractTest {
             "A declared machine that names fewer than three states, or whose refusal does not read "
             + "the map, is not the thing this slice built:\n  %s", String.join("\n  ", thin))
             .isEmpty();
+    }
+
+    /**
+     * F2-305 — where a machine's edges are ALSO written in prose, the prose must agree with the map
+     * edge for edge.
+     *
+     * <h4>Why only four files, and why that is the honest answer</h4>
+     *
+     * ⚠⚠ The obvious version of this leg — parse every {@code A → B} in every comment — was built
+     * and <b>rejected</b>. It reported 6 disagreements across 8 machines and almost all were the
+     * detector's fault: this codebase documents lifecycles as <b>ASCII-art happy paths</b>
+     * ({@code DRAFT → UNDER_REVIEW ─┬─> APPROVED}), as narrative chains inside
+     * {@code @Operation(summary = "Move a case through INTAKE → TRIAGE → …")}, as single-edge
+     * remarks in code comments, and in one case as an <b>HTTP transcript</b>. 🔑 <b>An arrow in
+     * prose is not a claim about a complete outgoing set, and a gate that treats it as one fails on
+     * correct code</b> ([[F2-214]]).
+     *
+     * <p>So the population is files whose {@code <pre>} block is a real table — one
+     * {@code FROM -> A | B} line per state, the form {@code CrisisCommsTemplateService} already
+     * used. F2-305 rewrote three ASCII-art diagrams into that form <em>because they were
+     * incomplete</em>: they documented 6 of 11, 7 of 11 and 8 of 9 edges respectively, so a reader
+     * consulting one to learn what was legal got a narrower answer than the machine — F2-303's
+     * defect one layer out, in the artefact a developer reads before writing a client.
+     *
+     * <p>⚙ The four other machines have no such table and are deliberately not gated. Inventing one
+     * so the leg could cover them would be documentation written to satisfy a test.
+     */
+    @Test
+    void everyDocumentedEdgeTableAgreesWithItsMap() throws IOException {
+        Map<String, String> documented = Map.of(
+            "module/bcm/cycle/service/BcmBiaAssessmentService.java",    "TRANSITIONS",
+            "module/bcm/cycle/service/BcpPlanService.java",             "TRANSITIONS",
+            "module/bcm/cycle/service/CrisisEventService.java",         "TRANSITIONS",
+            "module/bcm/comms/service/CrisisCommsTemplateService.java", "TRANSITIONS");
+
+        Map<String, String> problems = new TreeMap<>();
+        int edgesChecked = 0;
+
+        for (Map.Entry<String, String> e : documented.entrySet()) {
+            Path p = MAIN.resolve(Paths.get("com", "tss", "grc").resolve(e.getKey()));
+            String raw = Files.readString(p);
+            Map<String, Set<String>> map = declaredEdges(
+                GuardExpressions.stripComments(raw), e.getValue());
+            Map<String, Set<String>> table = documentedEdges(raw);
+
+            if (map.isEmpty()) {
+                problems.put(e.getKey(), "no " + e.getValue() + " map could be parsed");
+                continue;
+            }
+            if (table.isEmpty()) {
+                problems.put(e.getKey(), "no <pre> edge table could be parsed — if the diagram was "
+                             + "rewritten as art, either restore the table form or remove this "
+                             + "file from the leg deliberately");
+                continue;
+            }
+            if (!table.keySet().equals(map.keySet())) {
+                problems.put(e.getKey(), "table documents states " + new TreeSet<>(table.keySet())
+                             + " and the map declares " + new TreeSet<>(map.keySet()));
+                continue;
+            }
+            for (String from : map.keySet()) {
+                if (!table.get(from).equals(map.get(from))) {
+                    problems.put(e.getKey() + " :: " + from,
+                                 "table says " + new TreeSet<>(table.get(from))
+                                 + ", map allows " + new TreeSet<>(map.get(from)));
+                }
+                edgesChecked += map.get(from).size();
+            }
+        }
+
+        assertThat(problems).as("""
+            A documented edge table disagrees with the machine it documents.
+
+            These <pre> blocks are the specification, not a summary: F2-305 rewrote three of them             because as ASCII-art happy paths they documented 6 of 11, 7 of 11 and 8 of 9 edges, and             a reader consulting one to learn what is legal got a narrower answer than the machine.
+
+            Fix whichever is wrong. If the MAP gained an edge, document it; if the map lost one, the             table must lose it too.
+
+            %s""".formatted(problems))
+            .isEmpty();
+
+        assertThat(edgesChecked).as(
+            "Edges compared: %d. If this collapsed, one of the two parsers stopped matching and the "
+            + "agreement above is being asserted over almost nothing.", edgesChecked)
+            .isGreaterThanOrEqualTo(30);
+    }
+
+    /** {@code FROM -> A | B} lines inside a {@code <pre>} block; {@code (terminal)} means no edges. */
+    private static Map<String, Set<String>> documentedEdges(String raw) {
+        Map<String, Set<String>> out = new TreeMap<>();
+        Matcher block = Pattern.compile("<pre>([\\s\\S]*?)</pre>").matcher(raw);
+        while (block.find()) {
+            Matcher line = Pattern.compile(
+                "^\\s*\\*?\\s*([A-Z][A-Z_]*)\\s*(?:->|\u2192)\\s*(.+)$", Pattern.MULTILINE)
+                .matcher(block.group(1));
+            Map<String, Set<String>> found = new TreeMap<>();
+            while (line.find()) {
+                String rhs = line.group(2).trim();
+                Set<String> targets = new java.util.LinkedHashSet<>();
+                if (!rhs.startsWith("(terminal)")) {
+                    Matcher t = Pattern.compile("([A-Z][A-Z_]*)").matcher(rhs);
+                    while (t.find()) {
+                        targets.add(t.group(1));
+                    }
+                }
+                found.put(line.group(1), targets);
+            }
+            // a block qualifies as a table only if it is ALL edge lines -- an ASCII diagram or an
+            // HTTP transcript yields one or two accidental matches and must not be treated as one
+            if (found.size() >= 3) {
+                out.putAll(found);
+            }
+        }
+        return out;
+    }
+
+    /** {@code Map.of(...)} / {@code Map.ofEntries(...)} machine edges, parsed from source. */
+    private static Map<String, Set<String>> declaredEdges(String code, String constant) {
+        Matcher m = Pattern.compile(
+            "Map<String,\\s*Set<String>>\\s+" + Pattern.quote(constant)
+            + "\\s*=\\s*Map\\.(?:of|ofEntries)\\(").matcher(code);
+        if (!m.find()) {
+            return Map.of();
+        }
+        int depth = 1;
+        int i = m.end();
+        while (i < code.length() && depth > 0) {
+            if (code.charAt(i) == '(') {
+                depth++;
+            } else if (code.charAt(i) == ')') {
+                depth--;
+            }
+            i++;
+        }
+        String body = code.substring(m.end(), Math.max(m.end(), i - 1));
+        Map<String, Set<String>> out = new TreeMap<>();
+        Matcher pair = Pattern.compile(
+            "\"([A-Z][A-Z_]*)\"\\s*,\\s*Set\\.of\\(([^)]*)\\)").matcher(body);
+        while (pair.find()) {
+            Set<String> targets = new java.util.LinkedHashSet<>();
+            Matcher t = Pattern.compile("\"([A-Z][A-Z_]*)\"").matcher(pair.group(2));
+            while (t.find()) {
+                targets.add(t.group(1));
+            }
+            out.put(pair.group(1), targets);
+        }
+        return out;
     }
 
     /** The keys of a {@code Map.of(...)} machine declaration. */
