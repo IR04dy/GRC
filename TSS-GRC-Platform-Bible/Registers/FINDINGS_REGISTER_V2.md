@@ -15025,3 +15025,194 @@ before it, an echo is trivially accepted and an omission trivially leaves the va
   computation anywhere** ([[F2-268]]'s standing filing).
 - `subject_name_ar` is **absent from the production table**: V391 is one of the 47 pending
   migrations, so that is the deployment gap and not a defect.
+
+---
+
+## F2-288 — the escalation that makes a screening match matter was on the RECORD path and absent from the REVIEWER's
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`a4eec5b9`) |
+| **Severity** | P1 — a KYC subject with a confirmed OFAC sanctions match could be approved for business |
+| **Register** | `ethics.screening_hits` (12 rows), `ethics.kyc_subjects` (16 rows) — byte-identical in dev and prod |
+| **Standards** | FATF R.12 (PEP enhanced due diligence), SAMA AML/CFT Rules, Saudi FIU STR filing |
+| **Found by** | executing [[F2-287]]'s top filing, disbelieving it ([[F2-221]]), and asking [[F2-196]]'s question of the register the refutation landed in |
+| **Verification** | live probe **8/18 pre-fix · 18/18 post-fix** on a freshly restarted listener; unit control **15 of 21 legs fire**; backend **4523 → 4544 / 0 / 0** |
+
+### The defect
+
+`KycService` reacted to a **confirmed** sanctions/PEP match by flagging its subject —
+`isSanctioned` + `riskRating = PROHIBITED` for the four sanctions lists, `isPep` +
+`eddRequired` + a STANDARD/LOW → HIGH raise for `PEP_GLOBAL`. That reaction lived inline in
+**`recordHit` only**. `disposition()` — the route a reviewer uses to *adjudicate* a hit — wrote
+the decision, the decider and the timestamp, and applied **none** of the consequences.
+
+Probed live as `compliance` (GRC_ADMINISTRATOR; *admin proves nothing about authorization*)
+against a `[REVIEW-TEST]` subject the probe plants itself ([[F2-206]]):
+
+| leg | pre-fix | post-fix |
+|---|---|---|
+| confirm an `OFAC_SDN` match on review | 200, `isSanctioned = false` | 200, `isSanctioned = true` |
+| the resulting risk rating | `STANDARD` | `PROHIBITED` |
+| **`POST /kyc/{id}/approve` afterwards** | **HTTP 200** | HTTP 400 |
+| confirm a `PEP_GLOBAL` match on review | `isPep = false`, `eddRequired = false` | both true, rating `HIGH` |
+
+🔑 **The third row is the finding.** `approve()` has always refused a sanctioned subject —
+*"Cannot approve a sanctioned subject"* — so the gate existed and could never fire, because
+nothing on the reviewer's path ever set the flag it reads. A control that cannot fire is
+[[F2-112]]'s shape; here it was one method away from the thing that would have armed it.
+
+### 🔑 The comment in `recordHit` is why nobody asked
+
+It documents the reaction mechanism at length and warns a future reader *not* to refuse the
+caller's disposition, because *"the service **reacts** to it below by flagging the subject
+sanctioned or PEP — refusing it would break the mechanism, which is the F2-40 trap."* Every
+word true, and every word about `recordHit`. [[F2-215]]'s two-of-N in the comment whose entire
+subject is this mechanism: **a reader who finds a mechanism explained does not then ask which
+sibling route is missing it.** That same comment lists **three** of the vocabulary's four
+tokens, which is what made it a fourth uncounted copy.
+
+### 🔑 The CHECK constraint is not the fix, and the probe proved it
+
+`ethics.screening_hits` had **zero** CHECK constraints of any kind, so `disposition` was
+narrowed by nothing and `disposition()` stored whatever string arrived. The vocabulary lived in
+**four** places and was enforced in none: the frontend's `HIT_DISPOSITIONS` dropdown (4 tokens),
+`recordHit`'s case-sensitive `"TRUE_MATCH".equals(...)`, the badge's tone ternary, and the
+comment above (3 tokens).
+
+⚠⚠ **V392 was applied to dev BEFORE the writer fix, so the pre-fix probe ran with the CHECK in
+place — and `disposition: "true_match"` was ACCEPTED, stored verbatim, and escalated nothing.**
+The collation is `Latin1_General_100_CI_AS_SC_UTF8`, so the constraint cannot see case
+([[F2-179]]). **A migration that adds the CHECK and stops leaves the defect intact while
+appearing to guard it** — which is [[F2-183]]'s rule demonstrated rather than asserted, and the
+reason the writer change and V392 are one commit.
+
+⚙ The same run showed the other half of that pair: with only the CHECK, an unrecognised
+disposition surfaced as **HTTP 409** and an unrecognised list source as a 409 **naming no
+field**. With `ClosedVocabulary.require()` both are **400 naming the field**. [[F2-230]]'s
+observation, live: the migration and the writer are two halves of one diagnostic.
+
+### What shipped
+
+- **One `applyConfirmedMatch`**, the single writer of all four consequences, reached by both
+  routes ([[F2-190]]; [[F2-245]]'s rule that the claim which prevents drift is about *where* the
+  writes live). It reads the **normalised** values, so it must run after the vocabulary calls.
+- **Three `ClosedVocabulary` declarations** naming V392's constraints:
+  `CK_screening_hits_disposition`, `CK_screening_hits_list_source`,
+  `CK_kyc_subjects_risk_rating`. `require`, not `coerce` — [[F2-182]]'s test says no coercion
+  exists upstream so out-of-vocabulary values do succeed today, but every value stored in either
+  database is already a member, and an unrecognised AML disposition does not degrade gracefully,
+  it **silently skips the sanctions escalation**. This is not the public whistleblower portal
+  where a lost report is worse than a mis-graded one.
+- **`risk_rating` closed in the same commit** because it is both an *input* to the PEP branch
+  (which raises STANDARD/LOW) and its *output* — a non-canonical value there does not render
+  oddly, it decides whether a confirmed PEP match raises the rating at all.
+- **V392**, with four THROWing self-checks including one asserting that every token
+  `applyConfirmedMatch` dispatches on is still admitted, so a later narrowing cannot make a
+  sanctions escalation unreachable in silence.
+
+### The gates
+
+`ScreeningEscalationContractTest` (9 legs, hermetic):
+- the four consequence setters appear in `applyConfirmedMatch` and in **neither** write route
+- both routes contain an `applyConfirmedMatch(` call
+- no bare `"TOKEN".equals(...)` comparison survives, scoped to the **shape** of the claim rather
+  than the token (which legitimately appears in the vocabulary declaration — [[F2-192]])
+- the operator's dropdowns and the vocabularies agree **in both directions**: a dropdown offering
+  a refused token is [[F2-180]]'s defect, a vocabulary admitting a token no operator can pick is
+  the mirror and reads as coverage
+- `RISK_RATING_TONE` covers every member ([[F2-197]]: an unmapped value renders neutral, so a
+  PROHIBITED subject could look unremarkable)
+- the hit badge's ternary names only real members
+- the comment stripper's own self-test, with the **two-pass** form as the negative control (never
+  a reordered alternation, which is an equivalent mutant — [[F2-211]])
+
+`KycScreeningEscalationTest` (12 legs) is paired deliberately: the `recordHit` half passed
+before this slice and the `disposition` half did not, **so a fix that moved the code without
+wiring the second caller fails exactly half of them.**
+
+⚠ **My first draft of the one-writer leg failed on correct code.** It counted `setIsSanctioned(`
+and `setIsPep(` at 1 and the tree has 2 — `apply()` legitimately copies all four flags, because
+the subject form lets an operator flag a PEP or a sanctioned party **by hand**, which is a
+different question from reacting to a hit, and `completeEdd` legitimately clears `eddRequired`.
+**A gate that fails on working code trains the next reader to edit the assertion** ([[F2-214]]),
+so it is scoped to the shape of the claim: the two hit-writing routes must not write a
+consequence themselves. Only `setIsSanctioned(true)` / `setIsPep(true)` /
+`setRiskRating("PROHIBITED")` can honestly be pinned at one.
+
+### ⚠ The refutation that produced this, recorded so nobody re-derives it
+
+[[F2-287]] filed: *"`externalId` is not one of `ServerOwnedFieldsModule`'s nine — 75 entities
+bind one on an entity-bound POST, 68 OPEN, and `ClientSuppliedReferenceRatchetTest` cannot see
+any of them because its key is a `setExternalId(...)` call site."* The **census reproduces
+exactly** by reflection — 117 entity-bound-POST entities, 75 with an `externalId`, **68 open, 7
+refused** — and the ratchet's blindness is real (`REFERENCE_SETTER` is a setter *call*, and an
+entity-bound POST has none, because Jackson writes the field).
+
+**Every consequence claim then fell:**
+
+| claim | measured |
+|---|---|
+| *"most are immune because the service mints over the top"* | **refuted** — 69 of 71 routes never mint. 40 rely on a UUID **field initialiser**, which Jackson overrides because it runs at construction and deserialisation follows; 29 have no filling mechanism at all |
+| the 6 NOT NULL sites with no mechanism | 3 are `socops` **ingest** paths carrying an upstream scanner/SIEM/DLP id (the ratchet's own `UPSTREAM_OWNED` bucket, correct); 3 are `audit_lc`, where `createAnnualPlan` **explicitly throws `"externalId is required"`** — caller-named by design, exactly as [[F2-286]] recorded |
+| [[F2-286]]'s ambiguity triple, re-paired properly | **HOT = 0.** 57 of 63 `external_id` finders are tenant-scoped, **0** unscoped `@Query`, and none of the 6 unscoped finders belongs to any of the 68 sites |
+| the 18 NULLABLE no-mechanism sites | `external_id` null on many live rows (`policy.documents` 22 of 51, `ndi.framework_item` 20 of 20), **no `{externalId}` route, no client, no unique index** — an inert column ([[F2-184]] at a column). Measured and **not** fixed ([[F2-278]]: sometimes the right answer is measure it and do not make it) |
+
+🔑 **A generalisation that returns zero is a result** ([[F2-216]]) — and asking [[F2-196]]'s
+question of the register the refutation had walked into is what found the P1.
+
+### ⚠ Instrument errors, all mine
+
+- **A member regex that consumes its leading `;` skips every other single-line member** — it
+  reported **210** `updatable = false`-style fields on a tree holding **424**, because the house
+  style puts `@Column` and the field on one line, several in a row. Carried over from
+  [[F2-287]]'s scratch tooling; a smaller population reads exactly like a clean tree.
+- **My pre-fix control script silently converted `KycService.java` from CRLF to LF.**
+  `io.open(...).read()` normalises to LF and writing with `newline=""` emits it verbatim. Third
+  instance of the line-ending trap in this lineage ([[F2-212]], [[F2-229]], [[F2-234]]) and the
+  first caused by a *restore* rather than an anchor. Verify the byte-level line endings after any
+  scripted restore, not just the content.
+- **`subprocess` resolved `mvn` to a guessed `C:\Sources\...` path** and died with
+  `WinError 193` (*not a valid Win32 application*) — the real launcher is on **D:**. The control
+  ran from Bash instead, where `mvn` resolves natively. Guessed-path family, at a tool this time.
+- **`mvn -o compile` did not trigger a DevTools restart** ([[F2-275]]), so the listener was still
+  serving the *fixed* code after the revert. Had the pre-fix probe run then, it would have scored
+  the defect as absent — i.e. **as never having been live.** `Started GrcApplication` counted
+  1 before and after; the fix is to kill by PID (identified by `-Djava.io.tmpdir`, guarded on
+  8090/8091 being the prod jar) and relaunch.
+
+### ⚙ Filed
+
+- **Whether a confirmed `INTERPOL_RED`, `ADVERSE_MEDIA` or `INTERNAL` match should move a
+  customer's risk rating.** Those three of the eight list sources escalate nothing, and inventing
+  a rule would be [[F2-183]]/[[F2-196]]'s defect. A gate leg asserts the current boundary in both
+  directions so it cannot drift silently. **Owner decision.**
+- **`kycApi.disposition` has no caller**, so **10 of 12 live hits are permanently
+  un-dispositionable through the platform's own screen** — the create form is the only place a
+  disposition can be set, and it defaults to `NEEDS_REVIEW`. The fix makes the *route* correct;
+  building the review screen is a product change. ⚠ [[F2-214]]'s warning applies squarely: a dark
+  client reads as an invitation to build the screen — and until this slice, that screen would
+  have fired the un-escalating path.
+- **`runScreening` screens nothing.** `POST /kyc/{id}/screening-run` only stamps
+  `lastScreenedAt`; it creates no hits and consults no list. The button is labelled "Run
+  screening" ([[F2-193]]'s shape: a control whose label describes something the platform cannot
+  do).
+- **Two screening registers for one concept**, both live and identical in dev and prod:
+  `aml.screening_hit` (3 rows, `status`, a **declared 7-token machine** in `SanctionsHitService`,
+  a `@Pattern` on its DTO) and `ethics.screening_hits` (12 rows, `disposition`, no machine). The
+  vocabularies are **disjoint near-synonyms** — `PENDING_REVIEW`/`TRUE_POSITIVE` against
+  `NEEDS_REVIEW`/`TRUE_MATCH` — and **two `@Entity` classes share the simple name
+  `ScreeningHit`** ([[F2-222]]'s 15). The UI drives the one with no machine. [[F2-196]]'s shape;
+  reconciling them changes what the platform reports to the Saudi FIU. **Owner decision.**
+- The `ethics` schema's remaining unconstrained columns: `aml_alerts.alert_type` /
+  `.severity` / `.disposition` (whose transition route still takes
+  `body.get("disposition").toString()` unvalidated), `cases.status` (11 of 30 rows still
+  unadvanceable — [[F2-221]]'s filing, re-confirmed), `kyc_subjects.status` / `.subject_type` /
+  `.cdd_level`, `disclosures.status`.
+- **The entity's `@Column(length)` disagrees with the column on both hit fields** —
+  `disposition` declares 30 against `nvarchar(60)`, `list_source` 60 against `nvarchar(120)`.
+  Inert under `ddl-auto=none` ([[F2-276]]'s declaration-versus-column gap), so noted rather than
+  changed.
+- **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
+  left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
+  upstream-owned, and the nullable ones are inert.

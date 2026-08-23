@@ -1,6 +1,7 @@
 package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.ethics.entity.KycSubject;
 import com.tss.grc.module.ethics.entity.ScreeningHit;
 import com.tss.grc.module.ethics.repository.KycSubjectRepository;
@@ -17,10 +18,69 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class KycService {
+
+    /**
+     * F2-288 — the disposition of a sanctions/PEP screening hit.
+     *
+     * <p>Before this it was declared in <b>four</b> places and enforced in none: the frontend's
+     * {@code HIT_DISPOSITIONS} dropdown (4 tokens), {@code recordHit}'s case-sensitive
+     * {@code "TRUE_MATCH".equals(...)}, the badge's tone map, and {@code recordHit}'s own comment,
+     * which lists <em>three</em> of the four. {@code ethics.screening_hits} had <b>zero</b> CHECK
+     * constraints, so the column was narrowed by nothing at all and {@link #disposition} stored
+     * whatever string arrived.
+     *
+     * <p>🔑 {@code require} rather than {@code coerce}, and F2-182's test is what settles it: no
+     * coercion exists upstream, so out-of-vocabulary values do succeed today — but every value
+     * stored in either database is already a member, and an unrecognised AML disposition does not
+     * degrade gracefully here, it <b>silently skips the sanctions escalation below</b>. On a
+     * governance decision that is the unsafe direction; this is not the public whistleblower
+     * portal, where a lost report is worse than a mis-graded one.
+     */
+    static final ClosedVocabulary HIT_DISPOSITION = ClosedVocabulary.of(
+        "disposition", "CK_screening_hits_disposition",
+        "NEEDS_REVIEW", "POTENTIAL_MATCH", "TRUE_MATCH", "FALSE_POSITIVE");
+
+    /**
+     * The list a match came from. Closed because {@link #applyConfirmedMatch} <b>dispatches</b> on
+     * it: an unrecognised source is not a cosmetic problem, it is a confirmed match that escalates
+     * nothing. The eight tokens are the frontend's {@code HIT_LIST_SOURCES} — the only place the
+     * vocabulary was ever written down — and all three values stored in either database are members.
+     */
+    static final ClosedVocabulary HIT_LIST_SOURCE = ClosedVocabulary.of(
+        "listSource", "CK_screening_hits_list_source",
+        "OFAC_SDN", "UN_CONSOLIDATED", "EU_CONSOLIDATED", "SAMA_LOCAL",
+        "PEP_GLOBAL", "INTERPOL_RED", "ADVERSE_MEDIA", "INTERNAL");
+
+    /**
+     * A subject's AML risk rating. Closed in the same commit because it is both an <b>input</b> to
+     * the PEP branch of {@link #applyConfirmedMatch} (which raises STANDARD/LOW to HIGH) and its
+     * <b>output</b> — so a non-canonical value there does not merely render oddly, it decides
+     * whether a confirmed PEP match raises the rating at all.
+     */
+    static final ClosedVocabulary RISK_RATING = ClosedVocabulary.of(
+        "riskRating", "CK_kyc_subjects_risk_rating",
+        "LOW", "STANDARD", "HIGH", "PROHIBITED");
+
+    /** The disposition that means "this match is real". */
+    static final String CONFIRMED = "TRUE_MATCH";
+
+    /**
+     * The four lists whose confirmed match makes a subject <b>sanctioned</b>. The other four
+     * {@link #HIT_LIST_SOURCE} members deliberately escalate nothing here: {@code PEP_GLOBAL} has
+     * its own branch below, and whether a confirmed {@code INTERPOL_RED}, {@code ADVERSE_MEDIA} or
+     * {@code INTERNAL} match should move a customer's risk rating is a product decision this slice
+     * does not get to invent (F2-183/F2-196) — it is filed, not guessed.
+     */
+    static final Set<String> SANCTIONS_LISTS =
+        Set.of("OFAC_SDN", "UN_CONSOLIDATED", "EU_CONSOLIDATED", "SAMA_LOCAL");
+
+    /** The list whose confirmed match makes a subject a politically exposed person. */
+    static final String PEP_LIST = "PEP_GLOBAL";
 
     private final KycSubjectRepository subjectRepo;
     private final ScreeningHitRepository hitRepo;
@@ -41,7 +101,9 @@ public class KycService {
         s.setOrganisationId(TenantContext.getCurrentTenant());
         apply(s, req);
         if (s.getStatus() == null) s.setStatus("PENDING");
-        if (s.getRiskRating() == null) s.setRiskRating("STANDARD");
+        // F2-288 -- one call where there were two literals for one fact: the default and the
+        // vocabulary can no longer disagree (F2-217).
+        s.setRiskRating(RISK_RATING.orDefault(s.getRiskRating(), "STANDARD"));
         return subjectRepo.save(s);
     }
 
@@ -147,20 +209,51 @@ public class KycService {
                 "screenedAt cannot be in the future — a screening that has not happened yet "
                 + "cannot have produced a match. Omit it to record the screening as happening now.");
         }
-        if (body.getDisposition() == null) body.setDisposition("NEEDS_REVIEW");
-        if ("TRUE_MATCH".equals(body.getDisposition())
-            && List.of("OFAC_SDN", "UN_CONSOLIDATED", "EU_CONSOLIDATED", "SAMA_LOCAL").contains(body.getListSource())) {
+        // F2-288 — normalise both closed columns on write, so the CHECK, the Java comparison below
+        // and the frontend's label map agree. The collation is case-INSENSITIVE, so before this a
+        // caller sending `true_match` had it stored verbatim and the escalation never fired: the
+        // register recorded a confirmed sanctions match and the subject stayed unflagged (F2-179).
+        body.setDisposition(HIT_DISPOSITION.orDefault(body.getDisposition(), "NEEDS_REVIEW"));
+        body.setListSource(HIT_LIST_SOURCE.require(body.getListSource()));
+        applyConfirmedMatch(s, body);
+        return hitRepo.save(body);
+    }
+
+    /**
+     * F2-288 — the single writer of what a <b>confirmed</b> screening match does to its subject.
+     *
+     * <p>This used to live inline in {@link #recordHit} only, and {@link #disposition} — the route
+     * a reviewer uses to adjudicate a hit — did not have it. So a reviewer confirming a UN or OFAC
+     * match set {@code disposition = TRUE_MATCH} and left {@code isSanctioned} false and the risk
+     * rating untouched; confirming a PEP match left {@code isPep} false and {@code eddRequired}
+     * false, which is the flag FATF R.12 and SAMA's AML/CFT rules turn on.
+     *
+     * <p>🔑 The comment in {@code recordHit} explaining the reaction mechanism is <b>why nobody
+     * asked</b>: it documents the escalation carefully, on the one path that had it, and a reader
+     * who finds a mechanism explained does not then ask which sibling route is missing it
+     * (F2-215's two-of-N). That comment also lists three of the vocabulary's four tokens.
+     *
+     * <p>⚠ Deliberately reads the hit's <em>normalised</em> values, so it must be called after the
+     * two {@code ClosedVocabulary} calls and never before — a raw {@code "true_match"} would slip
+     * past {@link ClosedVocabulary#is} exactly as it slipped past the old {@code equals}.
+     */
+    private void applyConfirmedMatch(KycSubject s, ScreeningHit h) {
+        if (!HIT_DISPOSITION.is(h.getDisposition(), CONFIRMED)) return;
+        boolean escalated = false;
+        if (SANCTIONS_LISTS.contains(h.getListSource())) {
             s.setIsSanctioned(true);
             s.setRiskRating("PROHIBITED");
-            subjectRepo.save(s);
+            escalated = true;
         }
-        if ("TRUE_MATCH".equals(body.getDisposition()) && "PEP_GLOBAL".equals(body.getListSource())) {
+        if (PEP_LIST.equals(h.getListSource())) {
             s.setIsPep(true);
-            if ("STANDARD".equals(s.getRiskRating()) || "LOW".equals(s.getRiskRating())) s.setRiskRating("HIGH");
+            if (RISK_RATING.is(s.getRiskRating(), "STANDARD") || RISK_RATING.is(s.getRiskRating(), "LOW")) {
+                s.setRiskRating("HIGH");
+            }
             s.setEddRequired(true);
-            subjectRepo.save(s);
+            escalated = true;
         }
-        return hitRepo.save(body);
+        if (escalated) subjectRepo.save(s);
     }
 
     /**
@@ -175,19 +268,22 @@ public class KycService {
     @Transactional
     public ScreeningHit disposition(Long hitId, String disposition, String notes, String decidedBy, Boolean sarFiled, String sarRef) {
         ScreeningHit h = hitRepo.findById(hitId).orElseThrow(() -> new EntityNotFoundException("Hit not found: " + hitId));
-        require(h.getSubjectId());
+        KycSubject subject = require(h.getSubjectId());
         String actor = CurrentActor.username();
         if (actor == null || actor.isBlank()) {
             throw new IllegalStateException(
                 "No authenticated principal to record as the decision-maker on screening hit "
                 + hitId + ". An AML disposition with no decider is not a disposition.");
         }
-        h.setDisposition(disposition);
+        // F2-288 — this is the reviewer's route, so it is the route where the consequences of a
+        // confirmed match matter most; before this it wrote the decision and applied none of them.
+        h.setDisposition(HIT_DISPOSITION.require(disposition));
         if (notes      != null) h.setDispositionNotes(notes);
         h.setDecidedByName(actor);
         h.setDecidedAt(LocalDateTime.now());
         if (sarFiled != null) h.setSarFiled(sarFiled);
         if (sarRef   != null) h.setSarReference(sarRef);
+        applyConfirmedMatch(subject, h);
         return hitRepo.save(h);
     }
 
@@ -219,7 +315,7 @@ public class KycService {
         if (s.getCommercialRegistration() != null) t.setCommercialRegistration(s.getCommercialRegistration());
         if (s.getSubjectLinkType()        != null) t.setSubjectLinkType(s.getSubjectLinkType());
         if (s.getSubjectLinkId()          != null) t.setSubjectLinkId(s.getSubjectLinkId());
-        if (s.getRiskRating()             != null) t.setRiskRating(s.getRiskRating());
+        if (s.getRiskRating()             != null) t.setRiskRating(RISK_RATING.require(s.getRiskRating()));
         if (s.getIsPep()                  != null) t.setIsPep(s.getIsPep());
         if (s.getIsSanctioned()           != null) t.setIsSanctioned(s.getIsSanctioned());
         if (s.getCddLevel()               != null) t.setCddLevel(s.getCddLevel());
