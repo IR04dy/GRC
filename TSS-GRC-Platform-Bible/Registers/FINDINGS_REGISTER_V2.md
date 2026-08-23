@@ -15219,6 +15219,211 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-293 — the first screen-reachable member of this population, and the reachability question is per call site rather than per page
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`452cc31b`) |
+| **Severity** | P1 — clicking **Pause** or **Resume** on a scheduled regulatory report rewrote its **format, language, cadence and delivery time**, and the report kept being emailed to its recipients on the new schedule. A body omitting `isActive` **resumed a paused report**. Separately, the semi-annual ISO 22301 / NCEMA BCM readiness report was being **retried daily** — 13 consecutive FAILED runs in both databases. All probed live. |
+| **Register** | `reporting.report_schedules` (11 live rows, byte-identical in dev and prod) |
+| **Standards** | the register carries the tenant's board and regulator reporting pack — NCA ECC posture, SAMA/CMA board risk-and-compliance, PDPL DSR/breach tracking, ISO 22301 / NCEMA BCM readiness, IIA audit-plan progress, ESG annex |
+| **Found by** | executing [[F2-292]]'s own 32-site work list, re-derived before executing ([[F2-221]]) because correcting the previous filing's ranking was that slice's whole finding |
+| **Verification** | live probe **14/14 pre-fix · 14/14 post-fix** as `compliance`, never `admin`; mutations **13/13 killed, 0 survived, 0 anchor-miss**; backend **4602 → 4614/0/0**; `npx tsc --noEmit` clean; register back at 11 live rows with 0 tagged rows left |
+
+### The defect
+
+`ReportScheduleController` binds the `ReportSchedule` **entity** on POST and PUT. Jackson
+deserialises an omitted key into `new ReportSchedule()`, and the entity declared
+`format = "PDF"`, `language = "en"`, `cadence = "WEEKLY"`, `timeOfDay = "06:00"` and
+`isActive = true` — so every `if (s.getX() != null)` in `apply` was **true on every request**, and a
+partial `PUT` rewrote all five.
+
+🔑🔑 **THE FIRST SCREEN-REACHABLE MEMBER OF THIS POPULATION, AND BY A ONE-CLICK CONTROL.**
+`ReportSchedulesPage` holds **two** update call sites:
+
+- `submitForm` sends `{...values}`, seeded from `reqFromDto`'s `{...s}` — the edit modal echoes every
+  field back, so it is safe. This is exactly the shape [[F2-291]] and [[F2-292]] both measured, and
+  why both of those were **API-reachable only**.
+- `togglePause` sends `{ isActive: !s.isActive }` **and nothing else**.
+
+So one page was simultaneously safe and destructive. Probed live as `compliance` — the only non-admin
+holder of `REPORTING:WRITE` — a schedule stored as `XLSX / ar / QUARTERLY / 22:00` became
+`PDF / en / WEEKLY / 06:00` after a single Pause click, while `cadenceAnchor` and `nameAr` survived:
+those two are guarded **and uninitialised**, which is the control showing the reset came from the
+initialisers rather than from the guards.
+
+🔑 **[[F2-283]]'s screen-reachable / API-reachable distinction is per CALL SITE, not per page.** Two
+slices in a row concluded *"the screen echoes the whole DTO, so this is API-reachable only"* from
+reading `reqFromDto`. This page's `reqFromDto` also echoes, and the defect is live anyway because a
+**different handler on the same page** builds its own body. Reading one payload builder is one file
+short — the same error shape as [[F2-187]]'s *"one file short is the whole error"*.
+
+### The measurement, and the third consecutive inverted ranking
+
+Identical in dev and prod over 11 live rows — rows a partial `PUT` would rewrite:
+
+| field | initialiser | differs on | what the reset asserts |
+|---|---|---|---|
+| `cadence` | `WEEKLY` | **10 / 11** | a quarterly regulator return becomes weekly |
+| `language` | `en` | **9 / 11** | an Arabic report reverts to English (house rule 7) |
+| `time_of_day` | `06:00` | **9 / 11** | the delivery time moves |
+| `format` | `PDF` | 1 / 11 | an XLSX tracker becomes a PDF |
+| `is_active` | `true` | **0 / 11** | a paused report resumes |
+
+🔑 **`isActive` differs on 0 rows because the toggle is the one caller that always sends it** — so the
+field [[F2-292]]'s filing ranked sharpest is the one this defect could not reach through the screen,
+and the four it listed as collateral were the live ones. It is closed anyway: a body that omits it
+resumed a paused report (probed, `PUT {"cadence":"MONTHLY"}` took `is_active` false → true), and a
+reset that **restarts delivery manufactures an assurance** rather than losing a fact ([[F2-240]]).
+
+**Third slice running where the filing's ranking and the executing slice's measurement disagree.**
+[[F2-291]]'s filing was corrected by [[F2-292]], and [[F2-292]]'s by this one. The pattern is
+structural rather than careless: **a filing ranks by what the initialiser asserts, because that is
+all it can see without reading the callers; the executing slice ranks by the caller.** Expect to
+re-derive, and expect the answer to move.
+
+⚠ No privilege escalation: `REPORTING:WRITE` guards the create, the PUT and `/run-now` alike, so the
+object-level behaviour was the only control ([[F2-219]]'s shape). `REPORTING:DELETE` is held only by
+`ORG_ADMIN`, which has **0 active holders**, so nobody but a platform administrator can delete a
+schedule ([[F2-253]]'s shape) — filed.
+
+### The adjacent defect the same measurement exposed, and why it had to land in this commit
+
+`reporting.report_schedules` has **zero CHECK constraints**, and `seed_real_data.py` wrote
+**`SEMIANNUAL`** onto the *"Semi-annual ISO 22301 / NCEMA BCM readiness"* schedule — a token
+`advanceNextRun`'s `switch` did not name, so its `default` arm rescheduled it `now.plusDays(1)`.
+Measured in both databases: **13 consecutive FAILED runs, 2026-08-11 to 2026-08-23**.
+
+⚠⚠ **Pre-fix, the pause toggle would have "healed" it by accident** — resetting the cadence to
+`WEEKLY`, a token the scheduler handles. So *this slice's own fix makes the daily retry permanent*.
+That is [[F2-203]]'s detonation (fixing one defect is what arms the next), and it is why the
+`SEMIANNUAL` arm is in the same commit rather than filed.
+
+🔑🔑 **EVERY READER AGREED AND THE STORED DATA WAS THE OUTLIER.** `CADENCE_OPTIONS` offers exactly the
+four the switch handled; `REPORT_TYPE_OPTIONS` offers exactly the five `renderBody` handles. So the
+screen and the server were consistent, and consistency among readers is what made a third value
+invisible. [[F2-205]]'s question — *how many things read this, and which of them is the server?* —
+assumes the disagreement is **between readers**; here there was none. [[F2-180]]'s mirror: there the
+screen offered categories the column's CHECK refused, here the column holds tokens every reader
+refuses — one **loudly** (`default -> throw` on `report_type`) and one **silently**
+(`default -> plusDays(1)` on `cadence`).
+
+`SUPPORTED_CADENCES` is now one declaration with two readers: the switch, and a write-boundary
+refusal that turns a silently-daily schedule into a **400 naming the field**. The frontend list is a
+third copy and is checked against it by `ReportCadenceContractTest`, cross-codebase in the way
+`ConnectorBackingContractTest` reads a `.ts` file ([[F2-193]]).
+
+⚠ Deliberately **not** a `ClosedVocabulary`: that primitive *requires* the name of a CHECK it mirrors
+and there is none on this table. The claim here is not about the schema — it is *the scheduler can
+compute a next run for every one of these* — which is checkable in Java, and is checked
+**behaviourally** rather than by matching `case` labels. `require` not `coerce` ([[F2-182]]): every
+stored value is already a member and the frontend offers exactly this set, so nothing that works
+today starts failing. The `default` arm keeps its one-day fallback — throwing would break the run
+loop, which calls `advanceNextRun` from its catch path too — but now **WARNs naming the token**, so
+an unrecognised cadence is chased rather than excused ([[F2-196]]).
+
+⚠ **No CHECK migration rides with this, and the reason is recorded rather than assumed:**
+`report_type` is the larger open vocabulary on the same table, and constraining `cadence` alone would
+leave the table's real vocabulary problem open while looking addressed. Both want one migration once
+the report-type question has an owner decision ([[F2-183]]: a constraint and its writers land
+together).
+
+### The test that could have caught it picked the two fields where the principle held
+
+`ReportScheduleBilingualTest.anOmittedArabicFieldIsLeftAloneRatherThanBlanked` states the general
+rule in its own javadoc — *"`apply()` treats null as 'leave alone' so a partial PATCH-style body
+cannot wipe fields"* — and exercised it on `nameAr` and `descriptionAr`, **two of the only guarded
+fields on this entity with no initialiser**. For the five that had one, the rule was **false**.
+
+🔑 **A partial-update test that picks the uninitialised fields proves the principle on exactly the
+fields where it holds.** [[F2-215]]'s two-of-N inside a test fixture, which is the artefact a reader
+trusts most. Corrected in place and extended to the other five — and a mocked repository cannot see
+this at all, which is why it was probed live (house rule 4).
+
+### Three of my own assertions were wrong, and each was caught by running something
+
+⚠ **(a) Distance cannot discriminate the fallback arm.** The first cadence leg asserted that no
+non-daily cadence lands within two days, and it **failed on correct code**: `nextWeekly` reads the
+anchor as a day-of-week, so a WEEKLY schedule legitimately lands tomorrow whenever tomorrow is the
+anchor day. A gate that fails on working code trains the next reader to edit the assertion
+([[F2-214]]), and a red leg is a finding only when the code is actually wrong ([[F2-206]]). Replaced
+by per-cadence **properties the default arm cannot produce** — the anchor's own day-of-week or
+day-of-month, and the month a period must start in, with every anchor chosen so tomorrow's date
+cannot satisfy it by coincidence.
+
+⚠⚠ **(b) The probe then reproduced that exact error one file over.** It asserted the `SEMIANNUAL`
+next-run was `>= 150` days out and failed at **145** — `2027-01-15`, which is precisely the next
+half-year start after 2026-08-23 for anchor 15. A half-year boundary is between 1 and ~183 days away
+depending where in the half you stand, so a distance threshold is only right for part of the year.
+🔑 **Naming a trap does not exempt you from it**, and I had fixed the identical mistake minutes
+earlier in the unit test.
+
+⚠ **(c) I replaced the last element of a hard-asserted work list with a member I had never
+measured** — a phantom in exactly the artefact [[F2-292]] recorded the hazard for. Caught before the
+build ran, by re-reading the edit.
+
+### 🔑 A test whose strength depends on the month it runs in
+
+The mutation harness found the sharpest instrument defect here: a mutant computing the **quarterly**
+start instead of the half-year start **SURVIVED**. Quarters begin Jan/Apr/Jul/Oct and halves Jan/Jul,
+so the two **agree in six months of twelve** — and the run was in August, where both answer July. So
+`isIn(1, 7)` passes over a quarterly implementation for Jan–Mar and Jul–Sep.
+
+🔑 **A test whose strength depends on the month it runs in is strong on the day you write it and weak
+on the day it matters.** No single instant can separate the two functions, so the fix is not a better
+assertion at *now*: `theSemiannualArithmeticHoldsInEveryMonthOfTheYear` drives `nextSemiannual`
+across **all twelve months**. It takes `now` as a parameter, which is why this is a unit assertion
+rather than a probe.
+
+### Harness landmines
+
+⚠ **`os._exit()` skips stdout flushing**, so the first piped probe run printed **nothing** and read
+exactly like a probe that never executed. It had in fact run — it planted and cleaned its rows.
+
+⚠⚠ **A wholesale pre-fix revert is the wrong control for a fix that INTRODUCES a symbol.** The new
+gate references `ReportSchedulerService.SUPPORTED_CADENCES`, so reverting the service made the test
+fail to **compile** — and a control that cannot run reads exactly like a gate that passed
+([[F2-287]], which recorded this same shape). Surgical mutations instead, which is the right
+instrument anyway because it says *which* leg sees *which* half.
+
+⚠ **A mutation anchor that is a PREFIX of its line leaves the tail dangling.** M1's anchor stopped
+before `(see ReportSchedulerService#renderBody)`, so the mutant did not compile and reported as
+inconclusive — **neither a kill nor a hole**. Anchor on the whole line, and keep
+*did-not-run* distinct from *survived*.
+
+⚠ **The helper-only floor was re-measured 8 → 5, and which it is matters.** All five members closed
+here were helper-only — their guards live in a private `apply` — so the population fell **because of
+the fix** rather than because the detector rotted ([[F2-213]]: a population that falls after a fix is
+not automatically rot, but it is always worth asking which). That floor also has a shape problem in
+its future, recorded in place: it counts `WORK_LIST`, so when the work list reaches zero the count is
+zero too and the leg goes vacuous ([[F2-219]]).
+
+### Filed
+
+⚠⚠ **Seven of eleven scheduled regulatory reports have never been delivered.** `renderBody` handles
+`RISK_REGISTER | FINDINGS_AGING | KRI_DASHBOARD | BOARD_PACK | AI_MODEL_REGISTRY` and answers
+`default -> throw`; the register holds seven other types, all written by the seed and none offered by
+`REPORT_TYPE_OPTIONS`: `BOARD_RISK_COMPLIANCE_PACK`, `CYBER_POSTURE_ECC`, `TPRM_RISK_POSTURE`,
+`AUDIT_PLAN_PROGRESS`, `ESG_ANNEX`, `PDPL_DSR_BREACH_TRACKER`, `BCM_READINESS`. Every one carries
+`last_run_status = FAILED` with `Unknown report type: …`, in **both** databases. `ExportService` has
+no generator for any of them, so this is seven new report builders — a **build plus an owner
+decision** (which framework each pack must satisfy), not a slice. It is also why no CHECK migration
+rode with this fix.
+
+⚠ **`FORMAT_OPTIONS` offers DOCX and PPTX and the renderer cannot produce either for most types.**
+`renderBody` is `"PDF".equalsIgnoreCase(fmt) ? …Pdf(lang) : …Xlsx()` for four of the five types, and
+`mimeFor` maps anything unrecognised to `application/pdf` — so choosing **DOCX** yields **XLSX bytes
+labelled as a PDF with a `.pdf` extension**. PPTX is real for `BOARD_PACK` only, and its label already
+says so. Latent: 10 of 11 live rows are PDF and one is XLSX. Deciding which formats each report type
+supports is a product matrix ([[F2-193]]'s rule that a catalogue must not claim a capability that
+does not exist).
+
+⚠ `reporting.report_schedules` has **zero CHECK constraints** on `report_type`, `format`, `language`
+or `cadence`; the cadence writer is closed now, the other three are not.
+
+⚠ `REPORTING:DELETE` is held only by `ORG_ADMIN`, which has **0 active holders** in either database.
+
+
 ## F2-292 — the sharpest member of a work list was not its widest, and the derivation that closed the last register could not be copied to this one
 
 | | |
