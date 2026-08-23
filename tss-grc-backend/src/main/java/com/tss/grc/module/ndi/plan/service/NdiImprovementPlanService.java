@@ -116,7 +116,15 @@ public class NdiImprovementPlanService {
 
     public NdiImprovementPlan update(Long id, NdiImprovementPlan body) {
         NdiImprovementPlan p = get(id);
-        if (body.getPlanCode()       != null) p.setPlanCode(body.getPlanCode());
+        // F2-308 — settable at birth, fixed thereafter. Nothing mints this code (one
+        // write in the whole service, the caller's), so a rename was expressible.
+        ServerOwnedState.requireImmutableReference(
+            body.getPlanCode(), p.getPlanCode(), "planCode",
+            "NDI improvement plan " + (p.getId() == null ? "(new)" : p.getId()),
+            "Omit planCode, or send the value already recorded.");
+        if (body.getPlanCode() != null && p.getPlanCode() == null) {
+            p.setPlanCode(body.getPlanCode());
+        }
         if (body.getNameEn()         != null) p.setNameEn(body.getNameEn());
         if (body.getNameAr()         != null) p.setNameAr(body.getNameAr());
         if (body.getDescriptionEn()  != null) p.setDescriptionEn(body.getDescriptionEn());

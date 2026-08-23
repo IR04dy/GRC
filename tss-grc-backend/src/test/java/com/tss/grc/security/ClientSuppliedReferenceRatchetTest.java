@@ -171,7 +171,7 @@ class ClientSuppliedReferenceRatchetTest {
      * <p>Asserted exactly rather than as a ceiling: a new rename site must fail, and a closed one
      * must lower the number in the same commit (house rule 3).
      */
-    private static final int UPDATE_PATH_REFERENCE_WRITES = 38;
+    private static final int UPDATE_PATH_REFERENCE_WRITES = 33;
 
     private static final Pattern UPDATE_ISH = Pattern.compile(
         "\\b(?:public|protected|private)\\s+[\\w<>,.\\[\\]?]+\\s+"

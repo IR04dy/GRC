@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.entity.CrisisCommsAudience;
 import com.tss.grc.module.bcm.entity.CrisisCommsDistribution;
@@ -92,7 +93,15 @@ public class CrisisCommsService {
      */
     public CrisisCommsTemplate updateTemplate(Long id, CrisisCommsTemplate req) {
         CrisisCommsTemplate t = mustGetTemplate(id);
-        if (req.getCode() != null)         t.setCode(req.getCode());
+        // F2-308 — settable at birth, fixed thereafter. Nothing mints this code (one
+        // write in the whole service, the caller's), so a rename was expressible.
+        ServerOwnedState.requireImmutableReference(
+            req.getCode(), t.getCode(), "code",
+            "Crisis comms template " + (t.getId() == null ? "(new)" : t.getId()),
+            "Omit code, or send the value already recorded.");
+        if (req.getCode() != null && t.getCode() == null) {
+            t.setCode(req.getCode());
+        }
         if (req.getNameEn() != null)       t.setNameEn(req.getNameEn());
         if (req.getNameAr() != null)       t.setNameAr(req.getNameAr());
         if (req.getAudienceRole() != null) t.setAudienceRole(req.getAudienceRole());

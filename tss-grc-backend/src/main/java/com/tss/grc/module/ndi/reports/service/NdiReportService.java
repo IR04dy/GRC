@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.reports.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.compliance.entity.NdiComplianceAssessment;
 import com.tss.grc.module.ndi.compliance.repository.NdiComplianceAssessmentRepository;
@@ -114,7 +115,15 @@ public class NdiReportService {
 
     public NdiReportDefinition update(Long id, NdiReportDefinition body) {
         NdiReportDefinition d = get(id);
-        if (body.getReportCode()    != null) d.setReportCode(body.getReportCode());
+        // F2-308 — settable at birth, fixed thereafter. Nothing mints this code (one
+        // write in the whole service, the caller's), so a rename was expressible.
+        ServerOwnedState.requireImmutableReference(
+            body.getReportCode(), d.getReportCode(), "reportCode",
+            "NDI report " + (d.getId() == null ? "(new)" : d.getId()),
+            "Omit reportCode, or send the value already recorded.");
+        if (body.getReportCode() != null && d.getReportCode() == null) {
+            d.setReportCode(body.getReportCode());
+        }
         if (body.getNameEn()        != null) d.setNameEn(body.getNameEn());
         if (body.getNameAr()        != null) d.setNameAr(body.getNameAr());
         if (body.getDescriptionEn() != null) d.setDescriptionEn(body.getDescriptionEn());

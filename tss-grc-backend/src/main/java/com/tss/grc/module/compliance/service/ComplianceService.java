@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.dto.*;
 import com.tss.grc.module.compliance.entity.*;
@@ -74,7 +75,22 @@ public class ComplianceService {
     }
 
     private void applyControl(Control c, ControlRequest req) {
-        c.setCode(req.code());
+        // ⚠ F2-308 — this wrote the caller's value unconditionally, and my first note here
+        // claimed that a body omitting the code therefore CLEARED it. That is FALSE, and only
+        // reading the request type showed it: `ControlRequest.code` is @NotBlank and the route binds
+        // @Valid @RequestBody, so an omitted code is refused by bean validation before this method
+        // is ever entered. F2-182's recorded blind spot — a guard living in a DTO annotation, which
+        // no setter-site scan can see — so the unconditional write was never a reset.
+        //
+        // What it WAS is a rename vector: a caller sending a DIFFERENT code replaced the one a
+        // framework mapping or an audit finding already cites. That is what the guard closes.
+        ServerOwnedState.requireImmutableReference(
+            req.code(), c.getCode(), "code",
+            "Control " + (c.getId() == null ? "(new)" : c.getId()),
+            "Omit code, or send the value already recorded.");
+        if (req.code() != null && c.getCode() == null) {
+            c.setCode(req.code());
+        }
         c.setNameEn(req.nameEn());
         c.setNameAr(req.nameAr());
         c.setFramework(req.framework());
