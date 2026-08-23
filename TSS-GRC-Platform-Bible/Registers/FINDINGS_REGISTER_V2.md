@@ -15219,6 +15219,54 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-308 — the last five kind-1 renames, and a reset claim of mine that was false
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — five more references renameable after the fact, closed; census **38 → 33**. One of the two "reset" claims I wrote was **false**, and the other is on a **dark** method. |
+| **Registers** | `ndi.improvement_plan`, `ndi.report`, the BCM crisis-comms templates, `compliance.controls`, `compliance.policies` |
+| **Standards** | NDMO / NDI improvement plans; NCEMA crisis communications; NCA ECC control library; policy governance |
+| **Found by** | Executing [[F2-307]]'s filed remainder |
+| **Verification** | suite **4698/0/0**; probe **5/5** as `compliance`; census confirms **33**, matching the prediction |
+
+### The mint question again, and it settled all five the same way
+
+Each has exactly **one** write of the code — the caller's — so nothing mints any of them and
+`requireImmutableReference` is the fit ([[F2-307]]'s rule).
+
+### The claim I got wrong, and what showed it
+
+Two of the five wrote the code **unconditionally**, and my first note said a body omitting it
+therefore **cleared** it. 🔑 **That is false for `ComplianceService`, and only reading the request
+type showed it:** `ControlRequest.code` is `@NotBlank` and the route binds `@Valid @RequestBody`, so
+an omitted code is refused by bean validation **before the service is entered** — probed, HTTP 400.
+**[[F2-182]]'s recorded blind spot: a guard living in a DTO annotation, which no setter-site scan can
+see.** The unconditional write was never a reset; it was only a rename vector.
+
+For `PolicyService` the reset really *was* expressible — `update` binds the **entity**, and
+`@Column(nullable = false)` is not a bean-validation annotation, so an omitted code would have
+reached a NOT NULL column. But it is a **latent-hazard closure and saying which is the point**
+([[F2-283]]): `PolicyService#update` has **no controller**. [[F2-187]]'s `DarkServiceMethodTest` holds
+that whole legacy write lifecycle as dark, retired in favour of `PolicyManagementService#transition`,
+which `RegChangePolicyController` names.
+
+⚙ Both comments are corrected **in place** rather than quietly softened, because a stale claim about
+what a guard prevents is the input to somebody's next estimate.
+
+### One more measurement error
+
+I queried `policy.documents` for the `code` column and it does not exist — `Policy` maps
+`compliance.policies`. The guessed-identifier error, this time in the **query** rather than the code.
+
+### Filed
+
+* **28 sites remain**, now essentially all kinds 2 and 3 — a pointer to another record (legitimately
+  editable) and an authority-issued reference (correctly caller-supplied). The kind-1 sweep is
+  **complete** as far as the census can see it.
+* **Nothing mints any of the eleven codes closed across [[F2-306]]–F2-308**, so all remain
+  **caller-named at birth** — [[F2-172]](d)'s question and a separate slice from the rename.
+
 ## F2-307 — measure whether the server mints it before choosing the guard
 
 | | |
