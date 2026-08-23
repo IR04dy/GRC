@@ -695,8 +695,14 @@ class SchemaContractRatchetTest {
      * correct code — the one failure a gate must never have. It fires only when the prefixed table
      * is unmapped and its bare twin is mapped.
      *
-     * <p>Driven over a synthetic corpus in both directions, because on a clean tree a rule that
-     * matches nothing and a rule that is correct produce the same green.
+     * <p>⚠ The mutation harness refuted this leg's first claim, which said a looser prefix rule
+     * "reported all 34" legitimate parent/child pairs. It does not: those 34 are <b>mapped on both
+     * sides</b>, and this gate's left side is always unmapped — so measured over today's register a
+     * generic prefix/suffix rule and this narrow one return the <b>same five pairs</b>. The
+     * narrowing is therefore <b>prospective</b>, and the only thing carrying it is the synthetic
+     * corpus below. 🔑 A widening that cannot change today's answer still fails silently on the
+     * first table that does not follow house style, and on a clean tree a rule that matches nothing
+     * and a rule that is correct produce the same green.
      */
     @Test
     void theShadowRuleIgnoresTheHouseStylePrefix() {
@@ -713,11 +719,16 @@ class SchemaContractRatchetTest {
         assertThat(shadowOf("cyber", "incidents", mapped)).isNull();
         // must NOT match: prefixed, but the bare twin is not a table anything maps.
         assertThat(shadowOf("bcm", "bcm_plans", mapped)).isNull();
+        // must NOT match: a prefix that is NOT this schema's own name. Only this case fails a rule
+        // that strips the first segment rather than the schema name — the harness showed the
+        // ml_model_audit case above kills a TRAILING widening and lets a LEADING one through,
+        // because `ml_model_audit` minus its first segment is `model_audit`, which nothing maps.
+        assertThat(shadowOf("cyber", "socops_incidents", mapped)).isNull();
 
         // …and the legitimate population it deliberately ignores is large, so the narrowing is
         // load-bearing rather than decorative.
         Map<String, String> real = mappedTables();
-        long housePrefix = real.keySet().stream()
+        Set<String> housePrefix = real.keySet().stream()
             .filter(k -> {
                 int dot = k.indexOf('.');
                 String schema = k.substring(0, dot);
@@ -725,13 +736,27 @@ class SchemaContractRatchetTest {
                 return table.startsWith(schema + "_")
                     && !real.containsKey(key(schema, table.substring(schema.length() + 1)));
             })
-            .count();
-        assertThat(housePrefix).as(
+            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+
+        assertThat(housePrefix.size()).as(
             "Mapped tables using the `<schema>_<thing>` shape with no bare twin: %d. This is the "
             + "population the shadow rule must never flag. If it collapsed, the prefix test broke "
             + "and everyNameShadowingAMappedTableIsDeclared is checking almost nothing.",
-            housePrefix)
+            housePrefix.size())
             .isGreaterThanOrEqualTo(MIN_LEGITIMATE_PREFIXED_TABLES);
+
+        // ⚠ That floor alone cannot see the no-bare-twin condition being dropped: without it the
+        // count goes 54 -> 55, so the WRONG answer is HIGHER than the right one and no floor can
+        // separate them (F2-215's rule, arriving from the other side — a floor is only worth having
+        // if it sits above the largest wrong answer, and here it cannot). Assert the condition
+        // itself: cyber.cyber_incidents is mapped AND has a mapped bare twin, so it is the one
+        // prefixed table that must never be counted as house style. An upper bound would have been
+        // the obvious fix and would fail the day a legitimate prefixed table is added.
+        assertThat(housePrefix).as(
+            "cyber.cyber_incidents has a mapped bare twin (cyber.incidents), so it is not an "
+            + "instance of the no-twin house style. Finding it here means the no-bare-twin "
+            + "condition was dropped and this floor is measuring the wrong population.")
+            .doesNotContain("cyber.cyber_incidents");
     }
 
     /**
