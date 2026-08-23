@@ -274,6 +274,20 @@ class NdiGapServiceTest {
             .as("CLOSED does not stamp a date -- no writer in this platform declares that it should")
             .isNull();
 
+        // ⚠ And CLOSED must not CLEAR one either. The mutation harness found that the assertion
+        // above cannot see that: it starts from a gap whose date is already null, so "does not
+        // clear it" holds whatever the code does. Widening NOT_CLOSED to include CLOSED -- which
+        // would wipe a date the rollup had stamped -- SURVIVED the whole build. F2-293's shape
+        // (a test that picks the case where the principle holds trivially) inside the boundary
+        // test written to pin it, so the dated fixture is the load-bearing half.
+        stored.setStatus("RESOLVED");
+        stored.setActualCloseDate(LocalDate.of(2026, 5, 17));
+        NdiGap datedToClosed = new NdiGap();
+        datedToClosed.setStatus("CLOSED");
+        assertThat(service.updateGap(GAP_ID, datedToClosed).getActualCloseDate())
+            .as("closing a gap that already carries a close date must keep it")
+            .isEqualTo(LocalDate.of(2026, 5, 17));
+
         stored.setStatus("RESOLVED");
         stored.setActualCloseDate(LocalDate.of(2026, 5, 17));
         NdiGap toAccepted = new NdiGap();
