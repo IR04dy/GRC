@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V394 packaged; next free V395** (382 files; ⚠ this line said "V1→V295 / next free
+— **V1→V395 packaged; next free V396** (383 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it — ⚠ **but until F2-266 it gated the figure in `MEASURED_BASELINE.md` and the census script's `PUBLISHED` dict and NOT this line**, so adding V385 while updating only those two left the suite green with this sentence reading V384/372. F2-265's finding in the file that records it. `claudeMdMigrationLineMatchesTheTree` closes it; if you reword the line, fix that pattern rather than deleting the assertion, because an unparsed line reports a clean tree).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V394 are pending** the
-next jar — 50 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V395 are pending** the
+next jar — 51 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V394 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V395 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+
 - ⚠⚠ **A GATE WHOSE PATTERN REQUIRES THE NULL TEST TO BE THE *WHOLE* CONDITION IS A HARD ZERO OVER EVERY CONJUNCTIVE GUARD, AND THAT IS WHY THE SAME INITIALISER RECURRED FIVE TIMES** (F2-298, measured 2026-08-23). Executing [[F2-297]]'s filing — *"looks like a live twin; **measure it, do not assume**"* — and re-deriving it first ([[F2-221]]). **REFUTED, the half that mattered most: it is not screen-reachable.** `BcmPage`'s plan form seeds its edit modal through `planToReq`, which copies `status: p.status`, and `FormModal` submits its whole seeded state, so the screen **echoes** the stored status and F2-296 made this route tolerate an echo — the same reason [[F2-292]]'s disclosure register survived. 🔑 **Recording the refutation is the result** ([[F2-283]]), and it is what makes this a **latent-hazard closure rather than a defect discovery** — say which you have. **CONFIRMED:** `BcmPlan#status` carried `= "DRAFT"`, `PUT /api/v1/bcm/legacy-plans/{id}` binds the entity, so a body omitting `status` deserialised to "DRAFT" and answered **400 *"A BCM plan's status is not editable here (APPROVED → DRAFT)"*** — naming a transition the caller never asked for. **8 live plans, DRAFT ×5 / APPROVED ×3, zero CHECKs on `status`, 0 non-canonical case**, identical in dev and prod, so **3 of 8 could not take a partial body**.
   🔑🔑 **THE FIFTH INSTANCE, AND THE BOUNDARY IS THE EXPLANATION.** [[F2-238]] removed this initialiser from `CrisisEvent`, `Issue` and `BcmBiaAssessment`; [[F2-297]] found the fourth on `BcpPlan`; this is the fifth. `NeverFiringNullGuardContractTest` exists for precisely this defect and [[F2-294]] promoted it to an invariant — and it was a **hard zero over the last two of them**, because `measure()`'s pattern needs a `)` immediately after `null` and both guards are **conjunctive**. [[F2-198]]'s shape where the narrowing is **how much of the `if` the null test occupies**, and unlike a filename or an allow-list it is invisible in the gate's own reading.
   ⚠⚠ **WIDENING IT NEEDED THE POPULATION READ FIRST, AND THE DISCRIMINATOR IS WHAT THE *OTHER* CONJUNCT COMPARES AGAINST.** F2-297 measured the raw conjunctive shape at 4 sites and filed rather than widened; read, they are **1 real / 3 refuted**: the **loaded row** (real — an initialiser makes the REFUSAL fire on every non-initial row), **no row at all** (a create, where an initialiser makes a vocabulary VALIDATION always *run* — stronger, not weaker: `ConsentRecordService#grant` ×2), and a **constant vocabulary** normalised to upper case first with no guarded lifecycle route on the register to bypass (`DetectionRuleService#save`). 🔑 **Widening without that distinction would have failed on correct code, which is the one thing a gate must never do** ([[F2-214]]) — so the leg is scoped to the row-comparing form, ships as a hard zero with **no exemption map**, and the two refuted shapes are must-NOT-match controls.

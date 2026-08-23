@@ -35,7 +35,17 @@ public class BcmPlan {
     private String version;
 
     /**
-     * DRAFT | UNDER_REVIEW | APPROVED | INVOKED | ARCHIVED (see {@code BcmService}).
+     * DRAFT | UNDER_REVIEW | APPROVED | INVOKED — the four states {@code BcmService} can write,
+     * and from V395 the four {@code CK_bcm_plans_status} admits.
+     *
+     * <p>⚠⚠ F2-299 — this line said {@code ... | ARCHIVED (see BcmService)} and **ARCHIVED appears
+     * nowhere in `BcmService`, its controller, or `BcmPage`**. I wrote it one slice earlier (F2-298)
+     * by copying the vocabulary of the *canonical* register, {@code BcpPlan}, which really does have
+     * ARCHIVED (and PUBLISHED, SUPERSEDED, CANCELLED) — so the two-registers-for-one-concept hazard
+     * [[F2-234]] filed bit the DOCUMENTATION first. 🔑 <b>The citation is what made it credible:
+     * "see BcmService" invites the reader not to look.</b> And it would have been load-bearing —
+     * writing V395's CHECK from this line would have admitted a token no route can produce, which
+     * is worse than admitting today's values, because it makes the vocabulary look like five.
      *
      * <p>F2-298 — deliberately NOT initialised, and this is the FIFTH instance of the same
      * residue. {@code PUT /api/v1/bcm/legacy-plans/{id}} binds this entity, and F2-234/F2-296
