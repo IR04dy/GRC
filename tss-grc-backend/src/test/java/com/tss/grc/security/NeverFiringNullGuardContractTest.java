@@ -463,7 +463,10 @@ class NeverFiringNullGuardContractTest {
                                Map<String, Map<String, String>> inits) {
         Set<String> out = new TreeSet<>();
         for (var entry : serviceSources.entrySet()) {
-            String service = entry.getKey();
+            // F2-295 — the map is keyed by fully-qualified name so no file is dropped; the LABEL is
+            // the simple name, so the held sets keep their established form. A synthetic corpus
+            // keyed by bare simple names passes through unchanged.
+            String service = label(entry.getKey(), serviceSources.keySet());
             String src = ServerStampedFieldContractTest.stripComments(entry.getValue());
             String pkg = pkgOf(entry.getValue());
             Map<String, Set<String>> helpers =
@@ -594,9 +597,15 @@ class NeverFiringNullGuardContractTest {
      * <p>A gate that reports a defect where none exists is worse than one that misses (F2-214), so
      * the merge is reverted and the phantom is PINNED by
      * {@link #theDuplicateNameHazardIsCrossAttributionNotOmission}, which fails if anybody
-     * reintroduces it. The real fix is module-aware pairing on BOTH maps — key by fully-qualified
-     * name and pair a service with the entity in its own module — which is a change to a shipped
-     * security gate and is filed rather than smuggled into a slice about a different register.
+     * reintroduces it.
+     *
+     * <p>⚠ <b>F2-295 closed the half this paragraph filed.</b> It read: <i>"The real fix is
+     * module-aware pairing on BOTH maps — key by fully-qualified name and pair a service with the
+     * entity in its own module — which is a change to a shipped security gate and is filed rather
+     * than smuggled into a slice about a different register."</i> Half of it was already true when
+     * that was written: the ENTITY side has paired by longest shared package prefix since F2-238,
+     * because {@link #measure} derives {@code pkgOf} per entry. What was missing was the service
+     * side, and its hazard was not the one this paragraph names — see {@link #liveServicesByFqn}.
      *
      * <p>⚠ What made the merge look safe was my own measurement: {@code f292_dupsvc.py} looked for
      * guards inside a <em>private helper</em>, which is narrower than this gate's population, and
@@ -609,6 +618,108 @@ class NeverFiringNullGuardContractTest {
             out.put(p.getFileName().toString().replace(".java", ""), read(p));
         }
         return out;
+    }
+
+    /**
+     * The same sources keyed by FULLY-QUALIFIED name — F2-295, and the population {@link #measure}
+     * scans.
+     *
+     * <p>⚠⚠ <b>{@link #liveServices} drops a file rather than mis-attributing one, and that is a
+     * different hazard from the one F2-292 measured.</b> It keys on the file's simple name over a
+     * {@code .sorted()} walk, so where two files share a simple name the LAST path wins the
+     * {@code put} and <b>the other file is never scanned at all</b> — four files today:
+     * {@code module/audit_eng/service/AuditEngagementService}, {@code module/board_pack/service/
+     * BoardPackService}, {@code module/compliance/service/RegulatoryChangeService} and
+     * {@code module/cyber/entity/CloudService} (which the {@code Service.java} suffix catches even
+     * though it is an entity). F2-292 tried the MERGE variant, found it produced a phantom finding
+     * naming the wrong table, reverted it and filed module-aware pairing — and its conclusion, <i>"the
+     * hazard is cross-attribution, not omission"</i>, is right about merging and silent about the
+     * status quo, where three whole services sit outside a hard-zero invariant's population.
+     *
+     * <p>🔑 <b>Keying by FQN is the fix that has neither failure mode:</b> no file is dropped, and
+     * the entity pairing was already module-aware, because {@link #measure} derives {@code pkgOf} per
+     * entry and {@link #initialisersFor} picks the same-named entity whose package shares the longest
+     * prefix. A merged value would have defeated exactly that, since {@code pkgOf} of two
+     * concatenated files returns whichever {@code package} line comes first.
+     *
+     * <p>⚠ The reported LABEL stays the simple name (see {@link #label}), so every entry in
+     * {@link #WORK_LIST} and the {@code CLOSED_BY_*} sets keeps its established
+     * {@code Service#method :: Entity#field} form — a keying fix that renamed 27 held entries would
+     * be indistinguishable from a slice that changed what they mean.
+     */
+    private static Map<String, String> liveServicesByFqn() {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Path p : sources("Service.java")) {
+            String raw = read(p);
+            String simple = p.getFileName().toString().replace(".java", "");
+            String pkg = pkgOf(raw);
+            out.put(pkg.isEmpty() ? simple : pkg + "." + simple, raw);
+        }
+        return out;
+    }
+
+    /**
+     * How a site is named in the measured set: the simple name, qualified by its owning module only
+     * when that simple name is declared more than once — F2-295.
+     *
+     * <p>Unqualified, two services with one name would produce one label and a reader could not tell
+     * which module a finding is in; qualified unconditionally, all 27 held entries would be renamed
+     * by a change that alters no behaviour. No ambiguous name produces a site today, which is why
+     * this can be both stable and unambiguous — and {@link #anAmbiguousServiceNameIsLabelledByModule}
+     * pins the ambiguous branch against a synthetic corpus, because a branch nothing reaches is a
+     * branch nothing checks.
+     */
+    /**
+     * {@code src} with every double-quoted span blanked, newlines preserved — F2-295.
+     *
+     * <p>Blanked rather than deleted, so any offset taken from the result still refers to the file
+     * (F2-286 recorded that {@code stripComments} removes comment LINES, so offsets into its output
+     * do not). Escaped quotes are honoured, because a Java assertion message routinely contains one.
+     *
+     * <p>⚠⚠ <b>CHAR LITERALS HAVE TO BE SKIPPED, and the first draft did not skip them.</b> This
+     * method's own body contains {@code '"'} — a single-quoted double-quote — so the scanner toggled
+     * {@code in} on it and <b>everything after that point was inverted</b>: real code blanked,
+     * string literals preserved. The tell was the wrong half of a pair of assertions failing, and
+     * the leg's own count is what caught it. Same family as F2-198's comment stripper and F2-211's
+     * branch order: <b>a stripper that mis-identifies one span does not degrade, it inverts.</b>
+     */
+    static String withoutStringLiterals(String src) {
+        StringBuilder out = new StringBuilder(src.length());
+        boolean inStr = false;
+        boolean inChr = false;
+        for (int i = 0; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if ((inStr || inChr) && c == '\\' && i + 1 < src.length()) {
+                out.append("  ");
+                i++;
+                continue;
+            }
+            if (c == '"' && !inChr) {
+                inStr = !inStr;
+                out.append(' ');
+            } else if (c == '\'' && !inStr) {
+                inChr = !inChr;
+                out.append(' ');
+            } else if (inStr || inChr) {
+                out.append(c == '\n' ? '\n' : ' ');
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    static String label(String fqn, Set<String> allKeys) {
+        String simple = fqn.contains(".") ? fqn.substring(fqn.lastIndexOf('.') + 1) : fqn;
+        long sameName = allKeys.stream()
+            .map(k -> k.contains(".") ? k.substring(k.lastIndexOf('.') + 1) : k)
+            .filter(simple::equals).count();
+        if (sameName < 2) return simple;
+        String[] bits = fqn.split("\\.");
+        for (int i = 0; i + 1 < bits.length; i++) {
+            if (bits[i].equals("module")) return bits[i + 1] + "." + simple;
+        }
+        return fqn;
     }
 
     private static Map<String, Map<String, String>> liveInitialisers() {
@@ -671,7 +782,7 @@ class NeverFiringNullGuardContractTest {
 
     @Test
     void theWorkListIsExactlyWhatTheTreeContains() {
-        Set<String> measured = measure(liveServices(), liveInitialisers());
+        Set<String> measured = measure(liveServicesByFqn(), liveInitialisers());
 
         assertThat(measured)
             .as("""
@@ -690,7 +801,7 @@ class NeverFiringNullGuardContractTest {
      */
     @Test
     void everyWorkListEntryStillNamesSomethingTheDerivationFinds() {
-        Set<String> measured = measure(liveServices(), liveInitialisers());
+        Set<String> measured = measure(liveServicesByFqn(), liveInitialisers());
         Set<String> stale = new TreeSet<>(WORK_LIST);
         stale.removeAll(measured);
         assertThat(stale)
@@ -1469,14 +1580,170 @@ class NeverFiringNullGuardContractTest {
             .isNotEmpty()
             .contains("AuditEngagementService");
 
-        assertThat(measure(liveServices(), liveInitialisers()))
+        assertThat(measure(liveServicesByFqn(), liveInitialisers()))
             .as("a merge across same-named services pairs one module's initialiser with another "
                 + "module's guard, and this is the pair it invents: audit_eng initialises "
                 + "auditType and has no update; compliance guards it and has no initialiser. A "
                 + "gate that names a table where no defect exists is worse than one that misses "
-                + "(F2-214), and the honest fix is module-aware pairing on BOTH maps — filed.")
+                + "(F2-214). F2-295 keyed the service map by fully-qualified name, so this pin now "
+                + "asserts the phantom stays absent under the WIDER population as well — which is "
+                + "the claim, since the merge variant is what invented it.")
             .doesNotContain("AuditEngagementService#update :: AuditEngagement#auditType");
     }
+    /**
+     * F2-295 — the population {@link #measure} scans is EVERY service source, and that is now a
+     * measured number rather than an implication.
+     *
+     * <p>{@link #liveServices} keys on the file's simple name over a {@code .sorted()} walk, so the
+     * last path of a colliding pair wins the {@code put} and the other file is <b>never scanned</b>.
+     * Four files today, three of them real services:
+     * {@code module/audit_eng/service/AuditEngagementService},
+     * {@code module/board_pack/service/BoardPackService},
+     * {@code module/compliance/service/RegulatoryChangeService}, and
+     * {@code module/cyber/entity/CloudService} — an ENTITY, which the {@code Service.java} suffix
+     * catches anyway, and whose presence in a map called "services" is its own small finding.
+     *
+     * <p>🔑 <b>This is the assertion the fix needs, and the site set is not.</b> None of the three
+     * dropped services holds a member of this family today, so the measured set is empty either way
+     * and a leg that only checked {@link #WORK_LIST} would pass over the defect — F2-205's rule that
+     * a hard zero over a population the instrument cannot see is the most reassuring possible
+     * artefact. What changed is the DENOMINATOR, so the denominator is what is asserted.
+     *
+     * <p>⚠ Both numbers are asserted, not just the good one: the FQN map must equal the file count
+     * (nothing dropped) and the simple-name map must be exactly four short (the drop is real, so a
+     * reader cannot mistake this leg for decoration). Reverting {@link #measure}'s argument to
+     * {@link #liveServices} is what the second assertion catches.
+     *
+     * <p>⚠ It is deliberately a latent-hazard closure and says so: F2-283's rule is that reporting
+     * one as a defect discovery is the error this register keeps warning about.
+     */
+    @Test
+    void theServiceMapScansEveryServiceSource() {
+        List<Path> paths = sources("Service.java");
+        Map<String, Long> perName = new java.util.LinkedHashMap<>();
+        for (Path p : paths) {
+            perName.merge(p.getFileName().toString().replace(".java", ""), 1L, Long::sum);
+        }
+        long shadowed = perName.values().stream().mapToLong(v -> v - 1).sum();
+
+        assertThat(paths.size())
+            .as("service-source floor — measured 327, so this sits above a walk that resolved only "
+                + "part of module/ rather than merely above zero (F2-215)")
+            .isGreaterThan(300);
+
+        assertThat(liveServicesByFqn())
+            .as("keyed by fully-qualified name, so no file can be shadowed out of the population of "
+                + "a hard-zero invariant")
+            .hasSize(paths.size());
+
+        assertThat(shadowed)
+            .as("the drop the simple-name keying causes is REAL and this is its size; if it ever "
+                + "reaches zero the tree has stopped colliding and this leg should be deleted "
+                + "rather than left passing over nothing")
+            .isEqualTo(4L);
+
+        assertThat(liveServices())
+            .as("...and the old keying is exactly that many short, which is the assertion a revert "
+                + "of measure()'s argument fails. The site set cannot catch it: none of the three "
+                + "dropped services holds a member of this family today, so this is a latent-hazard "
+                + "closure and not a defect discovery (F2-283)")
+            .hasSize(paths.size() - (int) shadowed);
+
+        List<String> dropped = new java.util.ArrayList<>();
+        for (Path p : paths) {
+            String simple = p.getFileName().toString().replace(".java", "");
+            if (perName.get(simple) > 1
+                && !p.equals(paths.stream().filter(
+                    q -> q.getFileName().toString().replace(".java", "").equals(simple))
+                    .reduce((a, b) -> b).orElseThrow())) {
+                dropped.add(p.toString().replace('\\', '/').replaceAll(".*com/tss/grc/", ""));
+            }
+        }
+        assertThat(dropped)
+            .as("named exactly, so a NEW collision fails this leg and forces the next reader to ask "
+                + "whether the newly shadowed file holds a guard — which is the question nobody was "
+                + "in a position to ask while three files were silently outside the population")
+            .containsExactlyInAnyOrder(
+                "module/audit_eng/service/AuditEngagementService.java",
+                "module/board_pack/service/BoardPackService.java",
+                "module/compliance/service/RegulatoryChangeService.java",
+                "module/cyber/entity/CloudService.java");
+
+        // ⚠⚠ AND THE CALL SITES, because everything above tests the two ACCESSORS and none of it
+        // tests which one the measurement calls. F2-274's rule verbatim: a leg that exercises a
+        // primitive says nothing about whether the code under review CALLS it, so the production
+        // path can stop using the thing under test with every assertion green. That mutation is
+        // invisible to the site set as well, because the measured set is empty either way — this
+        // is the only leg that sees it.
+        // ⚠⚠ STRING LITERALS ARE STRIPPED AS WELL AS COMMENTS, and the first draft of this leg is
+        // why: it read comment-stripped source, and the two assertions BELOW quote the very call
+        // shapes they are about, so the ban matched its own message and the leg failed on a correct
+        // tree. F2-193's rule — a detector that cannot tell a quotation from a claim forces every
+        // correction to paraphrase away its own evidence — landing on a leg written after quoting it.
+        String code = withoutStringLiterals(
+            ServerStampedFieldContractTest.stripComments(read(java.nio.file.Path.of(
+                "src/test/java/com/tss/grc/security/NeverFiringNullGuardContractTest.java"))));
+        assertThat(code)
+            .as("no measurement may be taken over the simple-name map — that is the shadowing this "
+                + "slice removed, and reverting one argument restores it silently")
+            .doesNotContain("measure(liveServices()");
+        assertThat(code.split(Pattern.quote("measure(liveServicesByFqn()"), -1).length - 1)
+            .as("every measure() call site reads the fully-qualified map — measured 4")
+            .isEqualTo(4);
+        assertThat(withoutStringLiterals("a = \"measure(liveServices()\"; b = c;"))
+            .as("the stripper is load-bearing and pinned: without it the ban above matches its own "
+                + "message, and a gate that fails on correct code trains the next reader to edit "
+                + "the assertion rather than the code (F2-214)")
+            .doesNotContain("measure(liveServices()")
+            .contains("b = c;");
+        assertThat(withoutStringLiterals("char q = '\"'; keep(); String s = \"drop\";"))
+            .as("and a CHAR literal holding a double quote must not toggle the scanner — the first "
+                + "draft inverted every span after this method's own quote character, so a stripper "
+                + "that mis-identifies one span does not degrade, it inverts")
+            .contains("keep();")
+            .doesNotContain("drop");
+    }
+
+    /**
+     * F2-295 — {@link #label} in both directions, over a synthetic corpus.
+     *
+     * <p>The ambiguous branch is unreachable from the live tree today, because no colliding service
+     * name produces a site — so without a synthetic corpus it would be a branch nothing checks, and
+     * "it passed" would mean "it never ran" (F2-195's rule about a scan that is green because the
+     * app is clean being indistinguishable from one whose regex has rotted).
+     *
+     * <p>⚠ The unambiguous direction matters as much: labelling every site by module would rename
+     * all 27 {@code CLOSED_BY_F2_294} entries and every {@code CLOSED_BY_F2_291/292/293} entry, and
+     * a keying fix that renames what a reader has been told is held is indistinguishable from a
+     * slice that changed what those entries mean.
+     */
+    @Test
+    void anAmbiguousServiceNameIsLabelledByModule() {
+        Set<String> unique = Set.of(
+            "com.tss.grc.module.ethics.service.KycService",
+            "com.tss.grc.module.compliance.service.AuditEngagementService");
+        assertThat(label("com.tss.grc.module.ethics.service.KycService", unique))
+            .as("one declaration of the name — the label stays the simple name, so every held entry "
+                + "keeps its established Service#method :: Entity#field form")
+            .isEqualTo("KycService");
+
+        Set<String> ambiguous = Set.of(
+            "com.tss.grc.module.audit_eng.service.AuditEngagementService",
+            "com.tss.grc.module.compliance.service.AuditEngagementService");
+        assertThat(label("com.tss.grc.module.audit_eng.service.AuditEngagementService", ambiguous))
+            .isEqualTo("audit_eng.AuditEngagementService");
+        assertThat(label("com.tss.grc.module.compliance.service.AuditEngagementService", ambiguous))
+            .as("two files, two labels — F2-287's rule that an unresolved ambiguity must never fall "
+                + "back to something confident, because a finding naming the wrong module reads "
+                + "exactly like a finding naming the right one")
+            .isEqualTo("compliance.AuditEngagementService");
+
+        assertThat(label("SyntheticService", Set.of("SyntheticService")))
+            .as("a synthetic corpus keyed by bare simple names must pass through unchanged, or every "
+                + "self-test in this class starts asserting a different label from the live tree")
+            .isEqualTo("SyntheticService");
+    }
+
 
     @Test
     void theEthicsAndKycConsequenceFlagsStayClosed() {
@@ -1484,7 +1751,7 @@ class NeverFiringNullGuardContractTest {
         closed.addAll(CLOSED_BY_F2_292);
         closed.addAll(CLOSED_BY_F2_293);
         closed.addAll(CLOSED_BY_F2_294);
-        assertThat(measure(liveServices(), liveInitialisers()))
+        assertThat(measure(liveServicesByFqn(), liveInitialisers()))
             .as("a reverted fix must FAIL rather than be absorbed by the work list")
             .doesNotContainAnyElementsOf(closed);
 
