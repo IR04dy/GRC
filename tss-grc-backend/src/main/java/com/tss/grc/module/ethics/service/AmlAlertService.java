@@ -80,6 +80,10 @@ public class AmlAlertService {
         // learn the value is not theirs, and the minted code is on the response.
         requireEcho("alertCode", req.getAlertCode(), null, MINTED_BY_SERVER);
         a.setAlertCode(ReferenceCodeMint.mint("AML-" + LocalDate.now().getYear()));
+        // F2-287 — the create is the ONLY path that may state this, because the column is
+        // updatable = false. Deliberately not in applyEditable: that helper is shared with
+        // update, where the write would compile, run and change nothing.
+        a.setFirstDetectedAt(detectionTime(req.getFirstDetectedAt()));
         if (a.getCurrency() == null) a.setCurrency("SAR");
         return repo.save(a);
     }
@@ -118,6 +122,10 @@ public class AmlAlertService {
         requireEcho("alertCode", req.getAlertCode(), a.getAlertCode(), MINTED_BY_SERVER);
         requireEcho("status", req.getStatus(), a.getStatus(), TRANSITION_ROUTE);
         requireEcho("analystName", req.getAnalystName(), a.getAnalystName(), ASSIGN_ROUTE);
+        // F2-287 — the mapping refuses a change to this column, so the wire must not appear to
+        // accept one. An echo is fine (a form that round-trips the row keeps working); a
+        // different value is refused rather than silently dropped.
+        requireEchoInstant("firstDetectedAt", req.getFirstDetectedAt(), a.getFirstDetectedAt());
         return repo.save(a);
     }
 
@@ -374,6 +382,43 @@ public class AmlAlertService {
      * (F2-179), and on an echo <b>nothing is written</b> — so unlike F2-249's assignment there is
      * no question of whose spelling wins.
      */
+    /**
+     * F2-287 — the detection time the create records: the caller's if stated, the server's
+     * clock if not.
+     *
+     * <p>The default is not tidiness. The column is NOT NULL and now insertable, so an omitted
+     * value reaches the INSERT as null — supplying the clock here is what stops the widening
+     * breaking the create outright.
+     *
+     * <p>An alert cannot have been detected in the future, and refusing that is what makes the
+     * widening safe: it is the one value that could only ever be a forgery. Five minutes of
+     * tolerance so a clock-skewed TM feed is not refused for being a second early.
+     */
+    private static LocalDateTime detectionTime(LocalDateTime supplied) {
+        if (supplied == null) return LocalDateTime.now();
+        if (supplied.isAfter(LocalDateTime.now().plusMinutes(5))) {
+            throw new IllegalArgumentException(
+                "firstDetectedAt cannot be in the future — activity that has not happened yet "
+              + "cannot have been detected. Omit the field to record the detection as now.");
+        }
+        return supplied;
+    }
+
+    /**
+     * F2-287 — the {@link java.time.LocalDateTime} counterpart of {@link #requireEcho}, for a
+     * column the mapping refuses to update. Compared exactly: a truncated value is a different
+     * detection time, not the same one, and on an FIU clock that difference is the point.
+     */
+    private static void requireEchoInstant(String field, LocalDateTime supplied,
+                                           LocalDateTime stored) {
+        if (supplied == null || supplied.equals(stored)) return;
+        throw new IllegalArgumentException(
+            field + ": this register's " + field + " is recorded when the alert is created and "
+          + "the column cannot be updated. It currently reads '" + stored + "' — send that "
+          + "value unchanged, or omit the field. A different value here would look accepted "
+          + "and change nothing.");
+    }
+
     private static void requireEcho(String field, String supplied, String stored, String route) {
         if (supplied == null || supplied.isBlank()) return;
         if (stored != null && supplied.equalsIgnoreCase(stored)) return;
