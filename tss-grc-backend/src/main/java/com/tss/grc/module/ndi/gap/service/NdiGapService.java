@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.gap.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
 import com.tss.grc.module.ndi.gap.entity.NdiGap;
@@ -86,6 +87,18 @@ public class NdiGapService {
         if (body.getTitleEn() == null || body.getTitleEn().isBlank())
             throw new IllegalArgumentException("titleEn is required");
         if (body.getSourceType() == null) body.setSourceType("MANUAL");
+        // F2-302 — a gap opens OPEN. `NdiGap.onCreate()` defaults the field, and a default is not a
+        // guard: probed live, a create naming RESOLVED returned 200 and stored it, so the state the
+        // CAPA rollup derives was assertable on a row with no CAPAs at all. Nothing sends a status
+        // on create (the register's form has no such field) and `createGapFromSource` sets OPEN
+        // outright, so refusing cannot break a request that works today ([[F2-182]]).
+        // The route clause is stated rather than defaulted: this register has NO state machine and
+        // the PUT records no actor, so the primitive's usual sentence would send an operator to a
+        // mechanism that does not exist (F2-302).
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), NdiGap.INITIAL_STATUS, "NDI gap",
+            "PUT /api/ndi/gaps/{id}", "status",
+            "which keeps the status and the close date consistent with the CAPA rollup"));
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getOpenDate() == null) body.setOpenDate(LocalDate.now());
@@ -96,6 +109,40 @@ public class NdiGapService {
             "CREATE", "CRITICAL".equals(saved.getSeverity()) ? "WARN" : "INFO",
             "Opened " + saved.getSeverity() + " gap: " + saved.getTitleEn());
         return saved;
+    }
+
+
+    /**
+     * F2-302 — the <b>single writer</b> of the pair {@code (status, actual_close_date)} on a gap.
+     *
+     * <p>{@code recomputeRollup} has always owned that pair: when every corrective action is
+     * complete it sets {@link NdiGap#RESOLVED} <em>and</em> stamps the close date in the same
+     * breath. {@code updateGap} wrote the two fields independently, so the register's status column
+     * — an inline {@code <select>} on the NDI Gap Register that sends {@code {status}} and nothing
+     * else — could produce <b>RESOLVED with no close date</b>, a state the rollup can never reach,
+     * rendered directly beside the progress bar showing {@code 0% · 0/1}. Probed live as
+     * {@code compliance}: HTTP 200, status RESOLVED, {@code actual_close_date} null.
+     *
+     * <p>The rule mirrors the rollup rather than adding to it: entering RESOLVED stamps a date if
+     * none is set, and returning to a {@link NdiGap#NOT_CLOSED} state clears it, because a gap that
+     * is open was not closed. ⚠ That clears a date the caller may have stated in the same body —
+     * deliberately, because on this register the close date is <b>derived from the status</b>, which
+     * is what the rollup already treats it as. It is not a field the server ignores ([[F2-184]]);
+     * the status governs it.
+     *
+     * <p>⚠ {@code CLOSED} and {@code ACCEPTED_RISK} are left alone in both directions. The rollup
+     * refuses to move either, and nothing in this platform declares whether they carry a close date
+     * — so stamping one would invent a rule rather than enforce a declared one ([[F2-183]]), and it
+     * is filed instead. That asymmetry is the reason this method is not simply "closure stamps a
+     * date".
+     */
+    private static void applyStatusAndCloseDate(NdiGap g, String next) {
+        g.setStatus(next);
+        if (NdiGap.RESOLVED.equals(next)) {
+            if (g.getActualCloseDate() == null) g.setActualCloseDate(LocalDate.now());
+        } else if (NdiGap.NOT_CLOSED.contains(next)) {
+            g.setActualCloseDate(null);
+        }
     }
 
     public NdiGap updateGap(Long id, NdiGap body) {
@@ -115,7 +162,9 @@ public class NdiGapService {
         if (body.getTargetDate()    != null) g.setTargetDate(body.getTargetDate());
         if (body.getActualCloseDate() != null) g.setActualCloseDate(body.getActualCloseDate());
         String prevStatus = g.getStatus();
-        if (body.getStatus()        != null) g.setStatus(body.getStatus());
+        // F2-302 — the status and the close date move together. Apply the caller's date FIRST so an
+        // explicitly stated one is honoured, then let the status govern.
+        if (body.getStatus()        != null) applyStatusAndCloseDate(g, body.getStatus());
         if (body.getRiskId()        != null) { crossLink.validateRiskExists(body.getRiskId()); g.setRiskId(body.getRiskId()); }
         if (body.getNotes()         != null) g.setNotes(body.getNotes());
         NdiGap saved = gaps.save(g);
@@ -308,10 +357,9 @@ public class NdiGapService {
             if (completed == n
                 && !"CLOSED".equals(g.getStatus())
                 && !"ACCEPTED_RISK".equals(g.getStatus())) {
-                g.setStatus("RESOLVED");
-                if (g.getActualCloseDate() == null) g.setActualCloseDate(LocalDate.now());
-            } else if (sum > 0 && "OPEN".equals(g.getStatus())) {
-                g.setStatus("IN_PROGRESS");
+                applyStatusAndCloseDate(g, NdiGap.RESOLVED);
+            } else if (sum > 0 && NdiGap.INITIAL_STATUS.equals(g.getStatus())) {
+                applyStatusAndCloseDate(g, "IN_PROGRESS");
             }
         }
         gaps.save(g);

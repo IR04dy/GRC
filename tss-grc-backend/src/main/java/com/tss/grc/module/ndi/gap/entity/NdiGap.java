@@ -65,12 +65,46 @@ public class NdiGap {
     @Column(name = "updated_at") private LocalDateTime updatedAt;
     @Column(name = "updated_by", length = 100) private String updatedBy;
 
+    /**
+     * The one state a gap may be created in. Read by three places that would otherwise each hold
+     * their own literal: {@link #onCreate()} below, {@code NdiGapService.createGapFromSource} (the
+     * intake path, which sets it explicitly), and {@code NdiGapService.createGap}'s
+     * {@code requireInitial} refusal.
+     *
+     * <p>⚠⚠ F2-302 — `onCreate()` has always defaulted this field, and a **default is not a
+     * guard** ([[F2-218]]'s headline, here at a lifecycle callback rather than in a service). A
+     * `@PrePersist` fires at flush time, after every setter, which makes it *stronger* evidence of
+     * server ownership to a reader than a field initialiser — and it still only fills a null.
+     * Probed live: `POST /api/ndi/gaps` with `status: "RESOLVED"` returned 200 and stored RESOLVED,
+     * so a gap could be created in the state the CAPA rollup derives, on a row the same callback
+     * had just given `capaCount = 0`.
+     */
+    public static final String INITIAL_STATUS = "OPEN";
+
+    /**
+     * The status the CAPA rollup derives when every corrective action is complete. It owns this
+     * token together with {@link #actualCloseDate} — see
+     * {@code NdiGapService.applyStatusAndCloseDate}, the single writer of that pair.
+     */
+    public static final String RESOLVED = "RESOLVED";
+
+    /**
+     * The states in which a gap is <b>not</b> closed, so an {@link #actualCloseDate} cannot stand.
+     * Deliberately not the whole vocabulary and deliberately not derived from the CHECK: this is a
+     * judgement about which states contradict a close date, not a copy of the five tokens
+     * {@code ck_ndi_gap_status} admits. {@code CLOSED} and {@code ACCEPTED_RISK} are absent on
+     * purpose — the rollup refuses to move either, and nothing in this platform declares whether
+     * they carry a close date, so a rule for them would be invented rather than enforced
+     * ([[F2-183]]).
+     */
+    public static final java.util.Set<String> NOT_CLOSED = java.util.Set.of("OPEN", "IN_PROGRESS");
+
     @PrePersist
     void onCreate() {
         if (createdAt == null)        createdAt = LocalDateTime.now();
         if (openDate == null)          openDate = LocalDate.now();
         if (severity == null)          severity = "MEDIUM";
-        if (status == null)            status = "OPEN";
+        if (status == null)            status = INITIAL_STATUS;
         if (rollupProgress == null)    rollupProgress = 0;
         if (capaCount == null)         capaCount = 0;
         if (capaCompletedCount == null) capaCompletedCount = 0;
