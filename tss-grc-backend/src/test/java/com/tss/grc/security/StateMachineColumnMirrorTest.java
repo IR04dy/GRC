@@ -73,6 +73,16 @@ class StateMachineColumnMirrorTest {
      * asserted: the constant by reflection, the constraint from the migration that declares it.
      */
     private static final Map<String, String[]> MIRRORED = Map.ofEntries(
+        // F2-289 — the first MAP-shaped machine in this bucket, and it could not have been here
+        // before. {@link #constantValue} cast the constant to Set<String>, so a machine that
+        // declares its vocabulary as Map<String, Set<String>> — i.e. as keys WITH their edges, the
+        // more precise declaration — was structurally excluded from being mirrored at all. That is
+        // why F2-221's UNCONSTRAINED entry for this register gave a reason about its writer: the
+        // shape was never the stated obstacle, because nothing had tried. F2-198's shape inside the
+        // gate, where the narrowing is the Java TYPE the resolver happens to cast to.
+        Map.entry("AmlAlert#status", new String[]{
+            "com.tss.grc.module.ethics.service.AmlAlertService",
+            "TRANSITIONS", "CK_aml_alerts_status"}),
         Map.entry("AuthorityDocument#status", new String[]{
             "com.tss.grc.module.platform.regulatory.service.AuthorityDocumentService",
             "STATUSES", "ck_authdoc_status"}),
@@ -118,11 +128,6 @@ class StateMachineColumnMirrorTest {
      * <p>Decrease-only: {@link #BASELINE_UNCONSTRAINED}. Two came off this list in F2-221 (V376).
      */
     private static final Map<String, String> UNCONSTRAINED = Map.of(
-        "AmlAlert#status",
-        "ethics.aml_alerts.status. The machine is a Map with explicit terminals, and all four stored "
-        + "values are keys in dev and prod, so this is latent. Not constrained here because the "
-        + "create path was not read in this slice — F2-183 ties the constraint to the writer.",
-
         "BcmBiaAssessment#approvalStatus",
         "bcm.bia_assessments.approval_status. Has a named STATUSES constant and no CHECK, so it is "
         + "the readiest candidate after F2-221's two — blocked only on reading its writers.",
@@ -184,8 +189,16 @@ class StateMachineColumnMirrorTest {
         + "create's membership test — the check that admitted ACTIVE — and transitionTemplate's "
         + "switch is exhaustive (F2-184: an inert construct is worse than none).");
 
-    /** Decrease-only. F2-221 measured 7 and closed 2 with V376. */
-    private static final int BASELINE_UNCONSTRAINED = 5;
+    /**
+     * Decrease-only. F2-221 measured 7 and closed 2 with V376; F2-289 closed {@code AmlAlert#status}
+     * with V393 and moved it to {@link #MIRRORED}.
+     *
+     * <p>⚠ Re-derived from the map's own size, never by subtracting one from the number written
+     * here (F2-207) — and lowered in the SAME commit as the sweep, because a ceiling left in place
+     * after a fix makes a tolerated member indistinguishable from a reviewed one (house rule 3,
+     * which F2-207 had to learn from the inside).
+     */
+    private static final int BASELINE_UNCONSTRAINED = 4;
 
     // ── plumbing ──────────────────────────────────────────────────────────────
 
@@ -245,11 +258,33 @@ class StateMachineColumnMirrorTest {
         return found;
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * The tokens a named vocabulary constant declares, whichever of the two shapes it uses.
+     *
+     * <p>⚠ F2-289 — this used to be a bare cast to {@code Set<String>}, which silently excluded
+     * every <b>Map-shaped</b> machine from {@link #MIRRORED}: a
+     * {@code Map<String, Set<String>>} declares the vocabulary as keys <i>with their edges</i>, and
+     * {@code new TreeSet<>((Set<String>) aMap)} is a {@code ClassCastException}, not a smaller
+     * answer. So the more precisely a machine declared itself, the less this gate could check —
+     * F2-198's shape, where the narrowing is the Java type the resolver happens to cast to.
+     *
+     * <p>A machine's vocabulary is its <b>state set</b>, so for a Map that is the key set. Reading
+     * the values instead would give the reachable targets, which for a terminal-bearing machine is a
+     * strict subset and would report every terminal state as "the column admits but the machine
+     * never writes".
+     */
     private static Set<String> constantValue(String fqn, String name) throws Exception {
         Field f = Class.forName(fqn).getDeclaredField(name);
         f.setAccessible(true);
-        return new TreeSet<>((Set<String>) f.get(null));
+        Object raw = f.get(null);
+        if (raw instanceof Map<?, ?> m) {
+            Set<String> out = new TreeSet<>();
+            for (Object k : m.keySet()) out.add((String) k);
+            return out;
+        }
+        Set<String> out = new TreeSet<>();
+        for (Object v : (Set<?>) raw) out.add((String) v);
+        return out;
     }
 
     // ── the assertions ────────────────────────────────────────────────────────
@@ -314,6 +349,45 @@ class StateMachineColumnMirrorTest {
                 + "transition; a token the column admits and the machine never writes is a state no "
                 + "route can leave. Both directions, always.")
             .isEmpty();
+    }
+
+    /**
+     * The Map-shape branch of {@link #constantValue} is load-bearing, not defensive.
+     *
+     * <p>F2-289 widened that resolver, and a widening whose new branch nothing exercises is
+     * indistinguishable from one that was never needed — F2-248's rule, where deleting a token from
+     * a vocabulary SURVIVED because the anti-vacuity list had not grown with it. So this asserts the
+     * population it admitted: at least one mirrored machine declares its states as a {@code Map}
+     * with edges, and it resolves to a non-trivial vocabulary rather than to an empty set.
+     *
+     * <p>⚠ Deleting the branch does not merely shrink an answer here, it throws
+     * {@code ClassCastException} — so the mirror leg above fails too. That is a second kill and not
+     * a reason to skip this one: a future refactor that made the resolver return {@code Set.of()}
+     * for an unrecognised shape would be silent, and silent is the direction this register keeps
+     * getting caught by.
+     */
+    @Test
+    void theResolverHandlesAMapShapedMachineAndSomethingActuallyUsesIt() throws Exception {
+        List<String> mapShaped = new ArrayList<>();
+        for (var e : new TreeMap<>(MIRRORED).entrySet()) {
+            String[] v = e.getValue();
+            Field f = Class.forName(v[0]).getDeclaredField(v[1]);
+            f.setAccessible(true);
+            if (f.get(null) instanceof Map<?, ?>) mapShaped.add(e.getKey());
+        }
+        assertThat(mapShaped)
+            .as("F2-289 widened constantValue to resolve a Map-shaped machine; if no mirrored "
+                + "machine is Map-shaped, that branch is untested and the next reader will read its "
+                + "presence as coverage")
+            .isNotEmpty();
+        for (String key : mapShaped) {
+            String[] v = MIRRORED.get(key);
+            assertThat(constantValue(v[0], v[1]))
+                .as("%s resolves through the Map branch, so it must yield the machine's STATES "
+                    + "(its keys). An empty or single-element answer means the branch is returning "
+                    + "something other than the vocabulary.", key)
+                .hasSizeGreaterThan(1);
+        }
     }
 
     /**
