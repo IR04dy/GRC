@@ -709,6 +709,25 @@ class NeverFiringNullGuardContractTest {
         return out.toString();
     }
 
+    /**
+     * Every by-name lookup in {@code code} that names a simple name declared more than once —
+     * F2-295.
+     *
+     * <p>Extracted rather than inlined so the leg can drive it over a SYNTHETIC corpus as well as
+     * over the tree. Inlined, the assertion was *"collect the violations, assert the list empty"* and
+     * the mutation harness blinded it and SURVIVED — on a clean corpus an empty list is what a
+     * correct detector and a dead one both return (F2-250).
+     */
+    static List<String> ambiguousLookupsIn(String code, Set<String> ambiguousNames) {
+        List<String> out = new java.util.ArrayList<>();
+        Matcher byName = Pattern.compile(
+            "(?:services|writers)\\s*\\.\\s*get\\s*\\(\\s*\"(\\w+)\"\\s*\\)").matcher(code);
+        while (byName.find()) {
+            if (ambiguousNames.contains(byName.group(1))) out.add(byName.group(1));
+        }
+        return out;
+    }
+
     static String label(String fqn, Set<String> allKeys) {
         String simple = fqn.contains(".") ? fqn.substring(fqn.lastIndexOf('.') + 1) : fqn;
         long sameName = allKeys.stream()
@@ -1702,6 +1721,41 @@ class NeverFiringNullGuardContractTest {
                 + "that mis-identifies one span does not degrade, it inverts")
             .contains("keep();")
             .doesNotContain("drop");
+
+        // ⚠⚠ THE OTHER KEYED MAP, because shipping a slice about keying ambiguity that closes one of
+        // two maps is F2-215's two-of-N in exactly the shape this lineage keeps finding.
+        // liveWriters() is a LOOKUP map and simple-name keying is right for it — `Moved` records name
+        // a writer by simple name — but a lookup of an AMBIGUOUS name silently returns whichever
+        // path sorted last, which is F2-287's rule: an unresolved ambiguity must never fall back to
+        // something confident, because an entry resolved against the wrong module reads exactly like
+        // one resolved against the right one. So no held record may name a colliding simple name.
+        Set<String> ambiguousNames = perName.entrySet().stream()
+            .filter(e -> e.getValue() > 1).map(Map.Entry::getKey).collect(Collectors.toSet());
+        assertThat(ambiguousNames)
+            .as("the collision set this leg is about — if it empties, the tree has stopped colliding "
+                + "and both this and the assertion below should go rather than pass over nothing")
+            .contains("AuditEngagementService", "BoardPackService", "RegulatoryChangeService");
+
+        assertThat(ambiguousLookupsIn(code, ambiguousNames))
+            .as("a by-name lookup of a colliding service resolves to whichever path sorted LAST. "
+                + "Nothing does that today — 58 *Request.java files carry 58 distinct names and no "
+                + "Moved record names a colliding service — so this is a tripwire, and what it "
+                + "protects is the direction that fails confidently rather than loudly (F2-287)")
+            .isEmpty();
+        // ⚠⚠ AND THE POSITIVE, because the assertion above is VACUOUS on a clean corpus: the
+        // mutation harness blinded the detector and SURVIVED, since a "collect the violations,
+        // assert the list empty" leg produces an empty list whether it is working or dead (F2-250).
+        // An empty list is what both a correct gate and a rotted one return, so the detector has to
+        // prove it can fire.
+        assertThat(ambiguousLookupsIn("String svc = services.get(\"BoardPackService\");",
+                                      ambiguousNames))
+            .as("the detector must be able to see the thing it forbids, or its emptiness above is "
+                + "evidence about the corpus and not about the code")
+            .containsExactly("BoardPackService");
+        assertThat(ambiguousLookupsIn("String svc = services.get(\"KycService\");", ambiguousNames))
+            .as("...and must not fire on a name that is declared once — a tripwire that flags an "
+                + "unambiguous lookup fails on correct code (F2-214)")
+            .isEmpty();
     }
 
     /**
