@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.tprm.entity.QuestionnaireQuestion;
 import com.tss.grc.module.tprm.entity.QuestionnaireResponse;
@@ -146,9 +147,12 @@ class QuestionnaireServiceTest {
         QuestionnaireTemplate t = template("ARCHIVED");
         when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(t));
 
+        // F2-303 — 409. ARCHIVED is terminal, so the allowed set is empty and the message says
+        // so; the old wording ("Illegal template transition") named neither a status nor a target.
         assertThatThrownBy(() -> service.transitionTemplate(TPL_ID, "DRAFT"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Illegal template transition");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("allowed: []");
     }
 
     @Test void addQuestion_toActiveTemplateRefused() {

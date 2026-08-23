@@ -1,5 +1,7 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import java.util.Map;
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
@@ -401,6 +403,26 @@ public class CrisisEventService {
      * State transition with closure rule enforcement. Stamps activation /
      * closure timestamps automatically.
      */
+    /**
+     * The register's declared edges, in ONE place. F2-303 — this was an inline
+     * {@code switch} of {@code Set.of(...).contains(...)}, so the legal-target list was not
+     * derivable at runtime and the refusal below could only say which move was rejected, never
+     * which moves would be accepted. Terminal states are present with an <b>empty</b> set rather
+     * than omitted, so the terminal set is derivable from the machine instead of typed out a
+     * second time ([[F2-196]]).
+     */
+    static final Map<String, Set<String>> TRANSITIONS = Map.of(
+        "DETECTED",  Set.of("ASSESSING", "ACTIVATED", "CANCELLED"),
+        "ASSESSING", Set.of("ACTIVATED", "CLOSED", "CANCELLED"),
+        "ACTIVATED", Set.of("CONTAINED", "RECOVERED"),
+        // CONTAINED → ACTIVATED is deliberate: re-escalation of a crisis that was contained and
+        // then worsened. It is the machine's only backwards edge and it must survive this
+        // conversion, which is why a test names it.
+        "CONTAINED", Set.of("RECOVERED", "ACTIVATED"),
+        "RECOVERED", Set.of("CLOSED"),
+        "CLOSED",    Set.of(),
+        "CANCELLED", Set.of());
+
     @Transactional
     public CrisisEvent transition(Long id, String toStatus) {
         CrisisEvent e = get(id);
@@ -408,18 +430,9 @@ public class CrisisEventService {
             throw new IllegalArgumentException("status must be one of " + STATUSES);
 
         String from = e.getStatus();
-        boolean legal = switch (from) {
-            case "DETECTED"  -> Set.of("ASSESSING", "ACTIVATED", "CANCELLED").contains(toStatus);
-            case "ASSESSING" -> Set.of("ACTIVATED", "CLOSED", "CANCELLED").contains(toStatus);
-            case "ACTIVATED" -> Set.of("CONTAINED", "RECOVERED").contains(toStatus);
-            case "CONTAINED" -> Set.of("RECOVERED", "ACTIVATED").contains(toStatus);  // re-escalation allowed
-            case "RECOVERED" -> Set.of("CLOSED").contains(toStatus);
-            case "CLOSED"    -> false;
-            case "CANCELLED" -> false;
-            default          -> false;
-        };
-        if (!legal)
-            throw new IllegalArgumentException("Illegal transition: " + from + " → " + toStatus);
+        Set<String> allowed = TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(toStatus))
+            throw new IllegalTransitionException(from, toStatus, allowed);
 
         // Closure rule per spec §J.13: root cause + lessons learned required.
         if ("CLOSED".equals(toStatus)) {

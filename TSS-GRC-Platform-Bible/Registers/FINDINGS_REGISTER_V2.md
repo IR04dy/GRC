@@ -15219,6 +15219,102 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-303 — a refusal that cannot name what it would accept, and a grep that found five of eleven
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — **a diagnostic and status-code defect on six lifecycle registers, and a measurement error that halved the population.** A refused transition answered **HTTP 400** (malformed input) for a request that was well formed and merely arrived from the wrong state, and its message could name only the move that was *rejected*, never the moves that would have been accepted. |
+| **Registers** | `bcm.bia_assessments`, `bcm.bcp_plans`, `bcm.crisis_events`, `platform.authority_documents`, `tprm.questionnaire_templates`, `change_mgmt.change_requests`, `bcm.crisis_comms_templates` |
+| **Standards** | — (the platform's own refusal contract; `IllegalTransitionException` → 409 + structured ProblemDetail) |
+| **Found by** | [[F2-297]]'s designated filing (*"the four machines declare themselves as an inline switch … must not be smuggled into a slice about something else"*), re-derived first ([[F2-221]]) |
+| **Verification** | suite **4684 → 4688/0/0**; probe **5/5** as `compliance`, confirming 409 + a structured `allowed` array on the wire and the vocabulary refusal still 400 |
+
+### The two halves had one cause
+
+**139 sites** throw `IllegalTransitionException`, which carries `from`, `to` and `allowed` and which
+`GlobalExceptionHandler` maps to **409** with a structured ProblemDetail. Five threw a bare
+`IllegalArgumentException("Illegal transition: FROM → TO")`.
+
+Each of the five declared its edges as an inline `switch` of `Set.of(...).contains(...)`, so
+🔑 **the legal-target list was not derivable at runtime — the refusal could not name it because
+nothing could be asked.** And `CrisisCommsTemplateService`, the one member whose refusal *did* name
+its targets, paid for that with a **second copy of the whole machine** in an `allowedFrom` helper:
+three copies counting its javadoc, agreeing, with nobody maintaining that ([[F2-177]]). The two
+switches were written in different **forms** — `"IN_REVIEW".equals(to)` against
+`Set.of("IN_REVIEW")` — which is what makes a drift between them invisible in a diff.
+
+Six machines now declare their edges once as `Map<String, Set<String>>`, with terminal states present
+as an **empty set** so the terminal set is derivable rather than typed a second time ([[F2-196]]).
+
+### The sixth was the sharpest and a grep could not see it
+
+`ChangeManagementService.guard` **already** computed `allowed` from a declared map on the line above
+and then **discarded it**, throwing a bare 400 — the set it needed was one step away. Its message
+says *"Cannot transition from"*, so a grep keyed on `IllegalArgumentException("Illegal` missed it
+entirely.
+
+### And the real population is eleven, not five
+
+Scoped to the **shape** — any transition-mentioning message — rather than to a spelling, the gate
+finds **11**. 🔑 **A detector keyed on the wording you have already seen returns a smaller
+population, and a smaller population reads exactly like a cleaner tree.** One of them is a **second**
+refusal inside `AuthorityDocumentService`, a file this slice had already converted.
+
+Six remain **unread** and ship as an exactly-asserted census with the honest reason *"not yet read"*
+rather than six manufactured ones ([[F2-188]] measured what happens otherwise: five claims written
+fluently, all five false). A new bare refusal fails the gate, and a converted one must be deleted
+from the set in the same commit.
+
+### The vocabulary check in front of each guard deliberately stays a 400
+
+An unknown token **is** bad input; a known token from the wrong state is a conflict with the record's
+state. Conflating them is exactly what the bare refusal did, and it is the same family as
+[[F2-230]]'s 547 naming no field and [[F2-210]]'s diagnostic that sends the reader nowhere. Probed
+both ways: `{"to": "PUBLISHED"}` from DRAFT is **409** with
+`allowed: ['CANCELLED', 'UNDER_REVIEW']`, and `{"to": "TOTALLY_MADE_UP"}` is still **400**.
+
+### Six test assertions pinned the old contract
+
+Each asserted `isInstanceOf(IllegalArgumentException.class)` on a refused transition — the 400 being
+replaced. A test written against a contract you are about to change is not evidence, it is the old
+contract ([[F2-300]]). Each was rewritten to assert the new **capability** rather than merely the new
+type: that the refusal names the moves the machine would accept, including `allowed: []` from a
+terminal state.
+
+### Three errors of mine, all caught by running something
+
+* **A field inserted between `@Transactional` and its method produced six "cannot find symbol:
+  variable `log`" errors in an untouched file.** One Lombok-processed file failing aborts annotation
+  processing build-wide, so every `@Slf4j` logger vanishes. 🔑 **One root cause, six errors pointing
+  at files you never touched** — anchor on the whole declaration including its annotations, never on
+  the signature line.
+* **The duplicate-detection leg first banned any `case "STATE" ->` arm** and fired on
+  `case "DETECTED" -> "بحاجة للتقييم"`, an Arabic **label** map, which legitimately switches on the
+  same states. A gate that fails on correct code trains the next reader to edit the assertion
+  ([[F2-214]]), so it is scoped to arms that **yield a machine**.
+* **A blanket prefix-replace on the gate's path keys hit both of its maps**, so a declared machine
+  resolved to `.../com/tss/grc/com/tss/grc/module/...`. It failed loudly on `Files.exists`, the safe
+  direction; both maps and the scan now share one key space so a mismatch cannot make a leg vacuous.
+
+### And two probe errors, one of which passed for the wrong reason
+
+The body key is **`to`**, not `status` — resolved from `BcpPlanController`'s `TransitionBody` record
+rather than guessed. With the wrong key `toStatus` arrived null, so three legs failed for a reason
+unrelated to their claim — and 🔑 **the leg asserting "an unknown token is still 400" PASSED, because
+the vocabulary check produced the same 400 from a different cause.** A leg can pass for the wrong
+reason whenever an earlier error yields the status it expects.
+
+### Filed
+
+* **The six unread bare refusals**: `AmlAlertService`, `DisclosureService`, `EthicsCaseService`,
+  `AuthorityDocumentService` (a second site), `IssueService`, `WorkflowEngineService`. Each needs its
+  own machine read — whether it has a declared map to name, and whether the refusal is even a
+  lifecycle refusal. The destination is zero; nothing correct stands in the way, only reading.
+* **The javadoc `<pre>` edge lists** are now a second copy beside each declared map. [[F2-191]]'s
+  precedent is to **parse the javadoc and compare it edge-for-edge**, so the prose becomes the
+  specification rather than a stale copy — worth doing, and not smuggled into this slice.
+
 ## F2-302 — a @PrePersist default is not a guard, and the status and the close date had two writers
 
 | | |

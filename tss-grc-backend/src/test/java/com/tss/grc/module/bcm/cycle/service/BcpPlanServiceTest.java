@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -155,8 +156,12 @@ class BcpPlanServiceTest {
     @Test void transition_illegal_PUBLISHEDfromDRAFT_rejected() {
         BcpPlan p = plan("BCP", "DRAFT");
         when(plans.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(p));
+        // F2-303 — 409, and the refusal names the two moves a DRAFT plan really has.
         assertThatThrownBy(() -> service.transition(7L, "PUBLISHED", "x"))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Illegal");
+            .isInstanceOf(IllegalTransitionException.class)
+            .hasMessageContaining("Illegal transition")
+            .hasMessageContaining("UNDER_REVIEW")
+            .hasMessageContaining("CANCELLED");
     }
 
     @Test void transition_APPROVED_snapshotsAndBumpsVersion() {
