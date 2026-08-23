@@ -15216,3 +15216,197 @@ question of the register the refutation had walked into is what found the P1.
 - **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
   left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
   upstream-owned, and the nullable ones are inert.
+
+---
+
+## F2-289 — the decider was recorded on TWO of one switch's THREE decision branches, and the comment explaining it was duplicated in the two that had it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`6ae807c6`) |
+| **Severity** | P2 — an AML alert could be escalated as a confirmed true positive and closed with no decider recorded anywhere, permanently. Latent (0 `ESCALATED` rows) and reachable from the platform's own screen (3 `INVESTIGATING` alerts in both databases) |
+| **Register** | `ethics.aml_alerts` (10 rows, byte-identical in dev and prod) |
+| **Standards** | SAMA AML/CFT Rules, FATF R.20 (STR reporting), Saudi FIU |
+| **Found by** | executing [[F2-288]]'s filing of *"the `ethics` schema's remaining unconstrained columns, sharpest being `aml_alerts.disposition`"*, and then reading the method the filing pointed at rather than only the line it named |
+| **Verification** | live probe **16/16 pre-fix · 16/16 post-fix** on a freshly restarted listener, **6 of 16 legs discriminating**; gate control **21 of 32 legs fire** across four classes; mutation harness **2/2 killed**; backend **4544 → 4567 / 0 / 0** |
+
+### The defect
+
+`AmlAlertService#transition` stamped `decidedByName` and `decidedAt` in **two of its three**
+decision branches. `ESCALATED` — which records a `TRUE_POSITIVE` disposition, i.e. the analyst's
+conclusion that a monitored transaction is genuinely suspicious, and the referral an MLRO acts on
+— stamped neither. `ESCALATED → CLOSED` is a declared edge and the `CLOSED` branch keeps decision
+metadata as-is, so the absence was **preserved rather than corrected**: escalate and close, and the
+alert is shut as a confirmed true positive with no decider and no route left that could add one.
+
+Probed live as `auditor` (COMPLIANCE:WRITE — the permission on create, update, assign *and*
+transition alike, so there is **no escalation** to report: the object-level machine was the only
+control on this register and the attribution sat inside it, which is [[F2-219]]'s shape) against
+alerts the probe plants itself ([[F2-206]]):
+
+| leg | pre-fix | post-fix |
+|---|---|---|
+| `INVESTIGATING → ESCALATED` | 200, disposition `TRUE_POSITIVE` | 200, disposition `TRUE_POSITIVE` |
+| ↳ the decider | **`NULL`** | `auditor` |
+| ↳ the decision timestamp | **`NULL`** | stamped |
+| **then `→ CLOSED`** | **closed, `TRUE_POSITIVE`, decider still `NULL`** | closed, decider preserved |
+| `→ CLEARED` (sibling branch) | decider `auditor` | decider `auditor` |
+| `→ STR_FILED` (sibling branch) | decider `auditor` | decider `auditor` |
+| `disposition: "PROBABLY_FINE"` | **200, stored verbatim** | 400 naming the field |
+| `disposition: "true_positive"` | **200, stored verbatim** | 200, stored `TRUE_POSITIVE` |
+| `PUT {"severity": "SEVERE"}` | **200, stored** | 400 naming the field |
+
+🔑 **The two sibling rows are the finding as much as the first three are.** One probe run, one
+persona, three branches of one switch: two stamped the decider and the third did not.
+
+### 🔑🔑 Repetition reads as a rule
+
+The five-line comment explaining the attribution was **byte-identical** in `CLEARED` and
+`STR_FILED`, and the gap sat between them — so a reader scrolling the switch met the mechanism
+twice and its absence once. Worse, the duplicated comment's own worked example was *"the STR filed
+with the Saudi FIU could be attributed to the empty string"*, i.e. **one of the two branches it
+appeared in**, so its subject reinforced exactly the coverage it did not have.
+
+[[F2-215]]'s two-of-N, sharpened: **a comment duplicated across the branches that have a mechanism
+is stronger evidence of coverage than one stated once.** A single explanatory comment invites the
+question *"does this apply elsewhere?"*; two identical ones answer it.
+
+### 🔑 And F2-223 wrote the comment
+
+[[F2-223]] is the slice that introduced the attribution — to two of the three branches, with the
+comment naming itself in both. That is [[F2-287]]'s headline again: **the slice that establishes a
+rule is the worst-placed slice to apply it to its own leftovers**, because the branch it did not
+touch is the one its new comment makes look finished. The frontend carries the same shape: the
+handler's comment says *"the decision-maker is NOT asked for. The server records the authenticated
+principal (AmlAlertService#transition)"* — a claim about the server that was true for two of the
+three branches the same function drives ([[F2-184]]).
+
+### Latent, and that is stated rather than implied
+
+0 rows are `ESCALATED`; both rows carrying a disposition also carry a decider. Identical in dev and
+prod. The Escalate control is offered on the register for every `INVESTIGATING` alert and **three
+real alerts are in that state in both databases**, so it is reachable from the platform's own screen
+today — a fact about today, not a property of the control ([[F2-182]]). Per [[F2-283]]: **this is a
+latent-hazard closure, not a defect discovery**, and reporting it as the latter is the error this
+register keeps warning about.
+
+### The fix
+
+One private `recordDisposition(alert, body, fallback)` is the **sole writer** of the four-column
+tuple — disposition, notes, decider, clock — reached by all three branches ([[F2-245]]: the claim
+that prevents drift is about *where* the writes live).
+
+- **`requireUsername`, never `username()`.** The method stamps the clock from the server, which is
+  the service declaring that *it* is the recorder of the act, so a blank name beside a real
+  timestamp would read as an attribution ([[F2-236]], whose javadoc states exactly this rule).
+- **All four move together, latest decision wins.** `STR_FILED` used to preserve an existing
+  `decidedAt` while overwriting `decidedByName` unconditionally — [[F2-223]]'s split waiting for a
+  second decision (name from decision 2, clock from decision 1). `ESCALATED → STR_FILED` is the only
+  two-disposition path the machine allows, and because `ESCALATED` wrote no clock the old
+  conditional always fired: **behaviour-identical on every reachable path today, and the split
+  removed.** Nothing is lost — `str_filed_at` records when the STR was filed.
+- **`require` not `coerce`** ([[F2-182]]'s third case, as [[F2-288]] stated it): no coercion exists
+  upstream *and* the column had no CHECK, so out-of-vocabulary values genuinely succeeded — but
+  every stored value is already a member, so nothing that works today starts failing, and an
+  unrecognised AML disposition does not degrade gracefully, it becomes a conclusion the register
+  cannot report.
+- **A caller may still choose within the vocabulary.** Escalating an alert the analyst believes is a
+  false positive — for a second opinion — is a real thing; whether it should be refused is a product
+  question about AML practice, not a side effect of an attribution fix. The boundary is pinned in
+  both directions so the next reader has to decide it deliberately.
+
+### What else the same commit closed, because F2-183 ties a constraint to its writer
+
+| column | before | after |
+|---|---|---|
+| `disposition` | `body.get("disposition").toString()` at **three** sites, table had **zero** CHECKs | one writer, `ClosedVocabulary.require`, `CK_aml_alerts_disposition` |
+| `severity` | copied straight out of an entity-bound PUT | `SEVERITY.require`, `CK_aml_alerts_severity` |
+| `status` | four writers, **all already closed** before this slice | `CK_aml_alerts_status`, mirrored against `TRANSITIONS` |
+| `analytics()` | two **typed inclusion lists** — a third and fourth copy of vocabularies this file declares | derived from `TRANSITIONS.keySet()` and `SEVERITY.tokens()` |
+| `alert_type` | open | **still open, and asserted as a decision** |
+
+`alert_type` is the [[F2-183]] `consumer.complaint.subcategory` precedent: 10 distinct values are
+stored and **no vocabulary for it is declared anywhere in either codebase** — no reader's inclusion
+list, no dropdown, no CHECK — so constraining it would mean inventing one. Recorded as a decision
+rather than left as an absence.
+
+V393 measured both databases first (10 rows each, 0 violations, 0 non-canonical casings), so no
+`WITH NOCHECK` and no casing UPDATE; applied twice to dev; four self-checks that `THROW`, including
+the mirror of the pre-flight — *every token the service can write must still be admitted*.
+
+### ⚠ The gate could not see this register at all, and the narrowing was a Java type
+
+`StateMachineColumnMirrorTest.constantValue` cast the vocabulary constant to `Set<String>`. A
+machine that declares its states as `Map<String, Set<String>>` — i.e. **with their edges, the more
+precise form** — was therefore structurally excluded from `MIRRORED`: not a smaller answer, a
+`ClassCastException`. **So the more precisely a machine declared itself, the less that gate could
+check it.** [[F2-198]]'s shape inside the gate, where the narrowing is neither a filename nor an
+allow-list nor a module name but the Java type the resolver happens to cast to.
+
+`AmlAlert#status` is the first Map-shaped entry in that bucket, and
+`theResolverHandlesAMapShapedMachineAndSomethingActuallyUsesIt` asserts the widening is
+load-bearing — [[F2-248]]'s rule, where deleting a token SURVIVED because the anti-vacuity list had
+not grown with the vocabulary. `BASELINE_UNCONSTRAINED` **5 → 4**, re-derived from the map's own
+size rather than subtracted ([[F2-207]]), and lowered in the same commit as the sweep.
+
+⚙ [[F2-221]]'s own entry for this register said it was left unconstrained *"because the create path
+was not read in this slice — F2-183 ties the constraint to the writer."* That was an accurate,
+honest reason, and the shape was never the stated obstacle **because nothing had tried**. Reading
+the create path is what surfaced the attribution gap; the constraint was the by-product.
+
+### ⚠ Two of my own gate legs failed on correct code, both scans wider than their claim
+
+- The analytics leg banned the literal `"INVESTIGATING"` anywhere in `analytics()` and fired on
+  `openAlerts = getOrDefault("OPEN") + getOrDefault("INVESTIGATING")` — a deliberately **narrower**
+  question than the machine's non-terminal complement (*"awaiting disposition"*, not *"not
+  closed"*), which [[F2-250]] had already recorded on this very service.
+- The frontend leg compared `EthicsPage`'s `disposition:` literals against this register's
+  vocabulary **file-wide**, and fired on the screening-hit draft further down the same component —
+  whose vocabulary (`NEEDS_REVIEW`/`TRUE_MATCH`) belongs to the sibling register. That is
+  [[F2-288]]'s two-registers-one-word finding, in one file, and a file-scoped scan therefore
+  compares one register's literals against the other register's CHECK and reports a defect that is
+  not there.
+
+🔑 **A gate that fails on correct code trains the next reader to edit the assertion rather than the
+code** ([[F2-214]]), and both were caught by *running* it. Scope a scan to the shape of its claim
+([[F2-192]]) — third and fourth instance in two slices.
+
+### ⚠ A behavioural leg that could not see the defect it is named for
+
+The mutation harness's first run killed the `decidedAt`-preservation mutation with the **structural**
+leg only: `aSecondDecisionMovesBothHalves` asserted `isAfterOrEqualTo(firstClock)`, which a
+**preserved** clock satisfies. 🔑 **A leg whose name claims more than its assertion can see is the
+family this register keeps catching** ([[F2-159]], [[F2-279]]) — and only the harness could tell,
+because on the fixed tree it passes either way. Now compared against a reading taken *between* the
+two decisions. 2/2 killed after.
+
+### ⚠ Measured and deliberately NOT done
+
+`KycService#disposition` — the sibling AML register, same package, same concept — hand-rolls the
+same *"no principal to record"* refusal instead of calling `CurrentActor.requireUsername`. That is
+[[F2-190]]'s shape, and converting it was measured rather than assumed: **21 sites use the
+primitive and there is a substantial population of hand-rolled refusals with bespoke messages**
+across `approvals`, `audit_lc`, `bcm`, `board_pack`, `capa`, `change_mgmt`, `compliance` and
+`cyber_lc`. Converting one arbitrary member would invent a rule that only one file follows, so the
+population is filed and nothing was changed ([[F2-278]]: sometimes the right answer is *measure it
+and do not make it*).
+
+### Filed
+
+- **`ethics.cases.status`** — [[F2-221]]'s finding, re-confirmed live: **11 of 30 rows** hold
+  `INVESTIGATING` or `TRIAGED`, which are not keys of that register's machine, so those cases cannot
+  be advanced by any route. Near-synonyms of real keys, so collapsing them rewrites live rows in two
+  databases — **owner decision**.
+- **The remaining unconstrained `ethics` columns**: `cases` (8 status values, 17 categories, 13
+  intake channels — all with **zero** CHECKs), `disclosures` (4 statuses, 8 types, 2 decisions),
+  `case_actions.action_type`, `case_links.entity_type`/`link_type`, `coi_recusal_event`. Each needs
+  its writers read first.
+- **`aml_alerts.alert_type`**, above — closing it means declaring the vocabulary *with the owner*.
+- **The hand-rolled-refusal population**, above.
+- **Two screening registers for one concept** ([[F2-288]]'s filing, unchanged and now sharper: this
+  slice declared `aml_alerts`' own two-token vocabulary and deliberately did **not** reconcile it
+  with `screening_hits`' four, because that changes what the platform reports to the Saudi FIU) —
+  **owner decision**.
+- **`str_filed = true` with a caller-supplied `FALSE_POSITIVE`** is storable: an STR filed with the
+  FIU while the alert records no suspicion. The frontend cannot produce it; a machine caller can.
+  Whether that combination should be refused is AML practice — **owner decision**.
