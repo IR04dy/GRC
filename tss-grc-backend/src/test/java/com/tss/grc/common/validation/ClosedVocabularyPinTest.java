@@ -92,7 +92,13 @@ class ClosedVocabularyPinTest {
         // they are declared through OrderedVocabulary, a wrapper this scan could not see until the
         // same commit taught it to, so without these names the widening could silently un-widen.
         "CK_tpc_residual_risk_tier", "CK_tpc_status", "CK_tpc_inherent_cyber_risk",
-        "CK_member_skill_level", "ck_ndi_gap_sev", "CK_cam_risk");
+        "CK_member_skill_level", "ck_ndi_gap_sev", "CK_cam_risk",
+        // F2-288 — V392, the `ethics` AML screening register's first constraints of any kind. Listed
+        // for the same reason as the others, and one more: two of these three columns are what
+        // `KycService#applyConfirmedMatch` DISPATCHES on, so a vocabulary that silently stopped
+        // being compared here would be a confirmed sanctions match that escalates nothing.
+        "CK_screening_hits_disposition", "CK_screening_hits_list_source",
+        "CK_kyc_subjects_risk_rating");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")
