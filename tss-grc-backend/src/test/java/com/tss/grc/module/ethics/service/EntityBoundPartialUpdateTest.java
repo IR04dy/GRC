@@ -2,10 +2,12 @@ package com.tss.grc.module.ethics.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.EthicsCaseLifecycle;
+import com.tss.grc.module.ethics.entity.Disclosure;
 import com.tss.grc.module.ethics.entity.EthicsCase;
 import com.tss.grc.module.ethics.entity.KycSubject;
 import com.tss.grc.module.ethics.repository.CaseActionRepository;
 import com.tss.grc.module.ethics.repository.CaseLinkRepository;
+import com.tss.grc.module.ethics.repository.DisclosureRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
 import com.tss.grc.module.ethics.repository.KycSubjectRepository;
 import com.tss.grc.module.ethics.repository.ScreeningHitRepository;
@@ -18,6 +20,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import com.tss.grc.security.GrcUserDetails;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
@@ -61,16 +67,23 @@ class EntityBoundPartialUpdateTest {
     @Mock private ScreeningHitRepository hitRepo;
     private KycService kyc;
 
+    // F2-292 — the third register, added to THIS class rather than a second one: it is the same
+    // question about the same mechanism, and two classes answering one question is this
+    // programme's own recurring defect (F2-190).
+    @Mock private DisclosureRepository disclosureRepo;
+    @InjectMocks private DisclosureService disclosures;
+
     @BeforeEach
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
         kyc = new KycService(subjectRepo, hitRepo, new KycSubjectDirectory(subjectRepo));
         when(caseRepo.save(any(EthicsCase.class))).thenAnswer(i -> i.getArgument(0));
         when(subjectRepo.save(any(KycSubject.class))).thenAnswer(i -> i.getArgument(0));
+        when(disclosureRepo.save(any(Disclosure.class))).thenAnswer(i -> i.getArgument(0));
     }
 
     @AfterEach
-    void tearDown() { TenantContext.clear(); }
+    void tearDown() { TenantContext.clear(); SecurityContextHolder.clearContext(); }
 
     // ── the whistleblowing register ──────────────────────────────────────────
 
@@ -273,5 +286,177 @@ class EntityBoundPartialUpdateTest {
             .isTrue();
         assertThat(made.getEddRequired()).isTrue();
         assertThat(made.getCddLevel()).isEqualTo("ENHANCED");
+    }
+
+    // ── F2-292: the conflict-of-interest disclosure register ─────────────────
+    //
+    // The sharpest member of F2-291's own 34-site work list, ranked by what the initialiser ASSERTS
+    // (F2-239) rather than by count -- and the measurement INVERTED the ranking. `BcmSettings`
+    // contributes 11 of the 34 entries and differs on 0 of 1 rows for ALL ELEVEN, i.e. it is
+    // entirely latent; this one differs on 18 of 18 live rows in dev and prod (APPROVED 11,
+    // REVIEW 4, SUBMITTED 2, REJECTED 1). APPROVED, RECUSED and MITIGATED are TERMINAL in
+    // DisclosureService.TRANSITIONS, so the reset escaped a terminal state by a route the machine
+    // cannot see, and DRAFT -> SUBMITTED exists, so the whole review cycle became re-runnable on a
+    // decided disclosure.
+
+    /** An APPROVED disclosure: the most common stored state, and a terminal one. */
+    private Disclosure approvedDisclosure() {
+        Disclosure d = new Disclosure();
+        d.setId(ID);
+        d.setOrganisationId(ORG);
+        d.setDisclosureCode("DISC-F2-292");
+        d.setTitleEn("Board member holds a stake in a shortlisted supplier");
+        d.setDisclosureType("CONFLICT_OF_INTEREST");
+        d.setStatus("APPROVED");
+        d.setCurrency("SAR");
+        d.setDecidedByName("compliance");
+        d.setDecidedAt(java.time.LocalDateTime.now().minusDays(3));
+        return d;
+    }
+
+    @Test
+    void aPartialUpdateLeavesADecidedDisclosureApproved() {
+        when(disclosureRepo.findById(ID))
+            .thenReturn(Optional.of(approvedDisclosure()));
+
+        Disclosure req = new Disclosure();
+        req.setTitleEn("Board member holds a stake in a shortlisted supplier (corrected)");
+
+        Disclosure saved = disclosures.update(ID, req);
+
+        assertThat(saved.getStatus())
+            .as("18 of 18 live rows in both databases were reverted to DRAFT by an edit that "
+                + "changed only the title, and APPROVED is TERMINAL in the machine")
+            .isEqualTo("APPROVED");
+        assertThat(saved.getCurrency()).isEqualTo("SAR");
+        assertThat(saved.getTitleEn()).endsWith("(corrected)");
+    }
+
+    @Test
+    void anEchoOfTheCurrentStatusIsToleratedAndAChangeIsRefused() {
+        when(disclosureRepo.findById(ID))
+            .thenReturn(Optional.of(approvedDisclosure()));
+
+        Disclosure echo = new Disclosure();
+        echo.setTitleEn("edited");
+        echo.setStatus("APPROVED");
+        assertThat(disclosures.update(ID, echo).getStatus())
+            .as("the client is typed Partial<DisclosureDto> but the screen round-trips whole rows, "
+                + "so refusing an echo would break a form that works today (F2-214)")
+            .isEqualTo("APPROVED");
+
+        Disclosure lower = new Disclosure();
+        lower.setStatus("approved");
+        assertThat(disclosures.update(ID, lower).getStatus())
+            .as("the column collates CI and carries no CHECK, so a case-variant echo must be "
+                + "tolerated too -- a bare equals is not a comparison here (F2-179)")
+            .isEqualTo("APPROVED");
+
+        Disclosure change = new Disclosure();
+        change.setStatus("DRAFT");
+        assertThatThrownBy(() -> disclosures.update(ID, change))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("cannot be moved to DRAFT by an update")
+            .hasMessageContaining("/transition");
+    }
+
+    @Test
+    void aBareCreateStartsAtDraftInSarAndACreateThatNamesAStateIsRefused() {
+        Disclosure req = new Disclosure();
+        req.setTitleEn("Gift received from a bidder");
+        req.setDisclosureType("GIFT_RECEIVED");
+
+        Disclosure made = disclosures.create(req);
+        assertThat(made.getStatus())
+            .as("status is NOT NULL, so a create that stops setting it is a 500 rather than a "
+                + "reset -- the one real hazard of removing an initialiser (F2-238)")
+            .isEqualTo("DRAFT");
+        assertThat(made.getCurrency()).isEqualTo("SAR");
+
+        Disclosure alreadyApproved = new Disclosure();
+        alreadyApproved.setTitleEn("Gift received from a bidder");
+        alreadyApproved.setStatus("APPROVED");
+        assertThatThrownBy(() -> disclosures.create(alreadyApproved))
+            .as("before F2-292 this returned 201 storing APPROVED, skipping DRAFT -> SUBMITTED -> "
+                + "REVIEW and the transition route that is the only writer of decidedByName and "
+                + "decidedAt (F2-220's shape, F2-223's attribution)")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("starts at DRAFT");
+    }
+
+    @Test
+    void aCreateThatSTATESACurrencyKeepsIt() {
+        Disclosure req = new Disclosure();
+        req.setTitleEn("Hospitality received abroad");
+        req.setDisclosureType("HOSPITALITY");
+        req.setCurrency("USD");
+
+        assertThat(disclosures.create(req).getCurrency())
+            .as("SAR is a DEFAULT, not an override: 0 of 18 live rows differ from it today, so "
+                + "this half was latent and closed anyway (F2-182)")
+            .isEqualTo("USD");
+    }
+
+    @Test
+    void theTransitionRouteStillMovesTheStatusAndStampsTheDecision() {
+        Disclosure inReview = approvedDisclosure();
+        inReview.setStatus("REVIEW");
+        inReview.setDecidedByName(null);
+        inReview.setDecidedAt(null);
+        when(disclosureRepo.findById(ID))
+            .thenReturn(Optional.of(inReview));
+
+        // ⚠ A principal is required, not optional decoration: `CurrentActor.username()` returns null
+        // for anything but a GrcUserDetails, so without this the decider assertion below fails for a
+        // reason unrelated to its claim (F2-244) — and weakening the assertion instead would leave
+        // the leg unable to see F2-223's attribution at all. House fixture idiom, copied rather than
+        // invented (F2-261).
+        GrcUserDetails ud = new GrcUserDetails(
+            42L, ORG, "compliance", "x", true, true,
+            java.util.List.of(new SimpleGrantedAuthority("ROLE_ETHICS_OFFICER")));
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(ud, "x", ud.getAuthorities()));
+
+        Disclosure decided = disclosures.transition(ID, "APPROVED", java.util.Map.of());
+
+        assertThat(decided.getStatus())
+            .as("the legitimate writer must keep working -- a slice that closed the bypass by "
+                + "breaking the approval route would score identically on every leg above")
+            .isEqualTo("APPROVED");
+        assertThat(decided.getDecidedByName()).isNotNull();
+        assertThat(decided.getDecidedAt()).isNotNull();
+    }
+
+    @Test
+    void theInitialStateIsDeclaredBecauseThisMachineHasNoRootToDeriveFrom() {
+        java.util.Map<String, java.util.Set<String>> machine = disclosureTransitions();
+        java.util.Set<String> targets = new java.util.TreeSet<>();
+        machine.values().forEach(targets::addAll);
+        java.util.Set<String> roots = new java.util.TreeSet<>(machine.keySet());
+        roots.removeAll(targets);
+
+        assertThat(roots)
+            .as("F2-291 derived EthicsCaseLifecycle.INITIAL as the one state that is never a "
+                + "transition target. REJECTED -> DRAFT makes DRAFT a target here, so that "
+                + "derivation yields NOTHING -- copying a derivation copies its convention "
+                + "(F2-290), and this is the case where the convention does not hold. The static "
+                + "block in DisclosureService asserts this same emptiness, so a reader can see the "
+                + "derivation was tried rather than overlooked.")
+            .isEmpty();
+        assertThat(machine).containsKey("DRAFT");
+        assertThat(machine.get("APPROVED"))
+            .as("and APPROVED being terminal is what made the reset an escape rather than a move")
+            .isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, java.util.Set<String>> disclosureTransitions() {
+        try {
+            java.lang.reflect.Field f = DisclosureService.class.getDeclaredField("TRANSITIONS");
+            f.setAccessible(true);
+            return (java.util.Map<String, java.util.Set<String>>) f.get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("DisclosureService.TRANSITIONS is the machine under test", e);
+        }
     }
 }

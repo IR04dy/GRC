@@ -239,8 +239,9 @@ class NeverFiringNullGuardContractTest {
         "ControlLibraryService#updateControl :: Control#automationLevel",
         "ControlLibraryService#updateControl :: Control#controlType",
         "CrisisCommsService#updateTemplate :: CrisisCommsTemplate#version",
-        "DisclosureService#update :: Disclosure#currency",
-        "DisclosureService#update :: Disclosure#status",
+        // ⚠ F2-292 removed `DisclosureService#update :: Disclosure#status` and `#currency` from
+        // here. They are the 18-of-18 member of this list, and they are now in
+        // CLOSED_BY_F2_292 so a revert FAILS rather than being absorbed back into a tolerated total.
         "FrameworkAnchorService#updateMapping :: PolicyDocumentFrameworkMapping#satisfaction",
         "OrganisationSettingsService#update :: OrganisationSettings#carbonOffsetCapPct",
         "OrganisationSettingsService#update :: OrganisationSettings#climateScenarioWeightsStrict",
@@ -264,6 +265,14 @@ class NeverFiringNullGuardContractTest {
         "KycService#update :: KycSubject#cddLevel",
         "KycService#update :: KycSubject#eddRequired",
         "KycService#update :: KycSubject#status");
+
+    /**
+     * The two pairs F2-292 closed, held separately from F2-291's for the same reason: a slice's
+     * closure has to be legible on its own, or a revert of one reads as a revert of the other.
+     */
+    private static final Set<String> CLOSED_BY_F2_292 = Set.of(
+        "DisclosureService#update :: Disclosure#status",
+        "DisclosureService#update :: Disclosure#currency");
 
     // ── the derivation ───────────────────────────────────────────────────────
 
@@ -479,6 +488,44 @@ class NeverFiringNullGuardContractTest {
         return false;
     }
 
+    /**
+     * ⚠⚠ <b>F2-292 tried to make this MERGE same-named files and the measurement REFUTED the fix.</b>
+     *
+     * <p>The reasoning was sound as far as it went: this is {@code put} into a
+     * {@code LinkedHashMap}, so where two files share a simple name the SECOND visited replaces the
+     * first — F2-276's exact defect, which failed in the quiet direction there (568 pairs reported
+     * where 585 exist). Of 37 duplicated simple names in {@code src/main}, <b>3</b> are
+     * {@code *Service} files under a {@code /service/} package: {@code AuditEngagementService}
+     * (audit_eng | compliance), {@code BoardPackService} (board_pack | reporting),
+     * {@code RegulatoryChangeService} (compliance | regchange).
+     *
+     * <p>🔑🔑 <b>But merging surfaced exactly ONE new site and it was a PHANTOM.</b>
+     * {@code AuditEngagementService#update :: AuditEngagement#auditType} appeared, and neither half
+     * of it is a defect: {@code audit_eng}'s entity initialises {@code auditType = "INTERNAL"} and
+     * its service has <em>no</em> {@code update} at all, while {@code compliance}'s service guards
+     * {@code auditType} and its entity declares <em>no</em> initialiser — so that guard CAN fire.
+     * Two different classes, two different tables, one manufactured finding.
+     *
+     * <p>🔑 <b>So the duplicate-name hazard here is CROSS-ATTRIBUTION, not omission — and the
+     * mechanism is the entity map's pre-existing {@code computeIfAbsent} union</b> (see
+     * {@link #initialisedFields}), which pools the initialisers of two unrelated entities that
+     * merely share a simple name. With {@code put} on this side the phantom cannot form, because
+     * only one twin's service is ever present; merging supplied the missing half. F2-287's rule
+     * verbatim: a fallback for an unresolved type reintroduces the ambiguity the resolution removed,
+     * and <b>it fails in the confident direction — a finding naming the wrong table</b>.
+     *
+     * <p>A gate that reports a defect where none exists is worse than one that misses (F2-214), so
+     * the merge is reverted and the phantom is PINNED by
+     * {@link #theDuplicateNameHazardIsCrossAttributionNotOmission}, which fails if anybody
+     * reintroduces it. The real fix is module-aware pairing on BOTH maps — key by fully-qualified
+     * name and pair a service with the entity in its own module — which is a change to a shipped
+     * security gate and is filed rather than smuggled into a slice about a different register.
+     *
+     * <p>⚠ What made the merge look safe was my own measurement: {@code f292_dupsvc.py} looked for
+     * guards inside a <em>private helper</em>, which is narrower than this gate's population, and
+     * concluded "no pair collapses today". <b>A hazard measured with a narrower population than the
+     * instrument's reads as latent when it is not.</b>
+     */
     private static Map<String, String> liveServices() {
         Map<String, String> out = new LinkedHashMap<>();
         for (Path p : sources("Service.java")) {
@@ -730,7 +777,23 @@ class NeverFiringNullGuardContractTest {
             new Moved("KycSubject", "isSanctioned", "setIsSanctioned", "KycService", "create"),
             new Moved("KycSubject", "cddLevel", "setCddLevel", "KycService", "create"),
             new Moved("KycSubject", "eddRequired", "setEddRequired", "KycService", "create"),
-            new Moved("KycSubject", "status", "setStatus", "KycService", "create"));
+            new Moved("KycSubject", "status", "setStatus", "KycService", "create"),
+            // ── F2-292 — the sharpest member of F2-291's own work list ──────────────────
+            // Ranked by what the initialiser ASSERTS rather than by count (F2-239), and the
+            // measurement INVERTED the ranking: `BcmSettings` contributes 11 of the 34 entries and
+            // is 0 of 1 rows on ALL ELEVEN, i.e. entirely latent, while this one differs on 18 of
+            // 18 live rows in both databases — APPROVED 11, REVIEW 4, SUBMITTED 2, REJECTED 1. So
+            // every conflict-of-interest disclosure in the register was DESTROYABLE by a body
+            // carrying only titleEn -- API-reachable, not screen-reachable, because EthicsPage's
+            // reqFromDto spreads the whole DTO and so echoed the status (F2-283: say which).
+            // APPROVED / RECUSED / MITIGATED are TERMINAL in
+            // DisclosureService.TRANSITIONS, so the reset escaped a terminal state by a route the
+            // machine cannot see.
+            //
+            // `currency` is the mirror case and was closed anyway: 0 of 18 rows differ from "SAR",
+            // so what made it harmless was the DATA and not the code (F2-182).
+            new Moved("Disclosure", "status", "setStatus", "DisclosureService", "create"),
+            new Moved("Disclosure", "currency", "setCurrency", "DisclosureService", "create"));
 
         Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
@@ -1188,11 +1251,55 @@ class NeverFiringNullGuardContractTest {
      * {@code apply} goes back to firing on every request and resetting a live row), and the measured
      * population must not contain them (or the fix has been reverted while the work list absorbed it).
      */
+    /**
+     * F2-292 — the duplicate-simple-name hazard in this gate is CROSS-ATTRIBUTION, and the obvious
+     * fix for the omission half manufactures a finding.
+     *
+     * <p>Three {@code *Service} simple names are declared twice under a {@code /service/} package,
+     * and {@link #liveServices} keys on the simple name, so only one twin of each is ever measured.
+     * Making it merge looks like the fix and produces
+     * {@code AuditEngagementService#update :: AuditEngagement#auditType} — a phantom, because
+     * {@code audit_eng} owns the initialiser and has no {@code update}, while {@code compliance}
+     * owns the guard and has no initialiser. The entity map's {@code computeIfAbsent} union is what
+     * supplies the other half.
+     *
+     * <p>This leg is a TRIPWIRE, not a coverage claim: it fails if the phantom reappears, so a
+     * future reader cannot "fix" the omission without also fixing the pairing. It deliberately
+     * asserts a duplicate still EXISTS, because without that floor it passes vacuously the day
+     * somebody renames the last colliding pair — and a green assertion and a dead one are
+     * indistinguishable from outside (F2-219).
+     */
+    @Test
+    void theDuplicateNameHazardIsCrossAttributionNotOmission() {
+        Map<String, Long> perName = new java.util.LinkedHashMap<>();
+        for (Path p : sources("Service.java")) {
+            perName.merge(p.getFileName().toString().replace(".java", ""), 1L, Long::sum);
+        }
+        List<String> dups = perName.entrySet().stream().filter(e -> e.getValue() > 1)
+            .map(Map.Entry::getKey).sorted().collect(Collectors.toList());
+
+        assertThat(dups)
+            .as("this leg is only meaningful while the tree still declares a colliding *Service "
+                + "name; if it ever empties, delete the leg rather than let it pass over nothing")
+            .isNotEmpty()
+            .contains("AuditEngagementService");
+
+        assertThat(measure(liveServices(), liveInitialisers()))
+            .as("a merge across same-named services pairs one module's initialiser with another "
+                + "module's guard, and this is the pair it invents: audit_eng initialises "
+                + "auditType and has no update; compliance guards it and has no initialiser. A "
+                + "gate that names a table where no defect exists is worse than one that misses "
+                + "(F2-214), and the honest fix is module-aware pairing on BOTH maps — filed.")
+            .doesNotContain("AuditEngagementService#update :: AuditEngagement#auditType");
+    }
+
     @Test
     void theEthicsAndKycConsequenceFlagsStayClosed() {
+        Set<String> closed = new TreeSet<>(CLOSED_BY_F2_291);
+        closed.addAll(CLOSED_BY_F2_292);
         assertThat(measure(liveServices(), liveInitialisers()))
             .as("a reverted fix must FAIL rather than be absorbed by the work list")
-            .doesNotContainAnyElementsOf(CLOSED_BY_F2_291);
+            .doesNotContainAnyElementsOf(closed);
 
         Map<String, Map<String, String>> inits = liveInitialisers();
         Map<String, String> ethics =

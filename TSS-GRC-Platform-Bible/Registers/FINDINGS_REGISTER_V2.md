@@ -15219,6 +15219,164 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-292 — the sharpest member of a work list was not its widest, and the derivation that closed the last register could not be copied to this one
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`81547da5`) |
+| **Severity** | P1 — every conflict-of-interest disclosure in the register was **destroyable by a body carrying only `titleEn`**, which reverted it to DRAFT and escaped a TERMINAL state; and a disclosure could be **filed already APPROVED** with no decider, skipping the whole review chain. Both probed live. |
+| **Register** | `ethics.disclosures` (18 live rows, byte-identical in dev and prod) |
+| **Standards** | NAZAHA and the Saudi anti-bribery regime; SAMA and CMA corporate-governance conflict-of-interest declaration requirements |
+| **Found by** | executing [[F2-291]]'s own 34-site work list, ranked by what the initialiser **asserts** ([[F2-239]]) rather than by count — and the measurement **inverted the ranking** |
+| **Verification** | live probe **7/12 pre-fix · 12/12 post-fix** as `compliance`, never `admin`; gate control **5 of 12 legs discriminate**, the other 7 named; backend **4595 → 4602/0/0**; both databases back at 18 / 30 / 16 / 12 with **0** tagged rows across 245 swept text columns |
+
+### The defect
+
+`DisclosureController` binds the `Disclosure` **entity** on POST and PUT. Jackson deserialises an
+omitted key into `new Disclosure()`, and the entity declared `private String status = "DRAFT"` — so
+`apply`'s `if (src.getStatus() != null) target.setStatus(...)` was **true on every request**, and a
+partial update reverted the disclosure.
+
+Measured identically in dev and the deployed database: **18 live rows, 18 of them non-DRAFT** —
+APPROVED 11, REVIEW 4, SUBMITTED 2, REJECTED 1 — so every disclosure in the register was destroyable
+this way.
+
+🔑 **APPROVED, RECUSED and MITIGATED are TERMINAL in `DisclosureService.TRANSITIONS`** (`Set.of()`,
+no outgoing edges), so the reset **escaped a terminal state by a route the machine cannot see** — and
+`DRAFT → SUBMITTED` exists, so the whole review cycle became re-runnable on a decided disclosure.
+There is no privilege escalation: `COMPLIANCE:WRITE` guards the create, the PUT and `/transition`
+alike, so the object-level machine was the only control and the PUT sat beside it without one
+([[F2-219]]'s shape).
+
+⚠ **API-reachable, not screen-reachable, and saying which is the point** ([[F2-283]]).
+`EthicsPage`'s disclosure form declares **no** status field among its sixteen, but `reqFromDto`
+spreads the whole DTO into the edit modal, so the screen's PUT **echoed** the stored status and those
+18 rows survived. The reachable caller is anything sending a genuinely partial body — which is
+exactly what the client's own `Partial<DisclosureDto>` type invites, and where machine callers live
+([[F2-179]]). That echo is also why the fix must **tolerate** one rather than refuse the field: a
+refusal would break the screen that works today, the one failure a fix must never have ([[F2-214]]).
+
+### The second half: the create's own default was dead too
+
+`create()` read `apply(d, req); if (d.getStatus() == null) d.setStatus("DRAFT");` — and `apply` copied
+a status that was never null, so **that default was dead code and the create accepted the caller's
+value**. Probed pre-fix: `POST` with `status: "APPROVED"` returned **201 storing APPROVED**, skipping
+`DRAFT → SUBMITTED → REVIEW` and the transition route that is the **only writer** of `decision`,
+`decisionNotes`, `decidedByName` and `decidedAt` ([[F2-220]]'s shape, [[F2-223]]'s attribution). The
+create now forces the initial state and refuses a contradicting one.
+
+### 🔑🔑 The ranking inverted, and breadth was the wrong axis
+
+`BcmSettingsService#update` contributes **11 of the 34** work-list entries — the RTO/RPO warning and
+critical hours, the exercise cadences, the evidence-expiry warning, the CAPA grace days, the risk
+matrix maxima — i.e. every ISO 22301 tolerance the BCM controls compare against. Measured: **0 of 1
+rows differ from the initialiser, on all eleven.** Entirely latent; nothing to destroy.
+
+The two-entry member differs on **18 of 18**. [[F2-239]]'s rule for the third time: **harm-if-reached
+and reach are two orderings and they disagree** — and the member a count would have picked has the
+widest apparent blast radius and the smallest real one.
+
+### 🔑🔑 A derivation cannot be copied to a machine with a different topology
+
+[[F2-291]] derived `EthicsCaseLifecycle.INITIAL` as *the one state that is never a transition target*.
+That derivation **yields nothing here**: this machine has `REJECTED → DRAFT`, so DRAFT **is** a target
+and the root set is **empty**. Copying it would have made every disclosure start nowhere.
+
+[[F2-290]]'s rule — **copying a derivation copies its convention** — with this as the case where the
+convention does not hold. So `INITIAL_STATUS` is **declared**, and a static block asserts *both* halves
+of the reasoning: that the literal is a state the machine knows, and that the root set really is empty,
+**so a reader can see the derivation was tried rather than overlooked**. It is also a tripwire: it
+throws the moment this machine gains a state that is never a target, telling the next reader to switch
+to the derivation.
+
+### Refuted, and worth recording so nobody re-derives them
+
+- **`analytics()`'s inclusion lists are exhaustive today.** `byStatus` loops 7 tokens and `byType` 8;
+  measured, **0 rows fall outside either** in both databases, and every listed token is stored. So
+  [[F2-290]]'s `byCategory` defect — the adjacent register, the same module — is **absent here**. Still
+  an inclusion list over a CHECK-less column, so latent; not a live defect, and "fixing" it would be a
+  latent-hazard closure rather than a discovery.
+- **`currency` is 0 of 18.** All eighteen rows hold `SAR`, so what made that half harmless was the
+  **data and not the code** ([[F2-182]]). Closed anyway — and the probe's own row, created with `USD`,
+  showed the reset live, which is what the seeded rows could not.
+
+### The instrument finding: a merge that manufactured a phantom
+
+`NeverFiringNullGuardContractTest` keys its service-source map by **file simple name into a
+`LinkedHashMap`**, so where two files share a name the second visited **replaces** the first —
+[[F2-276]]'s exact defect, which failed in the quiet direction there. Three `*Service` names collide
+under a `/service/` package: `AuditEngagementService` (audit_eng | compliance), `BoardPackService`
+(board_pack | reporting), `RegulatoryChangeService` (compliance | regchange). And the **entity** map in
+the same class was **already fixed** for it with `computeIfAbsent` — [[F2-215]]'s two-of-N inside the
+instrument, with the fixed half visibly present.
+
+🔑🔑 **So I changed it to merge, and the merge surfaced exactly one new site — a phantom.**
+`AuditEngagementService#update :: AuditEngagement#auditType`: `audit_eng`'s entity initialises
+`auditType = "INTERNAL"` and its service has **no `update` at all**, while `compliance`'s service
+guards `auditType` and its entity declares **no initialiser**, so that guard can fire. Two different
+classes, two different tables, one manufactured finding — and the entity map's pre-existing
+`computeIfAbsent` union is what supplied the other half.
+
+**The hazard here is CROSS-ATTRIBUTION, not omission**, and it is [[F2-287]]'s rule verbatim: a
+fallback for an unresolved type reintroduces the ambiguity the resolution removed, and **it fails in
+the confident direction — a finding naming the wrong table**. A gate that reports a defect where none
+exists is worse than one that misses ([[F2-214]]), so the merge is **reverted** and the phantom is
+pinned by `theDuplicateNameHazardIsCrossAttributionNotOmission`, which fails if anybody reintroduces
+it. The real fix is module-aware pairing on **both** maps, which is a change to a shipped security
+gate and is **filed** rather than smuggled into a slice about a different register.
+
+⚠ **What made the merge look safe was my own measurement.** `f292_dupsvc.py` looked for guards inside
+a **private helper**, which is narrower than this gate's population, and concluded *"no pair collapses
+today"*. 🔑 **A hazard measured with a narrower population than the instrument's reads as latent when
+it is not.**
+
+### My own errors, all caught by running something
+
+- ⚠⚠ **A member regex anchored on the previous member's `;` cannot match a field preceded by a
+  comment**, and this codebase comments heavily between fields. **13 of 34 initialisers read as
+  absent** — and a field with no initialiser is not in this population at all, so the miss read
+  exactly like *nothing to see here* ([[F2-206]]). Stripping comments first — the rule already on the
+  record — took it to **0 unresolved**. The tell was `rtoCriticalHours` resolving while
+  `rtoWarningHours`, on the adjacent identical line, did not.
+- My `src()` resolver returned a **3-tuple** on its unresolvable path, and [[F2-287]]'s rule is that
+  ambiguity must **throw** rather than resolve by luck. Corrected, it fired immediately on
+  `AuditEngagementService` — the exact pair F2-287 lost a hypothesis to — and resolving the twin by
+  *which one declares the method* is what settled it.
+- **A piped build's exit code is the pipe's, not Maven's.** `mvn … | grep` reported `exited with
+  code 0` over a `BUILD FAILURE`, and I had edited the gate mid-build, so the failure was
+  attributable to neither. Redirect to a file and read `$?`.
+- **The jar lock, twice.** `mvn clean` cannot delete a jar a running JVM holds open, and the probe
+  jar was mine both times. Kill by CommandLine, guarded on the session id and on the target not
+  owning 8090/8091.
+- Guessed the repository finder (`findByIdAndOrganisationIdAndIsDeletedFalse`); it is `findById(id)`
+  with an in-memory tenant filter. Guessed nothing else after resolving `target` and `accessToken`
+  from the controller and `AuthController` respectively.
+- The transition leg failed because `CurrentActor.username()` returns null with no principal —
+  a leg failing for a reason unrelated to its claim ([[F2-244]]). Fixed by installing the house
+  `GrcUserDetails` fixture ([[F2-261]]), not by weakening the assertion.
+- The victim create failed on `description`, **NOT NULL with no default**, and the diagnostic reads
+  *"A required field was not supplied"* naming **no field** — [[F2-210]]/[[F2-214]]'s shape, which
+  cost one probe iteration. Resolved from `sys.columns`.
+
+### Filed
+
+- The **32** remaining work-list sites, no reasons ([[F2-188]]). By what the initialiser asserts:
+  `ReportSchedule#isActive = true` **manufactures an assurance** — a paused regulator report resumes
+  — beside `cadence = "WEEKLY"`, `language = "en"` (an Arabic report reverting to English, house
+  rule 7) and `format`/`timeOfDay`, measured **10/11, 9/11, 1/11, 9/11** differing; `Control#controlType
+  = "PREVENTIVE"` and `#automationLevel = "MANUAL"` at **15/32 and 12/32**;
+  `AuditEngagement#status = "PLANNED"` at 10/12; `ChangeRequest#changeType = "NORMAL"` at 6/17 dev and
+  6/15 prod. `BcmSettings`' eleven are **0/1 and latent**.
+- **Module-aware pairing** for both of this gate's source maps.
+- `ethics.disclosures` has **zero CHECK constraints** — now cheap, since this slice closed its only
+  open status writer ([[F2-183]]) — and `title_ar` is **not NOT NULL**, so a statutory disclosure can
+  be filed with no Arabic title (house rule 7).
+- **7 of the 11 APPROVED rows carry no `decided_by_name` and no `decided_at`**, identical in both
+  databases: seed-origin, since `transition` has stamped both since F2-223, so those approvals record
+  no approver. Repair rewrites live governance rows — **owner decision**.
+- `apply` still copies `disclosureCode`, so a caller can rename the reference an auditor cites
+  ([[F2-172]](d)'s family, outside `ClientSuppliedReferenceRatchetTest`'s setter key).
+
 ## F2-291 — a hard-zero invariant whose population was `publicMethods`, over a codebase whose house idiom is a private `apply(target, src)` helper
 
 | | |
@@ -15331,7 +15489,7 @@ count to **0** — and [[F2-278]] already filed that field for a different reaso
 `DisclosureService#update :: Disclosure#status` (a conflict-of-interest disclosure reverts to
 **DRAFT**); `ChangeManagementService#update :: ChangeRequest#changeType` (an **EMERGENCY** change
 becomes **NORMAL**); `ReportScheduleService#update :: ReportSchedule#isActive` (resets to **true**,
-so a paused regulator report starts sending again); the nine `BcmSettingsService#update` thresholds.
+so a paused regulator report starts sending again); the **eleven** `BcmSettingsService#update` thresholds ⚠ **corrected by [[F2-292]], which re-derived the list before executing it ([[F2-221]]):** this said *"nine `BcmSettingsService#update` thresholds"*, and there are **eleven** — and all eleven differ from their initialiser on **0 of 1 rows**, so the member with 11 of the 34 entries is entirely **latent** while the two-entry `Disclosure` member behind it was **18 of 18**. Breadth was the wrong axis.
 
 ### ⚠ My own errors, all caught by running something
 
