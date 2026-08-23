@@ -129,6 +129,101 @@ class ClientSuppliedReferenceRatchetTest {
         + "(create\\w*|submit\\w*|start\\w*|open\\w*|record\\w*|register\\w*"
         + "|import\\w*|add\\w*)\\s*\\(");
 
+    /**
+     * ⚠⚠ F2-306 — the UPDATE-side mirror of the census above, which nobody had measured.
+     *
+     * <p>{@link #CREATE_ISH} is a verb list and {@code update} is deliberately absent, because that
+     * leg's claim is <em>"a reference is chosen when a record is born"</em>. So the <b>rename</b>
+     * question was outside this class's population <b>by construction</b> — and renaming is arguably
+     * the sharper harm: the record already exists, an auditor may already cite the code, and the
+     * citation breaks <b>silently</b>.
+     *
+     * <h4>Measured: 42 sites across 34 services, in three kinds</h4>
+     *
+     * Only one kind is a defect, which is why this ships as a count with <b>no per-site verdicts</b>
+     * ([[F2-188]]):
+     *
+     * <ol>
+     *   <li><b>The record's own identifier</b> — {@code setEngagementCode}, {@code setChangeCode},
+     *       {@code setCaseCode}, {@code setDisclosureCode}, {@code setGapCode}, {@code setPlanCode},
+     *       {@code setReportCode}. Renaming one breaks every citation of it. This is the defect, and
+     *       F2-306 closed the two in {@code ethics}; {@code setGapCode} is [[F2-302]]'s filing.</li>
+     *   <li><b>A pointer to another record</b> — {@code setEvidenceRef} (nine sites),
+     *       {@code setClauseRef}, {@code setSourceRef}, {@code setContractRef}. Correcting which
+     *       clause a finding maps to is <b>legitimate</b>, and refusing it would fail on working
+     *       usage ([[F2-214]]). Whether the pointer RESOLVES is a different question ([[F2-242]],
+     *       [[F2-252]]).</li>
+     *   <li><b>An outside authority's reference</b> — {@code setSamaLicenceRef},
+     *       {@code setSamaNonObjectionRef}, {@code setBoardResolutionReference},
+     *       {@code setFilingArtifactReference}. Caller-supplied is <b>correct</b>: a reference only
+     *       an authority can issue is received and recorded, or absent ([[F2-209]], [[F2-269]]), and
+     *       the server may not mint it either.</li>
+     * </ol>
+     *
+     * <p>⚠ The subtraction is <b>per field, not per method</b>. A site guarded by
+     * {@code ServerOwnedState.requireImmutableReference} keeps its setter inside the guard, so a
+     * pattern keyed on the setter alone still matches it — but a method-level subtraction removes
+     * every OTHER reference setter in the same method too. Both {@code apply} helpers F2-306 closed
+     * also write {@code setClauseRef} and {@code setRegulatorReference}, which are kinds 2 and 3 and
+     * must stay counted: a method-scoped check reported <b>39</b> where the answer is <b>42</b>.
+     * 🔑 <b>An over-subtraction reads exactly like progress.</b>
+     *
+     * <p>Asserted exactly rather than as a ceiling: a new rename site must fail, and a closed one
+     * must lower the number in the same commit (house rule 3).
+     */
+    private static final int UPDATE_PATH_REFERENCE_WRITES = 42;
+
+    private static final Pattern UPDATE_ISH = Pattern.compile(
+        "\\b(?:public|protected|private)\\s+[\\w<>,.\\[\\]?]+\\s+"
+        + "(update\\w*|edit\\w*|patch\\w*|apply\\w*|modify\\w*|save\\w*|merge\\w*)\\s*\\(");
+
+    @Test
+    void theUpdatePathRenameShapeIsCountedToo() throws IOException {
+        List<String> sites = new ArrayList<>();
+        for (Path f : javaSources()) {
+            if (!f.getFileName().toString().endsWith("Service.java")) { continue; }
+            String src = stripComments(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher um = UPDATE_ISH.matcher(src);
+            while (um.find()) {
+                String body = balancedBody(src, um.end());
+                if (body == null) { continue; }
+                Matcher sm = BUSINESS_REFERENCE_SETTER.matcher(body);
+                while (sm.find()) {
+                    String arg = argumentAt(body, sm.end());
+                    if (arg.isEmpty()
+                        || !Pattern.compile("\\b(?:req|request|in|dto|body|cmd|src|patch)\\b\\s*\\.")
+                                   .matcher(arg).find()) {
+                        continue;
+                    }
+                    // per-FIELD subtraction: the primitive's guard leaves the setter in place, and a
+                    // method-scoped check would also drop the other reference setters beside it
+                    String field = sm.group().replace("set", "").replace("(", "").trim();
+                    int at = body.indexOf("requireImmutableReference");
+                    if (at >= 0 && body.substring(at, Math.min(body.length(), at + 400))
+                                       .contains("get" + field + "()")) {
+                        continue;
+                    }
+                    sites.add(f.getFileName().toString().replace(".java", "") + "#" + um.group(1)
+                              + " :: " + sm.group().replace("(", "").trim());
+                }
+            }
+        }
+        List<String> sorted = sites.stream().distinct().sorted().toList();
+
+        assertThat(sorted.size()).as("""
+            Update paths writing a business reference from the request: %d, against %d.
+
+            This is the RENAME question, and it is outside the create-side census above by             construction: CREATE_ISH excludes `update` because a reference is chosen when a record             is born. Renaming is the sharper harm — the record exists and a citation of the code             breaks silently.
+
+            Only ONE of the three kinds is a defect (the record's own identifier); a pointer to             another record is legitimately editable and an authority-issued reference is correctly             caller-supplied. Read the site before closing it, and use             ServerOwnedState.requireImmutableReference where it is kind 1.
+
+            If it went UP, a new rename site shipped. If it went DOWN, lower the number here in the             same commit.
+
+            %s""".formatted(sorted.size(), UPDATE_PATH_REFERENCE_WRITES,
+                            String.join("\n            ", sorted)))
+            .isEqualTo(UPDATE_PATH_REFERENCE_WRITES);
+    }
+
     /** Where the census lands, so no document has to restate it (F2-265). */
     private static final Path CENSUS = Path.of("target", "caller-named-references.txt");
 

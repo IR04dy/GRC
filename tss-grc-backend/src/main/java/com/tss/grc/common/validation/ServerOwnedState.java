@@ -219,6 +219,45 @@ public final class ServerOwnedState {
     }
 
     /**
+     * ⚠⚠ F2-306 — the same rule for a <b>business reference</b> rather than a lifecycle state, and
+     * it exists because {@link #requireUnchanged} could not say what a reference needs.
+     *
+     * <p>That method's wording is lifecycle-flavoured — <em>"is at X and cannot be moved to Y by an
+     * update. That move goes through {@code <route>}"</em> — and it is deliberately frozen, because
+     * its own comment records that two tests assert it and a caller's integration may match on it.
+     * For a reference every clause of it is wrong: a code is not "moved to" another code, and there
+     * is <b>no route</b> to send the caller to, because the reference is fixed once assigned. Naming
+     * a route that does not exist is [[F2-302]]'s defect, which is the same primitive telling a
+     * caller to use a state machine this register does not have.
+     *
+     * <p>🔑 <b>A primitive that cannot express what a caller needs is a primitive callers route
+     * around</b> ([[F2-190]]), and the divergence is then invisible — so the expression is added
+     * here rather than hand-rolled at the two call sites.
+     *
+     * <p>Settable while absent, immutable once set. That shape covers the create and the update in
+     * one place, which matters where both share an {@code apply(target, src)} helper — and it is
+     * stronger than an update-only guard, because it also stops a second write on any other path.
+     * An <b>echo</b> is accepted case-insensitively, because an edit form that round-trips the whole
+     * record sends the existing code back and refusing that would break the screen that works today
+     * ([[F2-296]], [[F2-231]]).
+     *
+     * @param why what the caller should do instead — never a route, because there is not one
+     */
+    public static void requireImmutableReference(String supplied, String current, String field,
+                                                 String record, String why) {
+        if (supplied == null || supplied.isBlank() || same(supplied, current)) {
+            return;
+        }
+        if (current == null || current.isBlank()) {
+            return;   // settable while absent
+        }
+        throw new IllegalArgumentException(
+            field + ": " + record + " is already recorded as " + current
+            + " and a reference cannot be renamed — anything already citing it would silently stop "
+            + "resolving. " + why);
+    }
+
+    /**
      * Case-insensitive, blank-tolerant comparison of two stored lifecycle tokens.
      *
      * <p>Not {@code equalsIgnoreCase} on the raw values: a stored token can carry surrounding
