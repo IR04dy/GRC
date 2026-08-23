@@ -50,6 +50,24 @@ public class ReportSchedulerService {
     @Value("${grc.reporting.from:noreply@tss-grc.local}")
     private String fromAddress;
 
+    /**
+     * F2-293 — every cadence {@link #advanceNextRun} can compute a next run for.
+     *
+     * <p>One declaration, two readers: this switch, and
+     * {@code ReportScheduleService#requireSupportedCadence}, which refuses anything else at the
+     * write boundary. Before this the vocabulary existed only as the switch's own {@code case}
+     * labels and, separately, as {@code CADENCE_OPTIONS} in {@code ReportSchedulesPage} — two
+     * copies that happened to agree while the DATABASE held a third token neither knew
+     * ({@code SEMIANNUAL}, written by the seed into a table with no CHECK constraint), which the
+     * {@code default} arm then rescheduled <b>daily</b>.
+     *
+     * <p>🔑 The screen and the scheduler agreeing is what made this invisible: F2-205's question
+     * ("how many things read this, and which is the server?") assumes the disagreement is between
+     * readers. Here every reader agreed and the stored DATA was the outlier.
+     */
+    public static final List<String> SUPPORTED_CADENCES =
+        List.of("DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUAL");
+
     @Scheduled(fixedDelayString = "${grc.reporting.scheduler-period-ms:60000}")
     @Transactional
     public void tick() {
@@ -201,12 +219,31 @@ public class ReportSchedulerService {
     private void advanceNextRun(ReportSchedule s) {
         LocalDateTime now = LocalDateTime.now();
         LocalTime tod = parseTod(s.getTimeOfDay());
-        LocalDateTime next = switch (s.getCadence()) {
-            case "DAILY"     -> nextDaily(now, tod);
-            case "WEEKLY"    -> nextWeekly(now, tod, s.getCadenceAnchor());
-            case "MONTHLY"   -> nextMonthly(now, tod, s.getCadenceAnchor());
-            case "QUARTERLY" -> nextQuarterly(now, tod, s.getCadenceAnchor());
-            default -> now.plusDays(1).withHour(tod.getHour()).withMinute(tod.getMinute()).withSecond(0).withNano(0);
+        String cadence = s.getCadence() == null
+            ? null : s.getCadence().trim().toUpperCase(java.util.Locale.ROOT);
+        LocalDateTime next = switch (cadence == null ? "" : cadence) {
+            case "DAILY"      -> nextDaily(now, tod);
+            case "WEEKLY"     -> nextWeekly(now, tod, s.getCadenceAnchor());
+            case "MONTHLY"    -> nextMonthly(now, tod, s.getCadenceAnchor());
+            case "QUARTERLY"  -> nextQuarterly(now, tod, s.getCadenceAnchor());
+            // F2-293 — SEMIANNUAL was stored by the seed and named by no `case`, so this fell to
+            // the `default` below and the semi-annual ISO 22301 / NCEMA BCM readiness report was
+            // rescheduled every day: 13 consecutive FAILED runs in dev and prod, 2026-08-11..23.
+            case "SEMIANNUAL" -> nextSemiannual(now, tod, s.getCadenceAnchor());
+            default -> {
+                // ⚠ The fallback stays a day, because throwing here would break the run loop —
+                // `advanceNextRun` is called from the catch path too. What changes is that it now
+                // SAYS SO: an unrecognised cadence used to become a silent daily retry, which is
+                // indistinguishable from a schedule somebody chose (F2-196 — an unrecognised member
+                // should be chased, not excused). The write boundary refuses these now, so this arm
+                // is reachable only by a row that predates that guard.
+                log.warn("Schedule {} ('{}') has cadence '{}', which is not one of {} — "
+                         + "rescheduling one day out. This row was written before the cadence guard "
+                         + "and its real cadence cannot be computed.",
+                         s.getId(), s.getName(), s.getCadence(), SUPPORTED_CADENCES);
+                yield now.plusDays(1).withHour(tod.getHour()).withMinute(tod.getMinute())
+                         .withSecond(0).withNano(0);
+            }
         };
         s.setNextRunAt(next);
     }
@@ -241,6 +278,20 @@ public class ReportSchedulerService {
         LocalDate cand = LocalDate.of(now.getYear(), qStart, Math.min(day, 28));
         LocalDateTime t = cand.atTime(tod);
         if (!t.isAfter(now)) t = cand.plusMonths(3).atTime(tod);
+        return t;
+    }
+
+    /**
+     * F2-293 — twice a year, on the anchor day of the half-year (January / July), mirroring
+     * {@link #nextQuarterly}. The anchor is a day-of-month, clamped to 28 for the same reason.
+     */
+    private LocalDateTime nextSemiannual(LocalDateTime now, LocalTime tod, String anchor) {
+        int day = parseInt(anchor, 1);
+        if (day < 1) day = 1; if (day > 28) day = 28;
+        int hStart = now.getMonthValue() <= 6 ? 1 : 7;   // half starts: Jan, Jul
+        LocalDate cand = LocalDate.of(now.getYear(), hStart, Math.min(day, 28));
+        LocalDateTime t = cand.atTime(tod);
+        if (!t.isAfter(now)) t = cand.plusMonths(6).atTime(tod);
         return t;
     }
 
