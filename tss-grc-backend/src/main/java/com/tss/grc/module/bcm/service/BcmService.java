@@ -353,11 +353,70 @@ public class BcmService {
             .orElseThrow(() -> new EntityNotFoundException("Exercise not found: " + id));
     }
 
+    /** The one state {@code completeExercise} owns, and the column it owns alongside it. */
+    static final String EXERCISE_COMPLETED = "COMPLETED";
+
+    /**
+     * F2-300 — the state an exercise is CREATED in when the caller does not name one.
+     *
+     * <p>It is a DEFAULT and deliberately not {@code ServerOwnedState.requireInitial}: recording an
+     * exercise that was run offline — created straight into COMPLETED with its execution date — is
+     * legitimate, and the BCM page's create form offers the full status select, so refusing a
+     * caller-supplied state would break working usage (F2-214).
+     */
+    static final String INITIAL_EXERCISE_STATUS = "SCHEDULED";
+
+    /**
+     * F2-300 — an exercise may not be COMPLETED without an execution date.
+     *
+     * <p>{@link #completeExercise} owns the pair: it writes {@code status = COMPLETED} <b>and</b>
+     * stamps {@code executedDate} from the server's clock. Both the entity-bound create and the
+     * entity-bound full-replace PUT wrote {@code status} and {@code executedDate} independently and
+     * unconditionally, so either could produce a COMPLETED exercise with no execution date —
+     * F2-188/F2-191's shape, where a duplicated transition agrees with the original on the row and
+     * differs on the part nothing asserts. On a full replace the PUT could also NULL the date of an
+     * exercise that had been completed properly, which is F2-212's shape on the same field.
+     *
+     * <p>⚠ Screen-reachable, not merely API-reachable: {@code BcmPage}'s exercise form offers
+     * {@code COMPLETED} in its status select with {@code executedDate} as a separate, optional date
+     * field, so an operator can mark an ISO 22301 / NCEMA continuity exercise complete and leave the
+     * date blank — and the execution date is the evidence a reviewer reads to accept the exercise
+     * took place at all.
+     *
+     * <p>🔑 Stated as ONE invariant rather than two guards, because "may not enter COMPLETED here"
+     * and "may not clear the date of a COMPLETED exercise" are the same fact, and a single
+     * predicate cannot be satisfied by half of it. The refusal names {@code /complete} because that
+     * route both sets the state and stamps the date — F2-180's rule that a diagnostic must send the
+     * reader somewhere.
+     *
+     * <p>⚠ Deliberately NOT {@code ServerOwnedState.requireUnchanged}: that refuses ANY change, and
+     * this register has no state machine — only one server-owned state. SCHEDULED/PLANNED are
+     * ordinary data entry, so refusing those edits would fail on correct usage (F2-214).
+     */
+    private static void requireExecutionDateWhenCompleted(BcmExercise e, Object id) {
+        if (!EXERCISE_COMPLETED.equalsIgnoreCase(e.getStatus())) return;
+        if (e.getExecutedDate() != null) return;
+        throw new IllegalArgumentException(
+            "executedDate: exercise " + (id == null ? "(new)" : id) + " cannot be "
+            + EXERCISE_COMPLETED + " with no execution date — that is the evidence the exercise "
+            + "took place. Supply executedDate, or use POST /api/v1/bcm/exercises/"
+            + (id == null ? "{id}" : id) + "/complete, which stamps it from the server's clock "
+            + "along with the score and findings.");
+    }
+
     @Transactional
     public BcmExercise createExercise(BcmExercise req) {
         // Mass-assignment defense — see createPlan().
         req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        // F2-300 — the create path owns the default now that the entity no longer initialises it.
+        // The column is NOT NULL and Hibernate always names it, so this must be unconditional in
+        // effect: a create that stopped setting it would turn a silent reset into a 500 that
+        // nothing else in the tree can see under ddl-auto=none (F2-238's hazard).
+        if (req.getStatus() == null || req.getStatus().isBlank()) {
+            req.setStatus(INITIAL_EXERCISE_STATUS);
+        }
+        requireExecutionDateWhenCompleted(req, null);
         return exerciseRepo.save(req);
     }
 
@@ -370,13 +429,27 @@ public class BcmService {
         e.setExerciseType(req.getExerciseType());
         e.setScenario(req.getScenario());
         e.setScheduledDate(req.getScheduledDate());
-        e.setExecutedDate(req.getExecutedDate());
+        // F2-300 — status and executedDate are null-guarded, and the pair has to move together.
+        // Unconditional writes made an OMITTED status arrive as the entity's "SCHEDULED"
+        // initialiser (now removed) and silently reset a COMPLETED exercise, and an omitted
+        // executedDate NULL the execution date of one that had been completed properly. Guarding
+        // only the status would have left a partial edit of a COMPLETED exercise clearing its date
+        // and then failing the invariant below — a 400 on correct usage, which is the trap F2-297
+        // and F2-298 were about. Omitted means "leave alone", the semantics this codebase's PUTs
+        // settled on; clearing an execution date is therefore not expressible here, which is the
+        // right answer for the field that evidences the exercise happened.
+        if (req.getExecutedDate() != null) e.setExecutedDate(req.getExecutedDate());
         e.setScore(req.getScore());
-        e.setStatus(req.getStatus());
+        if (req.getStatus() != null) e.setStatus(req.getStatus());
         e.setFindings(req.getFindings());
         e.setCapaCount(req.getCapaCount() != null ? req.getCapaCount() : 0);
         e.setFacilitator(req.getFacilitator());
         e.setUpdatedAt(java.time.LocalDateTime.now());
+        // F2-300 — checked on the LOADED row after the copies, not on the request, because this is
+        // a full replace: the offending state can be reached either by supplying COMPLETED with no
+        // date OR by omitting the date of an exercise that was already COMPLETED, and only the
+        // merged row shows both. Checking `req` would miss the second.
+        requireExecutionDateWhenCompleted(e, id);
         return exerciseRepo.save(e);
     }
 
