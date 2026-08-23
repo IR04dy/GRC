@@ -15219,6 +15219,58 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-307 — measure whether the server mints it before choosing the guard
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — four more governance references renameable after the fact, closed; census **42 → 38**. |
+| **Registers** | `ndi.gap` (`gap_code`), `ndi.corrective_action` (`action_code`), `compliance.audit_engagements` (`engagement_code`), `change_mgmt.change_requests` (`change_code`) |
+| **Standards** | NDMO / NDI gap remediation; IIA Standard 2010 (the engagement code); ADR-017 §D-3 (the change code a CAB record cites) |
+| **Found by** | Executing [[F2-306]]'s filed kind-1 members |
+| **Verification** | suite **4697 → 4698/0/0**; the census confirms **38**, matching the prediction; a control removing one guard fires and names the file |
+
+### The measurement that decides the guard
+
+🔑 **Whether the server MINTS a code determines which rule is right, and getting it backwards would
+bless the defect.** If something mints it, the create must not accept a caller value at all
+([[F2-172]](d)) and immutability would ratify a caller-named reference. Measured per candidate:
+**nothing mints any of these four**, so `requireImmutableReference` is the fit — settable at birth,
+fixed thereafter.
+
+### Three measurement corrections before any code was touched
+
+* **Three of my candidate paths did not exist** — guessed from the module name. `CrisisCommsService`
+  is in `bcm/`, not `bcm/comms/`; `NdiReportService` in `ndi/reports/`, not `ndi/report/`;
+  `PolicyService` in `compliance/`, not `policy/`. The recurring guessed-identifier error.
+* **`AuditEngagementService` resolves to TWO files** — `audit_eng/` and `compliance/` — the duplicate
+  simple name [[F2-278]] and [[F2-286]] both lost a hypothesis to. Only the `compliance` one holds
+  the site, and only that one's `apply` is shared with its create. 🔑 **A census keyed on a simple
+  name cannot tell you which twin it measured.**
+* **`setActionCode` is in `NdiGapService#updateCapa`**, not `AuditLifecycleService` — so that one
+  file holds **two** of the four, which is why the structural leg counts its guards rather than
+  merely checking the file mentions the primitive.
+
+### The wiring is asserted structurally, and that is proportionate rather than lazy
+
+The primitive's behaviour is unit-tested. What no cheap behaviour test can see is whether each
+**site** still routes through it: the four sites live in three services with three different mock
+sets. Every one of them began as a one-line `if (src.getX() != null) target.setX(src.getX())`, so
+restoring that shape is a single-line change no behaviour test in the owning service would notice.
+⚠ Asserted per **(file, field)** rather than by counting call sites, because a count cannot see one
+site being replaced while another is added, and three of these files hold other reference setters
+that are kinds 2 and 3 ([[F2-306]]'s per-field lesson). A control removing one guard fires and names
+the file.
+
+### Filed
+
+* **34 sites remain** on the census, now dominated by kinds 2 and 3 — a pointer to another record
+  (legitimately editable) and an authority-issued reference (correctly caller-supplied). The
+  remaining kind-1 candidates are `setPlanCode`, `setReportCode` and two `setCode` sites, each
+  needing the mint question asked of it first.
+* **Nothing mints any of the six codes closed so far**, so all remain **caller-named at birth** —
+  [[F2-172]](d)'s question, and a separate slice from the rename.
+
 ## F2-306 — a reference the caller can RENAME, and a census scoped to creates could not see it
 
 | | |

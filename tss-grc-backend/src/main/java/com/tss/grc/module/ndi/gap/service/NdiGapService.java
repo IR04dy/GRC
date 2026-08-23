@@ -151,7 +151,15 @@ public class NdiGapService {
 
     public NdiGap updateGap(Long id, NdiGap body) {
         NdiGap g = getGap(id);
-        if (body.getGapCode()       != null) g.setGapCode(body.getGapCode());
+        // F2-307 — settable at birth, fixed thereafter. Nothing mints this code, so a caller
+        // names it on create; renaming it afterwards would break anything already citing it.
+        ServerOwnedState.requireImmutableReference(
+            body.getGapCode(), g.getGapCode(), "gapCode",
+            "NDI gap " + (g.getId() == null ? "(new)" : g.getId()),
+            "Omit gapCode, or send the value already recorded.");
+        if (body.getGapCode() != null && g.getGapCode() == null) {
+            g.setGapCode(body.getGapCode());
+        }
         if (body.getDomain()        != null) g.setDomain(body.getDomain());
         if (body.getTitleEn()       != null) g.setTitleEn(body.getTitleEn());
         if (body.getTitleAr()       != null) g.setTitleAr(body.getTitleAr());
@@ -229,7 +237,15 @@ public class NdiGapService {
 
     public NdiCorrectiveAction updateCapa(Long id, NdiCorrectiveAction body) {
         NdiCorrectiveAction c = getCapa(id);
-        if (body.getActionCode()    != null) c.setActionCode(body.getActionCode());
+        // F2-307 — settable at birth, fixed thereafter. Nothing mints this code, so a caller
+        // names it on create; renaming it afterwards would break anything already citing it.
+        ServerOwnedState.requireImmutableReference(
+            body.getActionCode(), c.getActionCode(), "actionCode",
+            "NDI corrective action " + (c.getId() == null ? "(new)" : c.getId()),
+            "Omit actionCode, or send the value already recorded.");
+        if (body.getActionCode() != null && c.getActionCode() == null) {
+            c.setActionCode(body.getActionCode());
+        }
         if (body.getActionEn()      != null) c.setActionEn(body.getActionEn());
         if (body.getActionAr()      != null) c.setActionAr(body.getActionAr());
         if (body.getActionType()    != null) c.setActionType(body.getActionType());
