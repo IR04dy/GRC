@@ -15219,6 +15219,56 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-310 — the filed question was refuted, and the rule that settles it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — a **decision**, not a change. Four consecutive slices filed the same follow-up; measuring it showed the premise does not hold, and the reasoning is now recorded with a gate so nobody re-opens it. |
+| **Registers** | the nine whose reference [[F2-306]]–[[F2-309]] froze |
+| **Standards** | — |
+| **Found by** | Executing [[F2-309]]'s filing (*"nothing mints any of the twelve, so all remain caller-named at birth — [[F2-172]](d)'s question"*) |
+| **Verification** | suite **4699 → 4700/0/0**; a control adding a mint to one frozen service fires and names it |
+
+### The premise did not hold
+
+Of the nine code fields, **seven have a create FORM FIELD** in the frontend (`EthicsPage`,
+`CompliancePage`, `ChangesPage`, `NdiPage`, `ChangeModelCatalogue`), one is declarable only
+(`gapCode`) and one is sent by code. 🔑 **So this platform's design is that the ORGANISATION names
+its own records, and minting them would be a product change rather than a fix** ([[F2-214]]).
+
+### The rule that separates the two cases
+
+```
+quoted to an OUTSIDE party       ->  the server must mint it   (F2-172(d))
+the organisation naming its own  ->  the operator names it     (this population)
+```
+
+[[F2-172]](d)'s actual subject is a **tracking code quoted to the public** — the intake reference the
+whistleblowing and breach-report portals hand a reporter, which `CaseTrackerPage` renders as
+`rec.referenceCode`. That one **is** server-minted through `ReferenceCodeMint`, and
+`ClientSuppliedReferenceRatchetTest` holds it at zero. **Checked: none of the frozen twelve reaches
+an external party.** An operator-chosen control code like `AC-2` or `POL-INFO-001` is a naming
+convention its organisation owns, and a mint would overwrite it.
+
+### What makes the decision safe is F2-309, not this finding
+
+A caller-named code was a real hazard **while a duplicate was storable**. With tenant-scoped
+uniqueness in place a collision is refused at the index, so *"the operator names it"* costs nothing
+that uniqueness does not already cover. 🔑 **The two filings looked like one question and were two:
+uniqueness was the defect, and authorship is a product decision.**
+
+### The gate records a decision, and states the boundary in both directions
+
+None of the nine services may call `ReferenceCodeMint` — a control adding one fires and names it —
+**and** the intake service must still call it. ⚙ Without that second half the leg would read as
+*"never mint anything"*, which is the opposite of the rule.
+
+### Filed
+
+* Nothing further on authorship. If a register's code genuinely becomes externally quoted, mint it
+  **and say so in the gate** rather than doing it silently.
+
 ## F2-309 — immutable + not unique means a duplicate is PERMANENT
 
 | | |
