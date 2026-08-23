@@ -15219,6 +15219,65 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-305 — three lifecycle diagrams documented the happy path while the machines allowed more
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — a documentation defect in the artefact a developer reads before writing a client, and it is [[F2-303]]'s defect one layer out: there the refusal could not name the legal moves, here the prose did not. No production behaviour changes. |
+| **Registers** | `bcm.bia_assessments`, `bcm.bcp_plans`, `bcm.crisis_events` (the diagrams; the machines were already correct) |
+| **Standards** | — |
+| **Found by** | Executing [[F2-303]]'s own filing that the javadoc edge lists had become a second copy beside each declared map |
+| **Verification** | suite **4689 → 4690/0/0**; controls **3 killed / 1 withdrawn as invalid** |
+
+### Measured against the maps F2-303/F2-304 declared
+
+| file | edges documented |
+|---|---|
+| `BcmBiaAssessmentService` | **6 of 11** |
+| `CrisisEventService` | **7 of 11** |
+| `BcpPlanService` | **8 of 9** |
+
+An ASCII-art diagram is a summary, and an incomplete one gives a reader consulting it to learn what
+is legal a **narrower** answer than the machine. 🔑 **The four `CrisisEventService` omissions are the
+ones a reader most needs**: `DETECTED → ACTIVATED` (a crisis obvious on sight, skipping assessment),
+`ASSESSING → CANCELLED`, `ACTIVATED → RECOVERED`, and `CONTAINED → ACTIVATED` — the machine's only
+backwards edge, a **re-escalation** of a crisis that worsened after containment.
+
+Rewritten as complete `FROM -> A | B` tables, the form `CrisisCommsTemplateService` already used,
+which is also the one form a gate can parse — so the prose is the specification rather than a second
+copy nobody maintains ([[F2-177]], [[F2-191]]'s precedent).
+
+### The obvious gate was built and rejected, and that is the reusable judgement
+
+Parsing every `A → B` in every comment reported **6 disagreements across 8 machines** and almost all
+were the detector's fault. This codebase documents lifecycles as ASCII-art happy paths
+(`DRAFT → UNDER_REVIEW ─┬─> APPROVED`), as narrative chains inside
+`@Operation(summary = "Move a case through INTAKE → TRIAGE → …")`, as single-edge remarks in code
+comments, and in one case as an **HTTP transcript**. 🔑 **An arrow in prose is not a claim about a
+complete outgoing set, and a gate that treats it as one fails on correct code** ([[F2-214]]).
+
+So the population is the four files whose `<pre>` block is a real table, and a block qualifies only
+if it is **all** edge lines — an ASCII diagram yields one or two accidental matches and must not
+count as one. ⚙ The other four machines have no such table and are **deliberately not gated**:
+inventing one so the leg could cover them would be documentation written to satisfy a test.
+
+### The floor cannot be made load-bearing here, and saying so is the point
+
+The controls killed the three mutations that matter — a table dropping an edge, a map gaining an
+undocumented one, and a table reverted to ASCII art. The fourth, weakening the anti-vacuity floor,
+**survived and is withdrawn as invalid**: you can always weaken an assertion ([[F2-206]]), and on a
+clean corpus a lower floor changes nothing. 🔑 **The per-file *"no table could be parsed"* problem
+already catches an empty parse, so the floor only covers a *coordinated* narrowing of both parsers —
+defence in depth rather than the thing doing the work.** Recording that is better than presenting
+three kills as four.
+
+### Two corrections of mine
+
+`TreeSet` was unimported (the compiler caught it), and the parser first accepted only ASCII `->`
+while `CrisisCommsTemplateService`'s table uses the unicode arrow. Forcing one spelling across the
+codebase would be churn rather than a contract, so the parser accepts both.
+
 ## F2-304 — the six filed refusals split four ways, and one was never a transition refusal at all
 
 | | |
