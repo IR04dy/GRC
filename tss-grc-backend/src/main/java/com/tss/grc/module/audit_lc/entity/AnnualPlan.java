@@ -38,7 +38,12 @@ public class AnnualPlan {
     @Column(name = "q3_codes", columnDefinition = "NVARCHAR(MAX)") private String q3Codes;
     @Column(name = "q4_codes", columnDefinition = "NVARCHAR(MAX)") private String q4Codes;
 
-    @Column(name = "budget_hours", nullable = false) private Integer budgetHours = 0;
+    // ⚠ F2-294 removed `= 0`. Both live IIA annual audit plans carry a real figure (4,800
+    // and 5,200 hours) in both databases, so a partial body zeroed the whole register's
+    // budgeted effort. `createAnnualPlan` saves the BOUND entity, so the default it now
+    // carries is load-bearing: this column is NOT NULL and an omitted key would otherwise
+    // reach the INSERT as null and 500 (F2-238's hazard, invisible under ddl-auto=none).
+    @Column(name = "budget_hours", nullable = false) private Integer budgetHours;
     @Column(name = "ac_notes_en",  columnDefinition = "NVARCHAR(MAX)") private String acNotesEn;
     @Column(name = "ac_notes_ar",  columnDefinition = "NVARCHAR(MAX)") private String acNotesAr;
 

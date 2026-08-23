@@ -52,7 +52,14 @@ public class ChangeRequest {
     private String descriptionAr;
 
     @Column(name = "change_type", nullable = false, length = 30)
-    private String changeType = "NORMAL"; // STANDARD | NORMAL | EMERGENCY
+    // ⚠⚠ F2-294 removed `= "NORMAL"`. `create` already carried
+    // `if (c.getChangeType() == null) c.setChangeType("NORMAL")`, dead while this stood.
+    // 6 of 17 dev rows and 6 of 15 prod rows differ, and the reset turns the one EMERGENCY
+    // change into a NORMAL one — removing it from the population an auditor reviews under
+    // ADR-017 D-3's emergency ratification separation. API-reachable only: both callers
+    // spread the whole record (`{...c}` in the register form, `{...change}` in the PIR
+    // card, whose F2-105 comment explains why it must).
+    private String changeType; // STANDARD | NORMAL | EMERGENCY
 
     @Column(name = "category", length = 40)
     private String category;

@@ -26,6 +26,23 @@ public class OrganisationSettingsService {
     private final OrganisationSettingsRepository repo;
     private final AuditLogService audit;
 
+    /**
+     * F2-294 — the two defaults {@link OrganisationSettings} used to carry as field
+     * initialisers, in one place both readers name.
+     *
+     * <p>They had to move rather than simply go: {@link #getOrCreate} relied on the
+     * constructor to populate a brand-new row, and both columns are NOT NULL. Relocating
+     * them also closed a drift the initialisers were hiding — {@link #resetToDefaults}
+     * writes its defaults as literals and never touched {@code carbonOffsetCapPct}, so
+     * "reset to defaults" left the carbon-offset cap wherever it happened to be.
+     */
+    static OrganisationSettings defaults() {
+        OrganisationSettings d = new OrganisationSettings();
+        d.setClimateScenarioWeightsStrict(false);
+        d.setCarbonOffsetCapPct(new BigDecimal("10"));
+        return d;
+    }
+
     private Long org() { return TenantContext.getCurrentTenant(); }
 
     /**
@@ -37,7 +54,10 @@ public class OrganisationSettingsService {
         Long orgId = org();
         return repo.findByOrganisationId(orgId)
             .orElseGet(() -> {
-                OrganisationSettings s = new OrganisationSettings();
+                // F2-294 — the two defaults this row used to inherit from the entity's
+                // field initialisers now come from defaults(), the one declaration
+                // `resetToDefaults()` also reads.
+                OrganisationSettings s = defaults();
                 s.setOrganisationId(orgId);
                 return repo.save(s);
             });
@@ -90,7 +110,14 @@ public class OrganisationSettingsService {
         cur.setCapaOverdueWarningDays(7);
         cur.setCapaExecutiveEscalationDays(30);
         cur.setSgiAtRiskProgressFactor(new BigDecimal("0.70"));
-        cur.setClimateScenarioWeightsStrict(false);
+        // ⚠⚠ F2-294 — this method wrote nine defaults as literals and never touched
+        // `carbonOffsetCapPct`, so "reset to defaults" left the carbon-offset cap exactly
+        // where it was. The entity's initialisers and this list were two copies of one
+        // fact with nobody maintaining the agreement (F2-177), and the drift only became
+        // visible once the initialisers moved. Both fields now come from DEFAULTS.
+        OrganisationSettings d = defaults();
+        cur.setClimateScenarioWeightsStrict(d.getClimateScenarioWeightsStrict());
+        cur.setCarbonOffsetCapPct(d.getCarbonOffsetCapPct());
         OrganisationSettings saved = repo.save(cur);
         audit.log("UPDATE", "OrganisationSettings", saved.getId(), "Sustainability settings reset to defaults");
         return saved;

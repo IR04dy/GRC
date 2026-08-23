@@ -55,12 +55,22 @@ public class OrganisationSettings {
      * is rejected (400).
      */
     @Column(name = "climate_scenario_weights_strict", nullable = false)
-    private Boolean climateScenarioWeightsStrict = false;
+    // ⚠⚠ F2-294 removed `= false` here and `= new BigDecimal("10")` from
+    // `carbonOffsetCapPct` below. This entity is the THIRD kind in the sweep: its
+    // initialisers were not merely a hazard, they were the register's declared FACTORY
+    // DEFAULTS, read by `getOrCreate()` through the constructor. So the declaration moved
+    // rather than being deleted — see `OrganisationSettingsService.DEFAULTS`.
+    // 🔑 And that relocation closed a drift the initialisers were hiding:
+    // `resetToDefaults()` wrote all nine of its defaults as LITERALS and never touched
+    // `carbonOffsetCapPct` at all, so "reset to defaults" left the carbon-offset cap
+    // exactly where it was. Two copies of one fact with nobody maintaining the agreement
+    // (F2-177); one declaration now, with both readers naming it.
+    private Boolean climateScenarioWeightsStrict;
 
     /** V295 (decision #4) — retired carbon offsets may not exceed this % of the
      *  disclosed gross reduction (anti-greenwashing cap; default 10). */
     @Column(name = "carbon_offset_cap_pct", nullable = false, precision = 5, scale = 2)
-    private java.math.BigDecimal carbonOffsetCapPct = new java.math.BigDecimal("10");
+    private java.math.BigDecimal carbonOffsetCapPct;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 

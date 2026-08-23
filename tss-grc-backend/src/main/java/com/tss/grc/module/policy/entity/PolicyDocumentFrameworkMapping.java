@@ -35,8 +35,16 @@ public class PolicyDocumentFrameworkMapping {
     @Column(name = "clause_ref", length = 100)
     private String clauseRef; // e.g. "ECC §2-1-1", "A.5.1.1", "Art. 33"
 
+    // ⚠⚠ F2-294 removed `= "PARTIAL"`. 10 of 15 live mappings differ in both databases and
+    // every one of them is FULL, so the reset UNDER-reports how completely a policy
+    // satisfies its framework clause — the pessimistic direction, which F2-210 recorded is
+    // far less likely to be reported because "not fully satisfied yet" reads as plausible.
+    // 🔑 The client's own type is the invitation: `frameworkApi.updateMapping` declares
+    // `{ clauseRef?, satisfaction?, notes? }` — every field optional — so it asks a caller
+    // for exactly the partial body the server could not survive. It has no call site yet.
+    // `addMapping` already owned the default (`body.getSatisfaction() == null ? …`).
     @Column(name = "satisfaction", nullable = false, length = 20)
-    private String satisfaction = "PARTIAL"; // FULL | PARTIAL | OUT_OF_SCOPE | NOT_APPLICABLE
+    private String satisfaction; // FULL | PARTIAL | OUT_OF_SCOPE | NOT_APPLICABLE
 
     @Column(name = "notes", columnDefinition = "NVARCHAR(MAX)")
     private String notes;

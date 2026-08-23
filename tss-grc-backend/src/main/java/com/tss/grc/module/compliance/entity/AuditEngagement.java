@@ -85,10 +85,23 @@ public class AuditEngagement {
     private String scopeSummary;
 
     @Column(name = "status", nullable = false, length = 40)
-    private String status = "PLANNED";
+    // ⚠⚠ F2-294 removed `= "PLANNED"`. THE SHARPEST SITE IN THIS SWEEP: `update` guards
+    // this and the initialiser made the guard fire on every entity-bound PUT, so a partial
+    // body walked an ISO 27001 external audit engagement back to PLANNED — 10 of 12 live
+    // rows in both databases, two of them CLOSED. `POST /audit-engagements/{id}/advance`
+    // is the declared route for that move and carries the same COMPLIANCE:WRITE
+    // permission, so the object-level machine was the only control and this PUT sat beside
+    // it without one (F2-219's shape); `compliance.audit_engagements` has ZERO CHECK
+    // constraints, so nothing else narrowed it either. `create` owns the default now.
+    private String status;
 
     @Column(name = "findings_count", nullable = false)
-    private Integer findingsCount = 0;
+    // ⚠ F2-294 removed `= 0`. `AuditEngagementRequest` — the only client type that binds
+    // this route — does not declare `findingsCount` at all, so the form could never send
+    // it and the guard fired with 0 on every request. 0 of 12 rows differ, so it was
+    // latent; F2-278 filed the same field as FROZEN from the other direction, and the
+    // sibling register derives it from its linked finding ids rather than storing it.
+    private Integer findingsCount;
 
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;

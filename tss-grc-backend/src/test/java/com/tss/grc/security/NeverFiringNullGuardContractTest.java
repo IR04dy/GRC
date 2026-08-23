@@ -210,11 +210,78 @@ class NeverFiringNullGuardContractTest {
      * closed the way F2-238/239/240 closed the first population — ordered by reach, entity by
      * entity. Do not write 33 reasons.
      */
-    private static final Set<String> WORK_LIST = Set.of(
-        // ⚠ this first entry was missing from the draft: my extraction grepped the gate's own
-        // output for lines starting with whitespace + a quote, and AssertJ puts the FIRST element
-        // of a list on the `["…` line. A 33-member answer where 34 exist reads exactly like a
-        // complete sweep — the same failure mode this slice is about, in the harness reading it.
+    private static final Set<String> WORK_LIST = Set.of();
+
+    /**
+     * F2-294 — the remaining 27 sites, swept in one slice for the reason F2-240 recorded when
+     * it did the same thing: <b>reach could no longer order them.</b>
+     *
+     * <p>Re-derived per F2-221 before executing, and F2-293's own finding made that mandatory
+     * — a filing ranks by what the initialiser ASSERTS, because that is all it can see without
+     * reading the callers, and three consecutive filings' rankings have now been corrected on
+     * measurement. The divergence ordering is real and identical in dev and prod:
+     * {@code Control#controlType} 15 of 32, {@code #automationLevel} 12 of 32,
+     * {@code BcmCorrectiveAction#progressPercent} <b>10 of 10</b>, {@code #priority} 6 of 10,
+     * {@code PolicyDocumentFrameworkMapping#satisfaction} 10 of 15,
+     * {@code AuditEngagement#status} 10 of 12, {@code AmlAlert#severity} 7 of 10,
+     * {@code WorkingPaper#hours} <b>12 of 12</b>, {@code ChangeRequest#changeType} 6 of 17 dev
+     * and 6 of 15 prod, {@code AnnualPlan#budgetHours} 2 of 2, and the eleven
+     * {@code BcmSettings} tolerances 0 of 1.
+     *
+     * <p>⚠⚠ <b>But every call site of every one of the eleven routes was checked, and not one
+     * sends a body that omits an initialised field.</b> Five of the seven highest-divergence
+     * sites have <em>no frontend caller at all</em> — {@code lib/controlLibrary.ts#updateControl},
+     * {@code lib/bcmCycle.ts#updateCapa}, {@code frameworkApi.updateMapping} and
+     * {@code amlApi.update} are dark clients — and the rest echo the whole record back
+     * ({@code engagementToReq} names every field including {@code status};
+     * {@code toBackendPlan}/{@code toBackendWp} name {@code budgetHours}/{@code hours}; both
+     * {@code changeApi.update} callers spread {@code {...c}}). So the population was
+     * latent-by-caller across the board, exactly as F2-240 found, and F2-237's rule applies
+     * with more force here than it did there: <b>a defence in one client is not a defence, and
+     * five of these had no client to be defended by.</b> Removing the initialiser makes the
+     * hazard ABSENT rather than latent (F2-213).
+     *
+     * <p>🔑🔑 <b>The reusable finding is that the remedy was ALREADY WRITTEN at nine of the 27
+     * sites and could not run.</b> {@code AmlAlertService#create} ends
+     * {@code if (a.getCurrency() == null) a.setCurrency("SAR")};
+     * {@code AuditEngagementService#create} had {@code if (e.getStatus() == null)
+     * e.setStatus("PLANNED")}; {@code createCapa} defaulted AND range-checked both its fields;
+     * {@code createControl} defaulted AND vocabulary-checked both of its. Every one of those
+     * guards was dead, because {@code apply} copies the request's value and the request's own
+     * initialiser made it non-null. F2-292 found this on one register and called it "the
+     * create's own default was dead too"; measured across a population it is a third of the
+     * sites. <b>A reader auditing such a create finds the default present and correct, and has
+     * no reason to ask whether its guard can fire.</b>
+     *
+     * <p>⚠⚠ <b>And the 13 settings sites are a THIRD kind, where deleting the initialiser
+     * would have been wrong.</b> On {@code BcmSettings} and {@code OrganisationSettings} the
+     * initialisers were the register's declared FACTORY DEFAULTS: {@code getOrInit()} relied on
+     * the constructor to populate a brand-new row, and {@code BcmSettingsService#reset()} read
+     * {@code new BcmSettings()} field by field as its source of truth. So the declaration MOVED
+     * to a {@code defaults()} factory both readers name. 🔑 That relocation closed a drift the
+     * initialisers were hiding: {@code OrganisationSettingsService#resetToDefaults} writes its
+     * defaults as literals and never touched {@code carbonOffsetCapPct} at all, so "reset to
+     * defaults" left the carbon-offset cap wherever it happened to be — two copies of one fact
+     * with nobody maintaining the agreement (F2-177), visible only once the third copy went.
+     *
+     * <p>⚠ <b>Directions are MIXED, which is worth stating because this register's recent
+     * history says otherwise.</b> Five resets are flattering (a CRITICAL AML alert reading
+     * MEDIUM; a CRITICAL ISO 22301 corrective action reading MEDIUM; the one EMERGENCY change
+     * reading NORMAL, which removes it from the population an ADR-017 D-3 reviewer examines; 9
+     * DETECTIVE, 4 CORRECTIVE and 2 RECOVERY controls reading PREVENTIVE; a CLOSED audit
+     * engagement reading PLANNED) and four are pessimistic (10 FULL framework satisfactions
+     * reading PARTIAL; 4 AUTOMATED and 8 SEMI controls reading MANUAL; every working paper's
+     * hours and both annual plans' budgets reading 0). F2-193/F2-195/F2-205 were uniformly
+     * flattering and F2-210 was pessimistic; F2-196's rule is that a reset has no direction
+     * until you look.
+     *
+     * <p>⚠ Those two enumerations are spelled out rather than summarised, because the first
+     * draft of this javadoc said "9 DETECTIVE and 2 RECOVERY" against a measured 15 of 32 —
+     * F2-273's shape (a count and the enumeration it summarises are two artefacts, and the
+     * count being right is what stops anybody checking the list) inside the comment recording
+     * the measurement.
+     */
+    private static final Set<String> CLOSED_BY_F2_294 = Set.of(
         "AmlAlertService#update :: AmlAlert#currency",
         "AmlAlertService#update :: AmlAlert#severity",
         "AuditEngagementService#update :: AuditEngagement#findingsCount",
@@ -239,16 +306,8 @@ class NeverFiringNullGuardContractTest {
         "ControlLibraryService#updateControl :: Control#automationLevel",
         "ControlLibraryService#updateControl :: Control#controlType",
         "CrisisCommsService#updateTemplate :: CrisisCommsTemplate#version",
-        // ⚠ F2-292 removed `DisclosureService#update :: Disclosure#status` and `#currency` from
-        // here. They are the 18-of-18 member of this list, and they are now in
-        // CLOSED_BY_F2_292 so a revert FAILS rather than being absorbed back into a tolerated total.
         "FrameworkAnchorService#updateMapping :: PolicyDocumentFrameworkMapping#satisfaction",
         "OrganisationSettingsService#update :: OrganisationSettings#carbonOffsetCapPct",
-        // ⚠ F2-293 removed the five `ReportScheduleService#update :: ReportSchedule#…` entries that
-        // stood below this one — cadence, format, isActive, language and timeOfDay. They are in
-        // CLOSED_BY_F2_293 so a revert FAILS rather than being absorbed back into a tolerated
-        // total. They were the first member of this list found to be SCREEN-reachable:
-        // `ReportSchedulesPage#togglePause` sends `{ isActive: !s.isActive }` and nothing else.
         "OrganisationSettingsService#update :: OrganisationSettings#climateScenarioWeightsStrict");
 
     /**
@@ -580,7 +639,14 @@ class NeverFiringNullGuardContractTest {
      */
     static String methodBody(String src, String name) {
         Matcher sig = Pattern.compile(
-            "(?:public|private|protected)\\s+(?:static\\s+)?[\\w<>,.\\[\\]\\s]+?\\s+"
+            // ⚠⚠ F2-294 — `static` is in this alternation because it was NOT, and the omission
+            // was a real narrowing: a package-private `static` factory (which is what a
+            // relocated set of factory defaults naturally is) never matched, so the Moved leg
+            // reported eleven writers as "no such method". It failed loudly, which is the only
+            // reason it cost nothing — a resolver that silently returns null here would have
+            // reported the create-path default as PRESENT (F2-291's shape, in this gate's own
+            // resolver). The trailing `(?:static\\s+)?` still allows `public static`.
+            "(?:public|private|protected|static)\\s+(?:static\\s+)?[\\w<>,.\\[\\]\\s]+?\\s+"
             + Pattern.quote(name) + "\\s*\\([^)]*\\)\\s*\\{").matcher(src);
         if (!sig.find()) return null;
         int open = src.indexOf('{', sig.end() - 1);
@@ -826,7 +892,44 @@ class NeverFiringNullGuardContractTest {
             new Moved("ReportSchedule", "language", "setLanguage", "ReportScheduleService", "create"),
             new Moved("ReportSchedule", "cadence", "setCadence", "ReportScheduleService", "create"),
             new Moved("ReportSchedule", "timeOfDay", "setTimeOfDay", "ReportScheduleService", "create"),
-            new Moved("ReportSchedule", "isActive", "setIsActive", "ReportScheduleService", "create"));
+            new Moved("ReportSchedule", "isActive", "setIsActive", "ReportScheduleService", "create"),
+            // ── F2-294 — the whole remaining population, in three kinds ──────────────────
+            // (a) NINE where the create-path default already existed and was DEAD CODE, so
+            //     the fix is purely removing the initialiser and the default starts working.
+            // (b) FIVE that had no create-path default at all; every one of those columns is
+            //     NOT NULL, so these five entries are the load-bearing ones — without them a
+            //     silent reset becomes a 500 on create and nothing else in the tree notices.
+            // (c) THIRTEEN settings fields whose initialisers WERE the register's declared
+            //     factory defaults, read through the constructor by getOrInit()/getOrCreate()
+            //     and field by field by reset(). Their writer is a `defaults()` factory, which
+            //     is why the method column below reads `defaults` rather than a create name.
+            new Moved("AmlAlert", "severity", "setSeverity", "AmlAlertService", "create"),
+            new Moved("AmlAlert", "currency", "setCurrency", "AmlAlertService", "create"),
+            new Moved("AuditEngagement", "status", "setStatus", "AuditEngagementService", "create"),
+            new Moved("AuditEngagement", "findingsCount", "setFindingsCount", "AuditEngagementService", "create"),
+            new Moved("AnnualPlan", "budgetHours", "setBudgetHours", "AuditLifecycleService", "createAnnualPlan"),
+            new Moved("WorkingPaper", "hours", "setHours", "AuditLifecycleService", "createWorkingPaper"),
+            new Moved("BcmGovernanceRecord", "policyVersion", "setPolicyVersion", "BcmCycleService", "createGovernance"),
+            new Moved("BcmCorrectiveAction", "priority", "setPriority", "BcmRemediationService", "createCapa"),
+            new Moved("BcmCorrectiveAction", "progressPercent", "setProgressPercent", "BcmRemediationService", "createCapa"),
+            new Moved("BcmSettings", "rtoWarningHours", "setRtoWarningHours", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "rtoCriticalHours", "setRtoCriticalHours", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "rpoWarningHours", "setRpoWarningHours", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "rpoCriticalHours", "setRpoCriticalHours", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "exerciseFrequencyMonthsDefault", "setExerciseFrequencyMonthsDefault", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "exerciseFrequencyMonthsCritical", "setExerciseFrequencyMonthsCritical", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "evidenceExpiryWarningDays", "setEvidenceExpiryWarningDays", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "capaOverdueGraceDays", "setCapaOverdueGraceDays", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "riskMatrixLikelihoodMax", "setRiskMatrixLikelihoodMax", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "riskMatrixImpactMax", "setRiskMatrixImpactMax", "BcmSettingsService", "defaults"),
+            new Moved("BcmSettings", "regulatoryImportStatus", "setRegulatoryImportStatus", "BcmSettingsService", "defaults"),
+            new Moved("ChangeRequest", "changeType", "setChangeType", "ChangeManagementService", "create"),
+            new Moved("Control", "controlType", "setControlType", "ControlLibraryService", "createControl"),
+            new Moved("Control", "automationLevel", "setAutomationLevel", "ControlLibraryService", "createControl"),
+            new Moved("CrisisCommsTemplate", "version", "setVersion", "CrisisCommsService", "createTemplate"),
+            new Moved("PolicyDocumentFrameworkMapping", "satisfaction", "setSatisfaction", "FrameworkAnchorService", "addMapping"),
+            new Moved("OrganisationSettings", "climateScenarioWeightsStrict", "setClimateScenarioWeightsStrict", "OrganisationSettingsService", "defaults"),
+            new Moved("OrganisationSettings", "carbonOffsetCapPct", "setCarbonOffsetCapPct", "OrganisationSettingsService", "defaults"));
 
         Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
@@ -899,6 +1002,14 @@ class NeverFiringNullGuardContractTest {
                     if (req.getMandatory() != null) cur.setMandatory(req.getMandatory());
                     return repo.save(cur);
                 }
+                static Foo defaults() {
+                    Foo d = new Foo();
+                    d.setMandatory(true);
+                    return d;
+                }
+                public Foo callsDefaults() {
+                    return defaults();
+                }
             }
             """;
 
@@ -917,6 +1028,23 @@ class NeverFiringNullGuardContractTest {
             .as("a name that does not resolve must be null so the leg can report it as stale rather "
                 + "than silently treating the default as present")
             .isNull();
+
+        // ⚠⚠ F2-294 — a package-private `static` factory. The pattern used to require an
+        // access modifier, so this shape resolved to null and the Moved leg reported every
+        // relocated settings default as "no such method". Both directions matter: the
+        // declaration must resolve, and the CALL SITE in `callsDefaults` must not be mistaken
+        // for one — `return defaults();` has no brace, so a resolver that matched it would be
+        // reading an expression as a method body.
+        assertThat(methodBody(corpus, "defaults"))
+            .as("a package-private static factory must resolve — a relocated set of factory "
+                + "defaults is exactly that shape, and F2-294 moved thirteen of them")
+            .isNotNull()
+            .contains("setMandatory(true)");
+        assertThat(methodBody(corpus, "callsDefaults"))
+            .as("the call site resolves as its OWN method, so the widening cannot make an "
+                + "expression read as a declaration")
+            .isNotNull()
+            .contains("return defaults();");
     }
 
     /**
@@ -1239,8 +1367,20 @@ class NeverFiringNullGuardContractTest {
         Map<String, String> services = liveServices();
         Map<String, Map<String, String>> inits = liveInitialisers();
 
+        // ⚠⚠ F2-294 re-scoped this population from WORK_LIST to the CLOSED_BY_* union, which is
+        // what the comment below always said would have to happen. Those members' NULL GUARDS are
+        // untouched by the fix — only their initialisers went — so "can the one-hop follow see this
+        // guard?" is still a real question about every one of them, and the answer no longer depends
+        // on there being unfixed work left. A member whose guard was inlined away, or a service that
+        // stopped existing, fails here rather than silently lowering a count.
+        Set<String> guardsStillPresent = new java.util.TreeSet<>(CLOSED_BY_F2_291);
+        guardsStillPresent.addAll(CLOSED_BY_F2_292);
+        guardsStillPresent.addAll(CLOSED_BY_F2_293);
+        guardsStillPresent.addAll(CLOSED_BY_F2_294);
+        guardsStillPresent.addAll(WORK_LIST);
+
         int helperOnly = 0;
-        for (String member : WORK_LIST) {
+        for (String member : guardsStillPresent) {
             String service = member.substring(0, member.indexOf('#'));
             String method = member.substring(member.indexOf('#') + 1, member.indexOf(" :: "));
             String field = member.substring(member.lastIndexOf('#') + 1);
@@ -1254,23 +1394,23 @@ class NeverFiringNullGuardContractTest {
                 + "\\s*\\(\\s*\\)\\s*!=\\s*null.*");
             if (!inline) helperOnly++;
         }
-        // ⚠ F2-293 re-measured this floor 8 -> 5, and the reason matters: all five members it
-        // closed (`ReportScheduleService#update`, whose guards live in a private `apply`) were
-        // helper-only, so the population fell BECAUSE of the fix rather than because the detector
-        // rotted. F2-213's rule — a population that falls after a fix is not automatically rot, but
-        // it is always worth asking which — and the answer is recorded here rather than the number
-        // being quietly edited.
-        //
-        // ⚠⚠ This floor has a shape problem in its future: WORK_LIST is what it counts, so when the
-        // work list reaches zero this count is zero too and the leg becomes vacuous (F2-219: an
-        // anti-vacuity floor must change shape when its figure reaches zero). At that point the
-        // load-bearing assertions are the two mechanism checks below, which do not depend on the
-        // count — do not simply lower this to 0.
+        // ⚠ The history of this number is worth keeping, because every move had a different
+        // cause. F2-291 opened it at 8; F2-293 re-measured it to 5 and the reason mattered — all
+        // five members it closed had their guards in a private `apply`, so the population fell
+        // BECAUSE of the fix rather than because the detector rotted (F2-213). F2-294 then emptied
+        // WORK_LIST entirely, which would have taken this to 0 and made the leg vacuous — the exact
+        // failure this comment used to predict. Re-scoped, not lowered.
         assertThat(helperOnly)
             .as("members whose guard is NOT in the public method, i.e. members only the one-hop "
                 + "helper follow can see. Delete the follow and every one of these disappears, "
                 + "which is what made this gate's hard zero look like a finished sweep")
-            .isGreaterThanOrEqualTo(5);
+            // Measured 21 of the 44 closed members on the day this was re-scoped. The floor is
+            // deliberately BELOW that and far above the largest wrong answer, which is ZERO —
+            // deleting the one-hop follow, or a service file failing to resolve, collapses this
+            // to nothing, and nothing is indistinguishable from a finished sweep (F2-215: a
+            // floor must sit above the largest WRONG answer, and you have to know what that is).
+            // 15 leaves room for a few legitimate inlinings without tolerating a dead detector.
+            .isGreaterThanOrEqualTo(15);
 
         // And the mechanism itself resolves, in the two shapes the tree uses.
         assertThat(ServerStampedFieldContractTest.helperNullGuardedFields(
@@ -1343,6 +1483,7 @@ class NeverFiringNullGuardContractTest {
         Set<String> closed = new TreeSet<>(CLOSED_BY_F2_291);
         closed.addAll(CLOSED_BY_F2_292);
         closed.addAll(CLOSED_BY_F2_293);
+        closed.addAll(CLOSED_BY_F2_294);
         assertThat(measure(liveServices(), liveInitialisers()))
             .as("a reverted fix must FAIL rather than be absorbed by the work list")
             .doesNotContainAnyElementsOf(closed);

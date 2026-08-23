@@ -27,6 +27,14 @@ import java.util.stream.Collectors;
 @Service
 public class CrisisCommsService {
 
+    /**
+     * F2-294 — {@code CrisisCommsTemplate.version} used to carry this as a field
+     * initialiser, which made {@code updateTemplate}'s null guard fire on every
+     * entity-bound request. The column is NOT NULL and {@link #createTemplate} saves the
+     * bound entity, so the default has to be written on the create path.
+     */
+    static final String DEFAULT_TEMPLATE_VERSION = "1.0";
+
     private final CrisisCommsTemplateRepository     templateRepo;
     private final CrisisCommsAudienceRepository     audienceRepo;
     private final CrisisCommsDistributionRepository distributionRepo;
@@ -66,6 +74,10 @@ public class CrisisCommsService {
         // merge() into a potentially cross-tenant row.
         t.setId(null);
         t.setOrganisationId(TenantContext.getCurrentTenant());
+        // F2-294 — `version` is NOT NULL and this create saves the BOUND entity, so the
+        // default the entity used to carry has to live here or an omitted version reaches
+        // the INSERT as null.
+        if (t.getVersion() == null) t.setVersion(DEFAULT_TEMPLATE_VERSION);
         return templateRepo.save(t);
     }
 

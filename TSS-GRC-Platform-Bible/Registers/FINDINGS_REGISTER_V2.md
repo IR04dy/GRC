@@ -15219,6 +15219,173 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-294 — the remedy was already written at nine of these sites and could not run, and the third kind of member is one where deleting the initialiser would have been wrong
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 (`055741da`) |
+| **Severity** | P2 — the remaining **27** members of this population, swept in one slice. Individually P2/P3: the sharpest is `AuditEngagement#status`, where a partial `PUT` reset a **CLOSED** IIA engagement to **PLANNED** through the register's only reverse edge, and the widest are `WorkingPaper#hours` (**12 of 12** live rows) and `BcmCorrectiveAction#progressPercent` (**10 of 10**). None was reachable from the platform's own screen. |
+| **Registers** | `platform.controls` (32) · `compliance.audit_engagements` (12) · `bcm.corrective_actions` (10) · `ethics.aml_alerts` (10) · `change_mgmt.change_requests` (17 dev / 15 prod) · `policy.document_framework_mappings` (15) · `audit_lc.working_papers` (12) · `audit_lc.annual_plans` (2) · `bcm.crisis_comms_templates` (5) · `bcm.governance_records` (1) · `bcm.settings` (1) · `sust.organisation_settings` (1) — every figure identical in dev and prod except the change register's total |
+| **Standards** | IIA Standards 2010/2330 (annual plan, working papers, engagement lifecycle), ISO 22301 (BCM tolerances, corrective actions), SAMA AML/CFT + FATF R.20 (alert severity), ADR-017 §D-3 (emergency change ratification), NCA ECC / ISO 27001 control classification |
+| **Found by** | executing the whole remaining `NeverFiringNullGuardContractTest` work list, re-derived per [[F2-221]] before executing — which [[F2-293]]'s own finding made mandatory rather than optional |
+| **Verification** | full hermetic suite **4614 → 4633/0/0**; gate 13/13; live probe **12/12 pre-fix · 12/12 post-fix** as `compliance`, never `admin`; mutations **14 killed / 0 survived / 0 anchor-miss / 0 did-not-compile**, plus one withdrawn as INVALID; both databases swept for the bare `[REVIEW-TEST]` prefix across 4,229 and 4,171 text columns — **dev 0 register rows** |
+
+### Why a sweep, and why that is not the same judgement F2-293 made
+
+[[F2-240]] swept this population once before, for a stated reason: *when every remaining member is
+latent-by-caller, reach has nothing left to rank.* That is the condition again. The divergence
+ordering is real and identical in dev and prod:
+
+| site | initialiser | differs on | what the reset asserts |
+|---|---|---|---|
+| `Control#controlType` | `PREVENTIVE` | **15 / 32** | 9 DETECTIVE + 4 CORRECTIVE + 2 RECOVERY controls read as preventive |
+| `Control#automationLevel` | `MANUAL` | **12 / 32** | 4 AUTOMATED + 8 SEMI controls read as manual |
+| `BcmCorrectiveAction#progressPercent` | `0` | **10 / 10** | every ISO 22301 corrective action's progress is zeroed |
+| `WorkingPaper#hours` | `0` | **12 / 12** | every IIA Standard 2330 time record is zeroed |
+| `PolicyDocFwMapping#satisfaction` | `PARTIAL` | **10 / 15** | 10 FULL framework satisfactions read as partial |
+| `AuditEngagement#status` | `PLANNED` | **10 / 12** | a CLOSED engagement reads as not yet started |
+| `AmlAlert#severity` | `MEDIUM` | **7 / 10** | 3 CRITICAL + 3 HIGH alerts read as medium |
+| `BcmCorrectiveAction#priority` | `MEDIUM` | 6 / 10 | a CRITICAL corrective action reads as medium |
+| `ChangeRequest#changeType` | `NORMAL` | 6 / 17 · 6 / 15 | the one EMERGENCY change reads as normal |
+| `AnnualPlan#budgetHours` | `0` | **2 / 2** | both annual plans' budgeted effort is zeroed |
+| 11 × `BcmSettings` tolerance | factory value | 0 / 1 | every ISO 22301 tolerance reverts |
+| 4 others | — | 0 | latent |
+
+⚠⚠ **And reach is uniformly zero through the screen, which is what makes ordering impossible.**
+Every call site of all eleven routes was read. **Five of the seven highest-divergence sites have no
+frontend caller at all** — `lib/controlLibrary.ts#updateControl`, `lib/bcmCycle.ts#updateCapa`,
+`frameworkApi.updateMapping` and `amlApi.update` are dark clients — and the rest echo the whole
+record back (`engagementToReq` names every field including `status`; `toBackendPlan`/`toBackendWp`
+name `budgetHours`/`hours`; both `changeApi.update` callers spread `{...c}`).
+
+🔑 [[F2-237]]'s rule applies with more force here than it did there: **a defence in one client is
+not a defence, and five of these had no client to be defended by.** `frameworkApi.updateMapping`'s
+declared body type is `{ clauseRef?, satisfaction?, notes? }` — an explicit invitation to send the
+partial body the server could not survive, on a route with no call site, which is [[F2-214]]'s
+invitation-to-build shape. Removing the initialiser makes the hazard **absent** rather than latent
+([[F2-213]]).
+
+### 🔑🔑 The remedy was already written at nine of the 27 sites and could not run
+
+`AmlAlertService#create` ended `if (a.getCurrency() == null) a.setCurrency("SAR")`.
+`AuditEngagementService#create` had `if (e.getStatus() == null) e.setStatus("PLANNED")`.
+`createCapa` defaulted **and** range-checked both its fields; `createControl` defaulted **and**
+vocabulary-checked both of its; `createGovernance`, `ChangeManagementService#create` and
+`addMapping` likewise.
+
+Every one of those guards was **dead**, because `apply` copies the request's value and the request's
+own initialiser made it non-null. [[F2-292]] found this on one register and called it *"the create's
+own default was dead too"*; measured across a population it is **a third of the sites**.
+
+🔑 **A reader auditing such a create finds the default present and correct, and has no reason to ask
+whether its guard can fire.** That is [[F2-215]]'s two-of-N one level down — not a mechanism present
+on two fields of three, but a mechanism present and *inert*, which is strictly more reassuring than
+one that is missing.
+
+### ⚠⚠ A third kind, where deleting the initialiser would have been wrong
+
+Thirteen of the 27 sites are on the two settings registers, and there the initialisers were the
+register's **declared factory defaults**. `BcmSettingsService#getOrInit()` carried the comment *"every
+default is set in the entity constructor"*, and `reset()` read `new BcmSettings()` field by field as
+its source of truth. Deleting them would have left eleven NOT NULL columns with no writer and broken
+the reset control outright.
+
+So the declaration **moved** to a `defaults()` factory that both readers name — one declaration, two
+readers ([[F2-217]]'s rule).
+
+🔑 **That relocation closed a drift the initialisers were hiding.**
+`OrganisationSettingsService#resetToDefaults` writes its defaults as **literals** and never touched
+`carbonOffsetCapPct` at all, so *"reset to defaults"* left the carbon-offset cap wherever it happened
+to be. The entity's initialisers and that literal list were two copies of one fact with nobody
+maintaining the agreement ([[F2-177]]), and the **third** copy going is what made the gap visible.
+
+### The sharpest site, and the reason it is sharp
+
+`AuditEngagementService#advance` is explicitly forward-only — `if (to <= from) throw "must advance
+forward only"` — so the entity-bound `PUT` was **the only reverse edge in the register**. It carries
+the same `COMPLIANCE:WRITE` permission as the create and `/advance`, so there is no privilege
+escalation: the object-level machine was the only control and the PUT sat beside it without one
+([[F2-219]]'s shape). `compliance.audit_engagements` has **zero CHECK constraints**, so nothing else
+narrowed the column either. Probed live: a create naming `CLOSED` returned **201 storing CLOSED**, and
+a partial `PUT` took a CLOSED engagement to **PLANNED** with `findings_count` **9 → 0**.
+
+### ⚠ Directions are MIXED, and this register's recent history says otherwise
+
+Five resets are **flattering** — a CRITICAL AML alert reading MEDIUM; a CRITICAL ISO 22301 corrective
+action reading MEDIUM; the one EMERGENCY change reading NORMAL, which removes it from the population
+an ADR-017 §D-3 reviewer examines; 9 DETECTIVE + 4 CORRECTIVE + 2 RECOVERY controls reading
+PREVENTIVE; a CLOSED audit engagement reading PLANNED. Four are **pessimistic** — 10 FULL framework
+satisfactions reading PARTIAL; 4 AUTOMATED + 8 SEMI controls reading MANUAL; every working paper's
+hours and both annual plans' budgets reading 0.
+
+[[F2-193]], [[F2-195]] and [[F2-205]] were uniformly flattering and [[F2-210]] uniformly pessimistic.
+🔑 [[F2-196]]'s rule is the one that holds: **a reset has no direction until you look.**
+
+### Instrument work, all of it in the same commit
+
+⚠⚠ **`methodBody`'s resolver required an access modifier**, so a package-private `static defaults()`
+was invisible and the `Moved` leg reported **13 writers as "no such method"**. [[F2-291]]'s shape
+inside this gate's own resolver, one slice after that finding. It failed **loudly**, which is the only
+reason it cost nothing — 🔑 **a resolver that silently returned null would have reported the
+create-path default as PRESENT**, i.e. would have certified thirteen fixes it could not see.
+
+⚠ **The anti-vacuity floor counted `WORK_LIST` and went vacuous the moment the list emptied** —
+exactly as its own comment predicted when [[F2-293]] wrote that prediction down ([[F2-219]]).
+Re-scoped to the `CLOSED_BY_*` union, with the floor taken from **the gate's own output** (21 of 44)
+after a sentinel run rather than from a prediction ([[F2-195]]), and the largest wrong answer — zero —
+named in place ([[F2-215]]).
+
+⚠ **The javadoc's first draft said "9 DETECTIVE and 2 RECOVERY" against a measured 15 of 32.**
+[[F2-273]]'s shape — a count and the enumeration it summarises are two artefacts, and the count being
+right is what stops anybody checking the list — inside the comment recording the measurement. Both
+enumerations are spelled out now.
+
+⚠ **Three `BcmSettingsServiceTest` fixtures built the stored row as `new BcmSettings()`** and leaned
+on the initialisers to make eleven NOT NULL columns complete; `validate()` unboxes all of them, so
+they failed with `NullPointerException` where an `IllegalArgumentException` was expected. [[F2-240]]'s
+recorded hazard: **when this family's fix breaks a test, read the fixture before the code.** Repointed
+at `defaults()`, with a comment explaining that a fixture built from the bare constructor now
+describes a row that cannot exist in either database.
+
+⚠ **The pre-fix control had to be surgical** — 11 replacements across 3 files — because a wholesale
+revert would not compile: the fix introduces `INITIAL_STATUS`, `DEFAULT_FINDINGS_COUNT` and two
+`defaults()` factories, and a control that cannot run reads exactly like a gate that passed
+([[F2-287]], [[F2-293]]).
+
+⚠ **`sed -i` on Git Bash rewrote two whole service files as LF in a CRLF tree** (165 and 394 bare
+LF), and Git warned *"LF will be replaced by CRLF the next time Git touches it"* — meaning **the bytes
+verified by the build and the probe were not the bytes that would ship.** Fifth instance of the
+line-ending trap in this lineage ([[F2-212]], [[F2-229]], [[F2-234]], [[F2-287]]) and the first from
+`sed -i` rather than a scripted restore. All 24 files normalised and re-verified before the build was
+believed.
+
+### Filed
+
+⚠ `compliance.audit_engagements` has **zero CHECK constraints** on `status`, over a 7-value stored
+vocabulary and a declared 8-state forward-only ladder. Cheap now, because this slice closed the
+register's only open writers ([[F2-183]]'s rule that a constraint and its writer land in one commit) —
+and it needs the ladder read against the stored values first, because the create is now held to
+`INITIAL_STATUS` and a CHECK admitting the current 7 would bless whatever the seed wrote.
+
+⚠ **Four dark write clients** — `lib/controlLibrary.ts#updateControl`, `lib/bcmCycle.ts#updateCapa`,
+`frameworkApi.updateMapping`, `amlApi.update`. Each is now safe to wire, which is the point of having
+fixed them before anybody built the screen ([[F2-214]]'s inverse); `frameworkApi.updateMapping`'s
+`{ clauseRef?, satisfaction?, notes? }` body type is the sharpest, being a typed invitation to the
+exact partial body that used to destroy the row.
+
+⚠ `BcmSettings#validate()` unboxes eleven `Integer` fields, so a row that reaches it with any of them
+null is a `NullPointerException` rather than the `IllegalArgumentException` the method exists to
+throw. Unreachable through the API now that `defaults()` owns the create path, and it is the shape
+that made three fixtures fail rather than a defect with a caller.
+
+⚠ **`WORK_LIST` is empty and the invariant is now the whole of it.** [[F2-240]] promoted this gate to
+an invariant with the words *"keep it empty; there is no correct code for a hard zero here to fail
+on"*, and [[F2-291]] then found it green over 42 sites for two structural reasons. The population is
+zero again — which is exactly what a rotted detector also reports, so what carries the weight is the
+`CLOSED_BY_*` reverse legs and the re-scoped anti-vacuity floor, not the zero.
+
+---
+
 ## F2-293 — the first screen-reachable member of this population, and the reachability question is per call site rather than per page
 
 | | |

@@ -37,7 +37,13 @@ public class BcmGovernanceRecord {
     private String policyTitleAr;
 
     @Column(name = "policy_version", nullable = false, length = 20)
-    private String policyVersion = "1.0";
+    // ⚠ F2-294 removed `= "1.0"`. `createGovernance` already carried
+    // `if (body.getPolicyVersion() == null) body.setPolicyVersion("1.0")`, which this
+    // initialiser made unreachable. SCREEN-REACHABLE: `BcmReadinessPage#submitEditGov`
+    // sends `policyVersion: String(v.policyVersion ?? '').trim() || undefined`, so
+    // clearing the field in the edit form omitted the key and reset the version rather
+    // than leaving it alone. 0 of 1 rows differ today, so latent by data, not by code.
+    private String policyVersion;
 
     @Column(columnDefinition = "NVARCHAR(MAX)")
     private String scope;
