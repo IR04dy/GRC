@@ -159,4 +159,196 @@ class NdiGapServiceTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("progressPct must be 0..100");
     }
+
+    // ── F2-302: the (status, actual_close_date) pair, and a create that cannot name a derived state
+
+    /**
+     * The create is a create. {@code NdiGap.onCreate()} has always defaulted the field, and a
+     * default is not a guard — probed live, a create naming RESOLVED returned 200 and stored it, so
+     * the state the CAPA rollup derives was assertable on a row with no CAPAs at all.
+     */
+    @Test
+    void createGap_cannotNameAStateTheRollupDerives() {
+        NdiGap body = gap();
+        body.setId(null);
+        body.setStatus("RESOLVED");
+
+        assertThatThrownBy(() -> service.createGap(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            // names the FIELD (F2-296) ...
+            .hasMessageContaining("status:")
+            // ... and states what THIS route guarantees, never the primitive's default sentence,
+            // because this register has no state machine and its PUT records no actor (F2-302).
+            .hasMessageContaining("consistent with the CAPA rollup")
+            .hasMessageNotContainingAny("state machine", "who made the change");
+    }
+
+    @Test
+    void createGap_withNoStatusLandsOpen() {
+        NdiGap body = gap();
+        body.setId(null);
+        body.setStatus(null);
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.createGap(body).getStatus()).isEqualTo(NdiGap.INITIAL_STATUS);
+    }
+
+    /** An echo of the initial state is not an attempt to skip anything. */
+    @Test
+    void createGap_mayStateTheInitialStateExplicitly() {
+        NdiGap body = gap();
+        body.setId(null);
+        body.setStatus("OPEN");
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.createGap(body).getStatus()).isEqualTo("OPEN");
+    }
+
+    /**
+     * The pair moves together. The rollup sets RESOLVED and stamps the close date in the same
+     * breath; the register's inline status {@code <select>} sends {@code {status}} and nothing else,
+     * so before this the screen could produce RESOLVED with no close date.
+     */
+    @Test
+    void updateGap_resolvingStampsTheCloseDate() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("RESOLVED");
+        NdiGap saved = service.updateGap(GAP_ID, patch);
+
+        assertThat(saved.getStatus()).isEqualTo("RESOLVED");
+        assertThat(saved.getActualCloseDate()).isEqualTo(LocalDate.now());
+    }
+
+    /** A date the caller states survives: it is applied before the status rule, which only fills. */
+    @Test
+    void updateGap_honoursACallerStatedCloseDate() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("RESOLVED");
+        patch.setActualCloseDate(LocalDate.of(2026, 3, 1));
+
+        assertThat(service.updateGap(GAP_ID, patch).getActualCloseDate())
+            .isEqualTo(LocalDate.of(2026, 3, 1));
+    }
+
+    /** A gap that is open was not closed, so a stale close date cannot stand. */
+    @Test
+    void updateGap_reopeningClearsTheCloseDate() {
+        NdiGap stored = gap();
+        stored.setStatus("RESOLVED");
+        stored.setActualCloseDate(LocalDate.of(2026, 5, 17));
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("IN_PROGRESS");
+        NdiGap saved = service.updateGap(GAP_ID, patch);
+
+        assertThat(saved.getStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(saved.getActualCloseDate()).isNull();
+    }
+
+    /**
+     * ⚠ The BOUNDARY, asserted in both directions. CLOSED and ACCEPTED_RISK are left alone: the
+     * rollup refuses to move either, and nothing in this platform declares whether they carry a
+     * close date — so stamping one would invent a rule rather than enforce a declared one
+     * (F2-183). If a later slice decides closure must be dated, this test is the thing to change
+     * deliberately rather than a behaviour to discover.
+     */
+    @Test
+    void updateGap_closingNeitherStampsNorClearsTheDate() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap toClosed = new NdiGap();
+        toClosed.setStatus("CLOSED");
+        assertThat(service.updateGap(GAP_ID, toClosed).getActualCloseDate())
+            .as("CLOSED does not stamp a date -- no writer in this platform declares that it should")
+            .isNull();
+
+        // ⚠ And CLOSED must not CLEAR one either. The mutation harness found that the assertion
+        // above cannot see that: it starts from a gap whose date is already null, so "does not
+        // clear it" holds whatever the code does. Widening NOT_CLOSED to include CLOSED -- which
+        // would wipe a date the rollup had stamped -- SURVIVED the whole build. F2-293's shape
+        // (a test that picks the case where the principle holds trivially) inside the boundary
+        // test written to pin it, so the dated fixture is the load-bearing half.
+        stored.setStatus("RESOLVED");
+        stored.setActualCloseDate(LocalDate.of(2026, 5, 17));
+        NdiGap datedToClosed = new NdiGap();
+        datedToClosed.setStatus("CLOSED");
+        assertThat(service.updateGap(GAP_ID, datedToClosed).getActualCloseDate())
+            .as("closing a gap that already carries a close date must keep it")
+            .isEqualTo(LocalDate.of(2026, 5, 17));
+
+        stored.setStatus("RESOLVED");
+        stored.setActualCloseDate(LocalDate.of(2026, 5, 17));
+        NdiGap toAccepted = new NdiGap();
+        toAccepted.setStatus("ACCEPTED_RISK");
+        assertThat(service.updateGap(GAP_ID, toAccepted).getActualCloseDate())
+            .as("ACCEPTED_RISK does not clear an existing date either")
+            .isEqualTo(LocalDate.of(2026, 5, 17));
+    }
+
+    /**
+     * Structural: the pair has ONE writer. A second {@code setStatus("RESOLVED")} beside its own
+     * date write is how the update path and the rollup came apart in the first place, and no
+     * behaviour test can see a third writer being added later.
+     */
+    @Test
+    void thePairHasASingleWriter() throws java.io.IOException {
+        String svc = java.nio.file.Files.readString(java.nio.file.Paths.get(
+            "src/main/java/com/tss/grc/module/ndi/gap/service/NdiGapService.java"));
+        String code = com.tss.grc.support.GuardExpressions.stripComments(svc);
+
+        assertThat(code).as(
+            "The rollup must route through applyStatusAndCloseDate, not set RESOLVED itself.")
+            .doesNotContain("setStatus(\"RESOLVED\")");
+        assertThat(code.split("setActualCloseDate\\(LocalDate\\.now\\(\\)\\)", -1).length - 1)
+            .as("Exactly one place may stamp the close date from the clock.")
+            .isEqualTo(1);
+    }
+
+    /**
+     * The column collates case-insensitively, so {@code ck_ndi_gap_status} accepts 'resolved' and
+     * stores it verbatim. Before the vocabulary was declared, both branches of the pair rule
+     * compared exactly, so a lower-case status skipped the stamp AND the clear — F2-179's defect
+     * inside F2-302's own fix.
+     */
+    @Test
+    void updateGap_normalisesTheStatusSoThePairRuleStillFires() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+        when(gaps.save(any(NdiGap.class))).thenAnswer(i -> i.getArgument(0));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("resolved");
+        NdiGap saved = service.updateGap(GAP_ID, patch);
+
+        assertThat(saved.getStatus()).as("stored canonically, not as the caller typed it")
+            .isEqualTo("RESOLVED");
+        assertThat(saved.getActualCloseDate()).as("and the pair still moved together")
+            .isEqualTo(LocalDate.now());
+    }
+
+    /** A token outside the CHECK's vocabulary becomes a 400 naming the field, not a 547. */
+    @Test
+    void updateGap_refusesAStatusTheColumnWouldRejectAnyway() {
+        NdiGap stored = gap();
+        when(gaps.findByIdAndOrganisationId(GAP_ID, ORG_ID)).thenReturn(Optional.of(stored));
+
+        NdiGap patch = new NdiGap();
+        patch.setStatus("TOTALLY_MADE_UP");
+
+        assertThatThrownBy(() -> service.updateGap(GAP_ID, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status");
+    }
 }

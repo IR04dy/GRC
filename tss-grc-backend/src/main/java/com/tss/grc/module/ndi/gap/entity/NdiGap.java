@@ -65,12 +65,70 @@ public class NdiGap {
     @Column(name = "updated_at") private LocalDateTime updatedAt;
     @Column(name = "updated_by", length = 100) private String updatedBy;
 
+    /**
+     * The one state a gap may be created in. Read by three places that would otherwise each hold
+     * their own literal: {@link #onCreate()} below, {@code NdiGapService.createGapFromSource} (the
+     * intake path, which sets it explicitly), and {@code NdiGapService.createGap}'s
+     * {@code requireInitial} refusal.
+     *
+     * <p>⚠⚠ F2-302 — `onCreate()` has always defaulted this field, and a **default is not a
+     * guard** ([[F2-218]]'s headline, here at a lifecycle callback rather than in a service). A
+     * `@PrePersist` fires at flush time, after every setter, which makes it *stronger* evidence of
+     * server ownership to a reader than a field initialiser — and it still only fills a null.
+     * Probed live: `POST /api/ndi/gaps` with `status: "RESOLVED"` returned 200 and stored RESOLVED,
+     * so a gap could be created in the state the CAPA rollup derives, on a row the same callback
+     * had just given `capaCount = 0`.
+     */
+    public static final String INITIAL_STATUS = "OPEN";
+
+    /**
+     * The status the CAPA rollup derives when every corrective action is complete. It owns this
+     * token together with {@link #actualCloseDate} — see
+     * {@code NdiGapService.applyStatusAndCloseDate}, the single writer of that pair.
+     */
+    public static final String RESOLVED = "RESOLVED";
+
+    /**
+     * The states in which a gap is <b>not</b> closed, so an {@link #actualCloseDate} cannot stand.
+     * Deliberately not the whole vocabulary and deliberately not derived from the CHECK: this is a
+     * judgement about which states contradict a close date, not a copy of the five tokens
+     * {@code ck_ndi_gap_status} admits. {@code CLOSED} and {@code ACCEPTED_RISK} are absent on
+     * purpose — the rollup refuses to move either, and nothing in this platform declares whether
+     * they carry a close date, so a rule for them would be invented rather than enforced
+     * ([[F2-183]]).
+     */
+    public static final java.util.Set<String> NOT_CLOSED = java.util.Set.of("OPEN", "IN_PROGRESS");
+
+    /**
+     * The five tokens {@code ck_ndi_gap_status} admits, as the platform's own primitive so
+     * {@code ClosedVocabularyPinTest} mirrors them against the migration by reflection and no second
+     * hand-rolled list can drift from the constraint.
+     *
+     * <p>⚠⚠ F2-302 — this is here because the first draft of the pair rule compared with
+     * {@code RESOLVED.equals(next)} and {@code NOT_CLOSED.contains(next)}, both <b>case-sensitive
+     * against a case-INSENSITIVELY collated column</b>. The CHECK accepts {@code 'resolved'} and
+     * stores it verbatim ([[F2-179]]), so a lower-case status would have skipped <em>both</em>
+     * branches — neither stamping the close date nor clearing it — which is the F2-179 defect inside
+     * the fix written to remove a different one. Normalise on write rather than reaching for
+     * {@code equalsIgnoreCase}, which leaves the odd casing in the column and misses the frontend's
+     * label lookup ({@code gapStatusLabel} and {@code gapStatusTone} both compare exactly).
+     *
+     * <p>{@code require}, not {@code coerce}, by [[F2-182]]'s mechanical test: nothing coerces
+     * upstream and the CHECK is already refusing, so every value that succeeds today is a
+     * case-variant of a legal token and this cannot break a working request — it only turns a 547
+     * that names no field into a 400 that does.
+     */
+    public static final com.tss.grc.common.validation.ClosedVocabulary STATUS =
+        com.tss.grc.common.validation.ClosedVocabulary.of(
+            "status", "ck_ndi_gap_status",
+            "OPEN", "IN_PROGRESS", "RESOLVED", "ACCEPTED_RISK", "CLOSED");
+
     @PrePersist
     void onCreate() {
         if (createdAt == null)        createdAt = LocalDateTime.now();
         if (openDate == null)          openDate = LocalDate.now();
         if (severity == null)          severity = "MEDIUM";
-        if (status == null)            status = "OPEN";
+        if (status == null)            status = INITIAL_STATUS;
         if (rollupProgress == null)    rollupProgress = 0;
         if (capaCount == null)         capaCount = 0;
         if (capaCompletedCount == null) capaCompletedCount = 0;

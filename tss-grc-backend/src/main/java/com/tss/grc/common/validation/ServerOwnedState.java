@@ -117,13 +117,39 @@ public final class ServerOwnedState {
      */
     public static String requireInitial(String supplied, String initial, String register,
                                         String route, String field) {
+        return requireInitial(supplied, initial, register, route, field, STATE_MACHINE_AND_ACTOR);
+    }
+
+    /**
+     * What the route guarantees, for the refusal below. This is what almost every caller's route
+     * does, so it is the default the five-argument form passes.
+     */
+    public static final String STATE_MACHINE_AND_ACTOR =
+        "which checks the state machine and records who made the change";
+
+    /**
+     * ⚠⚠ F2-302 — the six-argument form exists because the clause after the route is a <b>claim
+     * about the caller's own route</b>, and the shared sentence was false for the first register
+     * that did not have a machine. {@code ndi.gap} has no transition endpoint, no declared edges and
+     * its PUT records no actor, so telling an operator the state "has to be reached through PUT
+     * …/{id}, which checks the state machine and records who made the change" sends them to a
+     * mechanism that does not exist — [[F2-210]]'s defect inverted, and the same shape [[F2-296]]
+     * found one phrase over when this primitive hard-coded {@code "status: "} and three callers
+     * emitted a 400 naming a field their request never carried.
+     *
+     * <p>🔑 <b>A primitive that cannot express what a caller needs is a primitive callers route
+     * around</b> ([[F2-190]]), and the divergence is then invisible. Pass the clause; do not
+     * hand-roll a twenty-ninth refusal.
+     */
+    public static String requireInitial(String supplied, String initial, String register,
+                                        String route, String field, String routeGuarantee) {
         if (supplied == null || supplied.isBlank() || same(supplied, initial)) {
             return initial;
         }
         throw new IllegalArgumentException(
             field + ": " + register + " is created in " + initial + ". '" + supplied + "' has to be "
-            + "reached through " + route + ", which checks the state machine and records who made "
-            + "the change. Send " + field + "=" + initial + ", or omit it.");
+            + "reached through " + route + ", " + routeGuarantee
+            + ". Send " + field + "=" + initial + ", or omit it.");
     }
 
     /**
