@@ -48,11 +48,21 @@ public class EthicsCase {
     @Column(name = "category", nullable = false, length = 50)
     private String category;
 
+    // F2-291 — NO field initialiser here, and the absence is the fix.
+    //
+    // `EthicsCaseController` binds this entity on POST and PUT, so Jackson deserialises an omitted
+    // key into `new EthicsCase()` and an initialiser is indistinguishable from a value the caller
+    // stated. `EthicsCaseService#apply` copies each of these under `if (src.getX() != null)`, which
+    // an initialiser makes true on every request — so a partial PUT that mentioned only the title
+    // reset the severity to MEDIUM, rewrote the intake channel as HOTLINE and cleared
+    // `isAnonymous`. Probed live: a CRITICAL, in-person, ANONYMOUS whistleblowing case came back
+    // MEDIUM / HOTLINE / attributable, HTTP 200. The defaults live on the create path instead
+    // (F2-238's remedy), where `NeverFiringNullGuardContractTest` asserts a writer exists for each.
     @Column(name = "severity", nullable = false, length = 20)
-    private String severity = "MEDIUM";
+    private String severity;
 
     @Column(name = "intake_channel", nullable = false, length = 40)
-    private String intakeChannel = "HOTLINE";
+    private String intakeChannel;
 
     @Column(name = "reporter_name", length = 255)
     private String reporterName;
@@ -63,8 +73,11 @@ public class EthicsCase {
     @Column(name = "reporter_employee_id")
     private Long reporterEmployeeId;
 
+    // F2-291 — the sharpest member of that set: on a whistleblowing register this flag is what
+    // protects the reporter, and `= false` made an omitted key read as a deliberate
+    // de-anonymisation. The reporter's name and email columns sit two fields above.
     @Column(name = "is_anonymous", nullable = false)
-    private Boolean isAnonymous = false;
+    private Boolean isAnonymous;
 
     @Column(name = "subject_summary", columnDefinition = "NVARCHAR(MAX)")
     private String subjectSummary;
@@ -84,8 +97,16 @@ public class EthicsCase {
     @Column(name = "clause_ref", length = 100)
     private String clauseRef;
 
+    // F2-291 — this one was not a reset, it was a REFUSAL. `apply` never copies `status` (F2-22b(v)
+    // moved it to transition()), but `requireLifecycleIsNotBodySet` compares the body's value
+    // against the stored one — and with `= "INTAKE"` a body that omitted `status` looked like a
+    // request to move the case BACK to INTAKE. Probed live: a partial PUT on a case at TRIAGE
+    // answered 400 "Case 50 is at TRIAGE and cannot be moved to INTAKE by an update", naming a
+    // state the caller never sent. That refusal is also what held the three resets above shut for
+    // the 28 of 30 live cases past INTAKE — so fixing it is what would otherwise have detonated
+    // them (F2-203). `create()` owns the initial state.
     @Column(name = "status", nullable = false, length = 40)
-    private String status = "INTAKE";
+    private String status;
 
     @Column(name = "triage_decision", length = 30)
     private String triageDecision;

@@ -104,6 +104,16 @@ public class KycService {
         // F2-288 -- one call where there were two literals for one fact: the default and the
         // vocabulary can no longer disagree (F2-217).
         s.setRiskRating(RISK_RATING.orDefault(s.getRiskRating(), "STANDARD"));
+        // F2-291 — these four defaults live here because `KycSubject` no longer carries field
+        // initialisers for them: on an entity-bound PUT an initialiser made `apply`'s null guards
+        // fire on every request and reset a confirmed sanctions or PEP match. The columns are NOT
+        // NULL, so a create that stops setting one turns that silent reset into a 500 —
+        // `NeverFiringNullGuardContractTest#everyRemovedInitialiserHasAWriterOnTheCreatePath` pins
+        // this method as the writer for all five (this and `status` above).
+        if (s.getIsPep()        == null) s.setIsPep(false);
+        if (s.getIsSanctioned() == null) s.setIsSanctioned(false);
+        if (s.getEddRequired()  == null) s.setEddRequired(false);
+        if (s.getCddLevel()     == null) s.setCddLevel("STANDARD");
         return subjectRepo.save(s);
     }
 

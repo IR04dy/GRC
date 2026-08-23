@@ -68,23 +68,41 @@ public class KycSubject {
     @Column(name = "subject_link_id")
     private Long subjectLinkId;
 
+    // F2-291 — NO field initialisers on these four, and the absence is the fix.
+    //
+    // `KycController` binds this entity on POST and PUT, so an omitted key deserialises into
+    // `new KycSubject()` and an initialiser is indistinguishable from a value the caller stated.
+    // `KycService#apply` copies each of them under `if (s.getX() != null)`, which an initialiser
+    // makes true on every request — so the ordinary subject-edit route reset every consequence of a
+    // confirmed screening match.
+    //
+    // 🔑 These are precisely the flags F2-288 armed one slice earlier so that `approve()`'s
+    // long-standing "Cannot approve a sanctioned subject" guard could finally fire. Probed live: a
+    // confirmed OFAC_SDN TRUE_MATCH set `isSanctioned` + `riskRating = PROHIBITED` and `approve()`
+    // correctly answered 400; a PUT carrying only `fullName` then answered 200, left the hit on the
+    // register still reading TRUE_MATCH, and `approve()` answered **200**. F2-288's own gate leg
+    // records that `apply()` legitimately copies these because the form lets an operator flag a PEP
+    // or a sanctioned party by hand — true of a full-echo form, and the initialiser is what made
+    // "a legitimate copy" a reset.
     @Column(name = "risk_rating", nullable = false, length = 20)
-    private String riskRating = "STANDARD"; // LOW | STANDARD | HIGH | PROHIBITED
+    private String riskRating; // LOW | STANDARD | HIGH | PROHIBITED
 
     @Column(name = "is_pep", nullable = false)
-    private Boolean isPep = false;
+    private Boolean isPep;
 
     @Column(name = "is_sanctioned", nullable = false)
-    private Boolean isSanctioned = false;
+    private Boolean isSanctioned;
 
     @Column(name = "cdd_level", nullable = false, length = 20)
-    private String cddLevel = "STANDARD"; // SIMPLIFIED | STANDARD | ENHANCED
+    private String cddLevel; // SIMPLIFIED | STANDARD | ENHANCED
 
     @Column(name = "cdd_completed_at")
     private LocalDateTime cddCompletedAt;
 
+    // F2-291 — the fifth of the same set. This is the flag FATF R.12 and SAMA's AML/CFT rules turn
+    // on for a PEP, and it was cleared by any edit that did not mention it.
     @Column(name = "edd_required", nullable = false)
-    private Boolean eddRequired = false;
+    private Boolean eddRequired;
 
     @Column(name = "edd_completed_at")
     private LocalDateTime eddCompletedAt;
@@ -95,8 +113,13 @@ public class KycSubject {
     @Column(name = "next_review_date")
     private LocalDate nextReviewDate;
 
+    // F2-291 — an omitted status reset an APPROVED or REJECTED subject to PENDING. Unlike the four
+    // above, `apply` copying this at all is a separate question (F2-22b(v) moved the ethics case's
+    // status out of its `apply` for exactly that reason and this register never got the same
+    // treatment) — filed, because a caller who SENDS a status still overwrites the lifecycle, and
+    // deciding whether that is legitimate here is not a side effect of removing an initialiser.
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "PENDING";
+    private String status;
     // PENDING | APPROVED | REJECTED | UNDER_REVIEW | OFFBOARDED
 
     @Column(name = "framework_id")

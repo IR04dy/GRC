@@ -942,6 +942,52 @@ class ServerStampedFieldContractTest {
     }
 
     /**
+     * Private helpers in this source, and the {@code Type#field}s each <b>null-guards</b> on one of
+     * its own parameters — {@code if (src.getSeverity() != null) t.setSeverity(...)}.
+     *
+     * <p>⚠⚠ <b>F2-291 — this is the third question the one-hop follow answers, and the sibling gate
+     * that needed it did not have it.</b> {@link NeverFiringNullGuardContractTest} asks whether such
+     * a guard can ever fire, and it walks {@link #publicMethods} — so a service that factors its
+     * null-guarded copy into a private {@code apply(target, src)} helper, <b>which is the house
+     * idiom in this codebase</b>, was outside that gate's population by construction. Its
+     * {@code WORK_LIST} was an empty invariant over it. F2-231 built the one-hop follow here for the
+     * write and stamp halves and documented it at length; the guard half is the same mechanism and
+     * nobody carried it across (F2-190), even though that gate already imports
+     * {@link #stripComments}, {@link #publicMethods} and {@link #requestParamTypes} from this class.
+     *
+     * <p>Measured when it landed: 7 helpers, 22 (helper, field) pairs — including
+     * {@code KycService#apply}, which reset {@code isSanctioned} and {@code riskRating} and so
+     * defeated the control F2-288 had armed one slice earlier.
+     *
+     * <p>The receiver's declared type comes from the helper's OWN parameter list, so the key names
+     * the entity rather than whatever the caller happened to call it. A guard on a local, or on a
+     * parameter of a type this walk cannot resolve, is skipped — under-reporting, which reads like a
+     * clean tree, so {@link NeverFiringNullGuardContractTest} pins the count.
+     */
+    static Map<String, Set<String>> helperNullGuardedFields(String src) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        Matcher m = Pattern.compile(
+            "(?m)^\\s*private\\s+(?:static\\s+)?[\\w.<>\\[\\], ]+?\\s+([a-z]\\w*)\\s*\\(([^)]*)\\)")
+            .matcher(src);
+        while (m.find()) {
+            int brace = src.indexOf('{', m.end());
+            if (brace < 0) continue;
+            String body = balancedBlock(src, brace);
+            Map<String, String> types = localTypes(m.group(2), body);
+            Set<String> fields = new TreeSet<>();
+            Matcher g = Pattern.compile(
+                "\\b(\\w+)\\s*\\.\\s*(?:get|is)([A-Z]\\w*)\\s*\\(\\s*\\)\\s*!=\\s*null\\s*\\)")
+                .matcher(body);
+            while (g.find()) {
+                String type = types.get(g.group(1));
+                if (type != null) fields.add(key(type, lower(g.group(2))));
+            }
+            if (!fields.isEmpty()) out.put(m.group(1), fields);
+        }
+        return out;
+    }
+
+    /**
      * One walk, two answers, so the forwarding and stamping halves cannot disagree about what a
      * helper does — {@code markReviewed(cur, to)} does BOTH (it forwards {@code to} into
      * {@code setDisclosureStatus} and stamps {@code setLastReviewedAt(now())}), which is why the
