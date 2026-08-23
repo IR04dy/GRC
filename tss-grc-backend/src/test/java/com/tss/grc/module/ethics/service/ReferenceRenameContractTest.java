@@ -259,4 +259,87 @@ class ReferenceRenameContractTest {
             + "added or removed, one of these two lists is now stale.")
             .hasSize(9);
     }
+
+    /**
+     * F2-310 — the frozen references are <b>deliberately operator-named</b>, and this leg exists so
+     * nobody "fixes" that by minting them.
+     *
+     * <h4>The filed question, and why it is refuted rather than done</h4>
+     *
+     * [[F2-306]]–[[F2-309]] each filed the same follow-up: nothing mints these codes, so all are
+     * caller-named at birth — [[F2-172]](d)'s question. Measured, the premise does not hold for this
+     * population. Of the nine code fields, <b>seven have a create FORM FIELD</b> in the frontend
+     * ({@code EthicsPage}, {@code CompliancePage}, {@code ChangesPage}, {@code NdiPage},
+     * {@code ChangeModelCatalogue}), one is declarable only ({@code gapCode}) and one is sent by
+     * code. 🔑 <b>So this platform's design is that the ORGANISATION names its own records, and
+     * minting would be a product change rather than a fix</b> ([[F2-214]]).
+     *
+     * <h4>The rule that separates the two cases</h4>
+     *
+     * <pre>
+     *   quoted to an OUTSIDE party      -> the server must mint it   (F2-172(d))
+     *   the organisation naming its own -> the operator names it     (this population)
+     * </pre>
+     *
+     * F2-172(d)'s actual subject is a <b>tracking code quoted to the public</b> — the intake
+     * reference the whistleblowing and breach-report portals hand a reporter, which
+     * {@code CaseTrackerPage} renders as {@code rec.referenceCode}. That one <b>is</b> server-minted,
+     * through {@code ReferenceCodeMint}, and {@code ClientSuppliedReferenceRatchetTest} holds it at
+     * zero. Checked: <b>none of the frozen twelve reaches an external party.</b> An operator-chosen
+     * control code like {@code AC-2} or {@code POL-INFO-001} is a naming convention its organisation
+     * owns, and a mint would overwrite it.
+     *
+     * <p>⚙ What makes the decision safe is [[F2-309]], not this leg: a caller-named code was a real
+     * hazard while a duplicate was storable. With tenant-scoped uniqueness in place a collision is
+     * refused at the index, so "the operator names it" costs nothing that uniqueness does not already
+     * cover.
+     */
+    @Test
+    void theFrozenReferencesAreDeliberatelyNotServerMinted() throws java.io.IOException {
+        java.nio.file.Path main = java.nio.file.Paths.get("src", "main", "java", "com", "tss", "grc",
+                                                          "module").toAbsolutePath().normalize();
+        java.util.List<String> minted = new java.util.ArrayList<>();
+        java.util.List<String> services = java.util.List.of(
+            "ethics/service/EthicsCaseService.java",
+            "ethics/service/DisclosureService.java",
+            "ndi/gap/service/NdiGapService.java",
+            "compliance/service/AuditEngagementService.java",
+            "change_mgmt/service/ChangeManagementService.java",
+            "ndi/plan/service/NdiImprovementPlanService.java",
+            "ndi/reports/service/NdiReportService.java",
+            "compliance/service/ComplianceService.java",
+            "compliance/service/PolicyService.java");
+
+        for (String rel : services) {
+            java.nio.file.Path p = main.resolve(rel);
+            assertThat(java.nio.file.Files.exists(p)).as("frozen-reference service missing: %s", rel)
+                .isTrue();
+            String code = com.tss.grc.support.GuardExpressions.stripComments(
+                java.nio.file.Files.readString(p));
+            if (code.contains("ReferenceCodeMint")) {
+                minted.add(rel);
+            }
+        }
+
+        assertThat(minted).as("""
+            A frozen business reference is being server-minted, and that is a PRODUCT change rather             than a fix.
+
+            Seven of these nine codes have a create FORM FIELD, so this platform's design is that the             organisation names its own records. A mint would overwrite an operator's naming             convention.
+
+            The rule: a reference quoted to an OUTSIDE party must be minted (F2-172(d) — the intake             tracking code the public portals hand a reporter, which IS minted through             ReferenceCodeMint); a reference the organisation uses to name its own records must not             be. None of these reaches an external party.
+
+            If a register's code genuinely becomes externally quoted, mint it AND say so here — do             not do it silently.
+
+            %s""".formatted(minted))
+            .isEmpty();
+
+        // ...and the public-facing one really is minted, so this is a boundary rather than a blanket
+        // refusal. Without this half the leg would read as "never mint anything".
+        java.nio.file.Path intake = main.resolve("intake/service/IntakeService.java");
+        assertThat(java.nio.file.Files.readString(intake)).as(
+            "The intake tracking code is quoted to the public and MUST be server-minted. If this "
+            + "stopped being true, the boundary this leg describes has moved and the rule above is "
+            + "no longer the rule.")
+            .contains("ReferenceCodeMint");
+    }
 }
