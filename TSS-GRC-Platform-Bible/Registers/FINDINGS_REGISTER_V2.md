@@ -15219,6 +15219,108 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-302 — a @PrePersist default is not a guard, and the status and the close date had two writers
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-23 |
+| **Severity** | P3 — **one live screen-reachable inconsistency, one API-reachable state jump, and a big refutation of my own hypothesis.** The NDI Gap Register's status column is an inline `<select>` sending `{status}` alone, so one click produced **RESOLVED with no close date** — a state the CAPA rollup can never reach — rendered beside the progress bar showing `0% · 0/1`. And the create could name RESOLVED outright. Harm is confined to the stored record: `actual_close_date` is read by **nothing**. |
+| **Registers** | `ndi.gap` — **18 rows, OPEN ×9 / IN_PROGRESS ×9, 0 RESOLVED, 0 CLOSED, 0 non-canonical casings**, identical in dev and prod; **1 row (gap 1) is IN_PROGRESS carrying a 2026-05-17 close date**, seed-origin |
+| **Standards** | NDMO / NDI data-governance gap remediation (the CAPA rollup the status is derived from) |
+| **Found by** | [[F2-296]]'s last unread census member, which [[F2-297]] kept by lowering that ceiling 7 → 1, re-derived first ([[F2-221]]) |
+| **Verification** | suite **4674 → 4684/0/0**; probe **4/6 pre-fix, 8/8 post-fix** as `compliance`; harness **6 killed / 0 survived** after closing a hole in my own test |
+
+### The big refutation is mine, and it is the most useful thing here
+
+I read `createGap`, found it never sets `status`, found **no field initialiser** on `NdiGap#status`,
+saw `@Column(nullable = false)`, and concluded the register's create path had never worked — F2-210's
+ROPA-wizard shape, where *"all 11 rows in dev and prod are seeded"*. The live probe returned
+**HTTP 200**.
+
+`NdiGap` has a `@PrePersist` that defaults eight fields including `status = "OPEN"`.
+🔑🔑 **[[F2-215]] records that a column can be filled four ways — an annotation, a lifecycle
+callback, a field initialiser, or `insertable = false` — and I checked one and concluded "no
+writer".** A `@PrePersist` is invisible to both a scan of the service and a check for an initialiser,
+and it is *stronger* evidence of server ownership than an initialiser, because it fires at flush time
+after every setter.
+
+### What survived: a default is not a guard, at a lifecycle callback
+
+That callback **defaults** and does not **refuse**, so `POST /api/ndi/gaps` with `status: "RESOLVED"`
+returned 200 and stored it — the state the CAPA rollup derives, on a row the same callback had just
+given `capaCount = 0`. [[F2-218]]'s headline (*"`if (x == null) x = INITIAL` is a default, not a
+guard"*) at a `@PrePersist` rather than in a service, which is the reason it reads as covered.
+
+### And the pair had two writers
+
+`recomputeRollup` has always owned `(RESOLVED, actual_close_date)` — when every corrective action is
+complete it sets the status **and** stamps the date in one breath, and it refuses to move a gap that
+is already CLOSED or ACCEPTED_RISK. `updateGap` wrote the two fields independently. One private
+writer owns the pair now, shared by the update path and the rollup: entering RESOLVED stamps a date
+if none is set, and returning to a not-closed state clears it, because a gap that is open was not
+closed.
+
+⚠ **CLOSED and ACCEPTED_RISK are left alone in both directions, and that boundary is a test.** The
+rollup refuses to move either and nothing in this platform declares whether they carry a close date,
+so a rule for them would be **invented** rather than enforced ([[F2-183]]). If a later slice decides
+closure must be dated, that test is the thing to change deliberately.
+
+### The shared refusal was asserting something false
+
+`ServerOwnedState.requireInitial`'s message hard-codes *"which checks the state machine and records
+who made the change"*. This register has **no state machine** (no transition route, no declared
+edges — [[F2-297]] established that) and its PUT records **no actor**, so the 400 sent an operator to
+a mechanism that does not exist — [[F2-210]]'s defect inverted. 🔑 **[[F2-296]]'s finding one phrase
+over**: that slice widened this same primitive to take a `field`, because three callers were emitting
+a 400 naming a field their request never carried. A six-argument overload takes the clause and the
+five-argument form passes the old sentence verbatim, so **none of the 28 existing call sites
+changes**. A primitive that cannot express what a caller needs is one callers route around
+([[F2-190]]), and the divergence is then invisible.
+
+### F2-179's defect inside this slice's own fix
+
+Asking why the census member's comparison was *still* there found it. `NdiGap.RESOLVED.equals(next)`
+and `NOT_CLOSED.contains(next)` both compare **exactly**, and `ck_ndi_gap_status` accepts
+`'resolved'` and stores it verbatim — so a lower-case status would have matched **neither** branch,
+skipping the stamp and the clear alike. 🔑 **That is worse than the split it replaced, because it
+looks like the rule ran.** Closed with `ClosedVocabulary` naming the constraint, so
+`ClosedVocabularyPinTest` mirrors the five tokens against the migration by reflection; `require` not
+`coerce` by [[F2-182]]'s mechanical test. The audit branch now compares the **saved canonical** value
+against the previous one — without that, a case-variant echo reads as a CHANGE and publishes a
+TRANSITION row for a move that never happened, which is exactly what [[F2-297]] found on
+`CmaDisclosureService` and `TcfdItemService`.
+
+### Two probe-design errors of mine, both caught by running it
+
+* The leg asserting a reopened gap keeps its stale date **could not test its claim**, because the
+  *previous* leg's defect left the date null, so the precondition never existed. 🔑 **A leg whose
+  precondition the defect it follows prevents is untested, not refuted** — the pre-fix behaviour is
+  established by reading (nothing else touched the date) and by that one seeded row, and is stated
+  that way rather than claimed as probed.
+* An anchor to move the close-date write matched **0**, because the write is already immediately
+  before the status. The accumulator had written nothing, which is why a patch script must build then
+  write rather than write per edit.
+
+### The harness found a hole in my own boundary test
+
+Widening `NOT_CLOSED` to include `CLOSED` — which would wipe a date the rollup had stamped —
+**SURVIVED the whole build**. The assertion meant to forbid it starts from a gap whose
+`actual_close_date` is already null, so *"CLOSED does not clear it"* holds whatever the code does.
+🔑 **[[F2-293]]'s shape inside the boundary test written to pin the boundary: a test that picks the
+case where the principle holds trivially.** 6/6 killed once the fixture carried a date.
+
+### Filed
+
+* **`gapCode` is caller-writable on create and update** — probed, a PUT renamed it to
+  `NDI-GAP-RENAMED` and stored it, so a caller can name *and rename* the reference an NDMO reviewer
+  cites. [[F2-172]](d)'s family, and outside `ClientSuppliedReferenceRatchetTest`'s setter key.
+* **Whether CLOSED should carry a close date** — an owner decision, not a side effect of this fix.
+* **Gap 1 is IN_PROGRESS with a 2026-05-17 close date** in both databases. Seed-origin, and any PUT
+  on it now clears the date — repairing the row directly rewrites live data, so it is reported.
+* **The status `<select>` lets an operator jump straight to CLOSED or ACCEPTED_RISK**, after which
+  the rollup will never move the gap again. Plausibly by design (an operator decision), and
+  deliberately not refused.
+
 ## F2-301 — a missing table errors; a confusably named one succeeds with the wrong rows
 
 | | |
