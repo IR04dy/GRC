@@ -34,7 +34,7 @@ import java.util.List;
  *   Tier-4 #24 — SAMA OPRES summary
  *     GET    /api/v1/bcm/opres/summary
  *
- *   Tier-4 #29 — PDPL Article 23 draft
+ *   Tier-4 #29 — PDPL Article 20 draft
  *     POST   /api/v1/bcm/crisis-events/{id}/pdpl-draft        {reference?}
  * </pre>
  */
@@ -105,7 +105,7 @@ public class BcmAuditCompletionController {
     @PreAuthorize("hasPermission('BCM', 'READ')")
     public OpresSummary opresSummary() { return service.opresSummary(); }
 
-    // ── PDPL Art. 23 draft (Tier-4 #29) ─────────────────────────
+    // ── PDPL Art. 20 draft (Tier-4 #29) ─────────────────────────
 
     @PostMapping("/crisis-events/{id}/pdpl-draft")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")

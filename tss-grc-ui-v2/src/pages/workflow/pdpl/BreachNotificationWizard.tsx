@@ -13,10 +13,12 @@ import { privacyApi } from '../../../lib/api';
  * PDPL §7.4 #8 — Personal Data Breach notification wizard.
  *
  * <p>PDPL Article 20 sets the 72-hour window for notifying SDAIA after becoming aware of a
- * personal-data breach. (This file cited "Article 23" in two places until F2-214; Article 23
- * is the data-subject-request article, and `lib/moduleAnchors.ts` — the regulator-citation
- * catalogue W2-1a-i deliberately keeps — records Article 20 as the breach window. Same shape
- * as F2-207's ROPA "Article 22" for "Article 31".) The wizard walks the DPO through:
+ * personal-data breach — `lib/moduleAnchors.ts`, the regulator-citation catalogue W2-1a-i
+ * deliberately keeps, records Article 20 as the breach window. (The data-subject-request
+ * 30-day article is a different one, not this notification; F2-214 corrected two citations
+ * here and F2-344 swept the rest of the crisis module and UI to Article 20, pinned by
+ * PdplBreachArticleCitationTest. Same shape as F2-207's ROPA "Article 22" for "Article 31".)
+ * The wizard walks the DPO through:
  *   1. Detect — when, who, what
  *   2. Severity — categories, volumes, special-category flag
  *   3. Scope — affected data subjects, data categories
@@ -112,7 +114,7 @@ export function BreachNotificationWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      // PDPL Art. 23 — 72-hour breach notification. The privacy/breaches
+      // PDPL Art. 20 — 72-hour breach notification. The privacy/breaches
       // endpoint is the canonical record (cross-references back to the BCM
       // crisis event via the wizard's containment summary when applicable).
       const description = [
@@ -372,8 +374,8 @@ export function BreachNotificationWizard() {
     <Shell>
       <PageHeader
         title={isAr ? 'إشعار خرق بيانات شخصية' : 'Personal data breach notification'}
-        sub={isAr ? 'معالج من ٦ خطوات وفق المادة ٢٣ من PDPL — نافذة ٧٢ ساعة'
-                  : '6-step wizard aligned with PDPL Article 23 — 72-hour window'}
+        sub={isAr ? 'معالج من ٦ خطوات وفق المادة ٢٠ من PDPL — نافذة ٧٢ ساعة'
+                  : '6-step wizard aligned with PDPL Article 20 — 72-hour window'}
         eyebrow={isAr ? 'الخصوصية / PDPL' : 'Privacy / PDPL'}
       />
       <WizardShell

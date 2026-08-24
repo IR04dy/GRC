@@ -22,7 +22,7 @@ import java.util.Map;
 /**
  * §5.4 Privacy slice of the buyer-assessment completion bundle — cross-border
  * transfer risk listing, special-category listing, the DSR fulfilment SLA
- * sweep (PDPL Article 4 — 30 days) and the PDPL Article 23 72-hour breach
+ * sweep (PDPL Article 4 — 30 days) and the PDPL Article 20 72-hour breach
  * deadline maintenance.
  *
  * <p>Extracted from the former {@code BuyerGapService} god-class
@@ -155,7 +155,7 @@ public class PrivacyGapService {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // §5.4 #2 — PDPL Article 23 72-hour breach deadline maintenance
+    // §5.4 #2 — PDPL Article 20 72-hour breach deadline maintenance
     // ══════════════════════════════════════════════════════════════
 
     public record Pdpl72hSweepResult(

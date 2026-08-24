@@ -277,7 +277,7 @@ public class CrisisAarService {
     private String buildRegulatoryNotificationsMd(List<CrisisRegulatoryNotification> list, CrisisEvent ce) {
         StringBuilder md = new StringBuilder();
         if (Boolean.TRUE.equals(ce.getPersonalDataAffected()) && ce.getPdpl72hDeadlineAt() != null) {
-            md.append("**PDPL Article 23 deadline:** ").append(ce.getPdpl72hDeadlineAt().format(TS))
+            md.append("**PDPL Article 20 deadline:** ").append(ce.getPdpl72hDeadlineAt().format(TS))
               .append(Boolean.TRUE.equals(ce.getPdpl72hBreached()) ? "  ⚠️ BREACHED\n\n" : "\n\n");
         }
         if (list.isEmpty()) {

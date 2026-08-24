@@ -265,7 +265,7 @@ export function CyberIncidentWizard() {
           {(draft.ncaReportable || draft.pdplReportable || draft.samaReportable) && (
             <div className="wf-summary" style={{ gridColumn: '1 / -1' }}>
               {draft.ncaReportable  && <Badge tone="info">NCA</Badge>}{' '}
-              {draft.pdplReportable && <Badge tone="warning">PDPL Art. 23 — 72h</Badge>}{' '}
+              {draft.pdplReportable && <Badge tone="warning">PDPL Art. 20 — 72h</Badge>}{' '}
               {draft.samaReportable && <Badge tone="info">SAMA</Badge>}
             </div>
           )}

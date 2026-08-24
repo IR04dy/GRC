@@ -90,7 +90,7 @@ public class AiSuggestionService {
             "Internal investigation, remediation cost, and management attention"));
         if (in.categoryCode() != null && in.categoryCode().toUpperCase().contains("CYBER")) {
             causes.add("Threat-actor exploitation of a known vulnerability");
-            consequences.add("Data exfiltration triggering PDPL Article 23 (72-hour notification)");
+            consequences.add("Data exfiltration triggering PDPL Article 20 (72-hour notification)");
         }
         if (in.categoryCode() != null && in.categoryCode().toUpperCase().contains("PRIVACY")) {
             causes.add("Personal data processed without explicit consent or legal basis");
