@@ -120,12 +120,17 @@ public class RegulatorPackageService {
                 e.getValidTo() == null ? "" : e.getValidTo().toString(), nz(e.getEvidenceHash())
             });
 
+        // F2-326: carry the ROLE the actor held at the time, next to the actor. The unified viewer
+        // (AuditLogPage) renders "<user> · <role>" and the BCM evidence package (F2-325) carries both;
+        // user_role is co-populated exactly with user_username (0 rows carry one without the other, both
+        // databases), so it adds no blank, and it is the field an auditor reads for a segregation-of-duties
+        // check (F2-54). A row with no principal blanks the actor rather than fabricating one (F2-213).
         byte[] auditTrail = writeXlsx(brandColor, "Audit Trail",
-            new String[]{"Time (UTC)", "Action", "Module", "Entity", "Code", "User", "Severity", "Message"},
+            new String[]{"Time (UTC)", "Action", "Module", "Entity", "Code", "User", "Role", "Severity", "Message"},
             audit, a -> new String[]{
                 a.getCreatedAt() == null ? "" : a.getCreatedAt().format(TS), nz(a.getActionType()),
                 nz(a.getSourceModule()), nz(a.getEntityType()), nz(a.getEntityCode()),
-                nz(a.getUserUsername()), nz(a.getSeverity()), nz(a.getMessage())
+                nz(a.getUserUsername()), nz(a.getUserRole()), nz(a.getSeverity()), nz(a.getMessage())
             });
 
         byte[] readme = readmePdf(orgName, o == null ? null : o.getNameAr(), brand, brandColor, now,
