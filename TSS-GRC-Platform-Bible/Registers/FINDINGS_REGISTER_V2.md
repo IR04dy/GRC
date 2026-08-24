@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-348 — a malformed date string returned an opaque 500 instead of a 400
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a client-input error surfacing as an opaque 500. Several controllers and intake adapters parse a caller-supplied date field with a manual `LocalDate.parse(...)` / `LocalDateTime.parse(...)` (`AuditEngagementController:88`, `EsgMetricController:80`, `NdiOperationalExcellenceKpiController:90`, `OutsourcingController:252`, `BreachPromotionAdapter`, `PolicyExceptionPromotionAdapter`, `ChangePromotionAdapter`, …), rather than a typed `@RequestParam LocalDate` (which `MethodArgumentTypeMismatchException` already maps to 400). `DateTimeParseException` is a `java.time` `RuntimeException`, not an `IllegalArgumentException`, so `handleIllegal` never caught it and it matched only `@ExceptionHandler(Exception.class)` → `handleGeneral` → opaque 500. A user submitting a form with a mistyped date got *"An unexpected error occurred"* + a correlation id (in prod SEC-CFG-001 strips the class), indistinguishable from an outage. |
+| **Registers** | none — an exception-routing defect in `GlobalExceptionHandler`. No data. |
+| **Standards** | RFC 7807 ProblemDetail; the F2-227 / [[F2-339]] opaque-500 family (a real, classifiable exception dressed as an internal error). |
+| **Found by** | Sweeping `LocalDate.parse` / `LocalDateTime.parse` / `Instant.parse` on caller-derived strings, then checking `GlobalExceptionHandler` for a `DateTimeParseException` / `DateTimeException` handler — there is none, and `DateTimeParseException` is not an `IllegalArgumentException`, so it falls to the catch-all. [[F2-339]]'s own note pointed here: *"asking F2-227's question of the OTHER opaque-500 family."* |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — the defect is one of ROUTING, so the load-bearing leg asserts Spring's own resolution: `new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(<DateTimeParseException>)` resolves to `handleBadDate`, not `handleGeneral`. Plus a direct-call leg (400, no class/root leak) and a verbose leg (class surfaced under `verboseErrors`). Pre-fix control ([[F2-274]] / [[F2-287]]): disabling ONLY the `@ExceptionHandler(DateTimeParseException.class)` annotation (keeping the method so the direct-call legs still compile — [[F2-339]]'s exact control) turns the routing leg RED (`expected "handleBadDate" but was "handleGeneral"`); fix committed first ([[F2-297]]). 21/21 `GlobalExceptionHandlerTest`; full backend suite green. No migration. |
+
+### Fix
+
+One `@ExceptionHandler(DateTimeParseException.class)` → 400, mirroring F2-339's `NoResultException` → 404: it closes every manual-date-parse site platform-wide in one place. 400 is unambiguous — a parse failure means the string did not match the expected date format, which only a caller (or a malformed stored value) can produce; the server never mints a date string it then fails to parse. The class name and root message stay dev-only (SEC-CFG-001), the same gate as the catch-all.
+
+### Scope
+
+`MethodArgumentTypeMismatchException` (already handled → 400) covers Spring's own conversion of a typed `@RequestParam LocalDate`; this handler covers the MANUAL `.parse(string)` sites, a disjoint population. `DateTimeException` (invalid date components, zone-rules errors) is deliberately NOT handled — a parse failure is unambiguously caller input, while a general `DateTimeException` could be a server bug that a 400 would hide. The per-site alternative (a try/catch at each of the ~8 sites) was rejected: one handler is the smaller, F2-339-consistent change.
+
 ## F2-347 — an exercise-observation gap title overflowed the 255-char title_en column when the run code was long
 
 | | |

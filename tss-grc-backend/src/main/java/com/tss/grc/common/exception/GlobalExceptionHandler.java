@@ -28,6 +28,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -327,6 +328,35 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         pd.setTitle("Bad Request");
         pd.setType(URI.create("https://grc.tss.com/errors/bad-request"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * F2-348 — a malformed date STRING returned an opaque 500. Several controllers and intake
+     * adapters parse a caller-supplied date field with a manual {@code LocalDate.parse(...)} /
+     * {@code LocalDateTime.parse(...)} rather than a typed {@code @RequestParam LocalDate} (which
+     * {@link MethodArgumentTypeMismatchException} already covers). {@link DateTimeParseException}
+     * is a {@code java.time} {@code RuntimeException}, not an {@link IllegalArgumentException}, so
+     * {@link #handleIllegal} never caught it and it fell through to {@link #handleGeneral} — a 500
+     * for unambiguously bad client input. Same opaque-500 family as F2-227 (optimistic lock) and
+     * F2-339 ({@code NoResultException}).
+     *
+     * <p>400 is unambiguous: a parse failure means the string did not match the expected date
+     * format, which only a caller (or a malformed stored value) can produce — the server never
+     * mints a date string it then fails to parse. Class and root message stay dev-only
+     * (SEC-CFG-001), the same gate as the catch-all.
+     */
+    @ExceptionHandler(DateTimeParseException.class)
+    public ProblemDetail handleBadDate(DateTimeParseException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+            "A date value could not be parsed. Expected an ISO date (e.g. 2026-08-25) or date-time.");
+        pd.setTitle("Invalid Date");
+        pd.setType(URI.create("https://grc.tss.com/errors/invalid-date"));
+        if (verboseErrors) {
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }
