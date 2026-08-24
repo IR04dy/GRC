@@ -63,10 +63,12 @@ export function RiskLifecyclePage() {
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribeRiskLifecycle(() => setTick(t => t + 1)), []);
 
-  // Sprint 4 §2.7 — also tick when the backend pushes a treatment-plan
-  // transition. Combines local + remote events through the same `_tick` so the
-  // page re-derives memoised data from either source.
-  useRealtimeOrgEvent('changed.treatment_plan', () => setTick(t => t + 1));
+  // Sprint 4 §2.7 — also react when the backend pushes a treatment-plan
+  // transition from ANOTHER user. F2-327: a broadcast means the server's copy
+  // has moved, so `_plans` must be RE-FETCHED (hydrateTreatmentPlans(true)) —
+  // a bare setTick only re-renders the stale local cache, leaving the
+  // subscription inert for the cross-user updates it exists to deliver (F2-205).
+  useRealtimeOrgEvent('changed.treatment_plan', () => { void hydrateTreatmentPlans(true).then(() => setTick(t => t + 1)); });
 
   const stats = useMemo(() => aggregateRiskLifecycle(), [_tick]);
   const plans = useMemo(() => plansForRisk(riskId), [riskId, _tick]);
