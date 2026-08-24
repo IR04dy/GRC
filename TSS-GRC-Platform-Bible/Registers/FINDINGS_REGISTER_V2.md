@@ -15219,6 +15219,59 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-329 — a cyber action plan could be created with a forged escalation trail, silently defeating its overdue sweep
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — `CyberController#saveActionPlan` binds the `CyberActionPlan` entity, so a `CYBER:WRITE` holder could `POST` with `escalatedAt` already set. `CyberActionPlanSlaScheduler` selects `…EscalatedAtIsNull…` for its escalation pass and skips reminders when `escalatedAt != null`, so the plan — a cyber remediation — is **never escalated when overdue and never chased**, from a single POST. A caller can also be born COMPLETED with a forged `completedAt`, and forge `reminderCount`/`lastReminderAt`. No escalation (all four routes are `CYBER:WRITE`) — a control-defeat, not a permission bypass. |
+| **Registers** | `cyber.cyber_action_plans` |
+| **Standards** | NCA ECC remediation SLA (overdue escalation / reminders); the complete action as a dated step |
+| **Found by** | the `mass-assignment-risk.txt` NEEDS-VERDICT backlog ([[F2-218]]) — `CyberController#saveActionPlan(CyberActionPlan) :: escalatedAt,workflowStatus`, read against the service and the scheduler. |
+| **Verification** | unit tests (a born-COMPLETED create is refused; the scheduler/complete trail is scrubbed on create); full hermetic build 4744 → 4746/0/0. No live probe: a synchronous create-guard with no database / tenant / auth dimension a mock cannot see ([[F2-325]]/[[F2-326]]/[[F2-327]]/[[F2-328]]'s calibrated standard). |
+
+### The create is F2-213's defect on the path its gate cannot see
+
+[[F2-213]] found that a service persisting the bound request entity erases/forges everything the
+request should not own, and built `FullReplaceUpdateContractTest` — a structural hard zero that no
+method may **load a `T` and persist its own `T` parameter**. That catches the UPDATE shape (load, then
+save the request); it is blind to the CREATE shape (a new entity bound from the request, saved without
+a load). `saveActionPlan` is exactly that: it set `titleEn`/`organisationId`/`isDeleted` and
+`save(ap)`, persisting the caller's `escalatedAt` / `lastReminderAt` / `reminderCount` / `completedAt` /
+`workflowStatus`. F2-213 scrubbed these on the UPDATE path (`applyEditable`, whose own comment lists
+them as *"written by the scheduler … and the source link at creation"*) and **left the create** —
+[[F2-215]]'s two-of-N. [[F2-328]] is the same shape on the vuln-exception register, one slice earlier.
+
+### 🔑 The sharp field is `escalatedAt` — it does not display wrong, it defeats a control
+
+`CyberActionPlanSlaScheduler`'s escalation pass is
+`findByWorkflowStatusNotInAndEscalatedAtIsNullAndDueDateBefore(TERMINAL, today)` and its reminder pass
+does `if (ap.getEscalatedAt() != null) continue;`. The CY-E comment says `escalatedAt` *"guards the
+sweep so an overdue plan is escalated exactly once."* So a plan **created** with `escalatedAt` already
+set is read as already-escalated: excluded from the escalation query, suppressed from reminders. A
+cyber remediation can be filed overdue-destined and then sit overdue forever — no escalation to
+management, no reminder to the owner — from a single POST. Not a cosmetic forgery (F2-328 was a
+fabricated approval); a functional defeat of the SLA sweep, which is why it is the sharper instance.
+
+### The fix
+
+`saveActionPlan` scrubs `escalatedAt` / `lastReminderAt` / `reminderCount` / `completedAt` (all
+scheduler- or complete-owned) and refuses `workflowStatus == "COMPLETED"` (a 400 naming
+`POST /api/v1/cyber/action-plans/{id}/complete`). Null-safe `equalsIgnoreCase`, so an omitted status
+keeps the entity's `OPEN` initialiser. The 5-state lifecycle is undesigned (no CHECK, no machine —
+[[F2-221]]), so only the terminal COMPLETED is withheld; the review states (OPEN / IN_PROGRESS /
+CANCELLED) stay caller-settable — forcing a single initial state would break the informal advance
+([[F2-214]]). Two unit tests.
+
+### Filed
+
+The create-side of [[F2-213]] is a **population**, not two incidents: `mass-assignment-risk.txt`'s
+CREATE rows are the census, and `FullReplaceUpdateContractTest` is blind to all of them (it is an
+UPDATE-shape gate). [[F2-328]] and F2-329 are two members read and fixed; the rest await per-member
+reading, not a sweep ([[F2-188]]). And `updateActionPlan`'s `applyEditable` still sets `workflowStatus`
+from the request, so an edit can jump to COMPLETED — the same undesigned-machine question filed at
+[[F2-328]]/[[F2-221]].
+
 ## F2-328 — a vulnerability exception could be created born-APPROVED with a forged approval date
 
 | | |
