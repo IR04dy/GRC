@@ -151,12 +151,32 @@ that password 401s, and a login attempt costs a lockout counter) ·
 Full persona list: PROJECT_CHRONICLE §4.
 
 Grants matter as much as passwords when probing authorization. Read them from
-`iam.role_permissions` rather than inferring from the username — the useful shapes
-are `so_officer` (EVIDENCE_READ+WRITE, RISK_READ, **CYBER_READ *and* CYBER_WRITE** — this
-line said READ only until 2026-08-06 and the omission cost a probe iteration; **no**
-COMPLIANCE/BCM; ROLE_CISO), `ranalyst` (EVIDENCE+RISK+COMPLIANCE reads, **no** BCM/CYBER/PRIVACY/TPRM)
-and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them they cover
-"holds the module permission", "holds the role but not the permission", and neither.
+`iam.role_permissions` rather than inferring from the username — and rather than from a
+description here. ⚠⚠ **This paragraph used to enumerate them and was wrong** (F2-314): it named
+**5 of `so_officer`'s 60** grants and asserted *"**no** COMPLIANCE/BCM"* when it holds `BCM:EXPORT`
+— V320 granted it so `BcpBinderController#download`'s AND would not deny the CISO, and the comment
+above that guard says so. 🔑 **An enumeration is a copy of a measurement and goes stale; a denial is
+what a 403 expectation actually rests on.** The matrix is published as **§G of
+`Appendix/ROLE_GUARD_CENSUS.md`**, regenerated per database by `role_guard_census.py`.
+
+What is structural, and therefore safe to state here:
+
+- **The three shapes the paragraph exists for still hold**: `so_officer` holds a module permission,
+  `ranalyst` holds the role and not the permission, and neither covers the third case.
+- **`ranalyst` is the genuinely narrow one** — measured, its four denials (`BCM`, `CYBER`, `PRIVACY`,
+  `TPRM`) are all still correct, which is why it is the right persona for an "expected 403" leg.
+- ⚠ **`auditor` is far wider than the old wording suggested** — 62 grants over **31 of 37**
+  modules, against `rmanager`'s 22 and `ranalyst`'s 13 — so it is the wrong persona to reach for as
+  "low-privilege"; its apparent narrowness was an artefact of describing it by three grants. (The
+  widest is `compliance` at **35 of 37**, missing only `CYBER`. ⚠ I first wrote "auditor is the
+  widest" here and the matrix I had just generated refuted it — a comparative claim in prose is the
+  same copy-of-a-measurement this whole correction is about.)
+- ⚠ **`viewer` is not read-only, it is read-AND-export**: it holds `EXPORT` in every module where it
+  holds `READ`, statutory registers included. Coherent — the export invariant ANDs a READ — but not
+  what the name suggests.
+- ⚠ **`so_officer` holds no `COMPLIANCE` and no `PRIVACY` grant at all** (F2-209 measured the second),
+  and it holds `TPRM:APPROVE`, `CAPA:APPROVE`, `CHANGE:APPROVE`, `WORKFLOW:DELETE` and
+  `IAM:BREAK_GLASS` — a persona the old wording made read as narrow.
 
 ---
 
@@ -1872,6 +1892,10 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **CONTAINMENT IS A PROPERTY OF A GUARD'S COMPOSITION, NOT OF A MODULE — AND THE DIRECTION IS THE WHOLE QUESTION** (F2-314, measured 2026-08-24). Asking [[F2-313]]'s mirror — *which roles can ACT on a module without being able to READ it?* — needed two corrections before it meant anything. *"Acting without that module's READ"* reported **27** rows and is the wrong unit: `BOARD:EXPORT` ANDs **`ADMIN:READ`**, a *different* module's read, so 🔑 **the guard names which READ matters and the module boundary does not.** Per composed guard it reported **60**, and holding `CHANGE:READ` without `CHANGE:EXPORT` is **least privilege working** — only the **acting half without the gating half** is interesting. Corrected: **two rows**, and both documented.
+  ⚙ **The documentation was in a comment above the guard**: `BcpBinderController#download` records that *"V320 grants BCM:EXPORT to CISO and CFO … without that grant the AND would have denied two roles the endpoint has always permitted."* So the grant exists solely to satisfy one composed guard's AND, is load-bearing there, and is insufficient on three siblings it was never meant to reach. 🔑 **Neither granting the READ nor revoking the EXPORT is a pure improvement** — one widens access to a customer's continuity plans, the other breaks the binder download — so there is nothing to fix. Probed 7/7: the same role is **403** on `/bcm/plans/{id}/export.pdf` and **200** on `/bcm/plans/{id}/binders`.
+  ⚠⚠ **THE DEFECT WAS IN THE PERSONA GUIDE THE PROBE WAS DESIGNED FROM.** This file's own persona-grant paragraph named **5 of `so_officer`'s 60** grants and asserted *"**no** COMPLIANCE/BCM"* — COMPLIANCE right, **BCM false**. 🔑 **Several slices here have chosen probe personas from that line, and a probe expecting 403 where the persona holds the permission reads as a defect in the code.** `auditor`, described by three grants, holds **62 over 31 of 37** modules — the wrong persona to reach for as low-privilege — and `viewer` is **read-AND-export**, holding `EXPORT` wherever it holds `READ`. The enumerations are **deleted, not corrected** ([[F2-273]]: an enumeration is a copy of a measurement, and that one had gone stale twice, its own text recording the earlier repair); the matrix is published as **§G of `ROLE_GUARD_CENSUS.md`**, derived per database, and only the **denials** stay in prose because a denial is what a 403 expectation rests on.
+  ⚠ **And §G refuted a comparative claim I had just written above it** — *"auditor is the widest read surface"*, when `compliance` is at 35 of 37 — while the section's own *"5 of 60"* had to be derived, since the deployed server's total is 55. **The copy-of-a-measurement defect reappearing inside the section written to remove it.** ⚙ `admin` holds **47 grants over 14 modules, fewer than `auditor` or `compliance`**, because `PLATFORM_ADMIN` bypasses in code — the sharpest illustration yet of *admin proves nothing about authorization*.
 - ⚠⚠ **A CENSUS SCOPED TO THE THING BEING RETIRED CANNOT SEE A DEFECT IN THE THING IT CONVERTS INTO** (F2-313, measured 2026-08-24). `ROLE_GUARD_CENSUS.md`'s §B2b asks *"which pure **role** guards admit nobody, by holder attrition?"* ([[F2-253]]'s question) and **every** section of that report is about role guards, because that is what it was built to track. `hasPermission` is [[F2-05]]'s ratified **destination**, and the identical question had never been put to it. 🔑 **So the instrument measuring the conversion backlog was blind to the half it converts into** — [[F2-198]]'s shape where the narrowing is the artefact's own subject. Joining the pairs guards cite (the artefact `PermissionCatalogueUsageTest` publishes) against **active** holders: **dev 7 of 131 pairs closing 36 routes, prod 5 of 131 closing 34** (now §F of that report, per database).
   ⚠⚠ **THE LIVE ONE IS A WHOLE MODULE: `PLATFORM:READ`/`WRITE`/`EXPORT` are granted to `ORG_ADMIN` alone, which has no active user**, so `module/platform`'s 29 routes are reachable by a platform administrator and nobody else — `/issues` and `/calendar` are **both sidebar-linked**, plus departments, file upload, branding writes and tenant onboarding. Probed 13/13: all six real personas **403 on every Issue route including READ**. 🔑 **`CcmService` (third consecutive CRITICAL control-test failure) and `KriBreachService` (a KRI breach) both escalate INTO that register**, so the platform files escalations into a console no non-administrator can open — and because READ is included, nobody can see that they exist. **When you find a register a scheduler writes to, ask who can read it.**
   ⚙ **`CHANGE:DELETE`, `REPORTING:DELETE`, `CPTY:APPROVE`, `AML:REFRESH_LISTS`** are the others; [[F2-260]] filed one, [[F2-293]] another, `CHANGE:DELETE` none — [[F2-266]]'s headline, **filings one at a time is what a population looks like when nothing counts it.** ⚙ All seven are granted to a role that **exists and is seated in nobody**, so [[F2-282]]'s precedent on this very role holds: **seat `ORG_ADMIN`, do not widen the grant** — granting `PLATFORM` to `GRC_ADMINISTRATOR` hands the GRC content administrator the branding, tenant-onboarding and department registers, which is a different job family and wider than the shipped audience.

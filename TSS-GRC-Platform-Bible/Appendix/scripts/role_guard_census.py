@@ -530,6 +530,57 @@ def main():
         emit("pending), so counting them would close routes a caveat below denied were closed.")
     emit()
 
+    # ── G. what each dev persona actually holds ─────────────────────────────────────────────
+    emit("## G. Persona grant surface (F2-314)")
+    emit()
+    emit("`CLAUDE.md` used to enumerate this in prose so a slice could pick the right persona for an")
+    emit("authorization probe. It named **five** of `so_officer`\'s grants and asserted *\"no")
+    emit("COMPLIANCE/BCM\"* while it holds `BCM:EXPORT`. 🔑 **An enumeration is a copy of a")
+    emit("measurement and goes stale; the derivation does not.** So the matrix lives here and that")
+    emit("paragraph points at it. (The *five* is a historical fact about what that paragraph said;")
+    emit("the total it should have given is in the table below, **derived** — writing it here would")
+    emit("repeat the defect, and on the deployed server the number differs.)")
+    emit()
+    emit("⚠ A **denial** is the load-bearing claim — it is what an \"expected 403\" leg rests on — so")
+    emit("the modules a persona holds NOTHING in are listed explicitly rather than left implicit.")
+    emit()
+    c.execute("""SELECT u.username, r.role_name
+                   FROM iam.users u
+                   JOIN iam.user_roles ur ON ur.user_id = u.id
+                   JOIN iam.roles r ON r.id = ur.role_id AND r.is_deleted = 0
+                  WHERE u.is_active = 1 AND u.is_deleted = 0""")
+    persona_roles = {}
+    for user, role in c.fetchall():
+        persona_roles.setdefault(user, []).append(role)
+
+    c.execute("""SELECT u.username, p.module, p.action
+                   FROM iam.users u
+                   JOIN iam.user_roles ur ON ur.user_id = u.id
+                   JOIN iam.roles r  ON r.id = ur.role_id AND r.is_deleted = 0
+                   JOIN iam.role_permissions rp ON rp.role_id = r.id
+                   JOIN iam.permissions p ON p.id = rp.permission_id
+                  WHERE u.is_active = 1 AND u.is_deleted = 0""")
+    persona_grants = {}
+    for user, mod, act in c.fetchall():
+        persona_grants.setdefault(user, {}).setdefault(mod, set()).add(act)
+
+    all_modules = sorted({m for g in persona_grants.values() for m in g})
+    emit("| Persona | Roles | Grants | Modules | Holds nothing in |")
+    emit("|---|---|---|---|---|")
+    for user in sorted(persona_grants):
+        mods = persona_grants[user]
+        total = sum(len(a) for a in mods.values())
+        absent = [m for m in all_modules if m not in mods]
+        emit("| `%s` | %s | %d | %d of %d | %s |" % (
+            user,
+            ", ".join("`%s`" % r for r in sorted(persona_roles.get(user, []))),
+            total, len(mods), len(all_modules),
+            ", ".join("`%s`" % m for m in absent) if absent else "— (holds something everywhere)"))
+    emit()
+    emit("⚠ `admin` is `PLATFORM_ADMIN` and **bypasses in code**, so its row describes grants that")
+    emit("are never consulted: it proves nothing about authorization either way.")
+    emit()
+
     emit("## D. Conversion backlog by module")
     emit()
     emit("F2-05 is sized S per module. Order by count, but read section B first: a module carrying")
