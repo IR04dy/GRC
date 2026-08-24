@@ -15219,6 +15219,62 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-319 — the automation engine runs on a pool thread, so no publisher could set its tenant
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | **P2** — latent, and unconditional: not "when a caller forgets" but *always*. |
+| **Registers** | `platform.automation_rule_runs`, `platform.audit_log` |
+| **Standards** | multi-tenancy; audit integrity |
+| **Found by** | Asking [[F2-318]]'s question of the **other** off-request entry points — `@Async`, `@EventListener`, `@TransactionalEventListener` |
+| **Verification** | 3 new legs (13/13); mutations **3/3 killed**; suite **4721 → 4724/0/0** |
+
+### The population, and the one member
+
+**4 such entry points, 3 write audit rows, 1 anchored no tenant**:
+`AutomationRuleEngine#onDomainEvent`, which carries `@Async` **and** `@EventListener` on one method.
+`@EnableAsync` is present on `GrcApplication`, so it runs on a **pool thread** — and `TenantContext`
+is a `ThreadLocal`.
+
+So `AuditLogService`'s `org != null ? org : 1L` applied to **every** audit row the engine and
+`AutomationActionExecutor` write — **nine sites** — **unconditionally**.
+
+### 🔑 Why this is structurally different from F2-317 and F2-318
+
+There the tenant was absent because nobody set it, and a caller *could in principle* have. **Here the
+ThreadLocal does not cross the async boundary, so no publisher could ever have helped.** That is what
+makes one anchor at the **thread boundary** the right fix rather than nine at the writers — and it is
+the answer to "the caller should have set it", which is not available.
+
+### The tell, three lines from the defect
+
+`recordRun` does `r.setOrganisationId(rule.getOrganisationId())` **explicitly**; the
+`audit.recordEvent` beside it took the fallback. The run row org-correct, the audit row not — fifth
+instance of that asymmetry in this family.
+
+### Latent, and the seeded rows nearly said otherwise
+
+All **673** automation runs in dev and **217** in prod are organisation 1. There *are* 10
+organisation-2 `RULE_FIRED` audit rows, which looked at first like the defect having fired — but four
+share **one timestamp to the second** (the bulk-write fingerprint, [[F2-256]]'s rule) and there are
+**zero** organisation-2 runs, so they are seeded. The 13 rules each in organisations 2 and 3 have
+never fired. 🔑 **The observable when one does is that the two tables disagree**: the run row in its
+own tenant, the audit row in tenant 1.
+
+### ⚠ The restore matters more on a pool thread
+
+A scheduler owns its thread for the run; a **pool thread is reused**, so a tenant left set leaks into
+the next event — a rule for one organisation audited under whichever organisation the previous task
+belonged to. That mutation is killed, and so is one replacing the anchor with a literal `1L`.
+
+⚙ The `event.organisationId() == null` refusal stays **before** the anchor, deliberately:
+`setCurrentTenant(null)` would put the thread back into exactly the state the fallback exists for.
+
+### Filed
+
+* Nothing new. Per-row `REQUIRES_NEW` stands as [[F2-317]] filed it.
+
 ## F2-318 — the other three off-request audit writers, and three of the four wrote the org into the prose
 
 | | |
