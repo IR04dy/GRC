@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-344 — the 72-hour PDPL breach notification was mis-cited as Article 23 (the DSR article) across the crisis module and UI
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a wrong statutory citation on regulator-facing content (no wrong figure or broken deadline; the 72-hour window itself is correct, only the cited PDPL article was wrong). The 72-hour SDAIA personal-data-breach notification is PDPL **Article 20** — the canonical `lib/moduleAnchors.ts` records it (`Article 20 → "Data-breach 72-hour notification window"`), and the `privacy` / `data_officer` modules cite it. **Article 23 is the data-subject-request 30-day article.** The crisis (`module/bcm/cycle`) module and several UI surfaces mis-cited the 72-hour breach as Article 23, so an operator / DPO reading the regulator countdown, the After-Action Report or the breach wizard saw the wrong legal basis. |
+| **Registers** | citation text (not data): `module/bcm/cycle` (RegulatorCountdownService legal basis, CrisisAarService AAR line, BcmAuditCompletionService drafter message + audit line, CrisisEvent/Controller comments), `module/ai` (AiSuggestionService consequence), `module/platform/completion` (PrivacyGapService), and FE `bcmRegulatorCountdown.ts`, `workflowCatalog.ts` (EN + Arabic), `CyberIncidentWizard`, `BuyerGapPage`, `BreachNotificationWizard`. |
+| **Standards** | PDPL Article 20 (72-hour breach notification) vs Article 23 (data-subject rights, 30-day); the [[F2-207]] / [[F2-214]] / [[F2-281]] citation-correctness family; canonical source is `lib/moduleAnchors.ts` (the regulator-citation catalogue W2-1a-i deliberately keeps). |
+| **Found by** | [[F2-215]]'s two-of-N: [[F2-214]] fixed one wizard's two Article-23 citations and its own note (`BreachNotificationWizard.tsx`) said it fixed *"two places"* — leaving the family, which the wrong comments then propagated through the crisis module. Grepping every `Article 23` / `Art. 23` / `المادة ٢٣` and classifying breach-context vs DSR found 24 breach-context mis-citations across 13 files. |
+| **Verification** | hermetic — a wrong citation is text, and only a live probe could see it rendered, so it is pinned structurally ([[F2-320]] / [[F2-325]]). `PdplBreachArticleCitationTest` (cross-codebase, reads both trees) has three legs: no source line ties an Article-23 citation to a 72-hour / breach context (line-scoped, with a DSR disambiguator so *"Article 23 is the 30-day data-subject article"* is not a violation, and stripping is unnecessary because the correct header carries no 72/breach on the Article-23 line); `moduleAnchors.ts` keeps the canonical Article 20 ↔ breach / Article 23 ↔ DSR mapping; and a self-test that the detector fires on a synthetic mis-citation and spares the DSR article. Pre-fix control ([[F2-274]] / [[F2-287]]): reverting one canonical citation turns the scan leg RED naming exactly that line while the anchor + self-test stay green; the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). Backend build + `tsc` + FE suite (827/827) green. |
+
+### Why it spread — and why the comments were fixed too
+
+F2-214 corrected the two rendered citations it noticed in `BreachNotificationWizard` and left the rest, including the crisis entity's own comment (`CrisisEvent` — *"PDPL Article 23 72-hour deadline"*) which the drafter, controller, AAR and countdown all copied. A wrong comment is the input to the next reader's citation ([[F2-184]] / [[F2-205]]), so this slice fixed the comments as well as the rendered strings — otherwise the gate (which scans source, comments included) could not be a clean hard zero, and the error would re-propagate.
+
+### Scope — what was left untouched
+
+The correct DSR / 30-day **Article 23** citations (`DsrRequestLifecycle`, `dsrLifecycle.ts`, `moduleAnchors.ts:49`, `entityAnchors.ts`, `PrivacyService`, the DSR lifecycle tests) and the generic placeholder examples (`"e.g. PDPL Art. 23"` in wizard input hints and `submitWizard`/`WorkflowSubmission` docs) are correct and unchanged. The separate question of whether the DSR 30-day clock is Article 23 or Article 4 (both are cited in the tree) is a distinct citation-consistency matter, deliberately out of scope.
+
 ## F2-343 — the fraud dashboard's "Open Cases" headline counted a stale inclusion list, dropping the non-terminal outcome states
 
 | | |
