@@ -12,6 +12,7 @@ import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -353,6 +354,34 @@ public class GlobalExceptionHandler {
             "A date value could not be parsed. Expected an ISO date (e.g. 2026-08-25) or date-time.");
         pd.setTitle("Invalid Date");
         pd.setType(URI.create("https://grc.tss.com/errors/invalid-date"));
+        if (verboseErrors) {
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * F2-349 — an oversized upload returned an opaque 500. The platform configures
+     * {@code spring.servlet.multipart.max-file-size} (50 MB) and has multipart upload endpoints
+     * (attachments, evidence, file upload), so a file over the limit throws
+     * {@link MaxUploadSizeExceededException} during multipart parsing. It is a
+     * {@code MultipartException} / {@code RuntimeException} matched by no handler here, so it fell
+     * through to {@link #handleGeneral} — a 500 that reads as an outage rather than "your file is
+     * too large." Same opaque-500 family as F2-227, F2-339 and F2-348.
+     *
+     * <p>413 Payload Too Large is the precise status; the limit is derived from the exception
+     * ({@code getMaxUploadSize()}) so the message names it without duplicating the config value.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        long maxBytes = ex.getMaxUploadSize();
+        String limit = maxBytes >= 0 ? (maxBytes / (1024 * 1024)) + " MB" : "the maximum allowed size";
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE,
+            "The uploaded file exceeds " + limit + ".");
+        pd.setTitle("File Too Large");
+        pd.setType(URI.create("https://grc.tss.com/errors/file-too-large"));
         if (verboseErrors) {
             pd.setProperty("exception", ex.getClass().getName());
             pd.setProperty("rootCause", rootMessage(ex));

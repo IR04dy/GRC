@@ -357,6 +357,45 @@ class GlobalExceptionHandlerTest {
             .isEqualTo("handleBadDate");
     }
 
+    // ─── F2-349: an oversized upload throws MaxUploadSizeExceededException during multipart
+    //             parsing — a MultipartException matched by no handler, so it fell to the opaque
+    //             500 catch-all; it is 413 Payload Too Large. ─────────────────────────────────
+    @Test
+    void uploadTooLarge_returns413NotOpaque500() {
+        ProblemDetail pd = handler.handleUploadTooLarge(
+            new org.springframework.web.multipart.MaxUploadSizeExceededException(50L * 1024 * 1024));
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(pd.getTitle()).isEqualTo("File Too Large");
+        assertThat(pd.getDetail()).contains("50 MB");   // limit derived from getMaxUploadSize()
+        // SEC-CFG-001: base/prod must not leak the exception class or root message.
+        assertThat(pd.getProperties()).doesNotContainKey("exception");
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+    }
+
+    @Test
+    void uploadTooLarge_verbose_surfacesExceptionClassButKeepsThe413() {
+        ProblemDetail pd = verboseHandler().handleUploadTooLarge(
+            new org.springframework.web.multipart.MaxUploadSizeExceededException(50L * 1024 * 1024));
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(pd.getProperties().get("exception"))
+            .isEqualTo(org.springframework.web.multipart.MaxUploadSizeExceededException.class.getName());
+    }
+
+    /**
+     * F2-349 — the defect is one of ROUTING (F2-339 / F2-348's shape): before the dedicated handler
+     * a MaxUploadSizeExceededException matched only {@code @ExceptionHandler(Exception.class)}, so
+     * Spring's own resolver sent it to {@code handleGeneral} → opaque 500. This asserts the
+     * resolution, which is what a revert of the @ExceptionHandler annotation would break.
+     */
+    @Test
+    void springRoutesMaxUploadSizeToTheDedicatedHandler_notHandleGeneral() {
+        ExceptionHandlerMethodResolver resolver =
+            new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+        assertThat(resolver.resolveMethod(
+                new org.springframework.web.multipart.MaxUploadSizeExceededException(1024L)).getName())
+            .isEqualTo("handleUploadTooLarge");
+    }
+
     /** A genuine DateTimeParseException, built by triggering a real parse (its constructor is fiddly). */
     private static java.time.format.DateTimeParseException parseFailure(String bad) {
         try {
