@@ -213,7 +213,7 @@ class CorrectiveActionServiceTest {
     @Test
     void aggregate_dueSoonWindows_respectConfiguredDays() {
         LocalDate today = LocalDate.now();
-        when(repo.findByOrganisationIdAndStatusIn(eq(ORG_ID), any())).thenReturn(List.of(
+        when(repo.findByOrganisationIdAndStatusNotIn(eq(ORG_ID), any())).thenReturn(List.of(
             dued(today.minusDays(1)),   // overdue
             dued(today.plusDays(3)),    // within 7d + 30d
             dued(today.plusDays(15)),   // within 30d, outside 7d
@@ -385,13 +385,51 @@ class CorrectiveActionServiceTest {
         car.setActionType("CORRECTIVE");
         CorrectiveAction par = action("OPEN", "Sara");
         par.setActionType("PREVENTIVE");
-        when(repo.findByOrganisationIdAndStatusIn(eq(ORG_ID), any()))
+        when(repo.findByOrganisationIdAndStatusNotIn(eq(ORG_ID), any()))
             .thenReturn(List.of(car, par));
         stubCapaWindows(7, 30);
 
         @SuppressWarnings("unchecked")
         Map<String, Integer> byType = (Map<String, Integer>) service.aggregate().get("byType");
         assertThat(byType).containsEntry("CORRECTIVE", 1).containsEntry("PREVENTIVE", 1);
+    }
+
+    // ── F2-341 (F2-336 family) — "outstanding" is the complement of TERMINAL ──
+
+    @Test
+    void aggregate_countsTheTerminalComplement_notATwoTokenSubset() {
+        // aggregate() must query the complement of TERMINAL_STATUSES so a
+        // COMPLETED or VERIFIED CAPA (both non-terminal — VERIFIED is documented
+        // here as "awaiting closure") is still counted as outstanding. The IFRS
+        // S2 / TCFD annual report reads the same population; before F2-336 it
+        // typed List.of("OPEN","IN_PROGRESS") and dropped the other two.
+        when(repo.findByOrganisationIdAndStatusNotIn(
+                eq(ORG_ID), eq(CorrectiveActionService.TERMINAL_STATUSES)))
+            .thenReturn(List.of(
+                action("OPEN", "a"), action("IN_PROGRESS", "b"),
+                action("COMPLETED", "c"), action("VERIFIED", "d")));
+        stubCapaWindows(7, 30);
+
+        Map<String, Object> agg = service.aggregate();
+        assertThat(agg).containsEntry("activeTotal", 4);
+        assertThat(agg).containsEntry("completed", 1);
+        assertThat(agg).containsEntry("verified", 1);
+        // The old inclusion-list query is gone — no reader types the open set.
+        verify(repo, never()).findByOrganisationIdAndStatusIn(any(), any());
+    }
+
+    @Test
+    void outstandingComplementIsExactlyTheFourNonTerminalStates() {
+        // Single source of truth: "outstanding" = STATUSES \ TERMINAL_STATUSES.
+        // Pins the vocabulary so neither reader can drift to a subset, and a new
+        // state added to STATUSES is forced through this assertion (F2-336/F2-196).
+        assertThat(CorrectiveActionService.STATUSES)
+            .containsAll(CorrectiveActionService.TERMINAL_STATUSES);
+        java.util.Set<String> outstanding =
+            new java.util.HashSet<>(CorrectiveActionService.STATUSES);
+        outstanding.removeAll(CorrectiveActionService.TERMINAL_STATUSES);
+        assertThat(outstanding).containsExactlyInAnyOrder(
+            "OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED");
     }
 
     // ── Helper ──────────────────────────────────────────────────────

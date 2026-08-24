@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.climate.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.AnnualClimateReport;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.CapaEntry;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.FinancedEmissionsResponse;
@@ -109,9 +110,15 @@ public class TcfdReportService {
         // 8. S-G — evidence index (linked items + file names + SHA-256).
         Map<String, Object> evidenceIndex = sustEvidenceLinkService.buildPackage(null);
 
-        // 9. S-G — open / in-progress gaps + corrective actions.
+        // 9. S-G — outstanding (NOT closed / cancelled) gaps + corrective
+        // actions. The old inline List.of("OPEN","IN_PROGRESS") dropped
+        // COMPLETED and VERIFIED, under-reporting the "Open CAPA" figure on the
+        // exported IFRS S2 / TCFD report — while the CAPA tab's own aggregate()
+        // counts all four non-terminal states, and VERIFIED is documented there
+        // as "awaiting closure", i.e. still outstanding. Derive from the single
+        // declared terminal set instead of a second list (F2-336 / F2-196).
         List<CapaEntry> gapsCapa = capaRepo
-                .findByOrganisationIdAndStatusIn(orgId, List.of("OPEN", "IN_PROGRESS")).stream()
+                .findByOrganisationIdAndStatusNotIn(orgId, CorrectiveActionService.TERMINAL_STATUSES).stream()
                 .map(TcfdReportService::toCapaEntry)
                 .toList();
 
