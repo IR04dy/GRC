@@ -1,7 +1,9 @@
 package com.tss.grc.common.exception;
 
+import jakarta.persistence.NoResultException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.BadSqlGrammarException;
@@ -277,5 +279,46 @@ class GlobalExceptionHandlerTest {
         assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
         assertThat(pd.getTitle()).isEqualTo("Transaction rolled back");
         assertThat(pd.getDetail()).contains("retry");
+    }
+
+    @Test
+    void noResult_fromGetSingleResult_returns404NotOpaque500() {
+        // F2-339: a @Service's em.getSingleResult() on a missing/foreign/soft-deleted id throws
+        // jakarta.persistence.NoResultException, which is NOT a Spring DataAccessException, so it
+        // escaped every DB handler and fell through to handleGeneral as an opaque 500. A by-id
+        // lookup returning zero rows is "not found" — 404, honestly.
+        ProblemDetail pd = handler.handleNoResult(new NoResultException("No entity found for query"));
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(pd.getTitle()).isEqualTo("Resource Not Found");
+        assertThat(pd.getDetail()).isEqualTo("The requested record was not found.");
+        // SEC-CFG-001: base/prod (verboseErrors=false) must not leak the exception class or the
+        // JPA root message ("No entity found for query" names the query shape).
+        assertThat(pd.getProperties()).doesNotContainKey("exception");
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+    }
+
+    @Test
+    void noResult_verbose_surfacesExceptionClassButKeepsThe404() {
+        ProblemDetail pd = verboseHandler().handleNoResult(new NoResultException("No entity found for query"));
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(pd.getProperties().get("exception")).isEqualTo(NoResultException.class.getName());
+        assertThat(pd.getProperties().get("rootCause")).isEqualTo("No entity found for query");
+    }
+
+    /**
+     * F2-339 — the defect is one of ROUTING: before the dedicated handler, a NoResultException
+     * (not a Spring DataAccessException) matched only {@code @ExceptionHandler(Exception.class)},
+     * so Spring's own resolver sent it to {@code handleGeneral} → opaque 500. This asserts the
+     * resolution itself, which is what actually changed — and it is what a wholesale revert of the
+     * fix would break (the resolver would pick {@code handleGeneral} again).
+     */
+    @Test
+    void springRoutesNoResultToTheDedicatedHandler_notHandleGeneral() {
+        ExceptionHandlerMethodResolver resolver =
+            new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+        assertThat(resolver.resolveMethod(new NoResultException("No entity found for query")).getName())
+            .isEqualTo("handleNoResult");
     }
 }

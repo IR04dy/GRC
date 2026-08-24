@@ -2,6 +2,7 @@ package com.tss.grc.common.exception;
 
 import com.tss.grc.module.platform.licensing.guard.ModuleDisabledException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.NoResultException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -148,6 +149,39 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setTitle("Resource Not Found");
         pd.setType(URI.create("https://grc.tss.com/errors/not-found"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * F2-339 — a {@code @Service} that reads a row with {@code em.getSingleResult()} throws
+     * {@link NoResultException} when the id is unknown, belongs to another tenant, or is
+     * soft-deleted. It is a {@code jakarta.persistence.PersistenceException}, <b>not</b> a Spring
+     * {@link DataAccessException}, so exception translation never touches it (that applies only to
+     * {@code @Repository} beans) and it escaped every DB handler here, falling through to
+     * {@link #handleGeneral} as a bare <i>"An unexpected database error occurred."</i> 500.
+     *
+     * <p>F2-281 observed exactly this on {@code CyberPdplBridgeService.triggerForIncident}
+     * (<i>"a wrong id is a NoResultException rather than a 404 naming the field"</i>) and filed it;
+     * the same shape is live on {@code EvidenceChainService.verifyChain}/{@code getChainStatus},
+     * reached by {@code GET /evidence-chain/{id}} and {@code POST /evidence-chain/{id}/verify} with
+     * the id taken straight from the path. {@code getSingleResult()} is the only source of this
+     * exception, and every reachable thrower is a by-id lookup where zero rows means <i>not
+     * found</i> — so 404 is unambiguously correct and there is no thrower for which the old 500 was
+     * right. F2-227's lineage: an opaque 500 that cannot be diagnosed from the response gets
+     * rediscovered instead of fixed.
+     */
+    @ExceptionHandler(NoResultException.class)
+    public ProblemDetail handleNoResult(NoResultException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
+            "The requested record was not found.");
+        pd.setTitle("Resource Not Found");
+        pd.setType(URI.create("https://grc.tss.com/errors/not-found"));
+        // SEC-CFG-001: the class name and root message are dev-only, same gate as the catch-all.
+        if (verboseErrors) {
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }
