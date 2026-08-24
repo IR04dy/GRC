@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-346 — an auto-raised CAPA's title overflowed the 255-char title_en column when the violation description was long
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — a latent-in-data, live-in-code 500 on a regulator-facing write. `EsgHorizonService.recordViolation` (the NCEC environmental-permit violation register, plan §5.6 / V293) raises a CAPA per violation and composed its title as `"NCEC violation on permit " + permitNumber + ": " + descriptionEn`, stored into `CorrectiveAction.title_en` `@Column(length = 255)`. `descriptionEn` is `@Size(max = 500)` at the controller and `EnvPermitViolation.description_en` is `NVARCHAR(500)`, so a long-but-legal violation description (> ~228 chars) composed a title exceeding 255 → SQL Server error 8152 (string-or-binary truncation) → 500 on `POST /esg/permits/{id}/violations`. The violation and its auto-CAPA share one `@Transactional`, so the whole recording rolls back — an NCEC violation with a verbose description cannot be recorded at all. |
+| **Registers** | `sust.corrective_action.title_en` (the auto-raised CAPA), composed from `sust.env_permit_violations.description_en`. No data change. |
+| **Standards** | NCEC (National Center for Environmental Compliance) permit-violation register; the [[F2-338]] / [[F2-185b]] server-composed-string-overflow family (a length budget must account for everything the code prepends, not just the caller's field). |
+| **Found by** | Sweeping title/name/subject/code setters fed by string concatenation (F2-338's shape) for a composed string wider than its target column. `recordViolation` composes the whole 500-char-capable `descriptionEn` into a 255-char title. Its sibling compositions (`target_code` 40-wide at :160/161, `permit_number` 60-wide at :267/:305/:306) compose ≤ 94 chars and are safe — no [[F2-215]] sibling. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — a unit test cannot hit a real 8152 (the mocked repository has no column), so it asserts the cap the service now applies before saving (F2-338's pattern). New `EsgHorizonServiceTest`: the composed title is ≤ 255 and ends with an ellipsis on a 500-char description; whole (no ellipsis) on a short one; `recordViolation` does not throw on a maximal description; and `CA_TITLE_MAX` mirrors `CorrectiveAction.title_en`'s `@Column(length)` by reflection so the cap and the column cannot drift. Pre-fix control ([[F2-274]] / [[F2-287]]): un-capping the composition turns the cap leg RED (title ~543 chars > 255); fix committed first, recoverable by `git checkout` ([[F2-297]]). 4/4 `EsgHorizonServiceTest`; full backend suite green. No migration. |
+
+### Why cap and not widen the column
+
+The full violation text is preserved on `EnvPermitViolation.description_en` (`NVARCHAR(500)`) and the CAPA links back via `source_ref = "ENV_PERMIT_VIOLATION:<id>"`, so truncating the title loses nothing recoverable ([[F2-338]]). Widening `title_en` would mean widening it on every CAPA writer platform-wide, and 255 is the platform's standard title width. The fix mirrors F2-338's `CrisisAarService.cap`.
+
+### Not a ROWVERSION double-save
+
+`recordViolation` saves the violation, saves the CAPA, then saves the violation again (to stamp `linked_capa_id`) — the [[F2-175]] / [[F2-227]] double-flush shape. Checked and refuted: neither `EnvPermitViolation` nor `CorrectiveAction` extends `BaseEntity` or carries `@Version`, so the second save is an ordinary by-id UPDATE with no optimistic-lock check.
+
+### Filed
+
+There are now four private `cap` / `truncate` copies (`CrisisAarService`, `ExerciseRunProjections`, `ExerciseObserverService`, `EsgHorizonService`) — an [[F2-190]] `common/` extraction candidate, deliberately deferred: F2-338 chose a private copy (no `common/` primitive exists), and an extraction touches four files plus their tests and is its own slice.
+
 ## F2-345 — the incident MTTR KPI averaged over the 200 newest-created incidents, not all resolved
 
 | | |
