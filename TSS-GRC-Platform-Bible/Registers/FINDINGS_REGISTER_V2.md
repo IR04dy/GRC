@@ -15219,6 +15219,72 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-323 — the census asked of the boundary instead of the catch, and the catch was dead code
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — latent. Cross-schedule atomicity on a 60-second scheduler, plus one transaction held open across N report generations. |
+| **Registers** | `reporting.report_schedules`, `reporting.report_runs` |
+| **Standards** | — |
+| **Found by** | Running the census [[F2-322]] filed |
+| **Verification** | **2 killed / 2 equivalent / 1 invalid**; suite **4727 → 4728/0/0** |
+
+### The census
+
+[[F2-317]] measured *"0 of 33 looping sweeps lack a per-item catch"* — true, and it counted the
+**catch**. Asked of the **boundary** instead — *does the loop body open its own transaction, or does a
+batch-wide `@Transactional` make the catch meaningless?* — the answer is **1 of 21**:
+`ReportSchedulerService#tick`.
+
+### ⚠⚠ Reading it changed the finding
+
+`runOnce` has its **own** try/catch that persists `FAILED` and returns normally, so `tick`'s
+per-schedule catch was **unreachable dead code** — which is exactly why it read as a decoy. The hazard
+was never the catch:
+
+* all due schedules shared **one** transaction, so a database-level failure persisting the fifth
+  schedule's run row would discard the first four's rows and their `next_run_at` advances
+* and that transaction stayed open across up to **eleven report generations** — each rendering a PDF or
+  workbook — on a 60-second scheduler
+
+🔑 **And the catch becomes reachable *and* useful now**: a commit failure in one schedule's own
+transaction throws into the loop and is handled without touching the others. It was written for a world
+where each schedule had its own boundary; it simply did not have one.
+
+### The rationale was already written in the tree
+
+`EmergencyRatificationSlaScheduler`'s javadoc: *"one unwritable change cannot roll back the escalations
+already recorded for the others. A batch control that is all-or-nothing fails closed on the whole
+tenant the first time one row misbehaves."* Its optional **non-final** `txManager` field is copied here
+so `@RequiredArgsConstructor` is unchanged and `ReportCadenceContractTest`'s two direct constructions
+keep compiling.
+
+### The census became an invariant
+
+Hard zero, **empty exemption map**: dropping `@Transactional` or wrapping the body is always available,
+so there is no correct code for it to fail on ([[F2-214]]). ⚠ It asks whether a boundary is **opened**,
+not whether the isolation works — the latter is not unit-observable, because the wrappers run inline
+when no transaction manager is present, and the leg says so.
+
+### Mutation results, stated honestly
+
+| | |
+|---|---|
+| **KILLED** | the true pre-fix state (annotation **and** boundary), and the wrapper's null-tolerance |
+| **SURVIVED — equivalent** | `@Transactional` alone (`REQUIRES_NEW` suspends the outer transaction, so it is still correct); removing the boundary alone (harmless with no batch transaction) |
+| **WITHDRAWN — invalid** | disabling my own assertion, which always survives ([[F2-206]]) |
+
+🔑 My first pre-fix mutation restored **only** the annotation and survived — correctly. **The regression
+is both changes together**, and treating that survival as a hole would have produced a gate assertion
+that fails on correct code. ⚙ The null-tolerance survival *was* a real gap: no test calls the reporting
+tick, so nothing exercised that path. Closed by asserting it structurally for **both** wrappers this
+family added.
+
+### Filed
+
+* `RiskReviewService.flag` per-row isolation, unchanged from [[F2-322]]'s filing.
+
 ## F2-322 — the per-org catch was a decoy, and fixing it is structural rather than a wrapper
 
 | | |

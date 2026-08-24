@@ -50,6 +50,18 @@ public class ReportSchedulerService {
     /** Optional — JavaMailSender bean exists only when spring.mail.* is configured. */
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
+    /**
+     * ⚠⚠ F2-323 — injected outside the constructor, and optional, so
+     * {@code @RequiredArgsConstructor} is unchanged and the two direct constructions in
+     * {@code ReportCadenceContractTest} keep compiling. Same declaration as
+     * {@code EmergencyRatificationSlaScheduler}, whose javadoc states this fix's rationale: <em>"one
+     * unwritable change cannot roll back the escalations already recorded for the others. A batch
+     * control that is all-or-nothing fails closed on the whole tenant the first time one row
+     * misbehaves."</em>
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.transaction.PlatformTransactionManager txManager;
+
     @Value("${grc.reporting.from:noreply@tss-grc.local}")
     private String fromAddress;
 
@@ -105,21 +117,62 @@ public class ReportSchedulerService {
     public static final List<String> SUPPORTED_CADENCES =
         List.of("DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUAL");
 
+    /**
+     * ⚠⚠ F2-323 — each due schedule runs in its <b>own</b> transaction, and this method is no
+     * longer {@code @Transactional}.
+     *
+     * <p>It used to hold one transaction across every due schedule. Two consequences, and the second
+     * is the one that bites: a database-level failure persisting the fifth schedule's run row would
+     * discard the first four's rows and their {@code next_run_at} advances, and the transaction stayed
+     * open across up to eleven report generations — each rendering a PDF or workbook — on a
+     * 60-second scheduler.
+     *
+     * <p>🔑 <b>The catch below was UNREACHABLE before this.</b> {@link #runOnce} has its own
+     * try/catch that persists {@code FAILED} and returns normally, so nothing ever reached here —
+     * which is precisely why F2-322's census flagged it as a decoy. It becomes reachable <em>and</em>
+     * useful now: a commit failure in one schedule's own transaction throws into this loop and is
+     * handled without touching the others. The catch was written for a world where each schedule had
+     * its own boundary; it simply did not have one.
+     *
+     * <p>⚠ Found by the census [[F2-322]] filed — [[F2-317]] had measured "0 of 33 sweeps lack a
+     * per-item catch", which counted the <b>catch</b> rather than whether the catch could mean
+     * anything. Asked of the transaction boundary instead, the answer is <b>1 of 21</b>, and this is it.
+     */
     @Scheduled(fixedDelayString = "${grc.reporting.scheduler-period-ms:60000}")
-    @Transactional
     public void tick() {
         LocalDateTime now = LocalDateTime.now();
         List<ReportSchedule> due = scheduleRepo.findDue(now);
         if (due.isEmpty()) return;
         log.info("Reporting scheduler tick — {} due schedules", due.size());
         for (ReportSchedule s : due) {
-            try { runOnce(s, "CRON"); }
+            try { inNewTransaction(() -> runOnce(s, "CRON")); }
             catch (Exception e) {
                 log.warn("Scheduled report '{}' failed: {}", s.getName(), e.getMessage());
-                recordRun(s, "FAILED", 0, 0, e.getMessage());
-                advanceNextRun(s);
+                inNewTransaction(() -> recordRun(s, "FAILED", 0, 0, e.getMessage()));
+                inNewTransaction(() -> advanceNextRun(s));
             }
         }
+    }
+
+    /**
+     * ⚠⚠ F2-323 — runs {@code body} in its own transaction, or <b>inline</b> when no transaction
+     * manager is present (directly-constructed unit tests).
+     *
+     * <p>The inline path is why <b>no unit test can verify the isolation this provides</b>: with a null
+     * {@code txManager} there is no boundary and a failure propagates exactly as before.
+     * {@code EmergencyRatificationSlaScheduler}'s wrapper records the same trap in the same words —
+     * <em>"the inline path is why the six unit tests could not catch the missing transaction"</em> —
+     * which is why F2-323's leg is structural and says so.
+     */
+    private void inNewTransaction(Runnable body) {
+        if (txManager == null) {
+            body.run();
+            return;
+        }
+        var tpl = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        tpl.setPropagationBehavior(
+            org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tpl.executeWithoutResult(status -> body.run());
     }
 
     @Transactional

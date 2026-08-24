@@ -451,4 +451,109 @@ class OffRequestAuditTenancyTest {
             inNewTransaction no longer tolerates a null transaction manager. That is what lets a             directly-constructed unit test run at all — and the reason the isolation itself cannot             be asserted here.""")
             .contains("txManager == null");
     }
+
+    // ── F2-323: a per-item catch inside a batch transaction, measured as a boundary ──────────────
+
+    /**
+     * ⚠⚠ F2-323 — a {@code @Scheduled} method that loops with a per-item catch must not be
+     * {@code @Transactional} unless the loop body opens its own transaction.
+     *
+     * <p>Otherwise one item's failure marks the batch transaction rollback-only and <b>every</b>
+     * item's work is discarded at commit, while the catch makes the method read as resilient
+     * ([[F2-322]]). 🔑 [[F2-317]] measured this population and counted the <b>catch</b> — "0 of 33
+     * sweeps lack a per-item catch", which is true and says nothing about whether the catch can mean
+     * anything. Asked of the boundary instead, the answer was <b>1 of 21</b>:
+     * {@code ReportSchedulerService#tick}, closed by F2-323.
+     *
+     * <p>A hard zero with <b>no exemption map</b>: dropping the annotation or wrapping the body is
+     * always available, so there is no correct code for this to fail on ([[F2-214]]).
+     *
+     * <p>⚠ It asks whether a boundary is <b>opened</b>, not whether the isolation works — the latter
+     * is not observable in a unit test, because the wrappers run inline when no transaction manager
+     * is present. Stated rather than implied.
+     */
+    @Test
+    @DisplayName("F2-323: no scheduled sweep catches per item inside a batch-wide transaction")
+    void noPerItemCatchSitsInsideABatchWideTransaction() throws IOException {
+        Pattern loop = Pattern.compile("\\bfor\\s*\\(|\\.forEach\\s*\\(");
+        Pattern perItemCatch = Pattern.compile("\\bcatch\\s*\\(");
+        Pattern ownTx = Pattern.compile("inNewTransaction\\s*\\(|TransactionTemplate"
+                                        + "|PROPAGATION_REQUIRES_NEW");
+        Pattern method = Pattern.compile(
+            "^[ \\t]+(?:public|private|protected)[^;=(){}\\n]{0,140}?\\b(\\w+)"
+            + "\\([^;{}\\n]{0,400}\\)[^;{\\n]{0,90}\\{", Pattern.MULTILINE);
+
+        List<String> decoys = new ArrayList<>();
+        int examined = 0;
+        try (Stream<Path> walk = Files.walk(MODULE)) {
+            for (Path p : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String src = strip(Files.readString(p, StandardCharsets.UTF_8));
+                if (!src.contains("@Scheduled")) {
+                    continue;
+                }
+                Matcher sched = Pattern.compile("@Scheduled\\s*\\(").matcher(src);
+                while (sched.find()) {
+                    Matcher sig = method.matcher(src);
+                    if (!sig.find(sched.start()) || sig.start() - sched.start() > 1500) {
+                        continue;
+                    }
+                    String annotations = src.substring(Math.max(0, sig.start() - 300), sig.start());
+                    String body = braceBalanced(src, sig.end() - 1);
+                    if (!loop.matcher(body).find() || !perItemCatch.matcher(body).find()) {
+                        continue;
+                    }
+                    examined++;
+                    if (annotations.contains("@Transactional") && !ownTx.matcher(body).find()) {
+                        decoys.add(p.getFileName() + "#" + sig.group(1));
+                    }
+                }
+            }
+        }
+
+        assertThat(examined).as("""
+            No looping sweep with a per-item catch was found, so this leg is vacuous — the population             was 21 when F2-323 measured it.""")
+            .isGreaterThanOrEqualTo(15);
+
+        assertThat(decoys).as("""
+            A scheduled sweep catches per item inside a batch-wide transaction.
+
+            Any joined write that fails marks that transaction rollback-only, so every item's work is             discarded at commit while the catch makes the method read as resilient. Either drop             @Transactional from the sweep, or wrap each item's work in its own transaction — the             platform has that wrapper in six files now.""")
+            .isEmpty();
+        // ⚠ F2-323 — every wrapper this family added must tolerate an ABSENT transaction manager, or
+        // a directly-constructed unit test cannot call the sweep at all. The mutation removing that
+        // tolerance SURVIVED, because no test currently calls the reporting tick — so the property is
+        // asserted structurally rather than left to a test that does not exist.
+        for (String f : List.of("reporting/service/ReportSchedulerService.java",
+                                "iam/governance/service/AccessRequestService.java")) {
+            String w = strip(Files.readString(MODULE.resolve(f), StandardCharsets.UTF_8));
+            int at = w.indexOf("private void inNewTransaction");
+            if (at < 0) {
+                at = w.indexOf("private <T> T inNewTransaction");
+            }
+            assertThat(at).as("%s has no inNewTransaction wrapper any more", f)
+                .isGreaterThanOrEqualTo(0);
+            assertThat(w.substring(at, Math.min(w.length(), at + 500)))
+                .as(f + "'s inNewTransaction no longer tolerates a null transaction manager, which is "
+                    + "what lets a directly-constructed unit test run the sweep — and is why the "
+                    + "isolation itself cannot be asserted here.")
+                .contains("txManager == null");
+        }
+    }
+
+    /** Brace-balanced body starting at an opening brace. */
+    private static String braceBalanced(String src, int open) {
+        int depth = 0;
+        for (int i = open; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return src.substring(open, i + 1);
+                }
+            }
+        }
+        return src.substring(open);
+    }
 }
