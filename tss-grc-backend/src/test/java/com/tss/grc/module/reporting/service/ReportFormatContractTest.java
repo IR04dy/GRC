@@ -100,7 +100,7 @@ class ReportFormatContractTest {
     @DisplayName("every report type the renderer handles declares its formats, and vice versa")
     void theDeclarationMatchesTheRenderersOwnCaseLabels() throws IOException {
         String body = methodBody(strip(read(MAIN.resolve("ReportSchedulerService.java"))),
-                                 "private byte[] renderBody(");
+                                 "private Rendered render(");
         Set<String> handled = new TreeSet<>();
         Matcher m = CASE_LABEL.matcher(body);
         while (m.find()) {
@@ -108,7 +108,7 @@ class ReportFormatContractTest {
         }
 
         assertThat(handled).as("""
-            renderBody's case labels could not be parsed. If that returned nothing, every \
+            render's case labels could not be parsed. If that returned nothing, every \
             assertion below is vacuous.""").hasSizeGreaterThanOrEqualTo(5);
 
         assertThat(new TreeSet<>(ReportSchedulerService.SUPPORTED_FORMATS.keySet())).as("""
@@ -119,7 +119,7 @@ class ReportFormatContractTest {
             not handle is a promise nothing keeps: the schedule fails with "Unknown report type".
 
             renderBody handles : %s
-            declared           : %s""".formatted(handled,
+            declared : %s""".formatted(handled,
                 new TreeSet<>(ReportSchedulerService.SUPPORTED_FORMATS.keySet())))
             .isEqualTo(handled);
     }
@@ -144,41 +144,112 @@ class ReportFormatContractTest {
     }
 
     /**
-     * ⚠⚠ F2-315 — the load-bearing leg. Every non-PDF format any type declares must have an
-     * <b>explicit</b> {@code case} in {@code filenameFor} <i>and</i> {@code mimeFor}.
+     * ⚠⚠ F2-316 — the bytes and <b>both</b> labels come from one switch, so a mismatch is not a bug
+     * to catch: it cannot be expressed.
      *
-     * <p>Both switches end {@code default -> pdf} / {@code default -> application/pdf}, so a format
-     * with no case of its own is labelled a PDF whatever bytes it holds. That is the whole mechanism:
-     * {@code DOCX} had no case in either, so Word requests were served as PDFs.
+     * <p>This replaces [[F2-315]]'s leg, which asserted that every declared non-PDF format had an
+     * explicit {@code case} in {@code filenameFor} <i>and</i> {@code mimeFor}. Those two methods are
+     * gone — they branched on the <b>format</b> while the renderer branched on the <b>type</b>, and
+     * their shared {@code default -> pdf} is what labelled every unrecognised format a PDF whatever
+     * bytes it held. ⚠ The old leg is not weakened, it is <b>obsolete</b>: its subject no longer
+     * exists, and this leg fails if either switch comes back.
+     *
+     * <p>🔑 The idiom is the platform's own: {@code NdiReportController#streamBytes} assigns the
+     * bytes, the MIME type and the extension in the same {@code case} arm, and
+     * {@code MlModelController#export} derives all three from one {@code boolean}. Every other
+     * download handler puts the format in the <b>route</b>. The report scheduler was the only one
+     * that put it in a <b>column</b> and read it from three places ([[F2-195]]).
      */
     @Test
-    @DisplayName("every declared non-PDF format is named explicitly by both labelling switches")
-    void noDeclaredFormatFallsThroughToThePdfDefault() throws IOException {
+    @DisplayName("the bytes and both labels are produced together, by three factories and no other")
+    void aMismatchedFormatLabelIsUnrepresentable() throws IOException {
         String src = strip(read(MAIN.resolve("ReportSchedulerService.java")));
-        String filename = methodBody(src, "private String filenameFor(");
-        String mime     = methodBody(src, "private String mimeFor(");
 
-        Set<String> declared = new TreeSet<>();
-        ReportSchedulerService.SUPPORTED_FORMATS.values().forEach(declared::addAll);
-        declared.remove("PDF");           // PDF legitimately IS the default in both switches
+        assertThat(src).as("""
+            The two label switches F2-316 deleted are back. They branched on the format while the renderer branched on the type, so their shared `default -> pdf` labelled every unrecognised format a PDF whatever bytes it held.""")
+            .doesNotContain("filenameFor")
+            .doesNotContain("mimeFor");
 
-        List<String> unlabelled = new ArrayList<>();
-        for (String fmt : declared) {
-            if (!filename.contains("\"" + fmt + "\"")) {
-                unlabelled.add(fmt + " — no case in filenameFor, so the file is named .pdf");
+        // only the three factories may build a Rendered, so an arm cannot invent a mismatched pair
+        List<String> constructors = new ArrayList<>();
+        Matcher ctor = Pattern.compile("new Rendered\\(").matcher(src);
+        while (ctor.find()) {
+            constructors.add(src.substring(Math.max(0, src.lastIndexOf("private static Rendered",
+                                                                      ctor.start())),
+                                           ctor.start()).lines().findFirst().orElse("?"));
+        }
+        assertThat(constructors).as("""
+            A Rendered is built somewhere other than the three factories. Each factory pairs one extension with one MIME type; anything else can pair them freely, which is exactly the state F2-316 removed.""")
+            .hasSize(3);
+
+        // and each factory pairs the right extension with the right MIME type
+        record Pair(String factory, String ext, String mime) { }
+        List<Pair> expected = List.of(
+            new Pair("pdf",  ".pdf",  "application/pdf"),
+            new Pair("xlsx", ".xlsx", "spreadsheetml.sheet"),
+            new Pair("pptx", ".pptx", "presentationml.presentation"));
+        List<String> wrong = new ArrayList<>();
+        for (Pair p : expected) {
+            String body = methodBody(src, "private static Rendered " + p.factory() + "(");
+            if (!body.contains(p.ext())) {
+                wrong.add(p.factory() + " does not append " + p.ext());
             }
-            if (!mime.contains("\"" + fmt + "\"")) {
-                unlabelled.add(fmt + " — no case in mimeFor, so it is served as application/pdf");
+            if (!body.contains(p.mime())) {
+                wrong.add(p.factory() + " does not declare " + p.mime());
             }
         }
-        assertThat(unlabelled).as("""
-            A format some report type can produce falls through to the PDF default in one of the \
-            two labelling switches, so its bytes leave the platform under the wrong name and MIME \
-            type. That is the F2-315 mechanism, not a cosmetic mismatch: the recipient gets an \
-            attachment that will not open.
+        assertThat(wrong).as("""
+            A factory pairs an extension with the wrong MIME type. These three pairings are the whole of the contract now: everything upstream chooses WHICH factory, and none of them can choose a label.""").isEmpty();
+    }
 
-            declared non-PDF formats: %s""".formatted(declared))
-            .isEmpty();
+    /**
+     * ⚠⚠ F2-316 — the residual the collapse does <b>not</b> close, said out loud.
+     *
+     * <p>Three factories make a mismatched <em>label pair</em> unrepresentable. They do not stop an
+     * arm handing XLSX bytes to {@code pdf(...)} — the original defect, moved upstream. The
+     * mutation harness found exactly that surviving, and a survivor is a hole only when the mutated
+     * code is genuinely wrong ([[F2-206]]): this one is.
+     *
+     * <p>So every factory call inside {@code render} must be handed bytes from a generator that names
+     * the same format — either in its method-name suffix ({@code riskRegisterXlsx},
+     * {@code generatePptx}) or as a string literal argument ({@code export("XLSX")}).
+     *
+     * <p>⚠ That is a <b>naming</b> rule, which [[F2-217]] warns measures the list its author knew.
+     * Stated as a limitation rather than hidden: a generator naming no format at all is reported as
+     * <em>unresolvable</em> rather than passed, so the answer cannot quietly shrink, and the count
+     * below fails if the population stops resolving.
+     */
+    @Test
+    @DisplayName("each arm hands its bytes to the factory matching the generator own format")
+    void noArmRoutesBytesToTheWrongFactory() throws IOException {
+        String body = methodBody(strip(read(MAIN.resolve("ReportSchedulerService.java"))),
+                                 "private Rendered render(");
+        Matcher call = Pattern.compile("\\b(pdf|xlsx|pptx)\\(([^;]*?), stem\\)").matcher(body);
+        List<String> wrong = new ArrayList<>();
+        int seen = 0;
+        while (call.find()) {
+            seen++;
+            String factory = call.group(1);
+            String arg = call.group(2).trim();
+            String lower = arg.toLowerCase();
+            boolean namesOwn = lower.contains(factory);
+            boolean namesAnother = List.of("pdf", "xlsx", "pptx").stream()
+                .filter(f -> !f.equals(factory))
+                .anyMatch(lower::contains);
+            if (namesAnother) {
+                wrong.add(factory + "(...) is handed " + arg + " — the bytes are one format and "
+                          + "the label is another. That is the F2-315 defect moved upstream of the "
+                          + "factories, which is why this leg exists.");
+            } else if (!namesOwn) {
+                wrong.add(factory + "(...) is handed " + arg + " — the generator names no "
+                          + "format, so nothing can check the pairing. Give it an explicit format "
+                          + "argument rather than leaving it unresolvable.");
+            }
+        }
+        assertThat(seen).as("No factory calls were found inside render, so this leg is vacuous and "
+                            + "the residual it covers is unguarded.")
+            .isGreaterThanOrEqualTo(8);
+        assertThat(wrong).as("An arm bytes and its factory disagree about the format.").isEmpty();
     }
 
     // ── the frontend offers exactly what the platform can emit ──────────────────────────────────
@@ -348,11 +419,11 @@ class ReportFormatContractTest {
         when(scheduleRepo.findById(7L)).thenReturn(Optional.of(stored));
 
         ReportSchedule formatOnly = new ReportSchedule();
-        formatOnly.setFormat("XLSX");                 // no reportType — it comes from storage
+        formatOnly.setFormat("XLSX"); // no reportType — it comes from storage
 
         assertThatThrownBy(() -> service.update(7L, formatOnly))
             .as("""
-                the request names no report type, so a check against the REQUEST would see null and                 wave it through — and the board pack cannot be rendered as XLSX""")
+                the request names no report type, so a check against the REQUEST would see null and wave it through — and the board pack cannot be rendered as XLSX""")
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("BOARD_PACK");
     }
