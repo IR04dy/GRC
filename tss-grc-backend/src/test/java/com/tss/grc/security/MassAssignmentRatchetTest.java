@@ -158,7 +158,7 @@ class MassAssignmentRatchetTest {
      * re-read a guarded path. Audited and adjudicated the nine plus F2-330's own BcpPlan
      * fix, re-derived 48 → 38. Read each service before adding a verdict (F2-188).
      */
-    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 38;
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 29;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -748,7 +748,40 @@ class MassAssignmentRatchetTest {
             + "initial status and scrubs closedAt"),
         Map.entry("RegChangePolicyController#updateChange(RegulatoryChange)",
             "INERT F2-213 — the update whitelist copies source / title / citation / summary / dates / "
-            + "applicability / impact and never mentions status or closedAt")
+            + "applicability / impact and never mentions status or closedAt"),
+
+        // ── F2-331: this slice's forensics fix + more census drift a CEILING let sit mislabelled.
+        // Each verdict was read against its service this slice (F2-188): a scrub/guard present, or a
+        // whitelist confirmed not to write the field. reviewerId on the two BCM registers is an
+        // ASSIGNMENT (no reviewedAt/reviewerName column, no route stamps it) — legitimately caller-set.
+        Map.entry("ForensicsArtefactController#create(ForensicsArtefact)",
+            "CLOSED F2-331 — a chain-of-custody artefact was born VERIFIED (entity initialiser, F2-238) "
+            + "and could name a forged integrityVerifiedAt; save() now owns UNVERIFIED and scrubs the "
+            + "stamp (the attestation is /{id}/verify-integrity's)"),
+        Map.entry("ForensicsArtefactController#update(ForensicsArtefact)",
+            "CLOSED F2-331 — copyMutable no longer copies integrityStatus / integrityVerifiedAt, so a PUT "
+            + "can no longer flip a CORRUPTED artefact back to VERIFIED past verifyIntegrity()"),
+        Map.entry("BcmBiaAssessmentController#create(BcmBiaAssessment)",
+            "CLOSED F2-22b — create rejects a non-DRAFT approvalStatus and forces DRAFT, stamps org from "
+            + "TenantContext; reviewerId is an assignment"),
+        Map.entry("BcmBiaAssessmentController#update(BcmBiaAssessment)",
+            "CLOSED F2-297 — update guards approvalStatus with requireUnchanged and its patch whitelist "
+            + "never copies organisationId; reviewerId is an assignment"),
+        Map.entry("BcmRemediationController#createCapa(BcmCorrectiveAction)",
+            "CLOSED F2-234 — createCapa forces the initial status via requireInitial, stamps org and clears "
+            + "closureDate; reviewerId is an assignment"),
+        Map.entry("BcmRemediationController#updateCapa(BcmCorrectiveAction)",
+            "INERT — updateCapa is a whitelist (title*/actionPlan/ownerId/priority/dueDate/progressPercent/"
+            + "evidenceId/reviewerId); it never writes status or organisationId (transitionCapa's)"),
+        Map.entry("PolicyController#create(PolicyDocument)",
+            "CLOSED F2-219 — create forces status=DRAFT and scrubs publishedAt, stamps org and createdBy; "
+            + "approverName is F2-222's deliberately pre-approval-editable field (offices, stamped by "
+            + "transition() on APPROVED)"),
+        Map.entry("CyberPolicyController#create(PolicyDocument)",
+            "CLOSED F2-219 — routes to the same PolicyManagementService.create as PolicyController#create"),
+        Map.entry("PolicyController#createAttestation(PolicyAttestation)",
+            "CLOSED F2-219 — createAttestation forces the initial status via requireInitial and scrubs "
+            + "attestedAt / declinedAt / declinedReason (completion belongs to /attest and /decline)")
     );
 
     /** Field names that decide tenancy, state or authority — never a caller's to set. */

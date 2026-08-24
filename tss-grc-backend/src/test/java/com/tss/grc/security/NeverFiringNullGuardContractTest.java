@@ -1074,7 +1074,11 @@ class NeverFiringNullGuardContractTest {
             new Moved("CrisisCommsTemplate", "version", "setVersion", "CrisisCommsService", "createTemplate"),
             new Moved("PolicyDocumentFrameworkMapping", "satisfaction", "setSatisfaction", "FrameworkAnchorService", "addMapping"),
             new Moved("OrganisationSettings", "climateScenarioWeightsStrict", "setClimateScenarioWeightsStrict", "OrganisationSettingsService", "defaults"),
-            new Moved("OrganisationSettings", "carbonOffsetCapPct", "setCarbonOffsetCapPct", "OrganisationSettingsService", "defaults"));
+            new Moved("OrganisationSettings", "carbonOffsetCapPct", "setCarbonOffsetCapPct", "OrganisationSettingsService", "defaults"),
+            // F2-331 — the forensics chain-of-custody register. The entity initialiser was "VERIFIED",
+            // so every artefact was born asserting a verification that never ran (F2-238, flattering
+            // direction); save() owns the correct initial state (UNVERIFIED) on the create path.
+            new Moved("ForensicsArtefact", "integrityStatus", "setIntegrityStatus", "ForensicsArtefactService", "save"));
 
         Map<String, String> services = liveWriters();
         Map<String, Map<String, String>> inits = liveInitialisers();
