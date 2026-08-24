@@ -15219,6 +15219,21 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-349 — an oversized file upload returned an opaque 500 instead of a 413
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a client-input error surfacing as an opaque 500, on the evidence/attachment upload path. The platform configures `spring.servlet.multipart.max-file-size` (50 MB, both `application.yml` and `application-prod.yml`) and has multipart upload endpoints (`AttachmentController`, `EvidenceItemController`, `FileUploadController`), so a file over the limit throws `MaxUploadSizeExceededException` during multipart parsing. It is a `MultipartException` / `RuntimeException` matched by no handler in `GlobalExceptionHandler`, so it fell through to `@ExceptionHandler(Exception.class)` → `handleGeneral` → opaque 500. A user uploading a large evidence document got *"An unexpected error occurred"* + a correlation id (in prod SEC-CFG-001 strips the class), indistinguishable from an outage, rather than "your file is too large." |
+| **Registers** | none — an exception-routing defect in `GlobalExceptionHandler`. No data. |
+| **Standards** | RFC 7807 ProblemDetail; RFC 9110 §15.5.14 (413 Content Too Large); the F2-227 / [[F2-339]] / [[F2-348]] opaque-500 family. |
+| **Found by** | Continuing the opaque-500 sweep ([[F2-348]]): which JDK / framework exceptions on a caller-input path fall to `handleGeneral`? Confirmed all three conditions — a configured `max-file-size`, multipart upload endpoints, and no `MaxUploadSizeExceededException` / `MultipartException` handler anywhere in the tree. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — the defect is one of ROUTING, so the load-bearing leg asserts Spring's own resolution: `new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(<MaxUploadSizeExceededException>)` resolves to `handleUploadTooLarge`, not `handleGeneral`. Plus a direct-call leg (413, the 50 MB limit named in the detail, no class/root leak) and a verbose leg. Pre-fix control ([[F2-274]] / [[F2-287]]): disabling ONLY the `@ExceptionHandler(MaxUploadSizeExceededException.class)` annotation (keeping the method so the direct-call legs still compile — [[F2-339]]'s control) turns the routing leg RED (`expected "handleUploadTooLarge" but was "handleGeneral"`); fix committed first ([[F2-297]]). 24/24 `GlobalExceptionHandlerTest`; full backend suite green. Latent until an oversized upload occurs; no dev backend to live-probe, so the resolver leg is the proof ([[F2-348]]'s precedent). No migration. |
+
+### Fix
+
+One `@ExceptionHandler(MaxUploadSizeExceededException.class)` → **413 Payload Too Large**, mirroring F2-348's `DateTimeParseException` → 400. The limit is derived from the exception itself (`getMaxUploadSize()`, bytes ÷ 1 MiB → "50 MB") so the message names it without duplicating the `max-file-size` config value; the class name and root message stay dev-only (SEC-CFG-001), the same gate as the catch-all. The three conditions (a configured limit so the exception can fire, an upload endpoint so it is reachable, no dedicated handler) were each confirmed before fixing rather than assumed.
+
 ## F2-348 — a malformed date string returned an opaque 500 instead of a 400
 
 | | |
