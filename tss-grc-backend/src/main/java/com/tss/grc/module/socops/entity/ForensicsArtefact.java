@@ -41,7 +41,9 @@ public class ForensicsArtefact extends BaseEntity {
     @Column(name = "sha256_hash", length = 128) private String sha256Hash;
     @Column(name = "sha512_hash", length = 256) private String sha512Hash;
     @Column(name = "integrity_verified_at") private LocalDateTime integrityVerifiedAt;
-    @Column(name = "integrity_status", nullable = false, length = 30) private String integrityStatus = "VERIFIED";
+    // F2-331 — no initialiser: the birth state is owned by ForensicsArtefactService.save(). The old
+    // "VERIFIED" default manufactured a chain-of-custody assurance on every artefact (F2-238).
+    @Column(name = "integrity_status", nullable = false, length = 30) private String integrityStatus;
     @Column(name = "current_custodian", length = 255) private String currentCustodian;
     @Column(name = "current_location", length = 300) private String currentLocation;
     @Column(name = "retention_until") private LocalDateTime retentionUntil;

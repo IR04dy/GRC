@@ -558,7 +558,7 @@ export interface ForensicsArtefact {
   md5Hash: string | null;
   sha256Hash: string | null;
   sha512Hash: string | null;
-  integrityStatus: string;            // VERIFIED | UNKNOWN | COMPROMISED | CORRUPTED
+  integrityStatus: string;            // backend writes VERIFIED | UNVERIFIED | CORRUPTED (F2-331); FE also labels legacy UNKNOWN | COMPROMISED
   integrityVerifiedAt: string | null;
   legalHold: boolean;
   retentionUntil: string | null;      // disposal becomes due once retention expires

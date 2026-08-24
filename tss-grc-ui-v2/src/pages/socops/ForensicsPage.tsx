@@ -17,12 +17,13 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 type Filter = 'all' | 'legal_hold' | 'compromised' | 'disposal_due';
 
 const INTEGRITY_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
-  VERIFIED: 'success', UNKNOWN: 'warning', COMPROMISED: 'danger', CORRUPTED: 'danger',
+  VERIFIED: 'success', UNVERIFIED: 'warning', UNKNOWN: 'warning', COMPROMISED: 'danger', CORRUPTED: 'danger',
 };
 const COMPROMISED = new Set(['COMPROMISED', 'CORRUPTED']);
 
 const INTEGRITY_LABEL: Record<string, { en: string; ar: string }> = {
   VERIFIED:   { en: 'Verified',   ar: 'موثّقة' },
+  UNVERIFIED: { en: 'Unverified', ar: 'غير مُحقَّقة' },   // F2-331 — the create-path birth state
   UNKNOWN:    { en: 'Unknown',    ar: 'غير معروفة' },
   COMPROMISED:{ en: 'Compromised',ar: 'مخترقة' },
   CORRUPTED:  { en: 'Compromised',ar: 'مخترقة' },

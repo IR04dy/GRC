@@ -57,6 +57,15 @@ public class ForensicsArtefactService {
         if (isNew) {
             in.setId(null);
             in.setOrganisationId(org);
+            // F2-331 — integrity_status / integrity_verified_at are the verifyIntegrity() attestation,
+            // owned by POST /{id}/verify-integrity (which emits FORENSICS_INTEGRITY_LOST on failure and
+            // audits the check). A fresh artefact has had its hash RECORDED at capture but not
+            // RE-VERIFIED, so it is UNVERIFIED until that route runs. The entity initialiser was
+            // "VERIFIED" (F2-238, flattering direction) — every artefact was born asserting a
+            // verification that never happened, on evidence this class calls court-bound. Own the
+            // correct initial state here; the create body may not assert it.
+            in.setIntegrityStatus("UNVERIFIED");
+            in.setIntegrityVerifiedAt(null);
             target = in;
         } else {
             ForensicsArtefact existing = repo.findByIdAndOrganisationId(in.getId(), org)
@@ -102,8 +111,10 @@ public class ForensicsArtefactService {
         target.setMd5Hash(in.getMd5Hash());
         target.setSha256Hash(in.getSha256Hash());
         target.setSha512Hash(in.getSha512Hash());
-        target.setIntegrityVerifiedAt(in.getIntegrityVerifiedAt());
-        target.setIntegrityStatus(in.getIntegrityStatus());
+        // F2-331 — integrityVerifiedAt and integrityStatus are NOT copied from the request: they are
+        // verifyIntegrity()'s alone. Copying them let a same-permission caller PUT a CORRUPTED
+        // artefact (court evidence flagged unusable, legal + CISO paged via FORENSICS_INTEGRITY_LOST)
+        // back to VERIFIED with no event and no integrity audit — a silent chain-of-custody forge.
         target.setCurrentCustodian(in.getCurrentCustodian());
         target.setCurrentLocation(in.getCurrentLocation());
         target.setRetentionUntil(in.getRetentionUntil());
