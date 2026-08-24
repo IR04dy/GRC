@@ -107,16 +107,39 @@ public class SodService {
         return raised;
     }
 
-    /** Nightly detective scan across all tenants (02:30 UTC; off-request-safe). */
+    /**
+     * Nightly detective scan across all tenants (02:30 UTC).
+     *
+     * <p>⚠⚠ F2-318 — the tenant is anchored per organisation. {@code AuditLogService.recordEvent}
+     * does {@code org != null ? org : 1L} ("fall back to tenant 1 for system events"), and this runs
+     * off-request, so before this every {@code CREATE}/{@code SodViolation} row {@link #scanForOrg}
+     * wrote landed in organisation 1 whatever tenant's violation it described — tenant 1's audit log
+     * gaining entries about other tenants' segregation-of-duties breaches (NCA ECC 2-2 / SAMA CSF
+     * 3.3.5), and those tenants getting none.
+     *
+     * <p>🔑 The tell was in the message: {@code "for org " + org}. <b>Three of this family's four
+     * instances interpolate the organisation into the audit prose</b>, which is what an author writes
+     * when the row's own tenant column will not carry it. The previous javadoc here said
+     * "off-request-safe", which was true about not crashing and silent about attribution.
+     *
+     * <p>⚠ The ambient tenant is <b>restored</b>, not cleared: {@link #scanForOrg} is also reachable
+     * on-request, and restoring is correct whether or not a caller supplied one.
+     */
     @Scheduled(cron = "0 30 2 * * *")
     public void nightlyScan() {
-        for (Long org : violations.distinctOrganisationIds()) {
-            try {
-                int n = scanForOrg(org);
-                if (n > 0) log.info("nightly SoD scan: org {} raised {} violation(s)", org, n);
-            } catch (RuntimeException e) {
-                log.warn("nightly SoD scan failed for org {}: {}", org, e.getMessage());
+        Long ambient = TenantContext.getCurrentTenant();
+        try {
+            for (Long org : violations.distinctOrganisationIds()) {
+                try {
+                    TenantContext.setCurrentTenant(org);
+                    int n = scanForOrg(org);
+                    if (n > 0) log.info("nightly SoD scan: org {} raised {} violation(s)", org, n);
+                } catch (RuntimeException e) {
+                    log.warn("nightly SoD scan failed for org {}: {}", org, e.getMessage());
+                }
             }
+        } finally {
+            TenantContext.setCurrentTenant(ambient);
         }
     }
 

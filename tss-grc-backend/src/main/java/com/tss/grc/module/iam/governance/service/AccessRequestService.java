@@ -288,18 +288,41 @@ public class AccessRequestService {
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT10M")
     @Transactional
     public void scheduledExpirySweep() {
-        for (Long org : requests.distinctOrganisationIds()) {
-            try {
-                int n = requests.expireAssignmentsForOrg(org);
-                if (n > 0) {
-                    audit.recordEvent(new AuditEventBuilder()
-                        .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
-                        .message("Expiry sweep removed " + n + " time-bound assignment(s) (org " + org + ")"));
-                    notifyExpiry(org, n);
+        // ⚠⚠ F2-318 — the tenant is anchored per organisation before anything is audited.
+        // `AuditLogService.recordEvent` does `org != null ? org : 1L` ("fall back to tenant 1 for
+        // system events"), and this method runs off-request, so before this every ACCESS_REVOKE row
+        // it wrote landed in organisation 1 whatever tenant's assignment had expired. 🔑 The tell was
+        // in the message itself: the org was interpolated into the FREE TEXT — "(org N)" — because
+        // the row's own tenant column was not carrying it. And `notifyExpiry(org, n)` on the next
+        // line was already org-explicit, which is the same asymmetry F2-317 found (the event
+        // org-explicit, the audit row beside it not) for the third time.
+        //
+        // ⚠ RESTORE rather than clear. Restoring is correct whether or not an ambient tenant exists;
+        // clearing is only correct when one does not, so it has to be re-justified every time a
+        // caller is added. `manualExpirySweep` twelve lines below is the on-request sibling and was
+        // always correct, because a request sets the tenant for it.
+        //
+        // ⚠ The org is left in the message too. It is redundant now, and removing it would rewrite
+        // what the fifteen existing rows say relative to new ones — an audit trail should not become
+        // harder to compare because it got more correct.
+        Long ambient = TenantContext.getCurrentTenant();
+        try {
+            for (Long org : requests.distinctOrganisationIds()) {
+                try {
+                    TenantContext.setCurrentTenant(org);
+                    int n = requests.expireAssignmentsForOrg(org);
+                    if (n > 0) {
+                        audit.recordEvent(new AuditEventBuilder()
+                            .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
+                            .message("Expiry sweep removed " + n + " time-bound assignment(s) (org " + org + ")"));
+                        notifyExpiry(org, n);
+                    }
+                } catch (RuntimeException e) {
+                    log.warn("access expiry sweep failed for org {}: {}", org, e.getMessage());
                 }
-            } catch (RuntimeException e) {
-                log.warn("access expiry sweep failed for org {}: {}", org, e.getMessage());
             }
+        } finally {
+            TenantContext.setCurrentTenant(ambient);
         }
     }
 
