@@ -256,6 +256,62 @@ class BcmEvidencePackageServiceTest {
             any(), any(), any(Pageable.class));
     }
 
+    /**
+     * \u26a0\u26a0 F2-325 \u2014 the regulator {@code audit_log.csv} recorded when/what/where and dropped
+     * <b>who</b>. The actor ({@code user_username}) is present on <b>89 of the 90</b> on-request BCM
+     * rows the package carries in dev (12 of 13 in prod) and the platform's own unified viewer renders
+     * a User column \u2014 so the two readers of one row disagreed, and the file that leaves the platform
+     * was the incomplete one ([[F2-215]] two-of-N, one column over from [[F2-324]]'s {@code source_module}
+     * in this same writer). This leg fails if the actor column is dropped or its order changes.
+     *
+     * <p>\U0001f511 A row with no principal (an off-request sweep or automation firing) must render a
+     * <b>blank</b> actor cell, never an invented one \u2014 the honest state the viewer shows as
+     * {@code "\u2014"} ([[F2-213]]/[[F2-209]]). {@code user_role} is co-populated exactly with
+     * {@code user_username} (0 rows carry one without the other, both databases), so it adds no blank;
+     * {@code user_id} is deliberately absent, being 0% populated in both databases ([[F2-198]]).
+     */
+    @Test void auditCsv_carriesTheActorAndRoleAndBlanksItHonestlyWhenAbsent() throws Exception {
+        var acted = new com.tss.grc.module.platform.auditlog.entity.AuditLogEntry();
+        acted.setId(7L);
+        acted.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 24, 9, 15, 0));
+        acted.setUserUsername("so_officer");
+        acted.setUserRole("CISO,SUSTAINABILITY_OFFICER");   // comma \u2192 must be quoted by csv()
+        acted.setActionType("TRANSITION");
+        acted.setEntityType("BcpPlan");
+        acted.setSourceModule("bcm");
+        acted.setMessage("Plan approved");
+
+        var offRequest = new com.tss.grc.module.platform.auditlog.entity.AuditLogEntry();
+        offRequest.setId(8L);
+        offRequest.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 24, 3, 0, 0));
+        offRequest.setActionType("RULE_FIRED");             // automation: no principal
+        offRequest.setEntityType("BcpPlan");
+        offRequest.setSourceModule("bcm");
+        offRequest.setMessage("Escalation rule fired");
+
+        when(auditLog.findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
+                eq(ORG_ID), eq("bcm"), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(acted, offRequest)));
+
+        BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor.tester");
+        String csv = readZipEntry(pkg.bytes(), "audit_log.csv");
+        java.util.List<String> lines = csv.lines().toList();
+
+        assertThat(lines.get(0)).as("the CSV must name the actor, in when\u2192who\u2192what order")
+            .startsWith("id,created_at,user_username,user_role,action_type,");
+
+        String actedLine = lines.stream().filter(l -> l.startsWith("7,")).findFirst().orElseThrow();
+        assertThat(actedLine)
+            .as("a row with a principal carries the actor and the role it held")
+            .contains(",so_officer,")
+            .contains("\"CISO,SUSTAINABILITY_OFFICER\"");
+
+        String offLine = lines.stream().filter(l -> l.startsWith("8,")).findFirst().orElseThrow();
+        assertThat(offLine)
+            .as("a row with no principal blanks the actor \u2014 never a fabricated one")
+            .contains(",,,RULE_FIRED,");
+    }
+
     /** A metamodel {@code EntityType} that answers only {@code getJavaType()} \u2014 all this filter reads. */
     @SuppressWarnings("unchecked")
     private static jakarta.persistence.metamodel.EntityType<?> entityType(Class<?> c) {

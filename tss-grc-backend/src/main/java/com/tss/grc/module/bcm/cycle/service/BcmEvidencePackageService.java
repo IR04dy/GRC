@@ -56,8 +56,10 @@ import java.util.zip.ZipOutputStream;
  *   <li>{@code gaps_and_capas.xlsx}         — open + closed gaps and CAPAs.</li>
  *   <li>{@code compliance_matrix.xlsx}      — every clause × status row with
  *       evidence and gap linkages.</li>
- *   <li>{@code audit_log.csv}               — every F7 audit-log entry with
- *       {@code sourceModule='bcm'} inside the cycle window.</li>
+ *   <li>{@code audit_log.csv}               — every F7 audit-log entry for this
+ *       cycle ({@code source_module='bcm'} or a BCM entity type — F2-324),
+ *       carrying who/when/what including the actor ({@code user_username}/
+ *       {@code user_role}) the unified viewer shows — F2-325.</li>
  *   <li>{@code MANIFEST.txt}                — per-file SHA-256 checksums so a
  *       regulator can verify integrity.</li>
  * </ul>
@@ -342,10 +344,18 @@ public class BcmEvidencePackageService {
      */
     private static byte[] writeAuditCsv(List<AuditLogEntry> rows) {
         StringBuilder sb = new StringBuilder();
-        sb.append("id,created_at,action_type,entity_type,entity_id,entity_code,severity,source_module,correlation_id,message\n");
+        sb.append("id,created_at,user_username,user_role,action_type,entity_type,entity_id,entity_code,severity,source_module,correlation_id,message\n");
         for (AuditLogEntry e : rows) {
             sb.append(e.getId()).append(',');
             sb.append(e.getCreatedAt() == null ? "" : e.getCreatedAt().format(ISO)).append(',');
+            // F2-325: the actor (who) and the role held at the time. The entity's own javadoc
+            // cites §29 — who/when/what/where — and the unified viewer renders a User column, but
+            // this regulator export dropped WHO. Recorded on 89/90 of the on-request BCM rows this
+            // package carries; blank where the writer was an off-request sweep/automation (the
+            // honest state the viewer shows as "—", not a fabrication). user_id is NOT exported:
+            // it is 0% populated in both databases (the service records the username, never the id).
+            sb.append(csv(e.getUserUsername())).append(',');
+            sb.append(csv(e.getUserRole())).append(',');
             sb.append(csv(e.getActionType())).append(',');
             sb.append(csv(e.getEntityType())).append(',');
             sb.append(e.getEntityId() == null ? "" : e.getEntityId()).append(',');
