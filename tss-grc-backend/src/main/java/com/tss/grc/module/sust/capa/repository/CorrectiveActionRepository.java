@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,4 +29,14 @@ public interface CorrectiveActionRepository extends JpaRepository<CorrectiveActi
 
     /** All open + in-progress actions — used by the inbox / aggregate view. */
     List<CorrectiveAction> findByOrganisationIdAndStatusIn(Long org, List<String> statuses);
+
+    /**
+     * The "outstanding" complement — every action NOT in one of the given
+     * terminal states. Readers derive "still in play" as the complement of
+     * {@link com.tss.grc.module.sust.capa.service.CorrectiveActionService#TERMINAL_STATUSES}
+     * rather than typing a second inclusion list (F2-336 / F2-196): a new
+     * non-terminal state is then counted automatically instead of silently
+     * dropped in the flattering direction.
+     */
+    List<CorrectiveAction> findByOrganisationIdAndStatusNotIn(Long org, Collection<String> statuses);
 }

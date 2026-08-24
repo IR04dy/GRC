@@ -9,7 +9,10 @@ import com.tss.grc.module.sust.climate.entity.TcfdClimateScenario;
 import com.tss.grc.module.sust.climate.entity.TcfdSectorImpact;
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsRecordRepository;
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsTargetRepository;
+import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.module.sust.climate.dto.ClimateDtos.CapaEntry;
 import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdSectorImpactRepository;
 import com.tss.grc.module.sust.evidence.service.SustEvidenceLinkService;
@@ -33,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,7 +85,10 @@ class ClimateReportServiceTest {
         // only cover the six original sections, so these degrade to empty.
         when(tcfdItemRepo.findByOrganisationIdAndReportingYear(anyLong(), any())).thenReturn(List.of());
         when(ghgService.aggregate(any())).thenReturn(Map.of());
-        when(capaRepo.findByOrganisationIdAndStatusIn(anyLong(), any())).thenReturn(List.of());
+        // F2-341 — outstanding CAPAs are the complement of the declared terminal
+        // set. lenient() because the F2-341 leg below re-stubs this with a
+        // specific fixture (the other tests use this empty default).
+        lenient().when(capaRepo.findByOrganisationIdAndStatusNotIn(anyLong(), any())).thenReturn(List.of());
         when(sustEvidenceLinkService.buildPackage(any())).thenReturn(Map.of());
     }
     @AfterEach void tearDown() { TenantContext.clear(); }
@@ -277,5 +286,42 @@ class ClimateReportServiceTest {
         AnnualClimateReport out = reportService.generateAnnualReportData(2030);
         assertThat(out.reportingYear()).isEqualTo(2030);
         assertThat(out.financedEmissionsTotal().reportingYear()).isEqualTo(2030);
+    }
+
+    // ── F2-341 (F2-336 family) — outstanding CAPAs = complement of TERMINAL ──
+
+    @Test
+    void annualReport_outstandingCapaSection_countsTheTerminalComplement() {
+        // The outstanding-CAPA section (persisted into the DRAFT ClimateReport and
+        // rendered on the exported PDF/XLSX as the "Open CAPA" figure) reads the
+        // complement of the declared terminal set, so COMPLETED and VERIFIED —
+        // both non-terminal, VERIFIED documented in aggregate() as "awaiting
+        // closure" — survive. The old inline List.of("OPEN","IN_PROGRESS") dropped
+        // them, under-reporting a regulator-facing export in the flattering
+        // direction (F2-336 / F2-196 / F2-282).
+        when(scenarioRepo.findByOrganisationIdAndLifecycleStageAndIsDeletedFalseOrderByCreatedAtDesc(
+                eq(ORG_ID), eq("BOARD_APPROVED"))).thenReturn(List.of());
+        when(recordRepo.findByOrganisationIdAndReportingYearAndIsDeletedFalseOrderByAssetClassAsc(
+                eq(ORG_ID), eq(2026))).thenReturn(List.of());
+        when(targetRepo.findByOrganisationIdAndIsDeletedFalseOrderByTargetYearAsc(ORG_ID))
+                .thenReturn(List.of());
+        when(capaRepo.findByOrganisationIdAndStatusNotIn(
+                eq(ORG_ID), eq(CorrectiveActionService.TERMINAL_STATUSES)))
+                .thenReturn(List.of(capa("OPEN"), capa("COMPLETED"), capa("VERIFIED")));
+
+        AnnualClimateReport out = reportService.generateAnnualReportData(2026);
+
+        assertThat(out.gapsCapa()).extracting(CapaEntry::status)
+                .containsExactlyInAnyOrder("OPEN", "COMPLETED", "VERIFIED");
+        // The old inclusion-list query is gone — no reader types the open set.
+        verify(capaRepo, never()).findByOrganisationIdAndStatusIn(any(), any());
+    }
+
+    private static CorrectiveAction capa(String status) {
+        CorrectiveAction c = new CorrectiveAction();
+        c.setStatus(status);
+        c.setActionCode("CA-" + status);
+        c.setTitleEn("gap " + status);
+        return c;
     }
 }

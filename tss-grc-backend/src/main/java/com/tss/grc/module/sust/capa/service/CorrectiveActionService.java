@@ -43,7 +43,10 @@ import java.util.*;
 @RequiredArgsConstructor
 public class CorrectiveActionService {
 
-    private static final Set<String> STATUSES =
+    /** The whole status vocabulary. Package-visible so the drift-guard test can
+     *  pin that the outstanding complement ({@code STATUSES} \ {@link #TERMINAL_STATUSES})
+     *  is exactly the four non-terminal states every reader counts (F2-336). */
+    static final Set<String> STATUSES =
         Set.of("OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED", "CLOSED", "CANCELLED");
 
     private static final Set<String> PRIORITIES =
@@ -67,8 +70,16 @@ public class CorrectiveActionService {
 
     /** A CAPA in one of these states no longer "covers" its source gap, so a
      *  freshly-surfaced gap on that source opens a new CAPA (mirrors the
-     *  compliance F8 AR-EVD-GAP dedup, which skips only NON-closed findings). */
-    private static final Set<String> TERMINAL_STATUSES = Set.of("CLOSED", "CANCELLED");
+     *  compliance F8 AR-EVD-GAP dedup, which skips only NON-closed findings).
+     *
+     *  <p>Also the single source of truth for "outstanding": a CAPA is still
+     *  in play iff its status is NOT in this set. Every reader that counts
+     *  "open" corrective actions (this service's {@code aggregate()} and the
+     *  IFRS S2 / TCFD annual climate report) derives the outstanding population
+     *  as the complement of this set — never a second inclusion list, which
+     *  drops any non-terminal state nobody remembered (F2-336 / F2-196).
+     *  Public so cross-package readers reference it instead of copying it. */
+    public static final Set<String> TERMINAL_STATUSES = Set.of("CLOSED", "CANCELLED");
 
     private final CorrectiveActionRepository repo;
     private final OrganisationSettingsService settingsService;
@@ -328,8 +339,12 @@ public class CorrectiveActionService {
         // escalation window are tenant-configurable via OrganisationSettings
         // (defaults 7 / 30 days live in the settings schema).
         var st = settingsService.getOrCreate();
-        List<CorrectiveAction> all = repo.findByOrganisationIdAndStatusIn(
-            org(), List.of("OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED"));
+        // "Outstanding" = the complement of the declared terminal set, so a new
+        // non-terminal state is counted automatically rather than silently
+        // dropped (F2-336). Today this equals {OPEN, IN_PROGRESS, COMPLETED,
+        // VERIFIED} — the same population the annual climate report reads.
+        List<CorrectiveAction> all = repo.findByOrganisationIdAndStatusNotIn(
+            org(), TERMINAL_STATUSES);
         LocalDate today  = LocalDate.now();
         LocalDate warnBy = today.plusDays(st.getCapaOverdueWarningDays());       // imminent (warning)
         LocalDate soon   = today.plusDays(st.getCapaExecutiveEscalationDays());  // executive-escalation window
