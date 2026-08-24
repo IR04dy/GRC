@@ -15219,6 +15219,98 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-313 — the census tracking the conversion backlog was blind to the half it converts into
+
+| | |
+|---|---|
+| **Status** | 🟡 MEASURED + INSTRUMENTED 2026-08-24 — the remedy is tenant data, not a jar |
+| **Severity** | **P2** — a whole module's surface reachable only through the `PLATFORM_ADMIN` code bypass, including two sidebar-linked consoles |
+| **Registers** | `platform.issues` (13 live rows), `platform.calendar_events`, `platform.departments`, file upload, branding, tenant onboarding |
+| **Standards** | — (the Issue register is where NCA ECC / SAMA CSF control-test escalations land) |
+| **Found by** | Asking [[F2-253]]'s question of the *destination*: `ROLE_GUARD_CENSUS.md` measures **role** guards, and `hasPermission` is [[F2-05]]'s ratified target |
+| **Verification** | probe **13/13** as six real personas; census run against **both** databases |
+
+### The instrument was scoped to the thing being retired
+
+`ROLE_GUARD_CENSUS.md`'s §B2b asks *"which pure **role** guards admit nobody, by holder
+attrition?"* — [[F2-253]]'s question, and the reason §B2b exists. Every section of that report is
+about role guards, because that is what it was built to track.
+
+🔑 **`hasPermission` is the ratified destination of the whole F2-05 conversion programme, and the
+same question had never been put to it.** So the census measuring the backlog could not see a defect
+in the half it converts *into* — [[F2-198]]'s shape, where the narrowing is the artefact's own
+subject.
+
+### What it found
+
+Joining the pairs guards cite — the artefact `PermissionCatalogueUsageTest` already publishes — against
+active holders:
+
+| | dev | prod |
+|---|---|---|
+| unsatisfiable pairs | **7** of 131 | **5** of 131 |
+| routes they close | **36** | **34** |
+
+`PLATFORM:READ` / `WRITE` / `EXPORT` are granted to **`ORG_ADMIN` alone, which has no active user**,
+so `module/platform`'s entire surface — **29 routes** — is reachable by a platform administrator and
+nobody else:
+
+* `/issues`, **sidebar-linked**: the cross-module Issue console
+* `/calendar`, **sidebar-linked**: the platform calendar and its `.ics` export
+* departments, file upload, branding writes, tenant onboarding
+
+Probed **13/13**: `compliance`, `so_officer`, `auditor`, `rmanager`, `ranalyst` and `viewer` all
+**403 on every Issue route including READ**, on `/api/v1/calendar/events`, on the `.ics` export and on
+departments; `admin` 200 throughout. (`brand-theme` READ is correctly `isAuthenticated()` — only its
+write is behind `PLATFORM`.)
+
+🔑 **Two automated ladders escalate into that register** — `CcmService` on the third consecutive
+CRITICAL control-test failure ([[F2-228]]) and `KriBreachService` on a KRI breach — across 7 source
+modules. **So the platform writes escalations into a console no non-administrator can open**, and
+because READ is included, nobody can even see that they exist.
+
+### The others, and why counting them is the point
+
+`CHANGE:DELETE` (4 routes), `REPORTING:DELETE`, `CPTY:APPROVE`, `AML:REFRESH_LISTS`. [[F2-260]] filed
+`CPTY:APPROVE`; [[F2-293]] filed `REPORTING:DELETE`; `CHANGE:DELETE` had never been mentioned.
+🔑 [[F2-266]]'s headline: **filings one at a time is what a population looks like when nothing counts
+it.**
+
+### The remedy is tenant data, and that is a precedent rather than a preference
+
+All seven are granted to a role that **exists and is seated in nobody**, so an administrator can
+assign it without a new jar — a **remedy, not a defence** ([[F2-253]]). [[F2-282]] settled the fix for
+this kind on exactly this role: **seat `ORG_ADMIN`, do not widen the grant.** Granting `PLATFORM` to
+`GRC_ADMINISTRATOR` would hand the GRC content administrator the **branding, tenant-onboarding and
+department** registers, which is a different job family and wider than the shipped guard's own
+audience ([[F2-260]]: for a grant, the shipped audience is the evidence and convention is the thing to
+argue against).
+
+⚙ **None** is granted to no role at all, so nothing here needs a migration — and the report says that
+explicitly, so [[F2-260]]'s `RRP` case reads as genuinely absent rather than merely unlisted.
+
+### Two refinements found by running it
+
+* **The rows are not of equal weight** — `PLATFORM:WRITE` guards 16 routes, `REPORTING:DELETE` one —
+  so the guarded-route count is **derived from the source**, not written into the prose ([[F2-273]]).
+* ⚠⚠ **Running against prod put `PLATFORM_ADMIN:READ/WRITE` into the table and the 42-route total**,
+  because there V369+ is pending so those rows really are ungranted — while the note beneath said they
+  are by design. **A caveat in prose contradicting the number above it** ([[F2-197]]), in the section I
+  had just written. The bypass module is excluded from the population now and the exclusion is
+  **printed**, so it is a measurement rather than a silent filter. 🔑 Only the second database showed
+  it ([[F2-259]]).
+
+### Filed
+
+* **Seat `ORG_ADMIN`** in each tenant — the whole of `module/platform` depends on it. Tenant data, so
+  an owner action.
+* Whether a cross-module Issue should be visible to holders of its **source module's** READ rather
+  than to `PLATFORM:READ` is a product question ([[F2-259]]: converting a READ tier can widen a
+  governance console to any authenticated reader).
+* The **holder half cannot be a build gate** — `mvn -o clean package` is deliberately database-free —
+  so this section is a script, like `role_guard_census.py`'s others. The hermetic half is already
+  `PermissionCatalogueUsageTest`'s ([[F2-255]]).
+
 ## F2-312 — a leg named for three exercised four and missed the fifth
 
 | | |
