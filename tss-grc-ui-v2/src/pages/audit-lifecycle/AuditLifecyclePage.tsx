@@ -64,9 +64,11 @@ export function AuditLifecyclePage() {
   }, [engagementCode, engagementCodes]);
 
   // Sprint 4 §2.7 — backend `audit_lc.FindingService` broadcasts on every
-  // finding transition. Tick the same counter so memoised data re-derives
-  // for either local or remote events.
-  useRealtimeOrgEvent('changed.audit_finding', () => setTick(t => t + 1));
+  // finding transition from ANOTHER user. F2-327: a broadcast means the
+  // server's copy has moved, so the /api/audit-lc/* caches must be RE-FETCHED
+  // (hydrateAuditLifecycle(true)) — a bare setTick only re-renders the stale
+  // caches, leaving the subscription inert for cross-user updates (F2-205).
+  useRealtimeOrgEvent('changed.audit_finding', () => { void hydrateAuditLifecycle(true).then(() => setTick(t => t + 1)); });
 
   const stats = useMemo(() => aggregateAuditLifecycle(), [_tick]);
   const plan = useMemo(() => loadAnnualPlan(), [_tick]);
