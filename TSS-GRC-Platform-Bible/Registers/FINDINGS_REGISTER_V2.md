@@ -15219,6 +15219,38 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-337 — open-banking incident reference minted from a COUNT, not a MAX: a collision the filtered unique index turns into a 500
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 (latent) — `ObService.generateIncidentReference` built the SAMA open-banking incident reference `OBI-<year>-NNN` from `count(this-year incidents among the 500 most recent, live) + 1`. A count re-mints an ordinal already in use whenever a reference is absent from the counted set: **deterministically** once a tenant passes 500 incidents in a year (the `PageRequest.of(0, 500)` window then always returns 500 rows, so the count sticks and every subsequent create re-mints the same ordinal), and after any soft-delete or under a concurrent create. `ob_incident.reference` carries a FILTERED unique index `ux_ob_incident_reference` on `(organisation_id, reference) WHERE is_deleted = 0`, which then rejects the duplicate INSERT with a **500 on raising a SAMA-reportable incident**. F2-48's collision minter. Latent (no soft-delete path today; deterministic only past 500/year; a race at any volume), so a latent-hazard closure rather than a live-reproducible defect ([[F2-283]]). |
+| **Registers** | `openbanking.ob_incident.reference` (SAMA Open Banking incident register) |
+| **Standards** | SAMA Open Banking Framework — incident register / reporting; the F2-48 collision-minter family; [[F2-266]]/[[F2-267]]'s reference-mint idiom. |
+| **Found by** | asking [[F2-197]]'s capped-list question of BACKEND minters and metrics (not just frontend KPI tiles): which count/aggregate is computed over a limited (`findTop…` / `PageRequest.of(0, N)`) result, where the cap can be exceeded? The incident-reference minter counted the top-500 to derive the "next" ordinal. |
+| **Verification** | hermetic Mockito `ObIncidentReferenceMintTest` (4 legs) drives `raiseIncident` with a mocked repo and an `ArgumentCaptor` on `save`, `tppId` null so no consent/TPP path is touched: (1) a MAX of `OBI-<year>-003` with a gap below it mints `-004` (a COUNT would have re-used a lower, in-use ordinal); (2) the skip-loop steps over an existing `-004` to mint `-005`, backstopped by the unique index; (3) the first incident of the year starts at `-001`; (4) the reference matches the canonical `OBI-\d{4}-\d{3}` format. Pure synchronous minting logic, fully visible to a mock — no DB / tenant / row_version / collation dimension — so verified hermetically ([[F2-320]]/[[F2-325]] calibration), no live probe. Pre-fix control: reverting `ObService` to the count-based minter makes all 4 legs FAIL (the reverted body calls the un-stubbed top-500 finder and the STRICT stubs go unused — the test is coupled to the max-based contract and cannot pass on the pre-fix tree). Full hermetic build **4766/0/0**. |
+
+### The fix
+
+Mirror `ComplaintService#generateNextComplaintNo`, the platform's own sequential-minter idiom:
+
+1. **Seed from the MAX, never a COUNT** — `findTopByOrganisationIdAndReferenceStartingWithOrderByReferenceDesc(org, "OBI-<year>-")` returns the highest live reference for the org+year (ordinals are zero-padded, so a lexicographic DESC is a numeric DESC within the format's domain), parse the tail, `+ 1`. A MAX survives a gap: deleting the middle of a sequence does not lower it, so a used ordinal is never re-issued.
+2. **A collision-skip loop** — try `OBI-<year>-NNN`, `NNN+1`, … skipping any candidate `existsByOrganisationIdAndReference` already holds, backstopped by the filtered unique index for the residual concurrency race (the loser of a true race gets the 500 and the caller retries — the same accepted residual `ComplaintService` and `SubprocessorService` carry, [[F2-267]]).
+
+Both new repository finders are scoped by the entity's `@Where(is_deleted = 0)`, so they see exactly the set the filtered unique index enforces — a soft-deleted reference is free to be re-used, and the loop agrees with the index on that.
+
+### Why format-preserving MAX, and not entropy
+
+[[F2-266]]/[[F2-267]] established `ReferenceCodeMint` (entropy) as the collision-proof primitive "because a per-tenant sequence needs a read-then-write so two concurrent creates race." Entropy would change `OBI-2026-001` to `OBI-2026-<entropy>` — a visible format change to a regulator-facing reference, which is a product decision with no defect behind it ([[F2-267]] made exactly this call for `subprocessorCode`). The MAX-seed + skip-loop is a **strict improvement that preserves the format**: it removes the deterministic collisions (window, gap) entirely and reduces the residual to the pure concurrency race, which the pre-existing unique index already backstops. So no owner decision is forced — the reference is still `OBI-<year>-NNN`, the server still mints it, and the only thing that changed is that a used ordinal is no longer re-issued.
+
+### Reachability
+
+`POST /api/v1/openbanking/incidents` → `raiseIncident` (`@Valid @RequestBody`), with a `lib/openbanking.ts` client (`raiseIncident`), so the minter is exercised end-to-end — not dark. The collision itself is latent: there is no soft-delete path for `ob_incident` in `ObService` today (so the gap-collision is not reachable via the API), and the window-cap collision needs > 500 incidents in one year for one tenant. State which you have ([[F2-283]]): this is a latent-hazard closure, and the deterministic window bug plus the concurrency race are what make it worth closing rather than filing.
+
+### Filed
+
+- No migration and no CHECK: the fix is pure minting logic, and the unique index already exists. `ob_incident` has no other count-based reference minter (the module's only one). The `OBI-<year>-NNN` format caps display niceness at 999/year (`%03d`); beyond that the skip-loop still produces valid uniques, and the format itself is the limiting factor, not the minter.
+
 ## F2-336 — "open" corrective actions / gaps counted by a single status token, under-reporting the NCA/ISO 22301 readiness KPI
 
 | | |
