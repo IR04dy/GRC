@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-347 — an exercise-observation gap title overflowed the 255-char title_en column when the run code was long
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 — the [[F2-215]] sibling of [[F2-346]], flagged in that slice and left. `ExerciseObserverService.promoteObservationToGap` composes the gap title as `"Exercise finding (" + run.getRunCode() + "): " + truncate(observation, 180)` into `BcmGap.title_en` `@Column(length = 255)`. `run_code` is CALLER-SUPPLIED (`StartRunRequest.runCode`, no `@Size`) up to its `@Column(length = 64)`, so 18 (prefix) + 64 + 3 + 180 = 265 can exceed 255 → SQL Server 8152 → 500 on promoting an observation to a gap, for a run with a long descriptive code. The free text was truncated to 180 for readability but the caller-supplied run code was never budgeted. Latent in data, live in code — reachable with a 55+ char run code and a 180+ char observation. |
+| **Registers** | `bcm.gaps.title_en` (the gap raised from an exercise observation), composed from a caller-supplied `exercise_runs.run_code`. No data change. |
+| **Standards** | ISO 22301 / NCEMA exercise programme (observation → gap → remediation); the [[F2-338]] / [[F2-346]] / [[F2-185b]] server-composed-string-overflow family. |
+| **Found by** | Directly — [[F2-346]] flagged this exact site (*"capped at 180 but check the gap title column"*) and deferred it. Confirmed: `run_code` is caller-supplied with no `@Size`, column 64, so `18 + 64 + 3 + 180 = 265 > 255`. Its sibling composition (`:445`, the Arabic title) has the same shape and was fixed too. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — `ExerciseObserverServiceTest` drives `promoteObservationToGap` with a 60-char run code + a 300-char observation and asserts both the EN and AR gap titles are ≤ 255 and the run reference survives; a reflection leg mirrors `GAP_TITLE_MAX` against `BcmGap.title_en`'s `@Column(length)`. Pre-fix control ([[F2-274]] / [[F2-287]]): un-capping the EN title turns the leg RED (261 > 255); fix committed first ([[F2-297]]). The test also adds the `BcmRemediationService` / `BcmGapRepository` mocks the promote path needs — the existing suite never exercised it ([[F2-248]]). 25/25; full backend suite green. No migration. |
+
+### Fix
+
+Cap the whole composed title (EN and AR) to `GAP_TITLE_MAX = 255`, reusing the existing `truncate()` helper (identical to F2-338's `cap`). `GAP_TITLE_MAX` mirrors `BcmGap.title_en`'s `@Column(length)` by reflection so the cap and the column cannot drift. The inner `truncate(text, 180)` readability cap is kept; the outer cap only bites when the run code is long, and the run reference (prefix + code, ≤ 85 chars) always survives.
+
+### Filed
+
+`StartRunRequest.runCode` has no `@Size`, so a caller-supplied run code > 64 chars 8152s on the `ExerciseRun` insert itself — a milder [[F2-185b]] instance (a 500 where a 400 naming the field is due). Not fixed here (a distinct boundary-validation question); the gap-title cap makes the overflow that reaches the gap harmless regardless of run-code length.
+
 ## F2-346 — an auto-raised CAPA's title overflowed the 255-char title_en column when the violation description was long
 
 | | |
