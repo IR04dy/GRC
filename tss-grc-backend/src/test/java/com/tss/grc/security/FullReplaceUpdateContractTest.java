@@ -972,7 +972,27 @@ class FullReplaceUpdateContractTest {
      * that failed on correct code. Ten of the thirty derived sites send a {@code *Dto}; asking this
      * question of them would demand roughly sixty reasons for a contract that does not exist.
      */
-    private static final Map<String, String> DERIVED_IGNORED_FIELDS = new LinkedHashMap<>() {{
+    /**
+     * ⚠⚠ F2-311 — this was {@code DERIVED_IGNORED_FIELDS}, and two of its four entries are not
+     * ignored at all: they are <b>consulted and refused</b>. [[F2-296]] wrote that gap into one of
+     * the entries itself — <em>"calling it 'ignored' understates what the route does"</em> — which is
+     * [[F2-224]]'s shape, a verdict vocabulary limited to the verdicts an earlier slice happened to
+     * reach.
+     *
+     * <p>{@code unwritten} is accurate for both kinds: neither is written <b>from the request</b>.
+     * The verdict token then says <em>why</em>, and it is <b>derived and checked</b> rather than
+     * trusted ({@link #everyUnwrittenVerdictMatchesWhatTheServiceDoes}), because the distinction is
+     * mechanical — a consulted field is compared by a refusal primitive, an ignored one is not.
+     *
+     * <ul>
+     *   <li><b>CONSULTED</b> — the field arrives, the server compares it against the stored value and
+     *       refuses a change while tolerating an echo. A caller can observe this: sending a different
+     *       value is a 400. Calling it "ignored" would tell a reader the opposite.</li>
+     *   <li><b>IGNORED</b> — the field arrives and is silently dropped. A form input that does
+     *       nothing, or an immutable the server never looks at.</li>
+     * </ul>
+     */
+    private static final Map<String, String> DERIVED_UNWRITTEN_FIELDS = new LinkedHashMap<>() {{
         // /api/v1/bcm/bia/{} :: linkedRiskId was here and is CLOSED by F2-279 —
         // BcmService#updateBia writes it now, so this map must no longer carry it (the
         // forward leg enforces that direction). Its entry read "settable on create and
@@ -980,12 +1000,12 @@ class FullReplaceUpdateContractTest {
         // already accepted the value unvalidated, and it still does — the reference cannot
         // be verified from bcm without a new module edge on a decrease-only graph ratchet.
         put("/api/v1/bcm/legacy-plans/{} :: status",
-            "BY DESIGN. F2-234 made this route accept an ECHO of the stored status and refuse a "
+            "CONSULTED. F2-234 made this route accept an ECHO of the stored status and refuse a "
             + "CHANGE, because bcm.bcm_plans has no CHECK on status and every transition guard is "
             + "an equality test, so a PUT-driven DRAFT -> APPROVED skipped the machine entirely. "
             + "The field is on the wire so a form that round-trips the row keeps working.");
         put("/api/v1/compliance/audit-engagements/{} :: status",
-            "BY DESIGN. F2-296 — the same shape as bcm/legacy-plans above, and finding the two "
+            "CONSULTED. F2-296 — the same shape as bcm/legacy-plans above, and finding the two "
             + "described identically in this map WITHOUT either naming the other is what showed "
             + "the rule had four hand-rolled sites across three modules (F2-215's two-of-N, in the "
             + "artefact that documents them). `apply()` copied the caller's status with no "
@@ -993,18 +1013,98 @@ class FullReplaceUpdateContractTest {
             + "forward-only, so the PUT was this register's only reverse edge; F2-294 closed the "
             + "create and filed the register as having 'closed its only open writers'. It now goes "
             + "through ServerOwnedState.requireUnchanged: an ECHO is accepted because "
-            + "engagementToReq always sends one, a CHANGE is refused naming /advance. ⚠ Note this "
-            + "map's own vocabulary has no bucket for it — the field is neither a form input that "
-            + "does nothing nor an immutable the server ignores: it is CONSULTED and never written, "
-            + "which is a third kind, and calling it 'ignored' understates what the route does.");
+            + "engagementToReq always sends one, a CHANGE is refused naming /advance. ⚙ F2-311 "
+            + "closed the gap this entry used to record: the map had no bucket for a field that is "
+            + "CONSULTED and never written, so 'ignored' understated the route. The verdict token "
+            + "above is now derived from the service and checked both ways.");
         put("/api/v1/cyber/policies/{} :: policyCode",
-            "BY DESIGN. The document-control code an auditor cites; CH-10 fixes it at creation and "
+            "IGNORED. The document-control code an auditor cites; CH-10 fixes it at creation and "
             + "PolicyManagementService writes it only when superseding a document into a new "
             + "version. Populated on 41 of 41 live rows in dev and 37 of 37 in prod.");
         put("/api/v1/privacy/dsrs/{} :: receivedAt",
-            "When the request arrived. Stamped once at creation; a later edit must not restyle "
+            "IGNORED. When the request arrived. Stamped once at creation; a later edit must not restyle "
             + "the start of the PDPL Article 23 clock.");
     }};
+
+    /**
+     * F2-311 — the verdict is derived from the service, not trusted from the prose.
+     *
+     * <p>A <b>CONSULTED</b> field is compared against the stored value by one of this platform's
+     * refusal primitives ({@code ServerOwnedState.requireUnchanged}, {@code sameState},
+     * {@code requireImmutableReference}); an <b>IGNORED</b> one is not looked at. So the two kinds
+     * are mechanically separable, and holding the token as prose alone would be the artefact
+     * [[F2-188]] measured — a reason that reads verified because it reads fluently.
+     *
+     * <p>⚠ Enforced in BOTH directions. A field declared IGNORED whose service consults it is the
+     * understatement F2-296 found; a field declared CONSULTED whose service does not is a claim that
+     * a caller's value is checked when it is silently dropped — and that is the more dangerous half,
+     * because it tells a reader a guard exists.
+     */
+    @Test
+    @DisplayName("every unwritten field's verdict matches what its service actually does")
+    void everyUnwrittenVerdictMatchesWhatTheServiceDoes() throws IOException {
+        Set<String> primitives = Set.of("requireUnchanged", "sameState", "requireImmutableReference");
+        List<String> wrong = new ArrayList<>();
+
+        for (Map.Entry<String, String> e : DERIVED_UNWRITTEN_FIELDS.entrySet()) {
+            String key = e.getKey();
+            String verdict = e.getValue().split("\\.", 2)[0].trim();
+            if (!verdict.equals("CONSULTED") && !verdict.equals("IGNORED")) {
+                wrong.add(key + " — reason must begin with CONSULTED or IGNORED, not '" + verdict
+                          + "'. The verdict is the part a reader acts on.");
+                continue;
+            }
+            String field = key.substring(key.indexOf(":: ") + 3).trim();
+            String getter = "get" + Character.toUpperCase(field.charAt(0)) + field.substring(1);
+
+            // does ANY service consult that field through a refusal primitive?
+            boolean consulted = false;
+            for (Path svc : javaSources()) {
+                if (!svc.getFileName().toString().endsWith("Service.java")) { continue; }
+                String code = stripComments(Files.readString(svc));
+                for (String prim : primitives) {
+                    int at = code.indexOf(prim);
+                    while (at >= 0) {
+                        String window = code.substring(at, Math.min(code.length(), at + 260));
+                        if (window.contains(getter + "()")) {
+                            consulted = true;
+                            break;
+                        }
+                        at = code.indexOf(prim, at + 1);
+                    }
+                    if (consulted) { break; }
+                }
+                if (consulted) { break; }
+            }
+
+            if (consulted && verdict.equals("IGNORED")) {
+                wrong.add(key + " — declared IGNORED, but a refusal primitive compares " + getter
+                          + "(). That is F2-296's understatement: a caller sending a different value "
+                          + "gets a 400, which 'ignored' tells them the opposite of.");
+            }
+            if (!consulted && verdict.equals("CONSULTED")) {
+                wrong.add(key + " — declared CONSULTED, but no refusal primitive compares " + getter
+                          + "(). This is the dangerous direction: the entry tells a reader a guard "
+                          + "exists where the value is silently dropped.");
+            }
+        }
+
+        assertThat(wrong).as("""
+            An unwritten field's declared verdict disagrees with what its service does.
+
+            CONSULTED means the server compares the caller's value and refuses a change; IGNORED             means it is silently dropped. Both are 'not written from the request', which is why they             share this map — but they are different things to a caller, and only one of them is a             guard.
+
+            %s""".formatted(String.join("\n            ", wrong)))
+            .isEmpty();
+
+        // anti-vacuity: at least one of each kind, or the leg is asserting over a single bucket
+        long consultedCount = DERIVED_UNWRITTEN_FIELDS.values().stream()
+            .filter(v -> v.startsWith("CONSULTED")).count();
+        long ignoredCount = DERIVED_UNWRITTEN_FIELDS.values().stream()
+            .filter(v -> v.startsWith("IGNORED")).count();
+        assertThat(consultedCount).as("no CONSULTED entry — the distinction is untested").isPositive();
+        assertThat(ignoredCount).as("no IGNORED entry — the distinction is untested").isPositive();
+    }
 
     @Test
     @DisplayName("over the derived population, an ignored inbound field is recorded")
@@ -1030,9 +1130,9 @@ class FullReplaceUpdateContractTest {
             .as("""
                 A field an inbound-only request type declares that the server never writes: \
                 either a form input that silently does nothing, or a deliberate immutable. Say \
-                which, in DERIVED_IGNORED_FIELDS, with a reason.""")
-            .containsExactlyInAnyOrderElementsOf(DERIVED_IGNORED_FIELDS.keySet());
-        assertThat(DERIVED_IGNORED_FIELDS.values())
+                which, in DERIVED_UNWRITTEN_FIELDS, with a reason.""")
+            .containsExactlyInAnyOrderElementsOf(DERIVED_UNWRITTEN_FIELDS.keySet());
+        assertThat(DERIVED_UNWRITTEN_FIELDS.values())
             .allSatisfy(r -> assertThat(r).hasSizeGreaterThan(40));
     }
 

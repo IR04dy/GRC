@@ -15219,6 +15219,63 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-311 — the map called IGNORED held two fields that are CONSULTED, and it said so itself
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — an instrument's verdict vocabulary understating what two routes do. No production change. |
+| **Registers** | `bcm.bcm_plans`, `compliance.audit_engagements` (the two mislabelled), `policy.documents`, `privacy.data_subject_requests` |
+| **Standards** | — |
+| **Found by** | Executing [[F2-296]]'s filing, which is written **inside one of the map's own entries** |
+| **Verification** | suite **4700 → 4701/0/0**; controls kill a mis-declared verdict in **both** directions |
+
+### The finding was already written down, in the artefact it is about
+
+`FullReplaceUpdateContractTest.DERIVED_IGNORED_FIELDS` carried this, in the entry F2-296 added:
+
+> ⚠ Note this map's own vocabulary has no bucket for it — the field is neither a form input that does
+> nothing nor an immutable the server ignores: it is CONSULTED and never written, which is a third
+> kind, and calling it 'ignored' understates what the route does.
+
+🔑 **[[F2-224]]'s shape: a verdict vocabulary limited to the verdicts an earlier slice happened to
+reach.** Measured, the split is **2 CONSULTED / 2 IGNORED** — `BcmService` compares the status with
+`sameState`, `AuditEngagementService` with `requireUnchanged`, while the other two only ever read the
+**stored** row and never the request's value.
+
+### `unwritten` is the accurate name, and the verdict says why
+
+Both kinds share one property — neither is written **from the request** — so the map is
+`DERIVED_UNWRITTEN_FIELDS` now, and each entry declares:
+
+* **CONSULTED** — the server compares the caller's value and refuses a change while tolerating an
+  echo. A caller can observe it: a different value is a 400.
+* **IGNORED** — the field arrives and is silently dropped.
+
+### The verdict is derived, not trusted
+
+The distinction is mechanical — a consulted field is compared by one of this platform's refusal
+primitives (`requireUnchanged`, `sameState`, `requireImmutableReference`) — so the leg reads the
+services and checks the declared token against them ([[F2-299]]'s rule: derive the vocabulary rather
+than hold a list). ⚠ **Enforced in both directions**, and the second is the dangerous one: a field
+declared CONSULTED whose service does not consult it **tells a reader a guard exists** where the
+value is silently dropped. Controls kill a flip either way.
+
+### The leg found a fourth entry on its first real run
+
+Three of the four reasons opened *"BY DESIGN."* and my edit replaced those; the fourth opened *"When
+the request arrived."*, so it had no verdict at all. 🔑 **An edit keyed on a prefix reaches only the
+entries that share it** — and the leg caught what the edit missed, which is the argument for deriving
+the check rather than trusting the pass.
+
+### Two smaller notes
+
+* The same reason text appears in **two** maps (`FROZEN_FIELDS` at line 586 and this one), so the
+  patch had to be applied by line rather than by content. They describe the field from two different
+  angles, so it is not a duplication defect — but it is why a content-keyed edit matched twice.
+* An inline `py -c` mangled an anchor containing a newline, again. The rule stands: use the Write
+  tool for any payload carrying escapes.
+
 ## F2-310 — the filed question was refuted, and the rule that settles it
 
 | | |
