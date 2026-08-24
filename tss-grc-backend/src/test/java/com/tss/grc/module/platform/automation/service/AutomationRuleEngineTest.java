@@ -6,6 +6,7 @@ import com.tss.grc.module.platform.automation.entity.AutomationRuleRun;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRepository;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRunRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -170,5 +171,80 @@ class AutomationRuleEngineTest {
         engine.onDomainEvent(e);
         verify(rules, never()).findByOrganisationIdAndTriggerEventAndEnabledTrueOrderByPriorityAsc(
             anyLong(), anyString());
+    }
+
+    // ── F2-319: the tenant is anchored at the async thread boundary ─────────────────────────────
+
+    /**
+     * ⚠⚠ F2-319 — {@code onDomainEvent} is {@code @Async} and {@code @EnableAsync} is present, so it
+     * runs on a <b>pool thread</b> where {@code TenantContext} — a {@code ThreadLocal} — is absent.
+     * {@code AuditLogService.recordEvent} then falls back to organisation 1, so before this every
+     * audit row the engine and {@code AutomationActionExecutor} wrote (nine sites) was filed under
+     * tenant 1 whatever tenant's rule had fired.
+     *
+     * <p>🔑 <b>A mock that records only its arguments cannot see this</b>: the organisation is never
+     * an argument to {@code recordEvent}, it is read from the thread. So the stub captures
+     * {@code TenantContext} at the moment of the call — the same technique [[F2-317]] needed.
+     *
+     * <p>🔑 And unlike F2-317/318, no publisher could have helped: the ThreadLocal does not cross the
+     * async boundary, which is why one anchor at the entry point is the fix rather than nine.
+     */
+    @Test
+    @DisplayName("F2-319: every audit row the engine writes carries the event's own organisation")
+    void theAuditRowCarriesTheEventsOrganisationNotTheTenantOneFallback() throws Exception {
+        java.util.List<Long> seen = new java.util.ArrayList<>();
+        org.mockito.Mockito.doAnswer(inv -> {
+            seen.add(com.tss.grc.common.tenant.TenantContext.getCurrentTenant());
+            return null;
+        }).when(audit).recordEvent(org.mockito.ArgumentMatchers.any());
+
+        AutomationRule r = rule("AR-901", "RISK_CREATED", null, "NOTIFY");
+        r.setAuditRequired(true);
+        when(rules.findByOrganisationIdAndTriggerEventAndEnabledTrueOrderByPriorityAsc(
+                ORG_ID, "RISK_CREATED")).thenReturn(java.util.List.of(r));
+        when(actions.execute(org.mockito.ArgumentMatchers.any(),
+                             org.mockito.ArgumentMatchers.any())).thenReturn("ok");
+
+        engine.onDomainEvent(ev("RISK_CREATED", java.util.Map.of()));
+
+        assertThat(seen).as("""
+            An audit row from the automation engine was written under the wrong organisation.             AuditLogService falls back to tenant 1 when TenantContext is unset, and this listener             runs on a pool thread where it always is — so before F2-319 this read [1].""")
+            .containsExactly(ORG_ID);
+    }
+
+    /**
+     * ⚠ A <b>pool thread is reused</b>, so a tenant left set would leak into the next event's
+     * processing — a rule for organisation 2 auditing as organisation 7 because that was the previous
+     * task. This matters more here than for a scheduler, which owns its thread for the run.
+     */
+    @Test
+    @DisplayName("F2-319: the pool thread is left with no tenant, so nothing leaks to the next event")
+    void thePoolThreadIsLeftCleanForTheNextEvent() {
+        com.tss.grc.common.tenant.TenantContext.clear();
+        when(rules.findByOrganisationIdAndTriggerEventAndEnabledTrueOrderByPriorityAsc(
+                ORG_ID, "RISK_CREATED")).thenReturn(java.util.List.of());
+
+        engine.onDomainEvent(ev("RISK_CREATED", java.util.Map.of()));
+
+        assertThat(com.tss.grc.common.tenant.TenantContext.getCurrentTenant()).as("""
+            The tenant survived the listener, so the next event handled on this pooled thread would             be audited under this event's organisation.""")
+            .isNull();
+    }
+
+    /**
+     * ⚠ And an event with no organisation is still refused before the anchor, which is the ordering
+     * the fix relies on: {@code setCurrentTenant(null)} would put the thread back into the state the
+     * fallback exists for.
+     */
+    @Test
+    @DisplayName("F2-319: an event with no organisation is refused before anything is anchored")
+    void anEventWithNoOrganisationIsStillRefusedFirst() {
+        com.tss.grc.common.tenant.TenantContext.clear();
+        engine.onDomainEvent(new DomainEvent(null, "RISK_CREATED", "Risk", 1L, "R-1",
+                                             java.util.Map.of()));
+        assertThat(com.tss.grc.common.tenant.TenantContext.getCurrentTenant()).isNull();
+        org.mockito.Mockito.verify(rules, org.mockito.Mockito.never())
+            .findByOrganisationIdAndTriggerEventAndEnabledTrueOrderByPriorityAsc(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 }

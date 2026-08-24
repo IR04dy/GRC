@@ -8,6 +8,7 @@ import com.tss.grc.module.platform.automation.entity.AutomationRuleRun;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRepository;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRunRepository;
+import com.tss.grc.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,34 @@ public class AutomationRuleEngine {
      * Subscribe to every DomainEvent. {@code @Async} is intentional:
      * rules must never slow down the originating service. Failures
      * are caught + logged + recorded as FAILED runs, never re-thrown.
+     *
+     * <p>⚠⚠ F2-319 — the tenant is anchored here, at the <b>thread boundary</b>, and that is the
+     * whole point of doing it in this method rather than at each writer.
+     *
+     * <p>{@code @Async} plus {@code @EnableAsync} on {@code GrcApplication} means this runs on a
+     * <b>pool thread</b>, and {@code TenantContext} is a {@code ThreadLocal}. So
+     * {@code AuditLogService.recordEvent}'s {@code org != null ? org : 1L} fallback applied to
+     * <b>every</b> audit row this engine and {@link AutomationActionExecutor} write — nine sites —
+     * <b>unconditionally</b>. 🔑 <b>Unlike [[F2-317]] and [[F2-318]], where the tenant was missing
+     * because nobody set it, here no publisher could ever have helped: the ThreadLocal does not cross
+     * the async boundary.</b> That is what makes one anchor at the entry point the right fix rather
+     * than nine.
+     *
+     * <p>🔑 The tell sat three lines from the defect: {@link #recordRun} does
+     * {@code r.setOrganisationId(rule.getOrganisationId())} explicitly while the
+     * {@code audit.recordEvent} beside it took the fallback — the run row org-correct, the audit row
+     * not. Fifth instance of that asymmetry in this family.
+     *
+     * <p>Latent when found: all 673 automation runs in dev and 217 in prod are organisation 1, so no
+     * mismatch is visible. The ten organisation-2 {@code RULE_FIRED} rows are seeded (four share one
+     * timestamp to the second, and there are <b>zero</b> organisation-2 runs), so the thirteen rules
+     * each in organisations 2 and 3 have never fired. The observable, when one does, is that its run
+     * row lands in its own tenant and its audit row does not — the two tables disagreeing.
+     *
+     * <p>⚠ The ambient value is restored in a {@code finally}, and here that matters more than in
+     * F2-317: a <b>pool thread is reused</b>, so a tenant left set would leak into the next event's
+     * processing. On a pool thread the ambient value is null, so restoring is clearing — but writing
+     * it as a restore keeps the idiom identical at all four sites in this family.
      */
     @Async
     @EventListener
@@ -66,6 +95,16 @@ public class AutomationRuleEngine {
             log.warn("[automation] event without organisation_id: {}", event);
             return;
         }
+        Long ambient = TenantContext.getCurrentTenant();
+        TenantContext.setCurrentTenant(event.organisationId());
+        try {
+            dispatch(event);
+        } finally {
+            TenantContext.setCurrentTenant(ambient);
+        }
+    }
+
+    private void dispatch(DomainEvent event) {
         List<AutomationRule> matching = rules
             .findByOrganisationIdAndTriggerEventAndEnabledTrueOrderByPriorityAsc(
                 event.organisationId(), event.triggerEvent());
