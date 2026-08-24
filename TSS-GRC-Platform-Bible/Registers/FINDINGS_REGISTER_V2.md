@@ -15219,6 +15219,74 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-327 — a realtime subscription that re-renders a cache instead of re-fetching is inert for cross-user updates
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — two lifecycle pages (`RiskLifecyclePage` ERM treatment plans, `AuditLifecyclePage` internal-audit findings) subscribed to a server broadcast and answered it with a bare `setTick`, so another user's transition re-rendered this browser's STALE hydrate-once cache. The data is correct on manual reload and the user's OWN changes still re-render; the realtime feature was silently inert for the cross-user liveness it exists to deliver. |
+| **Registers** | `risk_lc.treatment_plans` / `audit_lc.findings` (frontend realtime handlers) |
+| **Standards** | — (realtime liveness; [[F2-205]]'s recorded blind spot) |
+| **Found by** | applying [[F2-205]]'s own generalisation — *"when you find a realtime subscription, read what its handler does with the frame"* — to every `useRealtimeOrgEvent` consumer. No instrument in the tree could see it (F2-205 said so), so this slice also builds the gate. |
+| **Verification** | the gate (`realtimeSubscriptionRefetches.test.ts`) with a pre-fix control that FAILS when the handlers are reverted to bare `setTick` (non-vacuous — [[F2-208]]); `tsc --noEmit` clean; full FE vitest suite green; the cache/refetch dataflow traced by reading |
+
+### F2-205's blind spot had two more instances
+
+[[F2-205]] found that `VulnerabilitiesV2Page` subscribed to `changed.vulnerability` and answered it by
+re-reading a browser-local store — a websocket frame refreshing a constant no server event could
+change — and fixed it to `hydrateVulns(true).then(() => setAllVulns(loadVulns()))`, force-refetching
+because *"a broadcast means the server's copy has moved, so the cached promise must not be reused —
+the only reading under which the subscription means anything."* It recorded the generalisation and
+noted **no instrument in this tree can see it**: every component is genuine, only the direction the
+data flows is wrong, so a reachability scan (is the symbol called?) and a provenance gate (does the
+page call a server?) both answer yes.
+
+Asked of every `useRealtimeOrgEvent` consumer (5 sites), two were the exact shape:
+- `RiskLifecyclePage` `changed.treatment_plan` → `() => setTick(t => t + 1)`.
+- `AuditLifecyclePage` `changed.audit_finding` → `() => setTick(t => t + 1)`.
+
+Both read a **hydrate-once server cache** — `hydrateTreatmentPlans` / `hydrateAuditLifecycle`, each
+`if (_promise && !force) return _promise`, with `loadTreatmentPlans()` / `loadFindings()` returning
+the cached array. A bare `setTick` only re-renders; the module cache is refreshed **only** by a forced
+hydrate. So this user's own transition re-renders (the local mutation replaced the cache and emitted),
+but **another user's transition — the whole reason to subscribe — arrived as a frame that re-rendered
+the unchanged cache**. Inert until a manual Refresh or a remount.
+
+### 🔑 The comment described the mechanism and was wrong
+
+Both handlers sat under a comment claiming the tick *"combines local + remote events through the same
+`_tick` so the page re-derives memoised data from either source"* / *"re-derives for either local or
+remote events."* False for the remote source: re-deriving from `_tick` re-reads the cache, and the
+remote change was never fetched into it. [[F2-184]]'s shape — the comment answers the question a reader
+was about to ask, incorrectly — so the fix corrects the comment with the code.
+
+### The fix
+
+Both handlers become the F2-205 pattern: `() => { void hydrateX(true).then(() => setTick(t => t + 1)); }`.
+`force = true` bypasses the cached promise, refetches, replaces the cache and `emit()`s; the
+`.then(setTick)` re-renders over fresh rows. Two one-line changes.
+
+### Gate
+
+`realtimeSubscriptionRefetches.test.ts` closes F2-205's blind spot: it enumerates every
+`useRealtimeOrgEvent` handler (paren-matched from comment-stripped source) and holds a named map with a
+verdict per site — `REFETCH` (with the exact force-refetch token the handler must contain:
+`hydrateVulns(true)`, `loadDsrCases()`, `hydrateTreatmentPlans(true)`, `hydrateAuditLifecycle(true)`) or
+`FILED`. The population is asserted **exactly** ([[F2-204]]): a new consumer with no verdict fails the
+forward leg, a stale verdict fails the reverse. A self-test proves the classifier flags a bare
+`setTick`, and a pre-fix control confirms the gate FAILS when the two handlers are reverted
+([[F2-208]]/[[F2-274]] — a green gate shown to fire on the defect).
+
+### Filed
+
+`BcmLifecyclePage` subscribes to `changed.bcm_invocation` and answers with a bare `setTick` — but
+`bcmLifecycle.ts`'s `loadInvocations()` reads a **pure browser-local store** (`grc.bcm.invocation.v1`,
+`SEED_INVOCATIONS` fallback) with **no server hydrate at all**. So it is not a stale-cache (F2-327) but
+an **unwired store receiving a server broadcast it cannot act on** — [[F2-204]]'s Kind-B shape. The fix
+is to wire the invocation store to a server endpoint first (a reading job: does one exist?), then the
+handler can force-refetch. Held as a `FILED` verdict in the gate so it cannot masquerade as fixed. Not
+this slice.
+
 ## F2-326 — the flagship regulator evidence package named the actor and dropped the role held
 
 | | |
