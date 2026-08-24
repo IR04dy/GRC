@@ -91,6 +91,36 @@ def main():
     c.execute("SELECT module + ':' + action FROM iam.permissions")
     catalogued = {r[0] for r in c.fetchall()}
 
+    # F2-313 -- the pairs guards CITE, from the artefact PermissionCatalogueUsageTest already
+    # publishes. Reusing it rather than re-deriving means this section cannot disagree with the
+    # gate that owns the question (F2-190).
+    usage_path = os.path.join(os.path.dirname(args.sites), "permission-usage.txt")
+    cited_pairs = []
+    if os.path.exists(usage_path):
+        with open(usage_path, encoding="utf-8") as fh:
+            cited_pairs = [ln.strip() for ln in fh if ln.strip()]
+
+    # active holders per catalogued pair. The question `hasPermission` puts is whether the acting
+    # principal holds it TODAY, so an inactive or soft-deleted user is not a holder.
+    c.execute("""SELECT p.module + ':' + p.action,
+                        COUNT(DISTINCT CASE WHEN u.is_active = 1 AND u.is_deleted = 0
+                                            THEN ur.user_id END)
+                   FROM iam.permissions p
+                   LEFT JOIN iam.role_permissions rp ON rp.permission_id = p.id
+                   LEFT JOIN iam.roles r  ON r.id = rp.role_id AND r.is_deleted = 0
+                   LEFT JOIN iam.user_roles ur ON ur.role_id = r.id
+                   LEFT JOIN iam.users u  ON u.id = ur.user_id
+                  GROUP BY p.module, p.action""")
+    pair_active_holders = dict(c.fetchall())
+
+    c.execute("""SELECT p.module + ':' + p.action, r.role_name
+                   FROM iam.permissions p
+                   JOIN iam.role_permissions rp ON rp.permission_id = p.id
+                   JOIN iam.roles r  ON r.id = rp.role_id AND r.is_deleted = 0""")
+    pair_grantees = {}
+    for pair, role in c.fetchall():
+        pair_grantees.setdefault(pair, []).append(role)
+
     c.execute("""SELECT p.module + '_' + p.action, COUNT(DISTINCT rp.role_id)
                  FROM iam.permissions p
                  LEFT JOIN iam.role_permissions rp ON rp.permission_id = p.id
@@ -396,6 +426,108 @@ def main():
         emit("|---|---|---|")
         for bucket, site, names, alive in sorted(thin):
             emit("| `%s` | `%s` | %s |" % (bucket, site, ", ".join("`%s`" % n for n in alive)))
+    emit()
+
+    # ── F. the permission-guard mirror of B2b ───────────────────────────────────────────────
+    emit("## F. Permission guards no active user can satisfy (F2-313)")
+    emit()
+    emit("Every section above is about **role** guards, because that is what this report was built")
+    emit("to track. `hasPermission` is F2-05's ratified **destination**, and the question B2b puts to")
+    emit("a role guard — *can anybody satisfy this today?* — had never been put to a permission one.")
+    emit("So the census measuring the conversion backlog was blind to the half it converts into.")
+    emit()
+    emit("A `hasPermission` guard gets **no** `PLATFORM_ADMIN` bypass from the evaluator's own")
+    emit("logic — the bypass is in code, ahead of it — so a pair with no active holder leaves its")
+    emit("routes reachable by a platform administrator and nobody else, exactly as B2b describes.")
+    emit()
+    emit("⚠ Read this section against the database named at the top. A pair unheld here may be held")
+    emit("on the deployed server and vice versa (F2-259).")
+    emit()
+    # How many routes each pair guards, DERIVED from the backend source -- the seven rows are not
+    # of equal weight and a number written into the prose would be a copy of a measurement (F2-273).
+    guard_sites = {}
+    backend = os.path.join(ROOT, "tss-grc-backend", "src", "main", "java")
+    for dirpath, _dirs, files in os.walk(backend):
+        for fn in files:
+            if not fn.endswith(".java"):
+                continue
+            try:
+                with open(os.path.join(dirpath, fn), encoding="utf-8") as fh:
+                    body = fh.read()
+            except OSError:
+                continue
+            for pair in set(cited_pairs):
+                mod, act = pair.split(":", 1)
+                needle = "hasPermission('%s','%s')" % (mod, act)
+                n = body.count(needle) + body.count("hasPermission('%s', '%s')" % (mod, act))
+                if n:
+                    guard_sites[pair] = guard_sites.get(pair, 0) + n
+
+    # PLATFORM_ADMIN bypasses in the evaluator's caller, ahead of any permission check, so V272
+    # records it as needing no grants: its pairs are inert BY DESIGN. Excluded from the population
+    # rather than noted underneath -- prod is ~52 migrations behind, so there those rows really are
+    # ungranted and would enter both the table and the route total while a caveat below denied it
+    # (F2-197). The exclusion is printed so it is a measurement, not a silent filter.
+    unsat, by_design = [], []
+    for pair in sorted(set(cited_pairs)):
+        if pair not in catalogued:
+            continue                      # PermissionCatalogueUsageTest owns that question
+        if pair_active_holders.get(pair, 0):
+            continue
+        grantees = sorted(pair_grantees.get(pair, []))
+        if pair.split(":", 1)[0] == "PLATFORM_ADMIN":
+            by_design.append(pair)
+            continue
+        unsat.append((pair, grantees))
+    if not unsat:
+        emit("None — every pair a guard cites has at least one active holder.")
+    else:
+        emit("Sorted by the number of routes each pair guards, because they are **not** of equal")
+        emit("weight: a pair guarding one endpoint is a feature nobody can use, and one guarding a")
+        emit("module\'s whole surface closes every screen in it.")
+        emit()
+        emit("| Pair cited by a guard | Guarded routes | Granted to | Active holders |")
+        emit("|---|---|---|---|")
+        for pair, grantees in sorted(unsat, key=lambda x: (-guard_sites.get(x[0], 0), x[0])):
+            emit("| `%s` | %d | %s | **0** |" % (
+                pair, guard_sites.get(pair, 0),
+                ", ".join("`%s`" % g for g in grantees) if grantees else "**no role**"))
+        emit()
+        seated = [p for p, g in unsat if g]
+        ungranted = [p for p, g in unsat if not g]
+        emit("**%d of %d cited pairs, closing %d routes.**" % (
+            len(unsat), len(set(cited_pairs)),
+            sum(guard_sites.get(p, 0) for p, _ in unsat)))
+        emit()
+        emit("There are two kinds and only one needs a jar. Present here:")
+        emit()
+        if seated:
+            emit("* **%d granted to a role that exists and is seated in nobody.** An administrator"
+                 % len(seated))
+            emit("  can assign it without a new jar — a **remedy, not a defence** (F2-253): as")
+            emit("  shipped and as seeded, the persona the feature was built for cannot use it.")
+            emit("  F2-282 settled the fix for this kind — **seat the role, do not widen the")
+            emit("  grant**, because a grant to a different job family is wider than the shipped")
+            emit("  guard\'s own audience.")
+        else:
+            emit("* none granted-but-unseated.")
+        if ungranted:
+            emit("* **%d granted to no role at all.** Nothing can be assigned, so it takes a"
+                 % len(ungranted))
+            emit("  migration (F2-260\'s `RRP` case): %s."
+                 % ", ".join("`%s`" % p for p in ungranted))
+        else:
+            emit("* **None granted to no role at all** — so nothing here needs a migration, and")
+            emit("  F2-260\'s `RRP` case is genuinely absent rather than merely unlisted.")
+        emit()
+    if by_design:
+        emit()
+        emit("⚙ **Excluded as by design: %s.** `PLATFORM_ADMIN` bypasses in the evaluator's caller,"
+             % ", ".join("`%s`" % p for p in by_design))
+        emit("ahead of any permission check, so V272 records it as needing no grants and its pairs")
+        emit("are inert on purpose. They are filtered out of the table and the route total rather")
+        emit("than noted underneath: on the deployed server they really are ungranted (V369+ is")
+        emit("pending), so counting them would close routes a caveat below denied were closed.")
     emit()
 
     emit("## D. Conversion backlog by module")
