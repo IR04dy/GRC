@@ -15219,6 +15219,106 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-324 — the audit ledger's source_module had two readers and almost no writers
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — a regulator-facing evidence export carried 15% of its own audit trail, and a platform-wide governance filter saw ~13% of the ledger. |
+| **Registers** | `platform.audit_log` |
+| **Standards** | ISO 22301 / NCEMA evidence packaging; the platform audit ledger (F7) |
+| **Found by** | Asking [[F2-196]]'s question of F2-321's filed remainder — *how many things read this column, and what do they see?* |
+| **Verification** | live probe **10/10** as `auditor`/`compliance`; mutation harness **9 killed / 0 survived**; suite **4728 → 4740/0/0** |
+
+### The column had two readers and 686 of 722 writers could not set it
+
+`source_module` is the `sourceModule` filter on `GET /api/v1/audit-log` — a **free-text control** on a
+sidebar-linked page whose own subtitle promises *"Every state-changing action across modules —
+filterable and traceable"* — and it is how `BcmEvidencePackageService` selects the BCM evidence
+package's `audit_log.csv`. Measured over both live databases it was **NULL on 87.1% of dev rows and
+93.6% of prod rows**, because `AuditLogService.log(...)` constructs its own builder internally and
+never set it: **686 of the 722 audit-writing sites** could not attribute themselves however carefully
+they were written. Only the 19 builder chains and 5 interceptor/whistleblower sites could.
+
+### 🔑 The consequence was in the emitted artefact, not the filter
+
+`BcmEvidencePackageService.generate` selected the package's audit CSV on `source_module = 'bcm'` alone,
+under a comment saying the regulator wants *"the whole tenant picture."* Measured: the CSV carried
+**15.0% of the BCM trail in dev and 6.8% in prod**, omitting **136 and 119 `BcmAssessmentCycle`
+rows** — the audit trail of the very cycle the package documents — while `README.pdf` printed the
+truncated count as the total. Probed live: the widened selection returns **442 of 442 BCM rows** where
+the module-only predicate returned 85.
+
+### The fix: derive, correct by construction
+
+`recordEvent` now derives `source_module` from the caller's package when the builder is silent. 🔑 The
+vocabulary is **not a list**: a top-level package under `com.tss.grc.module` *is* a module, enumerated
+once by `module-registry.yaml` and gated by `ModuleRegistryContractTest` ([[F2-217]]: a check keyed on
+a list measures the list). An explicit `sourceModule(…)` always wins; a caller outside the module root
+(`config`, `security`, `common`) derives null rather than a fifth invented token.
+
+### ⚠⚠ The frame walk must survive the CGLIB proxy, and F2-321's did not
+
+`callerOf()` (built by F2-321 for the F2-320 warning) and the new derivation share one walk. F2-321
+filtered `!c.equals(AuditLogService.class.getName())` — an **exact-equality** test. `recordEvent` is
+`@Transactional`, so the bean is CGLIB-proxied and the generated subclass is named
+`…AuditLogService$$SpringCGLIB$$0`, which is **not equal to** that name. 🔑 **Probed live with F2-321's
+filter restored: the export's own audit row landed `source_module=None`** — i.e. the walk returned a
+frame outside `com.tss.grc` entirely, so F2-321's warning has been naming Spring's proxy machinery, not
+the caller, all along. The walk now narrows on the platform *root* with `startsWith`, robust to the
+proxy by construction.
+
+### ⚠ The historical rows stay NULL — the ledger is append-only
+
+The column is filled for every row written from now on; it may **not** be back-filled, because the
+ledger is append-only and F2-31 hash-chains it, so a back-fill would rewrite history **and** invalidate
+every seal. So the evidence package recovers pre-F2-324 rows through the column that *is* populated —
+`entity_type` — with the BCM entity vocabulary **derived from the JPA metamodel** ([[F2-217]] again).
+
+### The three stored non-modules
+
+Of the 14 values the column held, **11 were registry modules and 3 were not**: `automation` and
+`licensing` are `platform` **sub-packages** and `ethics.whistleblower` is a dotted
+`module.subpackage` token — three vocabularies in one column, with a fourth in
+`ExportAuditInterceptor.moduleFromPath`'s `"EXPORT"` default arm, which named an **action**. All
+narrowed to the module (`platform`, `platform`, `ethics`); the automation/licensing sites lose their
+explicit value and take the derived `platform`, because the `RULE_FIRED`/`LICENSE_*` action type
+already carries the finer detail.
+
+### Gates
+
+* `AuditSourceModuleContractTest` (hermetic) — every audit `sourceModule` literal names a registry
+  module (hard zero, no exemptions); `moduleFromPath`'s arms all name modules; the frame walk is
+  narrowed by root not by name; a caller outside the module root derives nothing; both readers still
+  exist; and a positive control for the registry parser (three of 59 entries span lines, so a same-line
+  parser reports 56 — a smaller vocabulary, which reads exactly like a clean tree).
+* `AuditModuleDerivationTest` — the positive twin, and **it lives in `module/bcm` on purpose**: a walk
+  that failed and returned `AuditLogService`'s own frame derives `platform`, which is exactly what a
+  correct walk derives for a caller in the ledger's own package, so the failure is invisible from
+  there. Asserting `bcm` from `module/bcm` can only be produced by a walk that actually skipped every
+  `AuditLogService` frame.
+* `BcmEvidencePackageServiceTest` — the metamodel filter narrows to this module's package, and with a
+  metamodel present `generate` uses the widened finder.
+
+### ⚠⚠ Two gate holes the mutation harness found
+
+* **M6 survived the first draft**: the `moduleFromPath` leg extracted arms with `->\s*"…"`, and the
+  `default` arm returns through a ternary (`seg.isEmpty() ? "EXPORT" : …`), so the literal it returns is
+  **not adjacent to the arrow**. 🔑 A regex keyed on the shape it had already seen missed the one shape
+  the mutation used. Rewritten to scan every uppercase-only literal in the switch (case labels are
+  lowercase URL segments, so uppercase-only is the return value).
+* **M5 was an ANCHOR-MISS, not a survival** — the harness patch itself failed on a Python escape error,
+  and *did-not-run* is kept distinct from *survived* ([[F2-212]]).
+
+### Filed
+
+* `ExportAuditInterceptor.moduleFromPath`'s `default -> seg.toUpperCase()` arm is **deliberately not
+  closed** and the gate says so: it has only ever produced registry modules (the URL segment happens to
+  be the package name — `PRIVACY`, `TPRM`), and narrowing it to a known set would drop those real
+  attributions. The path→module mapping is a mapping job, not a scan.
+* The AuditLogPage `sourceModule` filter is a **free-text box**; now that the column holds a gated
+  vocabulary it could be a `<select>` over the registry modules (a product change, not this fix).
+
 ## F2-323 — the census asked of the boundary instead of the catch, and the catch was dead code
 
 | | |

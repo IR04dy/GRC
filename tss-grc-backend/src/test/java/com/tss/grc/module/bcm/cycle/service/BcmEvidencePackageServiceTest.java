@@ -37,6 +37,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 
 /**
  * Lock the audit evidence package shape:
@@ -192,5 +195,74 @@ class BcmEvidencePackageServiceTest {
             }
         }
         throw new IllegalStateException("Entry not found: " + name);
+    }
+
+    // ── F2-324: the audit CSV's selection ────────────────────────────────────────────────────────
+
+    /**
+     * \u26a0\u26a0 F2-324 \u2014 the audit CSV carried <b>15.0% of the BCM trail in dev and 6.8% in prod</b>,
+     * because it selected on {@code source_module = 'bcm'} and 686 of the platform's 722
+     * audit-writing sites could not set that column. It omitted 136 and 119
+     * {@code BcmAssessmentCycle} rows \u2014 the trail of the very cycle the package documents \u2014 while
+     * {@code README.pdf} printed the truncated count as the total.
+     *
+     * <p>\U0001f511 The entity vocabulary must be <b>derived</b>: {@code module/bcm} declares 52 entity
+     * classes, and a constant naming them is the artefact [[F2-217]] found measuring its own
+     * contents. This leg pins the narrowing \u2014 without it the package would select audit rows for
+     * every entity in the platform.
+     */
+    @Test void bcmEntityTypes_takesOnlyThisModulesEntitiesFromTheMetamodel() {
+        jakarta.persistence.EntityManager em = mock(jakarta.persistence.EntityManager.class);
+        jakarta.persistence.metamodel.Metamodel mm =
+            mock(jakarta.persistence.metamodel.Metamodel.class);
+        when(em.getMetamodel()).thenReturn(mm);
+        // ⚠ Mockito forbids a nested when(...): entityType() stubs, so it cannot be evaluated
+        // inside the outer stubbing's argument list. Build the types first.
+        var bcmType   = entityType(com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle.class);
+        var otherType = entityType(com.tss.grc.module.platform.auditlog.entity.AuditLogEntry.class);
+        when(mm.getEntities()).thenReturn(Set.of(bcmType, otherType));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "em", em);
+
+        assertThat(service.bcmEntityTypes()).as("""
+            The metamodel filter no longer narrows to com.tss.grc.module.bcm, so the evidence package \
+            would pull audit rows for entities that have nothing to do with BCM.""")
+            .containsExactly("BcmAssessmentCycle");
+    }
+
+    /**
+     * \u26a0\u26a0 F2-324 \u2014 with a metamodel present, {@code generate} must use the widened finder.
+     *
+     * <p>\u26a0 Every other leg in this class exercises the FALLBACK, because {@code @InjectMocks} leaves
+     * {@code em} null \u2014 that is the pre-F2-324 selection, kept working on purpose. So the widened
+     * path is reachable only from a fixture that supplies one, and without this leg the ternary could
+     * be reverted with the whole class still green.
+     */
+    @Test void generate_withAMetamodel_usesTheWidenedAuditSelection() throws Exception {
+        jakarta.persistence.EntityManager em = mock(jakarta.persistence.EntityManager.class);
+        jakarta.persistence.metamodel.Metamodel mm =
+            mock(jakarta.persistence.metamodel.Metamodel.class);
+        when(em.getMetamodel()).thenReturn(mm);
+        var bcmType = entityType(com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle.class);
+        when(mm.getEntities()).thenReturn(Set.of(bcmType));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "em", em);
+        when(auditLog.findForModuleOrEntityTypes(eq(ORG_ID), eq("bcm"), any()))
+            .thenReturn(List.of());
+
+        service.generate(CYCLE_ID, "auditor.tester");
+
+        verify(auditLog).findForModuleOrEntityTypes(eq(ORG_ID), eq("bcm"),
+            org.mockito.ArgumentMatchers.argThat(t -> t.contains("BcmAssessmentCycle")));
+        verify(auditLog, never()).findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
+            any(), any(), any(Pageable.class));
+    }
+
+    /** A metamodel {@code EntityType} that answers only {@code getJavaType()} \u2014 all this filter reads. */
+    @SuppressWarnings("unchecked")
+    private static jakarta.persistence.metamodel.EntityType<?> entityType(Class<?> c) {
+        jakarta.persistence.metamodel.EntityType<?> t =
+            mock(jakarta.persistence.metamodel.EntityType.class);
+        when(((jakarta.persistence.metamodel.EntityType<Object>) t).getJavaType())
+            .thenReturn((Class<Object>) c);
+        return t;
     }
 }

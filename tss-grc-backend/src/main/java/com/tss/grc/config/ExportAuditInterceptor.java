@@ -147,7 +147,16 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
             case "attachments"    -> "EVIDENCE";
             case "risk"           -> "RISK";
             case "calendar"       -> "PLATFORM";
-            default               -> seg.isEmpty() ? "EXPORT" : seg.toUpperCase();
+            // ⚠⚠ F2-324 — null, not "EXPORT". Every other arm names a module
+            // (module-registry.yaml, gated by AuditSourceModuleContractTest); "EXPORT" named an
+            // action, so it put a fifth spelling into a column that already had four. An export
+            // whose path has no segment has no module, and null says that.
+            //
+            // ⚠ The `seg.toUpperCase()` fallback is deliberately kept and is NOT closed: it has
+            // only ever produced registry modules (PRIVACY, TPRM — the URL segment happens to be
+            // the package name), and narrowing it to a known set would DROP those real
+            // attributions. Filed: the path→module mapping is a mapping job, not a scan.
+            default               -> seg.isEmpty() ? null : seg.toUpperCase();
         };
     }
 

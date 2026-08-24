@@ -94,6 +94,11 @@ public class AuditLogService {
 
     private static final Set<String> SEVERITIES = Set.of("INFO", "WARN", "ERROR");
 
+    /** F2-324 — the platform's own package root; anything else on the stack is a proxy or the JDK. */
+    private static final String PLATFORM_ROOT = "com.tss.grc.";
+    /** F2-324 — a top-level package under this root IS a module (see {@code module-registry.yaml}). */
+    private static final String MODULE_ROOT = "com.tss.grc.module.";
+
     // ─── F2-54: user_role provenance ──────────────────────────────
     /** {@code platform.audit_log.user_role} is NVARCHAR(60) — see V95. */
     static final int USER_ROLE_MAX = 60;
@@ -171,12 +176,68 @@ public class AuditLogService {
      * does not materialise the whole trace — this runs on every unanchored audit write.
      */
     private static String callerOf() {
+        String c = callerFrame();
+        return c == null ? "unknown caller" : c;
+    }
+
+    /**
+     * ⚠⚠ F2-324 — the first <b>platform</b> frame outside this class, shared by {@link #callerOf}
+     * and {@link #callerModule}.
+     *
+     * <p>F2-321's version took the first frame outside this class by exact class-name equality. That
+     * is not the same thing: {@link #recordEvent} is {@code @Transactional}, so this bean is
+     * CGLIB-proxied, and the frames between the module caller and here include the generated
+     * subclass — whose class name is {@code …AuditLogService$$SpringCGLIB$$0}, which is <b>not equal
+     * to</b> {@code AuditLogService.class.getName()} — plus Spring's AOP interceptors. So the naive
+     * filter could return Spring's proxy machinery, which is a diagnostic naming nothing locatable:
+     * exactly the defect F2-321 was written to remove, one mechanism down.
+     *
+     * <p>🔑 Asking for the first {@code com.tss.grc} frame that is not this class is robust to the
+     * proxy, to reflection and to any future advice <b>by construction</b>, rather than by listing
+     * the frames observed today ([[F2-217]]: a filter keyed on a list measures the list).
+     *
+     * <p>⚠ {@code StackWalker} rather than {@code new Throwable().getStackTrace()} because it does
+     * not materialise the whole trace — this runs on every audit write, not only the unanchored ones.
+     */
+    private static String callerFrame() {
+        String self = AuditLogService.class.getName();
         return StackWalker.getInstance()
             .walk(frames -> frames
                 .map(StackWalker.StackFrame::getClassName)
-                .filter(c -> !c.equals(AuditLogService.class.getName()))
+                .filter(c -> c.startsWith(PLATFORM_ROOT) && !c.startsWith(self))
                 .findFirst()
-                .orElse("unknown caller"));
+                .orElse(null));
+    }
+
+    /**
+     * ⚠⚠ F2-324 — the module that wrote this row, derived from the caller's package.
+     *
+     * <p>{@code source_module} is read by two things — the {@code sourceModule} filter on
+     * {@code GET /api/v1/audit-log}, whose control is a free-text box on a sidebar-linked page whose
+     * own subtitle promises <em>"Every state-changing action across modules — filterable and
+     * traceable"</em>, and {@code BcmEvidencePackageService}, which selects the BCM evidence
+     * package's {@code audit_log.csv} with it. It was NULL on <b>87.1% of dev rows and 93.6% of prod
+     * rows</b>, because {@link #log} constructs its builder internally and never set it: <b>686 of
+     * the 722 audit-writing sites</b> could not attribute themselves however carefully they were
+     * written.
+     *
+     * <p>🔑 The vocabulary is not invented and is not a list: a top-level package under
+     * {@code com.tss.grc.module} <b>is</b> a module, enumerated exactly once by
+     * {@code module-registry.yaml} and gated by {@code ModuleRegistryContractTest}. So the derivation
+     * is correct by construction and {@code AuditSourceModuleContractTest} is what ties it to the
+     * registry — there is no runtime lookup to go stale.
+     *
+     * <p>⚠ Returns null for a caller outside {@code com.tss.grc.module} — {@code config},
+     * {@code security}, a scheduler in {@code common} — because those are not modules and inventing
+     * a token for them would put a fifth spelling in a column that already had four. An explicit
+     * {@code sourceModule(…)} on the builder always wins; this only fills the gap.
+     */
+    static String callerModule() {
+        String c = callerFrame();
+        if (c == null || !c.startsWith(MODULE_ROOT)) return null;
+        int dot = c.indexOf('.', MODULE_ROOT.length());
+        String seg = dot < 0 ? c.substring(MODULE_ROOT.length()) : c.substring(MODULE_ROOT.length(), dot);
+        return seg.isBlank() ? null : seg;
     }
 
     /** Full builder path. */
@@ -228,7 +289,10 @@ public class AuditLogService {
         e.setNewValueJson(b.newValueJson);
         e.setWorkflowStatusBefore(b.workflowStatusBefore);
         e.setWorkflowStatusAfter(b.workflowStatusAfter);
-        e.setSourceModule(b.sourceModule);
+        // ⚠⚠ F2-324 — derive when the builder did not say. An explicit value wins; this is what
+        // makes the 686 log(...) sites attributable without editing any of them, which is the only
+        // way a column with two readers gets filled at all.
+        e.setSourceModule(b.sourceModule != null ? b.sourceModule : callerModule());
         e.setCorrelationId(b.correlationId);
         e.setParentAuditId(b.parentAuditId);
         e.setDigitalSignatureRef(b.digitalSignatureRef);

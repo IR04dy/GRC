@@ -549,7 +549,11 @@ public class WhistleblowerCaseService {
         e.setActionType(actionType);
         e.setEntityType("WhistleblowerCase");
         e.setEntityId(entityId);
-        e.setSourceModule("ethics.whistleblower");
+        // ⚠⚠ F2-324 — the module, not `ethics.whistleblower`. This writer bypasses
+        // recordEvent by design (see the javadoc above), so it gets no derived value and
+        // must name the module itself. A dotted module.subpackage token was a third
+        // vocabulary in a column whose two readers both match it with a single `=`.
+        e.setSourceModule("ethics");
         e.setMessage(message);
         e.setSeverity("INFO");
         // Explicitly leave ip_address / user_agent / source_endpoint /

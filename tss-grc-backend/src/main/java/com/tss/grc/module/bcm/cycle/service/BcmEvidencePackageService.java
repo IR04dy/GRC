@@ -86,6 +86,15 @@ public class BcmEvidencePackageService {
     private final BcmCorrectiveActionRepository capas;
     private final BcmComplianceMappingRepository compliance;
     private final AuditLogRepository auditLog;
+
+    /**
+     * \u26a0\u26a0 F2-324 \u2014 injected as a FIELD, not a constructor parameter, so
+     * {@code @RequiredArgsConstructor} is unchanged and {@code BcmEvidencePackageServiceTest}'s
+     * {@code @InjectMocks} keeps working. Same reason F2-323 declared its transaction manager this
+     * way. It is used only to enumerate this module's entity types (see {@link #bcmEntityTypes}).
+     */
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager em;
     private final OrganisationRepository organisations;
     private final AuditLogService audit;
     private final BrandThemeService brandThemeService;
@@ -122,9 +131,20 @@ public class BcmEvidencePackageService {
             List<BcmGap>                    gapRows         = gaps.findByOrganisationIdAndCycleIdOrderByIdDesc(org, cycleId);
             List<BcmCorrectiveAction>       capaRows        = capas.findByOrganisationIdOrderByIdDesc(org);
             List<BcmComplianceMapping>      complianceRows  = compliance.findByOrganisationIdOrderBySourceFrameworkAscRequirementCodeAsc(org);
-            List<AuditLogEntry>             auditRows       = auditLog
-                .findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(org, "bcm", Pageable.unpaged())
-                .getContent();
+            // \u26a0\u26a0 F2-324 \u2014 `source_module = 'bcm'` alone carried 15.0% of the BCM trail in dev
+            // and 6.8% in prod, because 686 of the platform's 722 audit-writing sites could not set
+            // the column at all. It omitted 136 BcmAssessmentCycle rows: the trail of the very cycle
+            // this package documents, in the file a regulator reads as that trail, with README.pdf
+            // printing the truncated count as the total.
+            //
+            // \U0001f511 The column is derived now (AuditLogService#callerModule), so rows written from
+            // here on carry `bcm`. Historical rows stay NULL and must \u2014 the ledger is append-only and
+            // F2-31 hash-chains it \u2014 so they are recovered by entity_type instead.
+            java.util.Set<String> bcmTypes = bcmEntityTypes();
+            List<AuditLogEntry> auditRows = bcmTypes.isEmpty()
+                ? auditLog.findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
+                      org, "bcm", Pageable.unpaged()).getContent()
+                : auditLog.findForModuleOrEntityTypes(org, "bcm", bcmTypes);
 
             byte[] bias_xlsx        = writeXlsx("BIA assessments",          biaRows,        BcmEvidencePackageService::biaRow,        biaHeader());
             byte[] risks_xlsx       = writeXlsx("BCM risks",                riskRows,       BcmEvidencePackageService::riskRow,       riskHeader());
@@ -452,5 +472,26 @@ public class BcmEvidencePackageService {
         zip.putNextEntry(new ZipEntry(name));
         zip.write(bytes);
         zip.closeEntry();
+    }
+
+    /**
+     * \u26a0\u26a0 F2-324 \u2014 this module's entity types, taken from the JPA metamodel.
+     *
+     * <p>\U0001f511 <b>Derived, never listed.</b> {@code module/bcm} declares 52 entity classes; a
+     * constant naming them is the artefact [[F2-217]] found measuring its own contents, and it would
+     * silently stop covering the next entity somebody adds. The metamodel is already built at
+     * startup, so this costs a filter over an in-memory set rather than a classpath scan.
+     *
+     * <p>\u26a0 Empty when no {@code EntityManager} is present (a directly-constructed unit test), in
+     * which case the caller falls back to the module-only query \u2014 the pre-F2-324 behaviour. That is
+     * why the widened path needs a test that supplies one, and why this method is package-private.
+     */
+    java.util.Set<String> bcmEntityTypes() {
+        if (em == null) return java.util.Set.of();
+        return em.getMetamodel().getEntities().stream()
+            .map(jakarta.persistence.metamodel.Type::getJavaType)
+            .filter(c -> c.getName().startsWith("com.tss.grc.module.bcm."))
+            .map(Class::getSimpleName)
+            .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
     }
 }
