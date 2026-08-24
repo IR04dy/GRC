@@ -878,6 +878,13 @@ export const en = {
   toastRiskFailed: 'We couldn’t save the risk. Try again.',
 
   // Generic
+  // F2-340 — generic UI strings referenced by t('key') at ~24 sites but never declared, so
+  // t()'s `return fallback ?? key` rendered the raw key. loading/loadingEllipsis are synonyms
+  // kept for the two call-site idioms (table-cell vs inline placeholder).
+  loading: 'Loading…',
+  loadingEllipsis: 'Loading…',
+  toastValidationFailed: 'Required fields missing',
+
   comingSoon: 'Coming next',
   comingSoonSub: 'This view will follow once we agree on the design language.',
   demoMode: 'Demo mode · using sample data',
