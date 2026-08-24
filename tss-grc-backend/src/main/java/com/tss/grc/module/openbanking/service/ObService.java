@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -583,14 +584,36 @@ public class ObService {
                         "TPP " + id + " not found in tenant"));
     }
 
+    /**
+     * F2-337 — mint the next {@code OBI-<year>-NNN} reference from the highest existing ordinal
+     * for this org+year, never from a COUNT. A count re-mints an ordinal already in use whenever a
+     * reference is missing from the counted set — beyond the query window (the old code counted only
+     * the 500 most-recent incidents, so a tenant past 500/year re-minted every subsequent ordinal)
+     * or after a soft-delete — and the filtered unique index {@code ux_ob_incident_reference} then
+     * rejects the insert with a 500 on a SAMA-reportable register (F2-48's collision minter). The
+     * skip loop absorbs a concurrent create, backstopped by that same index — this mirrors
+     * {@code ComplaintService#generateNextComplaintNo}, the platform's own sequential-minter idiom.
+     */
     private String generateIncidentReference() {
         int year = LocalDate.now().getYear();
-        long ordinal = incidentRepo.findByOrganisationIdOrderByDetectedAtDesc(
-                        org(), PageRequest.of(0, 500)).stream()
-                .filter(i -> i.getDetectedAt() != null
-                        && i.getDetectedAt().getYear() == year)
-                .count() + 1L;
-        return "OBI-" + year + "-" + String.format("%03d", ordinal);
+        Long org = org();
+        String prefix = "OBI-" + year + "-";
+        int next = 1;
+        Optional<ObIncident> top = incidentRepo
+                .findTopByOrganisationIdAndReferenceStartingWithOrderByReferenceDesc(org, prefix);
+        if (top.isPresent() && top.get().getReference() != null
+                && top.get().getReference().matches("OBI-\\d{4}-\\d{3,}")) {
+            String ref = top.get().getReference();
+            next = Integer.parseInt(ref.substring(ref.lastIndexOf('-') + 1)) + 1;
+        }
+        for (int seq = next; seq < next + 1000; seq++) {
+            String candidate = prefix + String.format("%03d", seq);
+            if (!incidentRepo.existsByOrganisationIdAndReference(org, candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException(
+                "Unable to allocate an open-banking incident reference for " + year);
     }
 
     private void recountTpp(ObTpp t) {
