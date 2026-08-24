@@ -32,10 +32,16 @@ const REPORT_TYPE_OPTIONS = [
   { value: 'BOARD_PACK',     label: 'Board Pack (multi-section)' },
   { value: 'AI_MODEL_REGISTRY', label: 'AI/ML Model Registry (posture pack)' },
 ];
+// F2-315 — 'DOCX' was offered here and NO report type can emit it: renderBody branches on the
+// report type (PDF ? pdf : xlsx, or PPTX ? pptx : pdf for the board pack) while filenameFor and
+// mimeFor branch on the format, so choosing Word returned XLSX bytes named .pdf with an
+// application/pdf MIME type. Removed rather than relabelled — a catalogue must not offer a
+// capability that does not exist (F2-193). The pair is refused server-side by
+// ReportScheduleService#requireRenderableFormat, because a label is not enforcement; this list is
+// the union of ReportSchedulerService.SUPPORTED_FORMATS and reportFormatOptions.test.ts holds it.
 const FORMAT_OPTIONS = [
   { value: 'PDF',  label: 'PDF' },
-  { value: 'XLSX', label: 'Excel' },
-  { value: 'DOCX', label: 'Word' },
+  { value: 'XLSX', label: 'Excel (not for the board pack)' },
   { value: 'PPTX', label: 'PowerPoint (board-pack only)' },
 ];
 const LANGUAGE_OPTIONS = [{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }];

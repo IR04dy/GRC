@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 /**
  * CRUD + run-now front for {@link ReportSchedule}. The actual cron tick lives
@@ -125,6 +126,58 @@ public class ReportScheduleService {
         if (s.getCcRecipients()   != null) t.setCcRecipients(s.getCcRecipients());
         if (s.getIsActive()       != null) t.setIsActive(s.getIsActive());
         if (s.getNextRunAt()      != null) t.setNextRunAt(s.getNextRunAt());
+
+        // F2-315 — validate the PAIR, and on the resulting row rather than on the request: `apply`
+        // copies reportType and format independently, so a partial update may change only the
+        // format while the type comes from storage. Checking the request alone would pass exactly
+        // the update that produces a mislabelled file.
+        requireRenderableFormat(t);
+    }
+
+    /**
+     * ⚠⚠ F2-315 — refuse a (report type, format) pair {@link ReportSchedulerService#renderBody}
+     * cannot produce, instead of emitting bytes of one format under another format's name.
+     *
+     * <p>{@code renderBody} branches on the <b>type</b> while {@code filenameFor} and
+     * {@code mimeFor} branch on the <b>format</b>, so an undeclared pair silently produced a
+     * mislabelled file: {@code XLSX} + {@code BOARD_PACK} gave PDF bytes named {@code .xlsx}, and
+     * every {@code DOCX} request gave whatever the type's non-PDF branch returned under a
+     * {@code .pdf} name. 🔑 <b>Nothing downstream can tell — the recipient gets an attachment that
+     * will not open, from a schedule the console reports as SUCCESS.</b>
+     *
+     * <p>⚠ A type this service cannot render at all is left alone. Seven of the eleven live
+     * schedules hold such a type ([[F2-293]]), and refusing them here would make those rows
+     * uneditable — a validation must not turn a rendering gap into a data-entry lockout
+     * ([[F2-183]]).
+     *
+     * <p>⚠ A null format is left alone too: every reader defaults it to {@code PDF}, which every
+     * declared type supports — asserted, rather than assumed, by {@code ReportFormatContractTest}.
+     *
+     * <p>{@code require} rather than {@code coerce} ([[F2-182]]): every live row is {@code PDF} or a
+     * type with no generator, so no request that succeeds today starts failing, and the frontend no
+     * longer offers {@code DOCX} at all.
+     */
+    private void requireRenderableFormat(ReportSchedule t) {
+        String type = t.getReportType();
+        if (type == null) {
+            return;
+        }
+        Set<String> allowed = ReportSchedulerService.SUPPORTED_FORMATS.get(type);
+        if (allowed == null) {
+            return;                      // no generator for this type at all — F2-293's filing
+        }
+        if (t.getFormat() == null) {
+            return;                      // defaults to PDF downstream
+        }
+        String canonical = t.getFormat().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!allowed.contains(canonical)) {
+            throw new IllegalArgumentException(
+                "format '" + t.getFormat() + "' is not one this platform can produce for report "
+                + "type " + type + ". Allowed: " + new java.util.TreeSet<>(allowed)
+                + ". Asking for another format does not fail — it returns the bytes of a "
+                + "different format under this one's file name and MIME type.");
+        }
+        t.setFormat(canonical);
     }
 
     /**
