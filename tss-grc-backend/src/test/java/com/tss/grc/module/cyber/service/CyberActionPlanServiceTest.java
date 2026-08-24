@@ -12,9 +12,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -47,5 +49,37 @@ class CyberActionPlanServiceTest {
         assertThat(after.getWorkflowStatus()).isEqualTo("COMPLETED");
         assertThat(after.getProgressPct()).isEqualTo(100);
         assertThat(after.getCompletedAt()).isEqualTo(LocalDate.now());
+    }
+
+    // ── F2-329: a create owns none of the scheduler/complete-owned trail ───────────────────────
+
+    @Test
+    void saveActionPlan_cannotBeBornCompleted() {
+        CyberActionPlan ap = new CyberActionPlan();
+        ap.setTitleEn("Patch the exposed admin console");
+        ap.setWorkflowStatus("COMPLETED");          // the bypass: born completed, skipping completeActionPlan
+        assertThatThrownBy(() -> service.saveActionPlan(ap, ORG_ID))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("complete");
+    }
+
+    @Test
+    void saveActionPlan_scrubsSchedulerAndCompletionTrail() {
+        CyberActionPlan ap = new CyberActionPlan();
+        ap.setTitleEn("Patch the exposed admin console");
+        // A forged escalation/reminder/completion trail (all scheduler/complete-owned — CY-E).
+        // escalatedAt is the sharp one: the sweep reads a set value as "already escalated once".
+        ap.setEscalatedAt(LocalDateTime.of(2020, 1, 1, 0, 0));
+        ap.setLastReminderAt(LocalDateTime.of(2020, 1, 1, 0, 0));
+        ap.setReminderCount(14);
+        ap.setCompletedAt(LocalDate.of(2020, 1, 1));
+        when(actionPlanRepo.save(any(CyberActionPlan.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CyberActionPlan saved = service.saveActionPlan(ap, ORG_ID);
+        assertThat(saved.getEscalatedAt()).as("the sweep must not see a forged escalation (CY-E)").isNull();
+        assertThat(saved.getLastReminderAt()).isNull();
+        assertThat(saved.getReminderCount()).isZero();
+        assertThat(saved.getCompletedAt()).as("completion is completeActionPlan's alone").isNull();
+        assertThat(saved.getWorkflowStatus()).isEqualTo("OPEN");   // intermediate states stay caller-settable
     }
 }
