@@ -3,12 +3,14 @@ package com.tss.grc.module.socops.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.socops.entity.ForensicsArtefact;
+import com.tss.grc.module.socops.entity.ForensicsCustodyEvent;
 import com.tss.grc.module.socops.repository.ForensicsArtefactRepository;
 import com.tss.grc.module.socops.repository.ForensicsCustodyEventRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,6 +40,13 @@ import static org.mockito.Mockito.when;
  *   <li>{@code copyMutable} copied both fields from the request, so a {@code PUT} could flip a
  *       CORRUPTED artefact (court evidence flagged unusable) back to VERIFIED with no event.</li>
  * </ul>
+ *
+ * <p>F2-332 is the sibling of the second hole, one field-pair over: {@code copyMutable} also copied
+ * {@code currentCustodian} / {@code currentLocation}, which are {@code transferCustody()}'s alone (it
+ * appends an immutable custody-ledger row before moving the pointer). {@code copyMutable} runs only on
+ * update, so a {@code PUT} moved court-bound evidence with no ledger row and no {@code
+ * FORENSICS_CUSTODY_TRANSFER} audit; the fix stops copying the pair, and the create path (which seeds
+ * the CAPTURE ledger row from them) is unaffected.
  *
  * <p>No live probe: {@code save}/{@code copyMutable} are a synchronous scrub with no DB/tenant/
  * row_version dimension, and the permission boundary is read from the controller's {@code
@@ -107,5 +118,45 @@ class ForensicsArtefactServiceTest {
 
         assertThat(saved.getIntegrityStatus()).isEqualTo("CORRUPTED");
         assertThat(saved.getIntegrityVerifiedAt()).isEqualTo(checkedAt);
+    }
+
+    /** F2-332 — currentCustodian / currentLocation are transferCustody()'s alone (it APPENDS an
+     *  immutable custody-ledger row before moving the pointer). A PUT that changed them moved
+     *  court-bound evidence with no ledger row and no FORENSICS_CUSTODY_TRANSFER audit, so an update
+     *  now leaves both untouched and writes NO custody event. */
+    @Test void update_cannotMoveCustodyWithoutLedger() {
+        ForensicsArtefact existing = minimal();
+        existing.setId(9L);
+        existing.setOrganisationId(ORG);
+        existing.setCurrentCustodian("Eng. Held");
+        existing.setCurrentLocation("Evidence Locker A");
+        when(repo.findByIdAndOrganisationId(eq(9L), eq(ORG))).thenReturn(Optional.of(existing));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ForensicsArtefact patch = minimal();
+        patch.setId(9L);
+        patch.setCurrentCustodian("Eng. Interloper");
+        patch.setCurrentLocation("Somewhere Else");
+        ForensicsArtefact saved = svc.save(patch);
+
+        assertThat(saved.getCurrentCustodian()).isEqualTo("Eng. Held");
+        assertThat(saved.getCurrentLocation()).isEqualTo("Evidence Locker A");
+        verify(ledger, never()).save(any());   // an update appends no TRANSFER row
+    }
+
+    /** The create half of copyMutable's scrub must stay open: a create legitimately sets the
+     *  initial custodian from the request AND seeds the CAPTURE ledger row from it. */
+    @Test void create_keepsRequestCustodian_andSeedsCaptureLedger() {
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        ForensicsArtefact in = minimal();
+        in.setCurrentCustodian("Eng. Acquirer");
+        in.setCurrentLocation("Evidence Locker A");
+        ForensicsArtefact saved = svc.save(in);
+
+        assertThat(saved.getCurrentCustodian()).isEqualTo("Eng. Acquirer");
+        ArgumentCaptor<ForensicsCustodyEvent> cap = ArgumentCaptor.forClass(ForensicsCustodyEvent.class);
+        verify(ledger).save(cap.capture());
+        assertThat(cap.getValue().getEventType()).isEqualTo("CAPTURE");
+        assertThat(cap.getValue().getToCustodian()).isEqualTo("Eng. Acquirer");
     }
 }
