@@ -321,4 +321,49 @@ class GlobalExceptionHandlerTest {
         assertThat(resolver.resolveMethod(new NoResultException("No entity found for query")).getName())
             .isEqualTo("handleNoResult");
     }
+
+    // ─── F2-348: a manual LocalDate.parse(callerString) throws DateTimeParseException — a
+    //             java.time RuntimeException that escaped handleIllegal and fell to the opaque
+    //             500 catch-all; it is bad client input, so 400. ────────────────────────────
+    @Test
+    void badDate_fromManualParse_returns400NotOpaque500() {
+        ProblemDetail pd = handler.handleBadDate(parseFailure("not-a-date"));
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(pd.getTitle()).isEqualTo("Invalid Date");
+        // SEC-CFG-001: base/prod must not leak the exception class or the java.time root message.
+        assertThat(pd.getProperties()).doesNotContainKey("exception");
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+    }
+
+    @Test
+    void badDate_verbose_surfacesExceptionClassButKeepsThe400() {
+        ProblemDetail pd = verboseHandler().handleBadDate(parseFailure("2026-99-99"));
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(pd.getProperties().get("exception"))
+            .isEqualTo(java.time.format.DateTimeParseException.class.getName());
+    }
+
+    /**
+     * F2-348 — the defect is one of ROUTING (F2-339's shape): before the dedicated handler a
+     * DateTimeParseException matched only {@code @ExceptionHandler(Exception.class)}, so Spring's
+     * own resolver sent it to {@code handleGeneral} → opaque 500. This asserts the resolution, which
+     * is what actually changed and what a revert of the @ExceptionHandler annotation would break.
+     */
+    @Test
+    void springRoutesDateTimeParseToTheDedicatedHandler_notHandleGeneral() {
+        ExceptionHandlerMethodResolver resolver =
+            new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+        assertThat(resolver.resolveMethod(parseFailure("nope")).getName())
+            .isEqualTo("handleBadDate");
+    }
+
+    /** A genuine DateTimeParseException, built by triggering a real parse (its constructor is fiddly). */
+    private static java.time.format.DateTimeParseException parseFailure(String bad) {
+        try {
+            java.time.LocalDate.parse(bad);
+        } catch (java.time.format.DateTimeParseException e) {
+            return e;
+        }
+        throw new AssertionError("expected LocalDate.parse(\"" + bad + "\") to fail");
+    }
 }
