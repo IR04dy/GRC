@@ -192,6 +192,23 @@ public class BcpPlanService {
         // reduce 7 → 1. The version on a continuity plan is what a recovery team cites.
         // 🔑 F2-215: a reader who finds four fields scrubbed does not ask what the fifth is.
         body.setCurrentVersion(1);
+        // F2-330 — the attestation trail (last_attested_at / _by_name / _by_id) is
+        // PlanReviewService.attest()'s alone, and POST /{id}/attest is hasPermission('BCM',
+        // 'APPROVE') — a HIGHER grant than the BCM:WRITE this create carries. Bound from the
+        // entity and left unscrubbed, a BCM:WRITE holder could POST a brand-new plan already
+        // stamped "last reviewed by X on Y": BcpPlan#lastAttestedAt's own comment says the UI
+        // renders exactly that, and reviewState filters treat an attested plan as review-current
+        // — so an unreviewed continuity plan passes the currency filter the APPROVE-gated attest
+        // route exists to earn. Not a same-permission control-defeat (F2-329) — a privilege
+        // boundary crossed by mass assignment.
+        // 🔑 F2-215's two-of-N, a SIXTH time on this create: F2-220 scrubbed status/approvedBy/
+        // approvedAt/publishedAt and F2-234 added currentVersion, each under a comment about the
+        // field a reader stops looking for — and the attestation trail was the field after that.
+        // Only lastAttestedAt is authority-shaped enough for the scan to name; _by_name/_by_id
+        // are the same trail (F2-236) and forgeable in the same breath, so all three go together.
+        body.setLastAttestedAt(null);
+        body.setLastAttestedByName(null);
+        body.setLastAttestedById(null);
         if (body.getPlanCode() == null || body.getPlanCode().isBlank()) {
             body.setPlanCode(nextCode(body.getPlanType()));
         }

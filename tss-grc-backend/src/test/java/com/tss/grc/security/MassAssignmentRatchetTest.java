@@ -150,8 +150,15 @@ class MassAssignmentRatchetTest {
      * <p>Each row is printed to {@code target/mass-assignment-risk.txt} marked NEEDS-VERDICT with
      * the fields that put it there, so this is a work list rather than a count. Read the service,
      * record CLOSED / INERT / BY DESIGN in {@link #ADJUDICATED}, lower this in the same commit.
+     *
+     * <p>⚠ F2-330 — this sat at 48 while NINE counted rows were already CLOSED or INERT
+     * service-side (F2-220 / F2-231 / F2-233 / F2-297 / F2-328 / F2-329), because a CEILING
+     * does not force the census update its own contract asks for. A closed defect printing
+     * NEEDS-VERDICT is worse than a missing row (F2-250): it sends the next reviewer to
+     * re-read a guarded path. Audited and adjudicated the nine plus F2-330's own BcpPlan
+     * fix, re-derived 48 → 38. Read each service before adding a verdict (F2-188).
      */
-    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 48;
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 38;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -704,7 +711,44 @@ class MassAssignmentRatchetTest {
             + "controlsCovered/hours); it never mentions status, reviewer or reviewedAt"),
         Map.entry("AuditLifecycleController#updateCapa(CapaTask)",
             "INERT — updateCapa is a whitelist (title*/ownerRole/targetDate/evidenceRef/"
-            + "verificationNotes*); closedAt and status are transitionCapa's and applyOverdue's")
+            + "verificationNotes*); closedAt and status are transitionCapa's and applyOverdue's"),
+
+
+        // ── F2-330: census drift — closed/inert rows a CEILING let sit mislabelled NEEDS-VERDICT.
+        // Each verdict names the finding whose service-side fix closed it; every one was read
+        // this slice (guard present, or whitelist confirmed) rather than trusted from prose (F2-188).
+        Map.entry("BcpPlanController#create(BcpPlan)",
+            "CLOSED F2-330 — was born with a forged last-attestation trail (a BCM:WRITE holder forging "
+            + "what /attest reserves for BCM:APPROVE); create now scrubs lastAttestedAt / _by_name / "
+            + "_by_id beside the five F2-220 / F2-234 already cleared"),
+        Map.entry("CyberController#saveException(VulnException)",
+            "CLOSED F2-328 — a vuln exception could be born APPROVED with a chosen approvedAt; "
+            + "saveException refuses APPROVED and scrubs approvedAt (approval is /exceptions/{id}/approve's)"),
+        Map.entry("CyberController#saveActionPlan(CyberActionPlan)",
+            "CLOSED F2-329 — a plan born with escalatedAt set reads to the overdue sweep as "
+            + "already-escalated; create scrubs escalatedAt / lastReminderAt / reminderCount / completedAt "
+            + "and refuses born-COMPLETED"),
+        Map.entry("PolicyController#createException(PolicyException)",
+            "CLOSED F2-231 — a policy waiver could be filed already APPROVED with an invented approver; "
+            + "createException forces the initial state and clears every review / approval / rejection column"),
+        Map.entry("DpiaController#create(Dpia)",
+            "CLOSED F2-233 — a PDPL Art.25 DPIA could be filed already APPROVED; create forces the "
+            + "initial status and scrubs rejectedAt / rejectionReason (approvedAt is READ_ONLY)"),
+        Map.entry("DpiaController#update(Dpia)",
+            "INERT F2-214 — the update whitelist copies ten data fields and never mentions status or "
+            + "rejectedAt; the submit-for-review transition owns those"),
+        Map.entry("IssueController#create(Issue)",
+            "CLOSED F2-220 — an issue could be born CLOSED skipping the resolution code and both "
+            + "timestamps; create forces the initial status and scrubs resolution / resolvedAt / closedAt"),
+        Map.entry("IssueController#update(Issue)",
+            "CLOSED F2-297 — update refuses a CHANGED status (requireUnchanged) and its whitelist never "
+            + "copies closedAt; both belong to transition()"),
+        Map.entry("RegChangePolicyController#createChange(RegulatoryChange)",
+            "CLOSED F2-233 — a regulatory change could be filed already CLOSED; create forces the "
+            + "initial status and scrubs closedAt"),
+        Map.entry("RegChangePolicyController#updateChange(RegulatoryChange)",
+            "INERT F2-213 — the update whitelist copies source / title / citation / summary / dates / "
+            + "applicability / impact and never mentions status or closedAt")
     );
 
     /** Field names that decide tenancy, state or authority — never a caller's to set. */

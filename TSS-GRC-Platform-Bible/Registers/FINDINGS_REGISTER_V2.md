@@ -15219,6 +15219,41 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-330 — a BCP plan could be born with a forged attestation trail, and a ceiling let nine closed rows sit mislabelled
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — `BcpPlanService.create` binds the `BcpPlan` entity and scrubbed status/approvedBy/approvedAt/publishedAt ([[F2-220]]) and currentVersion ([[F2-234]]) but not the attestation trail `lastAttestedAt`/`lastAttestedByName`/`lastAttestedById`, written ONLY by `PlanReviewService.attest()` — whose route is `hasPermission('BCM','APPROVE')`, a HIGHER grant than the `BCM:WRITE` on create. So a `BCM:WRITE` holder could `POST` a continuity plan born *"last reviewed by X on Y"* (the entity comment says the UI renders that string, and `reviewState` filters treat an attested plan as review-current), forging by mass assignment the attestation the APPROVE-gated `/attest` route exists to earn — a **privilege-boundary crossing**, not [[F2-329]]'s same-permission control-defeat. |
+| **Registers** | `bcm.bcp_plans` |
+| **Standards** | ISO 22301 / NCEMA continuity-plan review sign-off; the plan-review-currency filter (`reviewState`) |
+| **Found by** | auditing the `mass-assignment-risk.txt` work-list ([[F2-218]]) — `BcpPlanController#create(BcpPlan) :: lastAttestedAt,publishedAt,status`, read against the service and `PlanReviewService.attest()`. |
+| **Verification** | unit test (a create carrying a forged `lastAttestedAt`/`_by_name`/`_by_id` is scrubbed to null); full hermetic build 4746 → 4747/0/0. No live probe: the scrub is synchronous and the privilege boundary is read from the two `@PreAuthorize` annotations, not a mock ([[F2-325]]…[[F2-329]]'s calibrated standard). |
+
+### F2-215's two-of-N, a sixth time on one create
+
+`BcpPlan.lastAttestedAt`/`lastAttestedByName`/`lastAttestedById` are stamped only by
+`PlanReviewService.attest()` (which sets `now()` plus the attesting principal's name and id) and carry
+**no `@JsonProperty(READ_ONLY)`**, so Jackson binds them from the `@RequestBody BcpPlan`. The create
+scrubs five sibling server-owned fields — [[F2-220]] added the status/approvedBy/approvedAt/publishedAt
+scrubs and [[F2-234]] added `currentVersion`, each under a comment about *"the field a reader stops
+looking for"* — and the attestation trail was the field after that. Only `lastAttestedAt` is
+authority-shaped enough for `MassAssignmentRatchetTest` to name (`attested`+`At`); `_by_name`/`_by_id`
+end in `Name`/`Id` and are invisible to the pattern ([[F2-236]]'s attribution-beside-the-timestamp),
+but they are the same trail and forgeable in the same breath, so all three are scrubbed together.
+
+### The meta-finding: a ceiling does not force the census update its own contract asks for
+
+`BASELINE_UNADJUDICATED_NEW_CRIT` is a **ceiling** and the adjudication column is a hand-maintained map,
+so a create closed service-side — a scrub `FullReplaceUpdateContractTest` and this scan cannot see —
+drops the defect without lowering the count or annotating the row. Nine counted rows were already
+CLOSED or INERT while printing NEEDS-VERDICT: [[F2-220]], [[F2-231]], [[F2-233]] (×2), [[F2-297]],
+[[F2-328]], [[F2-329]]. A closed defect printing *"unread"* is worse than a missing row ([[F2-250]]):
+it sends the next reviewer to re-read a guarded path. Each of the ten (the nine plus this slice's own
+BcpPlan fix) was read against its service — guard present, or whitelist confirmed — rather than trusted
+from prose ([[F2-188]]), and the ceiling was re-derived from the regenerated census (48 → 38), not
+guessed ([[F2-207]]/[[F2-258]]). The remaining 38 are a work list to read per member, not a sweep.
+
 ## F2-329 — a cyber action plan could be created with a forged escalation trail, silently defeating its overdue sweep
 
 | | |
