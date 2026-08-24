@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-341 — the annual IFRS S2 / TCFD climate report counted outstanding CAPAs with a two-token list, dropping COMPLETED + VERIFIED
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a completeness defect on a regulator-facing EXPORT, in the flattering direction, but latent in data and dropping the near-complete states rather than the urgent ones. The `sust.corrective_action` machine declares `TERMINAL_STATUSES = {CLOSED, CANCELLED}`, so "outstanding" is the four-state complement `{OPEN, IN_PROGRESS, COMPLETED, VERIFIED}`. `TcfdReportService.generateAnnualReportData` (section 9, `gapsCapa`) typed an inline `List.of("OPEN", "IN_PROGRESS")`, dropping COMPLETED and VERIFIED — so the "Open CAPA" KPI on the exported IFRS S2 / TCFD report PDF cover (plus the "Gaps & Corrective Actions" section and the XLSX sheet) under-counted outstanding remediation. The report is persisted whole into a DRAFT `ClimateReport.content_json` and rendered by `ClimateReportExportService`, so the under-count leaves the platform ([[F2-199]] harm ladder). The CAPA tab's own authoritative `aggregate()` counts all four non-terminal states and documents VERIFIED as *"awaiting closure"*, i.e. still outstanding — so the report had drifted from the module's own definition. Latent in data — needs a COMPLETED or VERIFIED (not-yet-CLOSED) CAPA to exist. |
+| **Registers** | `sust.corrective_action.status` — read by `TcfdReportService` for the annual climate report and by `CorrectiveActionService.aggregate()` for the CAPA-tab KPI strip. |
+| **Standards** | IFRS S2 / TCFD annual climate disclosure; CMA sustainability disclosure; the [[F2-196]] "open = complement of a declared terminal set, never a second list" family; [[F2-336]] (the same shape on the BCM CAPA readers); [[F2-282]] / [[F2-205]] "one concept, one definition, and which reader is authoritative." |
+| **Found by** | asking [[F2-196]]'s / [[F2-336]]'s question of the non-BCM inclusion-list status counts — is "outstanding" the COMPLEMENT of a declared terminal set, or a typed subset that drops states? `TcfdReportService`'s `List.of("OPEN","IN_PROGRESS")` on a CAPA register was the sharpest: a two-token list on a machine with four non-terminal states, feeding an exported disclosure. |
+| **Verification** | hermetic — pure read-path assembly logic, no DB / tenant / collation dimension ([[F2-320]]/[[F2-325]] calibration). New `TcfdReportServiceTest` (9 mocked collaborators) asserts COMPLETED + VERIFIED survive into `gapsCapa` and that no reader queries the old `StatusIn`; `CorrectiveActionServiceTest` gains a consolidation leg (`aggregate()` queries the `NotIn(TERMINAL_STATUSES)` complement, old `StatusIn` gone) and an arithmetic pin (`STATUSES \ TERMINAL_STATUSES == {OPEN, IN_PROGRESS, COMPLETED, VERIFIED}`). Pre-fix control ([[F2-274]]/[[F2-287]]): surgically reverting only the two query call sites turns 4 query-dependent legs RED via assertion failures (Mockito's default empty list, not an NPE) while the query-independent arithmetic pin stays green; the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). 25/25 backend legs; full build green. |
+
+### Why the two dropped states are outstanding, not resolved
+
+The `sust.corrective_action` lifecycle is `OPEN → IN_PROGRESS → COMPLETED → VERIFIED → CLOSED`, with `CANCELLED` terminal. COMPLETED = remediation done, awaiting independent verification; VERIFIED = verified effective, awaiting formal closure. Neither is CLOSED, so both are still outstanding governance items — and the platform's own `CorrectiveActionService.aggregate()` says so twice: it counts both in `activeTotal`, and its overdue loop carries the comment *"VERIFIED items are no longer 'overdue' — they're awaiting closure."* Awaiting closure is outstanding. The annual report dropping them under-reported exactly the CAPAs an IFRS S2 assurer expects to see as open-but-nearly-done.
+
+### One declared terminal set, two readers
+
+`TERMINAL_STATUSES` is now `public` on `CorrectiveActionService` — the single source of truth. Both readers derive "outstanding" as its complement via a new `CorrectiveActionRepository.findByOrganisationIdAndStatusNotIn`, so a new non-terminal state added to the machine is counted automatically rather than silently dropped by a stale inclusion list ([[F2-336]] / [[F2-196]]). `aggregate()`'s query was already correct (a four-token `StatusIn` == the complement today) and was consolidated onto the same terminal-set derivation — behaviour-identical today, drift-proof tomorrow ([[F2-282]]: a third reader, never a third copy). Its display-bucket seed (an ordered `{OPEN, IN_PROGRESS, COMPLETED, VERIFIED}` for the KPI strip) is left as an explicit ordered list — a display concern, not an open-set copy.
+
+### Scope and Filed
+
+Only the outstanding-CAPA count was the defect. No migration, no CHECK, no vocabulary change — the fix is which statuses each reader queries. The `gapsCapa` field/comment still calls it "gaps + corrective actions" although the code queries only the CAPA register (the sust climate report has no separate gaps query) — a pre-existing naming looseness, not touched. The other non-BCM inclusion-list counts the sweep surfaced (`reginspect`, `regreporting`, `sharia`, `aml` screening) each ask a genuinely narrower question against their own machines and were read and left ([[F2-290]]'s "narrower question" exception): none typed a subset of a declared terminal complement the way this one did.
+
 ## F2-340 — a t('key') whose key is never declared rendered the raw key string to the user
 
 | | |
