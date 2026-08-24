@@ -15219,6 +15219,86 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-318 — the other three off-request audit writers, and three of the four wrote the org into the prose
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | **P2** — latent, but one member is ungated and hourly, so ordinary use fires it. |
+| **Registers** | `iam.user_roles` (time-bound revocation), `iam.sod_violations`, `cyber.vulnerability_sla_finding`, `platform.audit_log` |
+| **Standards** | NCA ECC 2-2 / SAMA CSF 3.3.5 (access governance, SoD); multi-tenancy |
+| **Found by** | Generalising [[F2-317]]: `AuditLogService` falls back to tenant 1 for **every** off-request writer, so how many are there? |
+| **Verification** | mutations **5/5 killed** (after the harness found a hole in my own gate); suite **4717 → 4721/0/0** |
+
+### The population
+
+Measured over all **33** `@Scheduled` methods, following one hop of delegation because F2-317's defect
+was exactly one hop down: **8 reach `audit.log`, 4 anchored no tenant.** F2-317 closed one; these are
+the other three.
+
+| | |
+|---|---|
+| `AccessRequestService#scheduledExpirySweep` | ⚠ `@Scheduled(PT1H)` and **ungated** — runs hourly in every environment |
+| `SodService#nightlyScan` | 02:30 UTC across all tenants |
+| `VulnerabilitySlaComputeService#runEscalationCheck` | `orgId` arrives as a **parameter** |
+
+### 🔑 Three of the four put the organisation in the audit MESSAGE
+
+`"(org " + org + ")"`, `"for org " + org`. **That is the signature: an author who needs the
+organisation in the row and cannot get it there writes it into the prose.** And in every case the
+notification or `DomainEvent` beside the audit row was already org-explicit while the audit row was
+not — the same asymmetry F2-317 found, now four times.
+
+⚠ Two of the four javadocs said *"off-request-safe"* — true about not crashing, silent about
+attribution ([[F2-184]]'s shape on the exact concern).
+
+### Latent, but not equally
+
+Every row in both databases is organisation 1, so no mismatch has occurred: what made all four
+harmless is the **data**, not the code ([[F2-182]]). But the IAM sweep is **ungated and hourly**, so an
+expiring time-bound assignment in any other tenant fires it through ordinary use — unlike F2-317,
+which needs a configuration change.
+
+### RESTORE, not clear — at all three sites
+
+Restoring is correct whether or not an ambient tenant exists; clearing is only correct when one does
+not, so it has to be re-justified every time a caller is added. Two of the three have an on-request
+sibling that a plain `finally { clear(); }` would have broken.
+
+### The gate's first run surfaced four more, and three are legitimate
+
+Each for a **different** reason, which is why they are a named map rather than a blanket rule:
+
+* `CrowdStrikeInboundService`, `TenableInboundService` — they **read** the tenant and refuse when it
+  is absent, so off-request they do nothing rather than mis-attribute. 🔑 **A `setCurrentTenant` scan
+  cannot tell consulting the tenant from ignoring it**, so both needed reading.
+* `DbSizeMonitorJob` — **genuinely org-less**: it audits the database itself, `entityType Database`
+  with a null entity id, so the tenant-1 fallback is intended and anchoring one would invent it.
+
+### ⚠⚠ And the harness found a hole in my own gate
+
+**All three pre-fix mutations SURVIVED.** The anchor pattern matched any
+`TenantContext.setCurrentTenant(...)` — and every fix in this family adds **two**: the real anchor
+plus a `finally { setCurrentTenant(ambient) }` restore. Deleting the anchor left the restore, which
+still matched.
+
+🔑 **A substring check satisfied by something other than its claim — and the thing satisfying it
+existed only because of the fix, so the gate got weaker the moment it was applied.** Narrowed to
+exclude the ambient argument; **5/5** after, with the deliberate `clear()`-instead-of-restore mutation
+correctly **surviving**.
+
+⚙ The tenant-1 fallback itself is asserted. If `AuditLogService` ever starts refusing an unset tenant,
+this family becomes a loud failure rather than a silent mis-attribution, and these legs should be
+re-read rather than left asserting a mechanism that is gone.
+
+### Filed
+
+* Nothing new. Per-row `REQUIRES_NEW` stands as [[F2-317]] filed it.
+
+⚙ Two recorded landmines walked into: the first scan's method regex used a lazy type class and
+**backtracked catastrophically**, hanging a whole-tree walk past the timeout (anchored to line starts
+after); and an inline `py -c` mangled its escapes again.
+
 ## F2-317 — a cross-tenant sweep whose audit rows all landed in tenant 1
 
 | | |
