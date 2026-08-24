@@ -154,6 +154,32 @@ There are two kinds and only one needs a jar. Present here:
   F2-260's `RRP` case is genuinely absent rather than merely unlisted.
 
 
+## G. Persona grant surface (F2-314)
+
+`CLAUDE.md` used to enumerate this in prose so a slice could pick the right persona for an
+authorization probe. It named **five** of `so_officer`'s grants and asserted *"no
+COMPLIANCE/BCM"* while it holds `BCM:EXPORT`. 🔑 **An enumeration is a copy of a
+measurement and goes stale; the derivation does not.** So the matrix lives here and that
+paragraph points at it. (The *five* is a historical fact about what that paragraph said;
+the total it should have given is in the table below, **derived** — writing it here would
+repeat the defect, and on the deployed server the number differs.)
+
+⚠ A **denial** is the load-bearing claim — it is what an "expected 403" leg rests on — so
+the modules a persona holds NOTHING in are listed explicitly rather than left implicit.
+
+| Persona | Roles | Grants | Modules | Holds nothing in |
+|---|---|---|---|---|
+| `admin` | `PLATFORM_ADMIN` | 47 | 14 of 37 | `ADMIN`, `AML`, `AUDIT`, `AUDIT_LOG`, `AUTOMATION`, `BOARD`, `CONSUMER`, `CONTROL_LIB`, `CPTY`, `ETHICS`, `FRAUD`, `IAM`, `INCIDENT`, `INTAKE`, `INTEGRATIONS`, `KB`, `OPENBANKING`, `PRIVACY`, `REGULATORY`, `REPORTING`, `RRP`, `SHARIA`, `TPRM` |
+| `auditor` | `AUDITOR`, `INTERNAL_AUDITOR` | 62 | 31 of 37 | `AUTOMATION`, `CONSUMER`, `IAM`, `INTEGRATIONS`, `KB`, `PLATFORM_ADMIN` |
+| `compliance` | `COMPLIANCE_OFFICER`, `GRC_ADMINISTRATOR` | 126 | 35 of 37 | `CYBER`, `PLATFORM_ADMIN` |
+| `ranalyst` | `RISK_ANALYST` | 34 | 13 of 37 | `ADMIN`, `AML`, `AUDIT`, `AUDIT_LOG`, `AUTOMATION`, `BCM`, `BOARD`, `CONSUMER`, `CPTY`, `CYBER`, `ETHICS`, `FRAUD`, `IAM`, `INTAKE`, `INTEGRATIONS`, `KB`, `OPENBANKING`, `PLATFORM_ADMIN`, `PRIVACY`, `REGULATORY`, `REPORTING`, `RRP`, `SHARIA`, `TPRM` |
+| `rmanager` | `RISK_MANAGER` | 62 | 22 of 37 | `AML`, `AUDIT_LOG`, `AUTOMATION`, `BOARD`, `CONSUMER`, `CYBER`, `ETHICS`, `IAM`, `INTAKE`, `INTEGRATIONS`, `KB`, `PLATFORM_ADMIN`, `PRIVACY`, `REGULATORY`, `REPORTING` |
+| `so_officer` | `CISO`, `SECURITY_ANALYST`, `SUSTAINABILITY_OFFICER` | 60 | 23 of 37 | `AUTOMATION`, `COMPLIANCE`, `CONSUMER`, `CPTY`, `ETHICS`, `FRAUD`, `INTAKE`, `KB`, `NDI`, `PLATFORM_ADMIN`, `PRIVACY`, `RRP`, `SCM`, `SHARIA` |
+| `viewer` | `VIEWER` | 36 | 19 of 37 | `ADMIN`, `AI`, `AML`, `AUDIT_LOG`, `AUTOMATION`, `BOARD`, `CONSUMER`, `CPTY`, `ETHICS`, `FRAUD`, `IAM`, `INTAKE`, `INTEGRATIONS`, `KB`, `OPENBANKING`, `PLATFORM_ADMIN`, `RRP`, `SHARIA` |
+
+⚠ `admin` is `PLATFORM_ADMIN` and **bypasses in code**, so its row describes grants that
+are never consulted: it proves nothing about authorization either way.
+
 ## D. Conversion backlog by module
 
 F2-05 is sized S per module. Order by count, but read section B first: a module carrying

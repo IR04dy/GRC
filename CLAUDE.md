@@ -151,12 +151,32 @@ that password 401s, and a login attempt costs a lockout counter) ·
 Full persona list: PROJECT_CHRONICLE §4.
 
 Grants matter as much as passwords when probing authorization. Read them from
-`iam.role_permissions` rather than inferring from the username — the useful shapes
-are `so_officer` (EVIDENCE_READ+WRITE, RISK_READ, **CYBER_READ *and* CYBER_WRITE** — this
-line said READ only until 2026-08-06 and the omission cost a probe iteration; **no**
-COMPLIANCE/BCM; ROLE_CISO), `ranalyst` (EVIDENCE+RISK+COMPLIANCE reads, **no** BCM/CYBER/PRIVACY/TPRM)
-and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them they cover
-"holds the module permission", "holds the role but not the permission", and neither.
+`iam.role_permissions` rather than inferring from the username — and rather than from a
+description here. ⚠⚠ **This paragraph used to enumerate them and was wrong** (F2-314): it named
+**5 of `so_officer`'s 60** grants and asserted *"**no** COMPLIANCE/BCM"* when it holds `BCM:EXPORT`
+— V320 granted it so `BcpBinderController#download`'s AND would not deny the CISO, and the comment
+above that guard says so. 🔑 **An enumeration is a copy of a measurement and goes stale; a denial is
+what a 403 expectation actually rests on.** The matrix is published as **§G of
+`Appendix/ROLE_GUARD_CENSUS.md`**, regenerated per database by `role_guard_census.py`.
+
+What is structural, and therefore safe to state here:
+
+- **The three shapes the paragraph exists for still hold**: `so_officer` holds a module permission,
+  `ranalyst` holds the role and not the permission, and neither covers the third case.
+- **`ranalyst` is the genuinely narrow one** — measured, its four denials (`BCM`, `CYBER`, `PRIVACY`,
+  `TPRM`) are all still correct, which is why it is the right persona for an "expected 403" leg.
+- ⚠ **`auditor` is far wider than the old wording suggested** — 62 grants over **31 of 37**
+  modules, against `rmanager`'s 22 and `ranalyst`'s 13 — so it is the wrong persona to reach for as
+  "low-privilege"; its apparent narrowness was an artefact of describing it by three grants. (The
+  widest is `compliance` at **35 of 37**, missing only `CYBER`. ⚠ I first wrote "auditor is the
+  widest" here and the matrix I had just generated refuted it — a comparative claim in prose is the
+  same copy-of-a-measurement this whole correction is about.)
+- ⚠ **`viewer` is not read-only, it is read-AND-export**: it holds `EXPORT` in every module where it
+  holds `READ`, statutory registers included. Coherent — the export invariant ANDs a READ — but not
+  what the name suggests.
+- ⚠ **`so_officer` holds no `COMPLIANCE` and no `PRIVACY` grant at all** (F2-209 measured the second),
+  and it holds `TPRM:APPROVE`, `CAPA:APPROVE`, `CHANGE:APPROVE`, `WORKFLOW:DELETE` and
+  `IAM:BREAK_GLASS` — a persona the old wording made read as narrow.
 
 ---
 
