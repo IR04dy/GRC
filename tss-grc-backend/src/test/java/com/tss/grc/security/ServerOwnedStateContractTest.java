@@ -231,11 +231,128 @@ class ServerOwnedStateContractTest {
             .isEmpty();
     }
 
+    /**
+     * F2-312 — the population of comparing entry points is <b>derived</b>, so the leg above cannot
+     * silently stop covering one.
+     *
+     * <p>It went stale once already: named for three, exercising four, missing the fifth. Reflection
+     * over the public static methods that take a candidate value and compare it means a new primitive
+     * fails here until somebody exercises it — which is the same rule this class applies to its
+     * subject ([[F2-299]]: derive the vocabulary, do not hold a list).
+     */
+    @Test
+    void everyComparingEntryPointIsExercisedHere() throws IOException {
+        Set<String> comparing = new java.util.TreeSet<>();
+        for (java.lang.reflect.Method m : ServerOwnedState.class.getDeclaredMethods()) {
+            if (!java.lang.reflect.Modifier.isPublic(m.getModifiers())
+                || !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                continue;
+            }
+            // a comparing primitive takes at least two Strings (the candidate and what it is
+            // measured against) or a Set of legal values
+            long strings = java.util.Arrays.stream(m.getParameterTypes())
+                .filter(t -> t == String.class).count();
+            boolean takesSet = java.util.Arrays.stream(m.getParameterTypes())
+                .anyMatch(t -> t == Set.class);
+            if (strings >= 2 || takesSet) {
+                comparing.add(m.getName());
+            }
+        }
+
+        // this class reads its OWN source, so the question is "is it exercised here"
+        String body = Files.readString(Paths.get("src", "test", "java", "com", "tss", "grc",
+                                                 "security",
+                                                 "ServerOwnedStateContractTest.java"));
+        var unexercised = comparing.stream()
+            .filter(n -> !body.contains("ServerOwnedState." + n + "("))
+            .sorted()
+            .toList();
+
+        assertThat(unexercised).as("""
+            A comparing entry point on ServerOwnedState is never exercised by this class.
+
+            This leg exists because the case-agreement leg was named for THREE while it exercised             FOUR and missed the fifth (requireImmutableReference, added by F2-306). A name that             reads like a complete population hides the gap, so the population is derived.
+
+            Exercise it above, or — if it genuinely does not compare a candidate against anything —             narrow the derivation and say why.
+
+            found %d comparing entry points: %s
+            unexercised: %s""".formatted(comparing.size(), comparing, unexercised))
+            .isEmpty();
+
+        assertThat(comparing.size()).as(
+            "Comparing entry points found by reflection: %d. If this collapsed, the derivation broke "
+            + "and the leg above is asserting over nothing.", comparing.size())
+            .isGreaterThanOrEqualTo(4);
+    }
+
+    /**
+     * ⚠⚠ F2-312 — {@code requireUnchanged} and {@code requireImmutableReference} differ in exactly
+     * ONE branch, and <b>nothing pinned it</b>.
+     *
+     * <p>When the stored value is <b>absent</b>:
+     *
+     * <ul>
+     *   <li>{@code requireUnchanged} <b>refuses</b> — its message says <em>"has no X yet and an
+     *       update cannot set one"</em>. Right for a lifecycle state: a row always has one, so an
+     *       absent stored value means something is wrong.</li>
+     *   <li>{@code requireImmutableReference} <b>permits</b> — settable while absent. Right for a
+     *       reference: a record may legitimately be created without one and given it later, which is
+     *       exactly what makes a UI-created row with no code repairable.</li>
+     * </ul>
+     *
+     * <p>⚠⚠ <b>My hypothesis was that this branch was unpinned, and it is REFUTED: both halves are
+     * asserted — in two different classes, neither of which names the other.</b>
+     * {@code requireUnchangedRefusesAValueForAnAbsentField} (below) pins the refusal;
+     * {@code ReferenceRenameContractTest.aReferenceIsSettableWhileAbsent} pins the permission. So the
+     * contrast holds by two artefacts happening to agree, with nobody maintaining the agreement
+     * ([[F2-177]]).
+     *
+     * <p>🔑 <b>What that costs is legibility at the moment it matters.</b> A reader who merges the two
+     * primitives makes ONE of those tests fail, in a class they are not editing, with a message about
+     * an ethics outcome or a reference — which reads as <em>"that test is now wrong"</em> rather than
+     * <em>"you have just broken the other primitive."</em> This leg asserts the two behaviours
+     * side by side so the failure names the contrast itself. It is deliberately a THIRD assertion of
+     * facts already covered: the duplication is the point, because the thing being protected is that
+     * they differ ([[F2-190]] from the other side — sharing is right until the thing being shared is
+     * not the same question).
+     */
+    @Test
+    void theTwoUpdateSidePrimitivesDivergeOnAnAbsentStoredValueAndThatIsDeliberate() {
+        // a lifecycle state: an absent stored value is refused
+        assertThatThrownBy(() -> ServerOwnedState.requireUnchanged(
+                "APPROVED", null, "status", "Plan 7", "/transition", null))
+            .as("a row always has a status, so an absent one means something is wrong — if this "
+                + "fails, requireUnchanged has been merged with requireImmutableReference and "
+                + "lifecycle states are now settable by an update")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("has no status yet");
+
+        assertThatThrownBy(() -> ServerOwnedState.requireUnchanged(
+                "APPROVED", "   ", "status", "Plan 7", "/transition", null))
+            .as("blank is absent for this purpose too")
+            .isInstanceOf(IllegalArgumentException.class);
+
+        // a business reference: an absent stored value is SETTABLE, and that is the whole difference.
+        // If either of these throws, requireImmutableReference has inherited requireUnchanged's
+        // refusal and every create that names its own code now fails.
+        ServerOwnedState.requireImmutableReference("POL-1", null, "code", "Policy 7", "Omit it.");
+        ServerOwnedState.requireImmutableReference("POL-1", "   ", "code", "Policy 7", "Omit it.");
+    }
+
     // ── one question, one answer: the three comparisons agree ────────────────────────────────────
 
+    /**
+     * ⚠⚠ F2-312 — this was named {@code allThreeEntryPointsAgreeOnCase} while it exercised
+     * <b>four</b>, and it did not touch {@code requireImmutableReference} at all, which [[F2-306]]
+     * added. 🔑 <b>A leg named for a count goes stale the moment the class grows, and the miss is
+     * invisible because the name reads like a complete population</b> — in the class whose whole
+     * subject is one-question-one-answer. The population is derived by reflection now
+     * ({@link #everyComparingEntryPointIsExercisedHere}), so a new comparing primitive fails the
+     * build until it is added here.
+     */
     @Test
-    @DisplayName("all three entry points compare case-insensitively and return the canonical spelling")
-    void allThreeEntryPointsAgreeOnCase() {
+    @DisplayName("every comparing entry point is case-insensitive and returns the canonical spelling")
+    void everyEntryPointAgreesOnCase() {
         assertThat(ServerOwnedState.sameState("planned", "PLANNED")).isTrue();
         assertThat(ServerOwnedState.sameState("  Planned ", "PLANNED")).isTrue();
         assertThat(ServerOwnedState.sameState("ENGAGED", "PLANNED")).isFalse();
@@ -265,6 +382,18 @@ class ServerOwnedStateContractTest {
             .hasMessageContaining("status:")
             .hasMessageContaining("cannot be moved to PLANNED by an update")
             .hasMessageContaining("/advance");
+
+        // F2-312 — the FIFTH entry point, absent from this leg until now. Same case rule, because
+        // the column collates CI and V396's unique index treats AC-2 and ac-2 as one value: a
+        // case-variant is an echo, not a rename, and refusing it would refuse a spelling the
+        // database would happily store (F2-179).
+        ServerOwnedState.requireImmutableReference("pol-info-001", "POL-INFO-001", "code",
+                                                   "Policy 1", "Omit it.");
+        assertThatThrownBy(() -> ServerOwnedState.requireImmutableReference(
+                "POL-INFO-999", "POL-INFO-001", "code", "Policy 1", "Omit it."))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("code:")
+            .hasMessageContaining("POL-INFO-001");
     }
 
     @Test
