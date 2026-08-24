@@ -22,10 +22,17 @@ public interface FraudCaseRepository extends JpaRepository<FraudCase, Long> {
 
     long countByOrganisationIdAndStatus(Long organisationId, String status);
 
+    // F2-343 — "open" is the COMPLEMENT of the machine's sole terminal state (CLOSED), never a
+    // second inclusion list. The old list IN ('DETECTED','TRIAGE','INVESTIGATING') both included
+    // a dead token ('TRIAGE' is never persisted — triage() sets INVESTIGATING/FALSE_POSITIVE) and
+    // dropped the non-terminal outcome states (CONFIRMED/CLEARED/FALSE_POSITIVE, each still
+    // awaiting CLOSE), so a confirmed fraud awaiting recovery/SAR read as NOT open — flatteringly
+    // under-counting the dashboard headline (F2-196 / F2-290 / F2-341). The excluded token is
+    // pinned against the machine's derived terminal set by FraudOpenCountContractTest.
     @Query("""
         SELECT COUNT(c) FROM FraudCase c
         WHERE c.organisationId = :orgId
-          AND c.status IN ('DETECTED','TRIAGE','INVESTIGATING')
+          AND c.status <> 'CLOSED'
         """)
     long countOpenByOrg(@Param("orgId") Long organisationId);
 

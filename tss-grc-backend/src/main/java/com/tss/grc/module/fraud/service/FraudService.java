@@ -83,6 +83,18 @@ public class FraudService {
             "CLOSED",         Set.of()
     );
 
+    /**
+     * F2-343 — the terminal states, DERIVED from the machine (a status with no outgoing edge),
+     * never a second typed list (F2-196). "Open" is the complement of this set, and
+     * {@code FraudCaseRepository.countOpenByOrg}'s excluded token is pinned against it by
+     * {@code FraudOpenCountContractTest}, so adding a terminal state fails the build until the
+     * query is updated. Package-visible for that drift guard.
+     */
+    static final Set<String> TERMINAL_STATUSES = ALLOWED_TRANSITIONS.entrySet().stream()
+            .filter(e -> e.getValue().isEmpty())
+            .map(Map.Entry::getKey)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
     private final FraudTypologyRepository typologyRepo;
     private final FraudCaseRepository caseRepo;
     private final FraudCaseUpdateRepository updateRepo;
