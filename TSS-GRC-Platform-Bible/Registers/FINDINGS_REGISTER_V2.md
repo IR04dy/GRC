@@ -15219,6 +15219,83 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-312 — a leg named for three exercised four and missed the fifth
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — a coverage gap in an instrument, plus one refuted hypothesis worth recording. No production change. |
+| **Registers** | — (`common/validation/ServerOwnedState`, the platform's refusal primitives) |
+| **Standards** | — |
+| **Found by** | Asking a question of this session's **own output**: I had extended `ServerOwnedState` twice ([[F2-302]], [[F2-306]]) and it now holds several near-identical refusal primitives — do any two answer the same question differently? |
+| **Verification** | suite **4701 → 4703/0/0**; mutations **4/4 killed** |
+
+### The leg's name was a population claim, and it was wrong
+
+`ServerOwnedStateContractTest.allThreeEntryPointsAgreeOnCase` is this class's
+one-question-one-answer leg — the one that exists to prove the primitives do not disagree. It
+exercised `sameState`, `requireInitial`, `requireCreatable` **and** `requireUnchanged`: **four**,
+against a name that says three. And it did not touch `requireImmutableReference` at all, which
+[[F2-306]] added four slices earlier.
+
+🔑 **A leg named for a count goes stale the moment the class grows, and the miss is invisible because
+the name reads like a complete population** — in the class whose entire subject is one question, one
+answer.
+
+### So the population is derived
+
+`everyComparingEntryPointIsExercisedHere` reflects over `ServerOwnedState`'s public static methods:
+one taking two `String`s (a candidate and what it is measured against) or a `Set` of legal values is
+a comparing primitive, and must be exercised by this class or the build fails. [[F2-299]]'s rule —
+derive the vocabulary, do not hold a list — applied to the list a test's own *name* implies.
+
+### REFUTED: the divergence was already pinned, in two classes
+
+My hypothesis was that the one branch where the two update-side primitives differ was unasserted.
+It is not:
+
+| | |
+|---|---|
+| `requireUnchanged` **refuses** when the stored value is absent | `ServerOwnedStateContractTest.requireUnchangedRefusesAValueForAnAbsentField` |
+| `requireImmutableReference` **permits** it — settable while absent | `ReferenceRenameContractTest.aReferenceIsSettableWhileAbsent` |
+
+**Neither test names the other**, so the contrast holds by two artefacts happening to agree with
+nobody maintaining the agreement ([[F2-177]]).
+
+🔑 **What that costs is legibility at the moment it matters.** A reader who merges the two primitives
+makes ONE of those tests fail, in a class they are not editing, with a message about an ethics
+outcome — which reads as *"that test is now wrong"* rather than *"you have just broken the other
+primitive."* The new leg asserts both behaviours **side by side**, deliberately as a third assertion
+of already-covered facts, because the thing being protected is that they **differ**.
+
+### And the divergence is sharper than I had described it
+
+`requireUnchanged` has **no absent branch at all** — it refuses any change and merely words the
+message differently (*"has no X yet"* versus *"is at Y and cannot be moved to Z"*). The reference
+primitive has an explicit early return. That is the whole difference, and the file already carries a
+comment warning that a de-duplication must not reword the 400 it emits — prose that is now a build
+failure.
+
+### Mutations 4/4
+
+| Mutation | |
+|---|---|
+| the reference primitive inherits `requireUnchanged`'s refusal | KILLED |
+| `requireUnchanged` stops refusing an absent stored value | KILLED |
+| a **new** comparing primitive is added and nobody exercises it — the F2-312 defect | KILLED |
+| the reflective derivation resolves nothing | KILLED |
+
+⚠ Two harness bugs of mine first: `-Dtest=A+B` is not a selector (surefire wants a **comma**), and my
+first M3 did not compile — **a mutation that does not compile is neither a kill nor a hole**, and my
+harness reported it as `DID-NOT-RUN` beside real results. That first M3 also tested something the leg
+does not claim: the derived leg asks *"is this primitive exercised anywhere in this class"*, not *"in
+that particular leg"*.
+
+### Filed
+
+* Nothing. The primitives are now covered by a derived population, and the divergence fails the build
+  in both directions.
+
 ## F2-311 — the map called IGNORED held two fields that are CONSULTED, and it said so itself
 
 | | |
