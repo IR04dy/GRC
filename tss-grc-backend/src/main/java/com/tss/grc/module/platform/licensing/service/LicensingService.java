@@ -258,7 +258,6 @@ public class LicensingService {
             .entityType("OrganisationLicense")
             .entityId(saved.getId())
             .entityCode(saved.getModuleCode())
-            .sourceModule("licensing")
             .severity("INFO")
             .message("License upserted: org=" + saved.getOrganisationId()
                      + " module=" + saved.getModuleCode()
@@ -280,7 +279,6 @@ public class LicensingService {
             .entityType("OrganisationLicense")
             .entityId(l.getId())
             .entityCode(moduleCode)
-            .sourceModule("licensing")
             .severity("WARN")
             .message("Module disabled: org=" + organisationId + " module=" + moduleCode));
     }

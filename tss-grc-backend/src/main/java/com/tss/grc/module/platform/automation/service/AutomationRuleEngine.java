@@ -141,7 +141,6 @@ public class AutomationRuleEngine {
                         .entityType(event.entityType())
                         .entityId(event.entityId())
                         .entityCode(r.getRuleCode())
-                        .sourceModule("automation")
                         .correlationId(event.correlationId())
                         .message("Rule " + r.getRuleCode() + " fired on " + event.triggerEvent()
                                  + (summary == null ? "" : " — " + summary)));
@@ -154,7 +153,6 @@ public class AutomationRuleEngine {
                     .actionType("RULE_FIRED")
                     .severity("ERROR")
                     .entityCode(r.getRuleCode())
-                    .sourceModule("automation")
                     .correlationId(event.correlationId())
                     .message("Rule " + r.getRuleCode() + " failed: " + ex.getMessage()));
             }

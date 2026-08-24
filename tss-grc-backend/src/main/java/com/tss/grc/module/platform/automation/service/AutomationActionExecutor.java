@@ -126,7 +126,6 @@ public class AutomationActionExecutor {
             .entityType(event.entityType())
             .entityId(event.entityId())
             .entityCode(rule.getRuleCode())
-            .sourceModule("automation")
             .correlationId(event.correlationId())
             .message(message));
         return "AUDIT(" + severity + ") emitted";
@@ -187,7 +186,6 @@ public class AutomationActionExecutor {
                 .actionType("RULE_FIRED")
                 .severity("WARN")
                 .entityCode(rule.getRuleCode())
-                .sourceModule("automation")
                 .correlationId(event.correlationId())
                 .message(verb + " rule " + rule.getRuleCode()
                     + " addresses no audience — expected one of " + RECIPIENT_KEYS
@@ -217,7 +215,6 @@ public class AutomationActionExecutor {
             .entityType(event.entityType())
             .entityId(event.entityId())
             .entityCode(rule.getRuleCode())
-            .sourceModule("automation")
             .correlationId(event.correlationId())
             .message(verb + " → " + outcome));
 
@@ -256,7 +253,6 @@ public class AutomationActionExecutor {
             .entityType(event.entityType())
             .entityId(event.entityId())
             .entityCode(rule.getRuleCode())
-            .sourceModule("automation")
             .correlationId(event.correlationId())
             .message("FLAG " + payload
                 + (event.entityType() == null ? "" : " on " + event.entityType()
@@ -290,7 +286,6 @@ public class AutomationActionExecutor {
                 .severity("INFO")
                 .entityType(entity)
                 .entityCode(rule.getRuleCode())
-                .sourceModule("automation")
                 .correlationId(event.correlationId())
                 .message("CREATE_RECORD " + entity + " — no creator registered (audit-only). fields=" + fieldsRepr));
             return "CREATE_RECORD " + entity + " (no creator registered — audit-only)";
@@ -303,7 +298,6 @@ public class AutomationActionExecutor {
                 .severity("INFO")
                 .entityType(entity)
                 .entityCode(rule.getRuleCode())
-                .sourceModule("automation")
                 .correlationId(event.correlationId())
                 .message("CREATE_RECORD " + entity + " — " + summary));
             return "CREATE_RECORD " + entity + " — " + summary;
@@ -314,7 +308,6 @@ public class AutomationActionExecutor {
                 .severity("ERROR")
                 .entityType(entity)
                 .entityCode(rule.getRuleCode())
-                .sourceModule("automation")
                 .correlationId(event.correlationId())
                 .message("CREATE_RECORD " + entity + " FAILED: " + ex.getMessage()));
             return "CREATE_RECORD " + entity + " FAILED: " + ex.getMessage();

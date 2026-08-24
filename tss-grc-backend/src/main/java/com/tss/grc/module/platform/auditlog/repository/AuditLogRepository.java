@@ -21,6 +21,35 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntry, Long> {
     Page<AuditLogEntry> findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
         Long organisationId, String sourceModule, Pageable pageable);
 
+    /**
+     * ⚠⚠ F2-324 — every row a module wrote, <b>including the ones written before
+     * {@code source_module} was derived</b>.
+     *
+     * <p>{@code BcmEvidencePackageService} selected its {@code audit_log.csv} on
+     * {@code source_module = 'bcm'} alone, and measured over the live ledger that carried <b>15.0% of
+     * the BCM trail in dev and 6.8% in prod</b> — omitting 136 and 119 {@code BcmAssessmentCycle}
+     * rows respectively, i.e. the audit trail of the very cycle the package documents. F2-324 fills
+     * the column for every row written from now on; it may not fill it retrospectively, because the
+     * ledger is append-only and F2-31 hash-chains it, so a back-fill would rewrite history <b>and</b>
+     * break every seal.
+     *
+     * <p>🔑 So the historical rows are recovered through the column that IS populated. The
+     * {@code entityTypes} set must be <b>derived</b> (see {@code BcmEvidencePackageService}) rather
+     * than typed out: a hand-list is the artefact [[F2-217]] found measuring its own contents.
+     *
+     * <p>⚠ Not paginated, matching the caller — the package deliberately excludes no rows.
+     */
+    @Query("""
+        SELECT a FROM AuditLogEntry a
+         WHERE a.organisationId = :org
+           AND (a.sourceModule = :module OR a.entityType IN :entityTypes)
+         ORDER BY a.createdAt DESC
+        """)
+    List<AuditLogEntry> findForModuleOrEntityTypes(
+        @Param("org") Long org,
+        @Param("module") String module,
+        @Param("entityTypes") java.util.Collection<String> entityTypes);
+
     Page<AuditLogEntry> findByOrganisationIdAndSeverityOrderByCreatedAtDesc(
         Long organisationId, String severity, Pageable pageable);
 
