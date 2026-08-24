@@ -15219,6 +15219,89 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-314 — the persona guide probes are designed from denied a grant the persona holds
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a document whose stated purpose is authorization-probe design, wrong in the direction that makes a correct server look broken. No production change. |
+| **Registers** | — (`iam.role_permissions`, read per persona) |
+| **Standards** | — |
+| **Found by** | Measuring the mirror of [[F2-313]] — *which roles can ACT on a module without being able to READ it?* — which was **refuted**, and the refutation needed the persona grants, which is where the stale claim was |
+| **Verification** | probe **7/7**; matrix published and derived per database |
+
+### The refuted question first, because it is the more useful half
+
+[[F2-313]] measured pairs nobody can satisfy. The mirror is [[F2-259]]'s hand-found case — *"the
+attest tier was WIDER than the tier producing the artefact it attests to"* — and V380's self-check
+asserts containment (*"nobody seals a ledger they cannot read"*) for exactly one pair. Nobody had
+measured it.
+
+**Two metric corrections, both from reading rather than counting:**
+
+* **Module-scoped containment is the wrong unit.** *"Acting without that module's READ"* reported
+  **27** rows; `BOARD:EXPORT` ANDs **`ADMIN:READ`** — a *different* module's read. 🔑 **The guard
+  names which READ matters; the module boundary does not.**
+* **Per-guard, the direction matters.** Composed-guard halves reported **60** rows, and holding
+  `CHANGE:READ` without `CHANGE:EXPORT` is *least privilege working*. Only the **acting half without
+  the gating half** is interesting.
+
+Corrected, the answer is **two rows** — `BCM:EXPORT` held by `CISO` and `CFO` without `BCM:READ`.
+
+### And both are documented, in a comment above the guard
+
+`BcpBinderController#download` says:
+
+> *"V320 grants BCM:EXPORT to CISO and CFO, which this list allows but the catalogue did not —
+> without that grant the AND would have denied two roles the endpoint has always permitted."*
+
+So the grant exists **solely** to satisfy one composed guard's AND, and was never a general BCM
+export capability. It is load-bearing where it was created for and insufficient on three siblings it
+was never meant to reach. 🔑 **Neither granting `BCM:READ` nor revoking `BCM:EXPORT` is a pure
+improvement** — the first widens access to a customer's continuity plans, the second breaks the
+binder download — so there is nothing to fix. Probed **7/7**: `so_officer` is **403** on
+`/bcm/plans/14/export.pdf` and **200** on `/bcm/plans/14/binders`, same role, same module, same
+permission.
+
+### The actual finding was in the guide the probe was designed from
+
+CLAUDE.md's persona-grant paragraph exists so a slice can pick the right persona. It named **5 of
+`so_officer`'s 60** grants and asserted *"**no** COMPLIANCE/BCM"*. COMPLIANCE is right; **BCM is
+false**. 🔑 **Several slices in this programme have chosen probe personas from that line, and a probe
+expecting 403 where the persona holds the permission reads as a defect in the code.**
+
+Two more claims read the wrong way round:
+
+| Claim | Measured |
+|---|---|
+| `auditor` = "EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ" | **62 grants over 31 of 37 modules** — against `rmanager` 22, `ranalyst` 13. The wrong persona to reach for as low-privilege. |
+| `viewer` reads as read-only | holds **`EXPORT` in every module where it holds `READ`**, statutory registers included |
+
+⚙ `ranalyst`'s four denials (`BCM`, `CYBER`, `PRIVACY`, `TPRM`) are **all still correct**, which is why
+it is the right persona for an expected-403 leg — and the paragraph's closing claim about covering
+three shapes still holds.
+
+### Deleted rather than corrected
+
+An enumeration is a copy of a measurement ([[F2-273]]) and this one had gone stale twice — its own
+text records one earlier repair (*"this line said READ only until 2026-08-06 and the omission cost a
+probe iteration"*). So the matrix is **published** as §G of `ROLE_GUARD_CENSUS.md`, derived per
+database, and only the **denials** stay in prose, because a denial is what a 403 expectation rests on.
+
+⚠⚠ **§G then refuted a comparative claim I had just written into CLAUDE.md** — *"auditor is the widest
+read surface"* — when `compliance` is, at **35 of 37**. Corrected in place. And the last hard-coded
+figure in the new section (*"5 of 60"*) was **derived**, because on the deployed server the total is
+55: 🔑 **a copy-of-a-measurement defect reappearing inside the section written to remove them.**
+
+⚙ `admin` holds **47 grants over 14 modules — fewer than `auditor` or `compliance`** — because
+`PLATFORM_ADMIN` bypasses in code and V272 records it as needing no grants. A concrete illustration
+of *admin proves nothing about authorization*, and §G says so on the row.
+
+### Filed
+
+* Nothing. The containment question is answered and its two rows are documented; the guide now points
+  at a derived matrix.
+
 ## F2-313 — the census tracking the conversion backlog was blind to the half it converts into
 
 | | |
