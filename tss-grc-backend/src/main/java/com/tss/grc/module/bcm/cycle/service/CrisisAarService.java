@@ -87,8 +87,8 @@ public class CrisisAarService {
         a.setOrganisationId(o);
         a.setCrisisEventId(crisisEventId);
         a.setReportCode(nextReportCode(o));
-        a.setTitleEn("After-Action Report — " + safe(ce.getTitleEn()));
-        a.setTitleAr("تقرير ما بعد الحدث — " + safe(ce.getTitleAr() == null ? ce.getTitleEn() : ce.getTitleAr()));
+        a.setTitleEn(cap("After-Action Report — " + safe(ce.getTitleEn()), TITLE_MAX));
+        a.setTitleAr(cap("تقرير ما بعد الحدث — " + safe(ce.getTitleAr() == null ? ce.getTitleEn() : ce.getTitleAr()), TITLE_MAX));
 
         a.setExecutiveSummaryEn(buildExecSummaryEn(ce, sitRepList.size(), decisionList.size(), regList.size()));
         a.setExecutiveSummaryAr(buildExecSummaryAr(ce, sitRepList.size(), decisionList.size(), regList.size()));
@@ -333,6 +333,19 @@ public class CrisisAarService {
     }
 
     private static String safe(String s) { return s == null ? "" : s; }
+
+    /** F2-338 — the AAR title is composed from the crisis event's title
+     *  ({@code bcm.crisis_events.title_en} is NVARCHAR(500)) plus a fixed prefix, and stored in
+     *  {@code bcm.crisis_aar.title_en/title_ar} (NVARCHAR(300), see {@code @Column(length = 300)}
+     *  on {@link CrisisAar}). Cap the composed string to the column length so a long-but-legal
+     *  crisis title cannot overflow it and turn AAR generation into a 500 — F2-185b: a length
+     *  budget must account for everything the code adds, not just the caller-supplied field. */
+    static final int TITLE_MAX = 300;
+    private static String cap(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
+    }
+
     private static String safeSingleLine(String s) {
         if (s == null) return "";
         return s.replace('\n', ' ').replace('\r', ' ').replace('|', '/');
