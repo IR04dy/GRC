@@ -21,6 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -142,6 +143,21 @@ class BcpPlanServiceTest {
         BcpPlan p = new BcpPlan(); p.setTitleEn("Plan"); p.setPlanType("DRP");
         BcpPlan saved = service.create(p);
         assertThat(saved.getPlanCode()).startsWith("DRP-");
+    }
+
+    // F2-330: a create must not forge the attestation trail (PlanReviewService.attest(),
+    // BCM:APPROVE) — a BCM:WRITE holder cannot be born "last reviewed by X on Y".
+    @Test void create_scrubsForgedAttestationTrail() {
+        BcpPlan p = new BcpPlan();
+        p.setTitleEn("Plan"); p.setPlanType("BCP");
+        p.setLastAttestedAt(LocalDateTime.of(2020, 1, 1, 0, 0));
+        p.setLastAttestedByName("Somebody Who Never Reviewed This");
+        p.setLastAttestedById(999L);
+        BcpPlan saved = service.create(p);
+        assertThat(saved.getLastAttestedAt())
+            .as("attestation is PlanReviewService.attest()'s alone (BCM:APPROVE)").isNull();
+        assertThat(saved.getLastAttestedByName()).isNull();
+        assertThat(saved.getLastAttestedById()).isNull();
     }
 
     // ─── State machine ──────────────────────────────────────
