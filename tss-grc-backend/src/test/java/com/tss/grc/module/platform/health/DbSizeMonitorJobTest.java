@@ -134,7 +134,7 @@ class DbSizeMonitorJobTest {
         assertThat(ev.payload()).containsEntry("thresholdMb", WARN);
         assertThat(ev.payload()).containsEntry("capMb", 10240L);
 
-        verify(audit).log(eq("DB_SIZE_WARN"), eq("Database"), eq(null), anyString());
+        verify(audit).logSystem(eq("DB_SIZE_WARN"), eq("Database"), eq(null), anyString());
     }
 
     @Test
@@ -145,7 +145,7 @@ class DbSizeMonitorJobTest {
         ArgumentCaptor<DomainEvent> evCap = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(evCap.capture());
         assertThat(evCap.getValue().payload()).containsEntry("severity", "ALERT");
-        verify(audit).log(eq("DB_SIZE_ALERT"), anyString(), eq(null), anyString());
+        verify(audit).logSystem(eq("DB_SIZE_ALERT"), anyString(), eq(null), anyString());
     }
 
     @Test
@@ -159,7 +159,7 @@ class DbSizeMonitorJobTest {
         assertThat(ev.payload()).containsEntry("severity", "HALT");
         // 9800 / 10240 = 95.7%
         assertThat((Double) ev.payload().get("pctOfCap")).isBetween(95.5, 96.0);
-        verify(audit).log(eq("DB_SIZE_HALT"), anyString(), eq(null), anyString());
+        verify(audit).logSystem(eq("DB_SIZE_HALT"), anyString(), eq(null), anyString());
     }
 
     @Test

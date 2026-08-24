@@ -138,12 +138,56 @@ public class AuditLogService {
             .message(message));
     }
 
+    /**
+     * ⚠⚠ F2-320 — {@link #log} for an event that belongs to <b>no tenant</b>.
+     *
+     * <p>Identical to {@code log(...)} except that it declares the event org-less, so filing it under
+     * organisation 1 is the intended behaviour rather than a lost {@code TenantContext}. Exactly one
+     * caller qualifies today: {@code DbSizeMonitorJob}, which audits the size of the database itself.
+     *
+     * <p>🔑 It exists because four off-request writers looked identical from in here and were
+     * defects ([[F2-317]], [[F2-318]], [[F2-319]]) — without a way to say "no tenant", that case and
+     * "lost the tenant" are the same call, which is what made all four silent.
+     */
+    @Transactional
+    public AuditLogEntry logSystem(String actionType, String entityType, Long entityId,
+                                   String message) {
+        return recordEvent(new AuditEventBuilder()
+            .actionType(actionType)
+            .entityType(entityType)
+            .entityId(entityId)
+            .systemEvent()
+            .message(message));
+    }
+
     /** Full builder path. */
     @Transactional
     public AuditLogEntry recordEvent(AuditEventBuilder b) {
         AuditLogEntry e = new AuditLogEntry();
         Long org = TenantContext.getCurrentTenant();
-        e.setOrganisationId(org != null ? org : 1L);   // fall back to tenant 1 (system events)
+        if (org == null && !b.systemEvent) {
+            // ⚠⚠ F2-320 — this fallback is correct for exactly ONE caller and was silently wrong
+            // for four. F2-317, F2-318 and F2-319 each found an off-request writer whose rows all
+            // landed in organisation 1: the risk-review sweep, the hourly IAM access-expiry sweep,
+            // the nightly SoD scan, the vuln-SLA escalation and the @Async automation engine. Every
+            // one of them had the organisation in hand — three had put it in the audit MESSAGE
+            // because the row's own column was not carrying it.
+            //
+            // 🔑 The fallback is not the defect; being SILENT is. A writer that means "this event
+            // belongs to no tenant" now says so with systemEvent(), and one that has simply lost its
+            // tenant produces a log line naming the action type instead of a plausible row in
+            // organisation 1's audit log.
+            //
+            // ⚠ A WARN rather than a throw, deliberately: off-request audit paths cannot be
+            // enumerated statically (listener registration, reflection, SpEL), so refusing would
+            // risk breaking a path nobody has seen — the one failure a fix must not have. The
+            // default is unchanged; only its visibility is.
+            log.warn("[audit] no tenant in context for action {} (module {}) — filing under "
+                     + "organisation 1. If this event genuinely belongs to no tenant, say so with "
+                     + "AuditEventBuilder.systemEvent(); otherwise anchor the tenant on the row "
+                     + "(F2-317/318/319).", b.actionType, b.sourceModule);
+        }
+        e.setOrganisationId(org != null ? org : 1L);
 
         // Required
         if (b.actionType == null || b.actionType.isBlank())
@@ -326,12 +370,24 @@ public class AuditLogService {
     // ─── Builder (compact API) ────────────────────────────────────
 
     public static class AuditEventBuilder {
+        boolean systemEvent;
         String actionType, entityType, entityExternalId, entityCode;
         Long entityId, parentAuditId;
         String oldValueJson, newValueJson;
         String workflowStatusBefore, workflowStatusAfter;
         String sourceModule, correlationId, digitalSignatureRef;
         String severity, message, userRoleSource;
+
+        /**
+      * ⚠⚠ F2-320 — declare that this event belongs to <b>no tenant</b>, so filing it under
+      * organisation 1 is the intended behaviour rather than a lost {@code TenantContext}.
+      *
+      * <p>Exactly one caller qualifies today: {@code DbSizeMonitorJob}, which audits the size of the
+      * database itself — {@code entityType Database}, null entity id. Four other off-request writers
+      * looked identical from here and were defects ([[F2-317]], [[F2-318]], [[F2-319]]), which is the
+      * whole reason this is opt-in: without it, "no tenant" and "lost the tenant" are the same call.
+      */
+        public AuditEventBuilder systemEvent() { this.systemEvent = true; return this; }
 
         public AuditEventBuilder actionType(String v) { this.actionType = v; return this; }
         public AuditEventBuilder entityType(String v) { this.entityType = v; return this; }

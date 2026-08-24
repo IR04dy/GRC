@@ -15219,6 +15219,72 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-320 — the fallback was right for one caller and silent for four, so it is opt-in now
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — the structural close of [[F2-317]]/[[F2-318]]/[[F2-319]]. No behaviour change on any working path. |
+| **Registers** | `platform.audit_log` |
+| **Standards** | audit integrity; multi-tenancy |
+| **Found by** | Completing the population: `afterCommit` callbacks were the one off-request kind still unmeasured, and they were **refuted** — which left the root |
+| **Verification** | mutations **4/4** + F2-318's **5/5** re-run; suite **4724 → 4726/0/0** |
+
+### The population is now complete
+
+| entry point | audit writers | unanchored |
+|---|---|---|
+| `@Scheduled` ([[F2-318]]) | 8 of 33 | 4 |
+| `@Async` / `@EventListener` ([[F2-319]]) | 3 of 4 | 1 |
+| programmatic `afterCommit` | 1 file, 2 sites | **0** — both on-request and same-thread, so the tenant is intact |
+
+Four were defects. **One** — `DbSizeMonitorJob`, auditing the size of the database itself — is
+genuinely org-less, and the fallback is its intended behaviour.
+
+### 🔑 The fallback is not the defect; being silent is
+
+Without a way to say *"this belongs to no tenant"*, that case and *"I lost the tenant"* are **the same
+call** — which is precisely why all four stayed invisible. So `recordEvent` warns, naming the action
+type, unless the caller declared `systemEvent()`; and `logSystem(...)` mirrors the `log(...)` the one
+qualifying caller already used.
+
+⚠ **A WARN rather than a throw, deliberately.** Off-request audit paths cannot be enumerated
+statically (listener registration, reflection, SpEL), so refusing would risk breaking a path nobody
+has seen — the one failure a fix must not have ([[F2-214]]). The default is unchanged; only its
+visibility is.
+
+### ⚠⚠ The fix turned an exemption into a property
+
+`DbSizeMonitorJob` had a named entry in the gate's exclusion map, exempted as *"genuinely org-less"* —
+which asserts that somebody read the file once. It now satisfies the invariant on its own merits
+(**anchor a tenant OR declare the event org-less**), so the entry is **deleted**. 🔑 **An exemption is a
+weaker artefact than a property; when a fix lets one become the other, delete the exemption rather
+than keeping both** ([[F2-205]]). The two pollers keep theirs, because they **refuse** rather than
+declare — a third correct answer the invariant cannot express structurally.
+
+⚙ The reverse leg is what caught this: after the change `DbSizeMonitorJob` no longer matched the audit
+pattern, so its exclusion said nothing, and the leg failed. That is the direction nobody writes first
+([[F2-199]]) earning its place.
+
+### Three of my own errors, all caught by running things
+
+* ⚠⚠ **My first behavioural leg was theatre.** It attached a Logback appender it never read and
+  asserted through a helper that **reimplemented the condition** — proving the helper agreed with
+  itself, the defect this register keeps recording, inside the leg meant to observe a warning.
+  Replaced with one that constructs the real service over mocks, invokes `recordEvent` and reads the
+  appender.
+* **The builder's fields are package-private**, so my first repoint of the three existing
+  `DbSizeMonitorJobTest` legs could not compile from `module.platform.health`. 🔑 That is what made
+  `logSystem(...)` the right shape rather than widening the builder's API for a test ([[F2-192]]'s
+  seam concern) — and it kept those legs asserting the **action type** instead of merely that some
+  audit call happened.
+* Two mutations reported **ANCHOR-MISS** because they pointed at text this slice changed. Re-aimed
+  rather than counted: **a mutation that does not run is neither a kill nor a hole.**
+
+### Filed
+
+* Nothing new. Per-row `REQUIRES_NEW` stands as [[F2-317]] filed it.
+
 ## F2-319 — the automation engine runs on a pool thread, so no publisher could set its tenant
 
 | | |
