@@ -15219,6 +15219,81 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-326 — the flagship regulator evidence package named the actor and dropped the role held
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — `RegulatorPackageService`'s `Audit_Trail.xlsx`, the platform-wide pack an auditor or regulator is handed, carried the actor (`user_username`) but **not** the role that actor held at the time. The actor being present makes this a completeness gap on the segregation-of-duties axis, not the attribution failure [[F2-325]] fixed in the BCM package. |
+| **Registers** | `platform.audit_log` |
+| **Standards** | Saudi GRC prompt §29 (who/when/what/where); segregation-of-duties / least-privilege review ([[F2-54]]); ISO 22301 / regulator evidence packaging |
+| **Found by** | applying [[F2-325]]'s own generalised rule — *when an export and an on-screen view read the same record, diff their columns* — to every OTHER consumer of `AuditLogEntry`. It refuted a cross-tenant-leak hypothesis on this file and surfaced the role gap ([[F2-215]]'s two-of-N: a sweep of one export is not a sweep of the family). |
+| **Verification** | the sharp hypothesis refuted by reading (the leak); full `generate()`-path behavioural test reading the XLSX out of the ZIP with POI (the fix); mutation harness **3 killed / 0 survived / 0 anchor-miss**; co-population cited from [[F2-325]]'s both-database measurement; suite **4741 → 4742/0/0** |
+
+### A sweep of one export is not a sweep of the family
+
+[[F2-325]] added the actor and the role to the BCM evidence package's `audit_log.csv` and closed with the
+rule *"when an export and an on-screen view read the same record, diff their columns — the one that leaves
+the platform is the one nobody re-reads."* Asking that of every OTHER reader of `AuditLogEntry` found a
+**second** regulator export of the same data: `RegulatorPackageService` — the platform-wide,
+framework-agnostic pack its own javadoc describes as *"a single self-describing archive an auditor or
+regulator can be handed"* — whose `Audit_Trail.xlsx` sheet named `Time, Action, Module, Entity, Code,
+User, Severity, Message`. It carried the actor (so [[F2-325]]'s attribution failure was **not** repeated
+here) and dropped `user_role`. 🔑 [[F2-215]]'s two-of-N at the level of an export family: fixing the actor
+in one export left the same data leaving through a second with the SoD field dropped, and the mechanism
+that made the first export whole (the actor column) was visibly present, so nothing invited a re-read.
+
+### 🔑 The refuted hypothesis was the sharper one
+
+The gather block scopes controls and evidence with `controlRepo.findByOrganisationId(org, …)` /
+`evidenceRepo.findByOrganisationId(org, …)` — explicit tenant arguments — and the audit trail with
+`auditLogService.list(null, null, null, 0, MAX_AUDIT)`, **no org argument**. A regulator package that
+embedded another tenant's audit rows would be a cross-tenant leak in a document handed to an external
+party — far sharper than a dropped column, and the tell (two org-scoped lines then one that is not) sat in
+plain sight. **Refuted:** `AuditLogService.list` scopes to `TenantContext.getCurrentTenant()` internally,
+and `generate()` resolves the same tenant through `TenantContext.requireOrganisationId()` on-request (via
+`ExportController`), so the trail is tenant-scoped to the same org as the rest of the pack. Recording the
+refutation is the result ([[F2-221]]/[[F2-283]]): the audit trail does not leak.
+
+### The two readers, and the one-field diff
+
+The platform's unified viewer (`AuditLogPage.tsx`) renders the actor **and the role held** —
+`{r.userUsername ?? '—'}` followed by `· {r.userRole}`. Diffing the viewer against this export column for
+column, the export is otherwise **richer** than the viewer (it adds `Module` and `Code`); the only field
+the viewer carried that the export dropped was `user_role`. So the finding is precisely one field, on the
+axis an auditor reads to ask *"who did this, and were they authorised to?"* — the role held **at the time**,
+which is not the same as the actor's role now.
+
+### The fix
+
+`Role` is added to the header immediately after `User`, and `nz(a.getUserRole())` to the row after the
+username (when→who→what order, matching [[F2-325]] and the viewer). 🔑 `user_role` is co-populated
+**exactly** with `user_username` ([[F2-325]]'s both-database measurement: 0 rows carry one without the
+other), so it adds no blank beyond where the actor itself is absent. Where a row has no principal — an
+off-request sweep, an automation firing — the role cell is **blank, never fabricated**, the honest state
+the viewer shows as `—` ([[F2-213]]/[[F2-209]]). `user_id` is not added, being 0% populated in both
+databases ([[F2-198]]'s blank-column trap), consistent with [[F2-325]].
+
+### Gate
+
+`RegulatorPackageServiceTest.auditTrailSheetCarriesTheActorAndTheRoleHeldAndBlanksItHonestlyWhenAbsent` —
+a full `generate()`-path behavioural test (a first for this service, which had none — [[F2-248]]): it plants
+one row with a principal and one without, generates the real ZIP, extracts `Audit_Trail.xlsx`, opens it with
+POI, and asserts the header names `Role` **immediately after** `User` in the full expected order, the
+principal row carries the role, and the no-principal row blanks both actor and role. Mutation harness:
+dropping `Role` from the header (**KILLED** by the ordered header assertion), dropping it from the row
+(**KILLED** by the role-value assertion), and reordering `Role` to the end of the header (**KILLED** by the
+order assertion).
+
+### Filed
+
+`RegulatorPackageService` caps the audit trail at `MAX_AUDIT = 1000` "recent" entries and prints
+`audit.size()` as the count in the README KPI (*"Audit / N / Trail entries"*) and the manifest. dev org 1
+holds 3,809+ audit rows ([[F2-321]]), so the cap bites and the printed count is the size of the *sheet*, not
+of the platform's trail — the count is honest about the file's contents, but the KPI label does not say
+"recent, up to 1000", so a reader could take N for the total ([[F2-197]]/[[F2-324]]'s truncated-count shape).
+A wording judgment on a deliberately-capped view, not this fix.
+
 ## F2-325 — the regulator audit trail exported when/what/where and dropped who
 
 | | |
