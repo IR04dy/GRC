@@ -15219,6 +15219,80 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-325 — the regulator audit trail exported when/what/where and dropped who
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — the BCM evidence package's `audit_log.csv`, handed to an external auditor for SIEM import, omitted the actor of every governance action — present on 89 of the 90 on-request rows it exports and shown by the platform's own audit viewer. |
+| **Registers** | `platform.audit_log` |
+| **Standards** | Saudi GRC prompt §29 (who/when/what/where/before/after/correlation); ISO 22301 / NCEMA evidence packaging; the audit ledger (F7) |
+| **Found by** | [[F2-215]]'s two-of-N question of [[F2-324]]'s own file — *what else does this export assert that another reader shows and this one drops?* — one column over from `source_module`. |
+| **Verification** | live column-population measured in **both** databases (the defect); full `generate()`-path behavioural test (the fix); mutation harness **3 killed / 0 survived / 0 did-not-run**; suite **4740 → 4741/0/0** |
+
+### The export named when/what/where and dropped who
+
+`BcmEvidencePackageService`'s `audit_log.csv` — the artefact a regulator or external auditor imports
+into their own SIEM (its own comment says so) — wrote
+`id, created_at, action_type, entity_type, entity_id, entity_code, severity, source_module,
+correlation_id, message`. The `AuditLogEntry` entity's own javadoc cites the requirement as Saudi GRC
+prompt §29 — **who / when / what / where / before / after / correlation** — and the CSV had *when*
+(`created_at`), *what* (`action_type`/`entity_*`), *where* ([[F2-324]] had just added `source_module`)
+and *correlation*, and **no who**. An audit trail handed to an auditor that says *a BCP plan was
+approved at 14:32* without saying **who approved it** is an event log, not an audit trail.
+
+### 🔑 It is an oversight, not a format choice — the two readers disagree
+
+The column has a second reader: `GET /api/v1/audit-log` returns the whole `AuditLogEntry`, and the
+platform's own unified audit viewer (`AuditLogPage.tsx`) **renders a "User / المستخدم" column**
+(`r.userUsername ?? '—'`) for every row. So the same data is shown complete on screen and exported
+incomplete to a regulator — [[F2-215]]'s two-of-N (one column over from F2-324's `source_module`, same
+writer) and [[F2-205]]'s *which reader is authoritative* inverted: here the on-screen view is complete
+and the file that **leaves** the platform is the poorer one. No comment claimed the omission was
+deliberate; the CSV writer was added in the original Audit-Fix #7 and never revisited for the actor,
+under a javadoc reading *"No row counts are excluded — auditors need the full register."*
+
+### The actor is populated where it matters
+
+Measured in both databases: `user_username` is overall 41.7% / 31.7% populated, but that figure is
+dragged down by machine-actor rows (`REFRESH_TOKEN_ISSUED` 4068, `RULE_FIRED` 506) that legitimately
+have no principal. On the **governance** action types it is near-universal — `TRANSITION` 955/984,
+`CREATE` 895/930, `EXPORT`/`UPDATE`/`DELETE`/`MEMBER_APPOINT`/`RESOLUTION_VOTE` 100% — and on the
+**exact rows the package exports** it is present on **89 of 90 (dev) / 12 of 13 (prod)** of the
+on-request `source_module='bcm'` subset (61.6% / 32% of the widened selector, the remainder being the
+off-request automation/ingest/sweep rows that legitimately have no actor). So the column is
+meaningfully populated, not a blank ([[F2-198]]).
+
+### The fix, and the honest blank
+
+`user_username` and `user_role` are added after `created_at` (canonical when→who→what order).
+🔑 `user_role` — the role the actor held at the time, [[F2-54]]'s first-class audit field, relevant to
+an auditor checking segregation of duties — is co-populated **exactly** with `user_username`
+(username-without-role = 0 and role-without-username = 0 in both databases), so it adds no blank beyond
+where the actor itself is absent. `user_id` is **not** exported: it is 0% populated in both databases
+(the service records the username, never the id — [[F2-198]]'s blank-column trap). ⚠ Where a row has no
+principal — an off-request sweep, an automation rule firing, a SIEM ingest — the actor cell is
+**blank, never fabricated**: the honest state the viewer already shows as `—` ([[F2-213]]/[[F2-209]]),
+and exposing it is more truthful for a regulator than hiding that a third-to-two-thirds of the trail
+has no recorded actor ([[F2-197]]).
+
+### Gate
+
+`BcmEvidencePackageServiceTest.auditCsv_carriesTheActorAndRoleAndBlanksItHonestlyWhenAbsent` — a full
+`generate()`-path behavioural test: it plants one row with a principal and one without, generates the
+real ZIP, extracts `audit_log.csv`, and asserts the header names the actor columns **in order**, the
+principal row carries the username and the (comma-bearing, so quoted) role, and the no-principal row
+blanks the actor rather than inventing one. Mutation harness: dropping the columns from the header
+(**KILLED**), dropping them from the row writes (**KILLED**), fabricating `"system"` for a null actor
+(**KILLED**).
+
+### Filed
+
+The same CSV still omits *before/after* (`workflow_status_before`/`_after`), but those are genuinely
+sparse — 0.2% / 0.5% populated, and even on `TRANSITION` rows the states live in the `message` — so
+adding them would export a near-blank column ([[F2-198]]); the transition narrative is already in
+`message`. Not this fix.
+
 ## F2-324 — the audit ledger's source_module had two readers and almost no writers
 
 | | |
