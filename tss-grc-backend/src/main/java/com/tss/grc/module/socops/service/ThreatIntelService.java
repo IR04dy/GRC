@@ -79,6 +79,15 @@ public class ThreatIntelService {
                     // SEC-CYB-002 — force id=null so a forged id on the body
                     // can't overwrite an existing (cross-tenant) row via merge.
                     in.setId(null);
+                    // F2-333 — a freshly ingested advisory is born un-actioned. The actioned
+                    // summary belongs to the SOC-E ledger (actionIoc), so scrub any body-supplied
+                    // value: save admits TI_INGEST, a role POST /{id}/action does not, so an
+                    // ingest caller could otherwise mint a forged "actioned by X" record with no
+                    // threat_intel_action row.
+                    in.setActioned(false);
+                    in.setActionedAt(null);
+                    in.setActionedByUserId(null);
+                    in.setActionNotes(null);
                     ThreatIntel saved = repo.save(in);
                     audit.log("TI_CREATE", "ThreatIntel", saved.getId(),
                         saved.getSource() + " · " + saved.getExternalId());
@@ -126,10 +135,13 @@ public class ThreatIntelService {
         target.setMitreTactics(in.getMitreTactics());
         target.setMitreTechniques(in.getMitreTechniques());
         target.setAffectedSectors(in.getAffectedSectors());
-        target.setActioned(in.getActioned());
-        target.setActionedAt(in.getActionedAt());
-        target.setActionedByUserId(in.getActionedByUserId());
-        target.setActionNotes(in.getActionNotes());
+        // F2-333 — actioned / actionedAt / actionedByUserId / actionNotes are a denormalised
+        // pointer to the append-only threat_intel_action ledger, written by exactly one route:
+        // actionIoc() (POST /{id}/action), which APPENDS an immutable ThreatIntelAction row
+        // (stamping actionedByUserId from CurrentActor) BEFORE flipping the summary, and audits
+        // TI_ACTIONED. copyMutable must not copy it — a PUT would forge "this IOC was actioned
+        // by X at T" with no ledger row and no audit (F2-331 / F2-332's shape). NOT copying it
+        // preserves whatever actionIoc last set on the loaded row.
     }
 
     /**

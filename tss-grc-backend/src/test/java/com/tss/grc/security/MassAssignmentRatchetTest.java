@@ -157,8 +157,16 @@ class MassAssignmentRatchetTest {
      * NEEDS-VERDICT is worse than a missing row (F2-250): it sends the next reviewer to
      * re-read a guarded path. Audited and adjudicated the nine plus F2-330's own BcpPlan
      * fix, re-derived 48 → 38. Read each service before adding a verdict (F2-188).
+     *
+     * <p>⚠ F2-333 — audited the work list further. One LIVE forge: ThreatIntelController#save
+     * copied the actioned* summary — the denormalised pointer to the append-only
+     * threat_intel_action ledger, owned by actionIoc — so a save/TI_INGEST caller could mint a
+     * forged actioned-by record with no ledger row (F2-331 / F2-332’s shape, off the scan’s
+     * flagged fields). Plus nine rows already CLOSED / INERT / BY DESIGN service-side (DPIA ×2,
+     * RegulatorExamination ×2, SustainabilityEvidence ×3, BcpPlan#update, CorrectiveAction#update),
+     * each read against its service (F2-188). Re-derived 29 → 19.
      */
-    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 29;
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 19;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -781,7 +789,54 @@ class MassAssignmentRatchetTest {
             "CLOSED F2-219 — routes to the same PolicyManagementService.create as PolicyController#create"),
         Map.entry("PolicyController#createAttestation(PolicyAttestation)",
             "CLOSED F2-219 — createAttestation forces the initial status via requireInitial and scrubs "
-            + "attestedAt / declinedAt / declinedReason (completion belongs to /attest and /decline)")
+            + "attestedAt / declinedAt / declinedReason (completion belongs to /attest and /decline)"),
+
+        // ── F2-333: the ThreatIntel actioned-ledger forge + census drift a CEILING let sit
+        // mislabelled NEEDS-VERDICT. The forge is a reading-found defect off the scan’s flagged
+        // fields; the other nine were read against their services this slice (F2-188): a scrub or
+        // guard present, a whitelist confirmed, or an undesigned lifecycle with no route to bypass.
+        Map.entry("ThreatIntelController#save(ThreatIntel)",
+            "BY DESIGN (flagged fields) + CLOSED F2-333 — organisationId is stamped from "
+            + "TenantContext on every path; publishedAt is an ingested advisory’s own publication "
+            + "date (there is no /publish route). F2-333 separately closed a reading-found forge OFF "
+            + "these flagged fields: copyMutable and the create path copied actioned / actionedAt / "
+            + "actionedByUserId / actionNotes, the denormalised summary of the append-only "
+            + "threat_intel_action ledger that actionIoc (POST /{id}/action) alone owns"),
+        Map.entry("DpiaController#addReview(DpiaReview)",
+            "CLOSED F2-22b(vii) — addReview stamps reviewerId / reviewerName from CurrentActor "
+            + "(refusing with no principal) and decidedAt from the clock; the call IS the review, so "
+            + "the acting principal is the reviewer by definition"),
+        Map.entry("DpiaController#addMitigation(DpiaMitigation)",
+            "BY DESIGN F2-22b(vii) — status is caller-set (no verify endpoint; PLANNED..VERIFIED "
+            + "has no state machine to bypass) and verifiedAt is server-stamped by a ternary whose "
+            + "branches are both server values (F2-231’s shape), not the caller’s"),
+        Map.entry("RegulatorExaminationController#save(RegulatorExamination)",
+            "BY DESIGN — a SAMA / NCA examination tracking register with no dedicated transition "
+            + "route and no state machine; status and closedAt are the milestone fields an operator "
+            + "records (notified -> fieldwork -> ... -> closed). organisationId is stamped from "
+            + "TenantContext on create and is never in copyMutable on update"),
+        Map.entry("RegulatorExaminationController#update(RegulatorExamination)",
+            "BY DESIGN — as save; copyMutable copies status / closedAt because they are ordinary "
+            + "tracking fields, and never copies organisationId (existing is loaded tenant-scoped)"),
+        Map.entry("SustainabilityEvidenceController#create(SustainabilityEvidence)",
+            "CLOSED SEC-ESG-003 — create forces approvalStatus=PENDING_REVIEW and scrubs "
+            + "approvedBy / approvedAt / reviewerName / reviewedAt / rejectionReason and the audit "
+            + "columns; org is set from TenantContext"),
+        Map.entry("SustainabilityEvidenceController#update(SustainabilityEvidence)",
+            "INERT — the update whitelist copies data and external-assurance metadata and never "
+            + "approvalStatus / reviewerName / reviewedAt (approve() and reject() own those); org is "
+            + "never copied and cur is loaded tenant-scoped"),
+        Map.entry("SustainabilityEvidenceController#supersede(SustainabilityEvidence)",
+            "CLOSED SEC-ESG-003 — supersede delegates to create(), which scrubs the whole "
+            + "approval / attribution set, so the replacement row is born PENDING_REVIEW"),
+        Map.entry("BcpPlanController#update(BcpPlan)",
+            "INERT F2-330 — update guards status with requireUnchanged (an echo is tolerated, a "
+            + "change goes to transition()) and its whitelist never copies lastAttestedAt / "
+            + "publishedAt (F2-330 scrubbed those on create); organisationId is never copied"),
+        Map.entry("CorrectiveActionController#update(CorrectiveAction)",
+            "INERT — the update whitelist omits status and closedAt (transition() owns them, "
+            + "stamping closedAt on CLOSED / CANCELLED) and refuses editing a CLOSED / CANCELLED row; "
+            + "org is loaded tenant-scoped")
     );
 
     /** Field names that decide tenancy, state or authority — never a caller's to set. */
