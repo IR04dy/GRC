@@ -46,8 +46,21 @@ class OffRequestAuditTenancyTest {
         Paths.get("src", "main", "java", "com", "tss", "grc", "module");
 
     private static final Pattern COMMENTS = Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
-    private static final Pattern AUDIT =
-        Pattern.compile("\\b(?:audit|auditLog|auditService|auditLogService)\\.(?:log|recordEvent)\\s*\\(");
+    private static final Pattern AUDIT = Pattern.compile(
+        "\\b(?:audit|auditLog|auditService|auditLogService)\\.(?:log|logSystem|recordEvent)\\s*\\(");
+
+    /**
+     * ⚠⚠ F2-320 — declaring the event org-less is the OTHER correct answer, so the invariant accepts
+     * it. {@code logSystem(...)} / {@code systemEvent()} say "this belongs to no tenant", which is
+     * true of exactly one writer today.
+     *
+     * <p>🔑 This turned an exemption into a property: {@code DbSizeMonitorJob} used to need a named
+     * entry in {@link #NOT_THIS_DEFECT} and now passes on its own merits. <b>An exemption is a weaker
+     * artefact than a property</b> ([[F2-205]]) — it asserts that somebody read the file once, where
+     * this asserts what the file does.
+     */
+    private static final Pattern DECLARES_ORG_LESS =
+        Pattern.compile("\\.logSystem\\s*\\(|\\.systemEvent\\s*\\(");
     /**
      * ⚠⚠ A <b>real</b> anchor, not a restore.
      *
@@ -105,11 +118,11 @@ class OffRequestAuditTenancyTest {
             "Same shape as the CrowdStrike poller: reads the tenant, refuses when absent. A scan for "
             + "setCurrentTenant cannot distinguish consulting the tenant from ignoring it, which is "
             + "why both needed reading rather than a pattern.");
-        put("DbSizeMonitorJob.java",
-            "GENUINELY org-less. It audits the size of the database itself — entityType Database, "
-            + "null entity id — so there is no tenant it could belong to, and the tenant-1 fallback is "
-            + "the intended behaviour for a system event rather than an accident. Anchoring a tenant "
-            + "here would invent one.");
+        // ⚠ DbSizeMonitorJob USED to be here, exempted as "genuinely org-less". F2-320 gave it a
+        // way to say so — audit.logSystem(...) — so it now satisfies the invariant on its own merits
+        // and needs no entry. 🔑 An exemption asserts that somebody read the file once; a property
+        // asserts what the file does. When a fix lets an exemption become a property, delete the
+        // exemption rather than keeping both (F2-205).
     }};
 
     private static String strip(String s) {
@@ -153,7 +166,7 @@ class OffRequestAuditTenancyTest {
                 if (NOT_THIS_DEFECT.containsKey(file)) {
                     continue;
                 }
-                if (!ANCHOR.matcher(src).find()) {
+                if (!ANCHOR.matcher(src).find() && !DECLARES_ORG_LESS.matcher(src).find()) {
                     unanchored.add(file);
                 }
             }
@@ -252,7 +265,7 @@ class OffRequestAuditTenancyTest {
             .map(Map.Entry::getKey)
             .toList();
         assertThat(thin).as("""
-            An exclusion reason is a bare label. Two of these three refuse rather than mis-attribute             and one is genuinely org-less — the distinction is the whole content.""").isEmpty();
+            An exclusion reason is a bare label. Both remaining entries REFUSE rather than mis-attribute, which the invariant cannot express structurally — that is the whole content, and it is why they are exemptions where DbSizeMonitorJob is now a property.""").isEmpty();
     }
 
     /**
@@ -273,5 +286,104 @@ class OffRequestAuditTenancyTest {
             means F2-317's and F2-318's fixes now guard a hazard that fails loudly instead — re-read \
             the legs above rather than leaving them asserting the old mechanism.""")
             .isTrue();
+    }
+
+    // ── F2-320: the fallback is opt-in, and silence is what changed ─────────────────────────────
+
+    /**
+     * ⚠⚠ F2-320 — the tenant-1 fallback is right for exactly one caller and was silently wrong for
+     * four, so it now announces itself unless the caller declares a system event.
+     *
+     * <p>🔑 <b>The row is written either way, so a leg asserting the row proves nothing.</b> The
+     * warning is the whole deliverable — so this constructs the real service over mocks, invokes
+     * {@code recordEvent}, and reads a Logback appender.
+     *
+     * <p>⚠ My first version of this leg attached an appender it never read and asserted through a
+     * helper that <b>reimplemented the condition</b>, so it proved the helper agreed with itself —
+     * the defect this register keeps recording, inside the leg meant to observe a warning. Replaced
+     * rather than patched.
+     *
+     * <p>⚠ A WARN rather than a throw, deliberately: off-request audit paths cannot be enumerated
+     * statically (listener registration, reflection, SpEL), so refusing would risk breaking a path
+     * nobody has seen ([[F2-214]]).
+     */
+    @Test
+    @DisplayName("F2-320: an audit write with no tenant warns, and a declared system event does not")
+    void anUnanchoredAuditWriteAnnouncesItselfAndADeclaredOneDoesNot() {
+        var repo = org.mockito.Mockito.mock(
+            com.tss.grc.module.platform.auditlog.repository.AuditLogRepository.class);
+        org.mockito.Mockito.when(repo.save(org.mockito.ArgumentMatchers.any()))
+            .thenAnswer(i -> i.getArgument(0));
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<jakarta.servlet.http.HttpServletRequest>
+            noRequest = org.mockito.Mockito.mock(
+                org.springframework.beans.factory.ObjectProvider.class);
+        var service = new com.tss.grc.module.platform.auditlog.service.AuditLogService(
+            repo, noRequest);
+
+        ch.qos.logback.classic.Logger auditLogger = (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(
+                com.tss.grc.module.platform.auditlog.service.AuditLogService.class);
+        var appender = new ch.qos.logback.core.read.ListAppender
+            <ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        auditLogger.addAppender(appender);
+        try {
+            com.tss.grc.common.tenant.TenantContext.clear();
+
+            service.recordEvent(new com.tss.grc.module.platform.auditlog.service.AuditLogService
+                .AuditEventBuilder().actionType("PROBE_UNANCHORED").sourceModule("test")
+                .message("probe"));
+            assertThat(appender.list.stream()
+                    .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN)
+                    .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .toList()).as("""
+                An audit write with no tenant produced no warning, so a row filed under organisation                 1 by mistake stays indistinguishable from one filed there on purpose — which is how                 F2-317, F2-318 and F2-319 each stayed invisible.""")
+                .anyMatch(m -> m.contains("PROBE_UNANCHORED") && m.contains("systemEvent"));
+
+            appender.list.clear();
+            service.recordEvent(new com.tss.grc.module.platform.auditlog.service.AuditLogService
+                .AuditEventBuilder().actionType("PROBE_SYSTEM").sourceModule("test")
+                .systemEvent().message("probe"));
+            assertThat(appender.list).as("""
+                A caller that declared systemEvent() still warned. The one legitimate caller                 (DbSizeMonitorJob, auditing the database itself) would then be noise — and noise is                 how a warning stops being read.""")
+                .isEmpty();
+
+            // and with a tenant set, neither warns
+            appender.list.clear();
+            com.tss.grc.common.tenant.TenantContext.setCurrentTenant(4L);
+            var saved = service.recordEvent(new com.tss.grc.module.platform.auditlog.service
+                .AuditLogService.AuditEventBuilder().actionType("PROBE_ANCHORED")
+                .sourceModule("test").message("probe"));
+            assertThat(appender.list).as("an anchored write must be silent").isEmpty();
+            assertThat(saved.getOrganisationId()).as("and must carry the anchored tenant")
+                .isEqualTo(4L);
+        } finally {
+            auditLogger.detachAppender(appender);
+            com.tss.grc.common.tenant.TenantContext.clear();
+        }
+    }
+
+    /**
+     * ⚠ The structural half, because {@link #warnsFor} reimplements the condition and would keep
+     * passing if {@code recordEvent} stopped consulting it — [[F2-274]]'s rule that a leg exercising a
+     * primitive says nothing about whether the code under review calls it.
+     */
+    @Test
+    @DisplayName("F2-320: recordEvent consults the opt-in, and the one declared caller declares it")
+    void theOptInIsConsultedAndItsOneLegitimateCallerUsesIt() throws IOException {
+        Path service = Paths.get("src", "main", "java", "com", "tss", "grc", "module", "platform",
+                                 "auditlog", "service", "AuditLogService.java");
+        String src = strip(Files.readString(service, StandardCharsets.UTF_8));
+        assertThat(src).as("""
+            recordEvent no longer guards the fallback on the opt-in, so either every write warns or             none does. The condition is `org == null && !b.systemEvent` and both halves matter.""")
+            .contains("org == null && !b.systemEvent")
+            .contains("log.warn");
+
+        Path job = Paths.get("src", "main", "java", "com", "tss", "grc", "module", "platform",
+                             "health", "DbSizeMonitorJob.java");
+        assertThat(strip(Files.readString(job, StandardCharsets.UTF_8))).as("""
+            The one genuinely org-less writer stopped declaring itself, so it is now indistinguishable             from the four that were defects — which is the distinction F2-320 exists to make.""")
+            .contains("audit.logSystem(");
     }
 }

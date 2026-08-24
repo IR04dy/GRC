@@ -178,7 +178,11 @@ public class DbSizeMonitorJob {
         }
 
         try {
-            audit.log(AUDIT_TYPE_PREFIX + sev.name(), "Database", null, msg);
+            // F2-320 — declared org-less: this audits the size of the database itself, so there is
+            // no tenant it could belong to and organisation 1 is intended rather than a lost
+            // TenantContext. Four off-request writers looked identical from AuditLogService and were
+            // defects (F2-317/318/319), which is why the distinction is stated at the call site.
+            audit.logSystem(AUDIT_TYPE_PREFIX + sev.name(), "Database", null, msg);
         } catch (Exception auditEx) {
             // Audit failures must not stop the alert pathway — log and continue.
             log.warn("[db-size] audit log write failed: {}", auditEx.getMessage());
