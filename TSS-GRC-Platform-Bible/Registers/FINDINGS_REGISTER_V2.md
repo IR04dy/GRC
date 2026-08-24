@@ -15219,6 +15219,65 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-322 — the per-org catch was a decoy, and fixing it is structural rather than a wrapper
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a resilience control that read as working and discarded every tenant's work on any tenant's failure. Ungated and hourly. |
+| **Registers** | `iam.user_roles` (time-bound revocation), `platform.audit_log` |
+| **Standards** | NCA ECC 2-2 / SAMA CSF 3.3.5 (access governance) |
+| **Found by** | Executing [[F2-317]]'s filing — it recorded this and declined to fix it, correctly |
+| **Verification** | mutations **3/3 killed**; suite **4726 → 4727/0/0** |
+
+### Why F2-317 filed it instead of fixing it
+
+`audit.log` is `@Transactional` and **joins** the caller's transaction. With `scheduledExpirySweep`
+itself `@Transactional`, a failure on one organisation marked the batch-wide transaction
+rollback-only, so **every** organisation's work was discarded at commit — while the per-org
+`catch (RuntimeException)` made the method read as resilient. 🔑 **The catch created the appearance of
+resilience while changing nothing**, and removing that appearance needs a transaction boundary, not a
+wrapper.
+
+⚙ This sweep is `@Scheduled(PT1H)` and **ungated**, so it runs hourly in every environment — which is
+why it is the member worth fixing.
+
+### The idiom was already in the tree, including in a scheduler
+
+Five files use `TransactionTemplate` with `PROPAGATION_REQUIRES_NEW`, one of them
+`EmergencyRatificationSlaScheduler`. The sweep is no longer `@Transactional` and each organisation's
+work runs inside `inNewTransaction(...)`.
+
+### ⚠⚠ The isolation is not unit-observable, and the leg says so
+
+`inNewTransaction` runs **inline** when `txManager` is null — the case for a directly-constructed
+service — so in a unit test the boundary does not exist and a failure propagates exactly as before.
+That precedent's own javadoc records the same trap in the same words: *"the inline path is why the six
+unit tests could not catch the missing transaction."*
+
+🔑 **A leg that cannot see the thing it is named for is worse than one that says so.** The two halves
+are testable to different depths:
+
+| | observable inline? |
+|---|---|
+| control flow — one org's failure does not stop the loop | **yes** (the catch runs either way) |
+| isolation — the other orgs' committed work survives | **no** — structural only |
+
+### RiskReviewService is re-filed rather than swept in
+
+Its scheduler is **off by default**, and its `flag` has **two callers whose atomicity requirements
+differ**: the controller path wants one atomic result, the sweep wants per-row isolation. Splitting it
+is a design decision, and threading a flag through a shared helper is the shape [[F2-306]] warned
+against.
+
+### Filed
+
+* `RiskReviewService.flag` per-row isolation, with the two-caller tension stated.
+* The other looping sweeps were measured at **0 of 33** missing a per-item catch ([[F2-317]]) — but
+  that measurement counted the *catch*, not whether the catch means anything. 🔑 **The same question
+  asked of the transaction boundary rather than the catch is a different census, and it has not been
+  run.**
+
 ## F2-321 — my own warning would have named nothing, for 92% of its callers
 
 | | |

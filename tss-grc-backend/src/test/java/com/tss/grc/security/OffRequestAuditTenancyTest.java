@@ -42,6 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class OffRequestAuditTenancyTest {
 
+    private static final String EOL = System.lineSeparator();
+
     private static final Path MODULE =
         Paths.get("src", "main", "java", "com", "tss", "grc", "module");
 
@@ -397,5 +399,56 @@ class OffRequestAuditTenancyTest {
         assertThat(strip(Files.readString(job, StandardCharsets.UTF_8))).as("""
             The one genuinely org-less writer stopped declaring itself, so it is now indistinguishable             from the four that were defects — which is the distinction F2-320 exists to make.""")
             .contains("audit.logSystem(");
+    }
+
+    // ── F2-322: the per-org catch means something now ────────────────────────────────────────────
+
+    /**
+     * ⚠⚠ F2-322 — the hourly IAM expiry sweep gets a transaction <b>per organisation</b>, which is what
+     * makes its per-org catch mean anything.
+     *
+     * <p>It used to be {@code @Transactional}, so {@code audit} joined one batch-wide transaction: a
+     * failure on one tenant marked it rollback-only and <b>every</b> organisation's work was discarded
+     * at commit, while the catch made the method read as resilient. [[F2-317]] recorded that and
+     * declined to fix it because the change is structural rather than a wrapper.
+     *
+     * <p>⚠⚠ <b>This leg is structural because the behavioural half is not observable in a unit test.</b>
+     * {@code inNewTransaction} runs <em>inline</em> when {@code txManager} is null, which is the case
+     * for a directly-constructed service — so the boundary does not exist and a failure propagates
+     * exactly as before. {@code EmergencyRatificationSlaScheduler}'s wrapper records the same trap in
+     * the same words: <em>"the inline path is why the six unit tests could not catch the missing
+     * transaction."</em> 🔑 <b>A leg that cannot see the thing it is named for is worse than one that
+     * says so.</b>
+     */
+    @Test
+    @DisplayName("F2-322: the expiry sweep is not batch-transactional and isolates each organisation")
+    void theExpirySweepIsolatesEachOrganisation() throws IOException {
+        Path svc = Paths.get("src", "main", "java", "com", "tss", "grc", "module", "iam",
+                             "governance", "service", "AccessRequestService.java");
+        String all = strip(Files.readString(svc, StandardCharsets.UTF_8));
+
+        int at = all.indexOf("public void scheduledExpirySweep()");
+        assertThat(at).as("scheduledExpirySweep not found — the gate is reading the wrong file")
+            .isGreaterThanOrEqualTo(0);
+
+        // the annotations immediately above the method
+        String annotations = all.substring(Math.max(0, at - 260), at);
+        assertThat(annotations).as("""
+            The sweep is @Transactional again, so every organisation shares one transaction: a             failure on any of them discards all of their work at commit, and the per-org catch below             becomes decoration.""")
+            .contains("@Scheduled")
+            .doesNotContain("@Transactional");
+
+        int end = all.indexOf(EOL + "    }", at);
+        String body = all.substring(at, end < 0 ? all.length() : end);
+        assertThat(body).as("""
+            The sweep no longer opens a transaction per organisation, so nothing isolates one             tenant's failure from the rest.""")
+            .contains("inNewTransaction(")
+            .contains("catch (RuntimeException");
+
+        // and the wrapper must tolerate an absent manager, or every unit test of this class breaks
+        String wrapper = all.substring(all.indexOf("private <T> T inNewTransaction"));
+        assertThat(wrapper.substring(0, Math.min(400, wrapper.length()))).as("""
+            inNewTransaction no longer tolerates a null transaction manager. That is what lets a             directly-constructed unit test run at all — and the reason the isolation itself cannot             be asserted here.""")
+            .contains("txManager == null");
     }
 }

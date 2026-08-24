@@ -178,8 +178,21 @@ public class AccessRequestService {
             });
     }
 
-    /** New-transaction wrapper for the post-commit native stamp. */
+    /**
+     * New-transaction wrapper: for the post-commit native stamp, and (F2-322) for each organisation
+     * of the expiry sweep, so one tenant's failure cannot discard the others' work.
+     *
+     * <p>⚠⚠ F2-322 — it runs <b>inline</b> when no transaction manager is present, which is the case
+     * in a directly-constructed unit test. So <b>no unit test can verify the isolation this provides</b>:
+     * with a null {@code txManager} the boundary does not exist and a failure propagates exactly as it
+     * did before. {@code EmergencyRatificationSlaScheduler}'s own wrapper records the same trap in the
+     * same words — <em>"the inline path is why the six unit tests could not catch the missing
+     * transaction"</em> — which is why F2-322's legs are structural and say so.
+     */
     private <T> T inNewTransaction(java.util.function.Supplier<T> work) {
+        if (txManager == null) {
+            return work.get();
+        }
         var tt = new org.springframework.transaction.support.TransactionTemplate(txManager);
         tt.setPropagationBehavior(
             org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -286,7 +299,6 @@ public class AccessRequestService {
     /** Hourly expiry sweep + manual trigger. Off-request-safe (audit guards internally).
      *  V294: per-org so each tenant's IAM_LEAD gets the revocation notification. */
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT10M")
-    @Transactional
     public void scheduledExpirySweep() {
         // ⚠⚠ F2-318 — the tenant is anchored per organisation before anything is audited.
         // `AuditLogService.recordEvent` does `org != null ? org : 1L` ("fall back to tenant 1 for
@@ -310,13 +322,24 @@ public class AccessRequestService {
             for (Long org : requests.distinctOrganisationIds()) {
                 try {
                     TenantContext.setCurrentTenant(org);
-                    int n = requests.expireAssignmentsForOrg(org);
-                    if (n > 0) {
-                        audit.recordEvent(new AuditEventBuilder()
-                            .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
-                            .message("Expiry sweep removed " + n + " time-bound assignment(s) (org " + org + ")"));
-                        notifyExpiry(org, n);
-                    }
+                    // ⚠⚠ F2-322 — each organisation gets its OWN transaction, which is what makes the
+                    // catch below mean anything. This method used to be @Transactional, so `audit`
+                    // joined one batch-wide transaction: a failure on org 2 marked it rollback-only
+                    // and every organisation's work was discarded at commit, while the catch made it
+                    // read as resilient. 🔑 F2-317 recorded that and declined to fix it because the
+                    // change is structural, not a wrapper — this is that change.
+                    inNewTransaction(() -> {
+                        int n = requests.expireAssignmentsForOrg(org);
+                        if (n > 0) {
+                            audit.recordEvent(new AuditEventBuilder()
+                                .actionType("ACCESS_REVOKE").sourceModule("IAM")
+                                .entityType("UserRoleAssignment")
+                                .message("Expiry sweep removed " + n
+                                         + " time-bound assignment(s) (org " + org + ")"));
+                            notifyExpiry(org, n);
+                        }
+                        return n;
+                    });
                 } catch (RuntimeException e) {
                     log.warn("access expiry sweep failed for org {}: {}", org, e.getMessage());
                 }
