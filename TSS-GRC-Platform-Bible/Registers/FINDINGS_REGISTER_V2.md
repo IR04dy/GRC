@@ -15219,6 +15219,63 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-328 — a vulnerability exception could be created born-APPROVED with a forged approval date
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — `CyberController#saveException` binds the `VulnException` entity, so a `CYBER:WRITE` holder could `POST /api/v1/cyber/exceptions` with `workflowStatus=APPROVED` and a `approvedAt` of their choosing → a formal NCA ECC risk-acceptance **born APPROVED from a single POST, skipping `approveException`** (the sole writer of the real approval date). No privilege escalation — all four exception routes are `CYBER:WRITE`, so the caller could approve legitimately; this is a control-integrity / attribution defect (a fabricated approval), not a permission bypass. |
+| **Registers** | `cyber.vuln_exceptions` |
+| **Standards** | NCA ECC (vulnerability risk-acceptance); the approve action as a distinct, dated step |
+| **Found by** | the `mass-assignment-risk.txt` NEEDS-VERDICT backlog ([[F2-218]] invited continuing it) — `CyberController#saveException(VulnException) :: approverName,workflowStatus`, read against the service. |
+| **Verification** | unit tests (a born-APPROVED create is refused; a REQUESTED create scrubs `approvedAt`); full hermetic build 4742 → 4744/0/0. No live probe: a synchronous input-guard (`if APPROVED throw` → 400 via the ubiquitous `IllegalArgumentException` path) with no database / tenant / auth dimension a mock cannot see, proportionate per the calibrated standard of [[F2-325]]/[[F2-326]]/[[F2-327]]. |
+
+### The bypass
+
+`approveException` is the dedicated approval route: it sets `workflowStatus = "APPROVED"` and stamps
+`approvedAt = LocalDate.now()`. But `saveException` (the create) set only `titleEn`/`organisationId`/
+`isDeleted` and then `exceptionRepo.save(e)` — persisting the caller's bound `workflowStatus` and
+`approvedAt` unscrubbed. So a single `POST` could create a risk-acceptance already `APPROVED`, dated
+whenever the caller liked, having gone through no approval action. `approveException` is where the
+approval date is minted; a create that reaches `APPROVED` mints a fabricated one.
+
+### 🔑 The lifecycle is undesigned, so the clean primitives are too strong
+
+`VulnException.workflowStatus` has **no CHECK constraint, no declared state machine**, and five
+informal states in the FE dropdown (`REQUESTED → IMPACT_ASSESSMENT → COMPENSATING_CONTROLS → APPROVED
+→ EXPIRED`) — yet the only backend transition is `approveException`'s slam to `APPROVED`. The
+intermediate review states are reachable **only** through the edit form's status dropdown, which is
+the informal (if undesigned) advancement path. So `ServerOwnedState.requireInitial` (force REQUESTED
+only) and `requireUnchanged` (refuse every change) are both too strong — they would refuse a
+legitimate create-at-review-state or a review-stage advance, breaking a working screen ([[F2-214]]).
+The unambiguous invariant is narrower: **`APPROVED` is reachable only via `approveException`, which
+owns `approvedAt`.**
+
+### The fix
+
+`saveException` refuses `workflowStatus == "APPROVED"` on create (a 400 naming
+`POST /api/v1/cyber/exceptions/{id}/approve`) and scrubs `approvedAt = null` — so the approval date is
+the approve path's alone ([[F2-213]] established that for the update path and left the create). The
+intermediate states stay caller-settable (the undesigned lifecycle is not this slice's to redesign).
+`equalsIgnoreCase` is null-safe, so an omitted status still defaults to the entity's `REQUESTED`
+initialiser. Two unit tests: a born-APPROVED create is refused; a REQUESTED create scrubs `approvedAt`.
+
+### Filed (the entangled rest — [[F2-221]]/[[F2-236]] owner-decisions, not this slice)
+
+- **The update path is the same bypass, one route over.** `applyEditable` sets `workflowStatus` from
+  the request, so an edit can jump `REQUESTED → APPROVED` (skipping `approveException`). Closing it
+  correctly needs the entity initialiser removed (an omitted status on the entity-bound `PUT` else
+  deserialises to `REQUESTED` and reads as a false change — [[F2-237]]/[[F2-250]]) **and** a real
+  state machine to tell a legal review-stage advance from the illegal approval jump. That machine
+  does not exist; declaring it (states, transitions, a CHECK) is [[F2-221]]'s owner-decision.
+- **`approveException` does not stamp the approver.** It sets `workflowStatus`+`approvedAt` but never
+  `approverName`, so the approver of a risk-acceptance is always caller-supplied (via create/edit),
+  never verified against the approving principal — [[F2-236]]'s attribution gap. Fixing it means
+  deciding `approverName` is stamped at approval, a design choice.
+- The `mass-assignment-risk.txt` row for `saveException`/`updateException` stays NEEDS-VERDICT because
+  its `approverName` half is the attribution gap above; only the `workflowStatus`/`approvedAt` create
+  half is closed here.
+
 ## F2-327 — a realtime subscription that re-renders a cache instead of re-fetching is inert for cross-user updates
 
 | | |
