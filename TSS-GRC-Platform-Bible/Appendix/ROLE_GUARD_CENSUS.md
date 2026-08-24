@@ -112,6 +112,48 @@ through it, which is why the count below can be trusted when it reads zero.
 
 None.
 
+## F. Permission guards no active user can satisfy (F2-313)
+
+Every section above is about **role** guards, because that is what this report was built
+to track. `hasPermission` is F2-05's ratified **destination**, and the question B2b puts to
+a role guard — *can anybody satisfy this today?* — had never been put to a permission one.
+So the census measuring the conversion backlog was blind to the half it converts into.
+
+A `hasPermission` guard gets **no** `PLATFORM_ADMIN` bypass from the evaluator's own
+logic — the bypass is in code, ahead of it — so a pair with no active holder leaves its
+routes reachable by a platform administrator and nobody else, exactly as B2b describes.
+
+⚠ Read this section against the database named at the top. A pair unheld here may be held
+on the deployed server and vice versa (F2-259).
+
+Sorted by the number of routes each pair guards, because they are **not** of equal
+weight: a pair guarding one endpoint is a feature nobody can use, and one guarding a
+module's whole surface closes every screen in it.
+
+| Pair cited by a guard | Guarded routes | Granted to | Active holders |
+|---|---|---|---|
+| `PLATFORM:WRITE` | 16 | `ORG_ADMIN` | **0** |
+| `PLATFORM:READ` | 12 | `ORG_ADMIN` | **0** |
+| `CHANGE:DELETE` | 4 | `ORG_ADMIN` | **0** |
+| `AML:REFRESH_LISTS` | 1 | `AML_OFFICER` | **0** |
+| `CPTY:APPROVE` | 1 | `CFO` | **0** |
+| `PLATFORM:EXPORT` | 1 | `ORG_ADMIN` | **0** |
+| `REPORTING:DELETE` | 1 | `ORG_ADMIN` | **0** |
+
+**7 of 131 cited pairs, closing 36 routes.**
+
+There are two kinds and only one needs a jar. Present here:
+
+* **7 granted to a role that exists and is seated in nobody.** An administrator
+  can assign it without a new jar — a **remedy, not a defence** (F2-253): as
+  shipped and as seeded, the persona the feature was built for cannot use it.
+  F2-282 settled the fix for this kind — **seat the role, do not widen the
+  grant**, because a grant to a different job family is wider than the shipped
+  guard's own audience.
+* **None granted to no role at all** — so nothing here needs a migration, and
+  F2-260's `RRP` case is genuinely absent rather than merely unlisted.
+
+
 ## D. Conversion backlog by module
 
 F2-05 is sized S per module. Order by count, but read section B first: a module carrying
@@ -158,15 +200,15 @@ permission as an actual grant row — which is a different question from the one
 
 | Module | Guard site | Authority | Catalogued | Role holders | PLATFORM_ADMIN holds it |
 |---|---|---|---|---|---|
-| `module.dashboard` | `DashboardController#kpiTrend` | `RISK_READ` | yes | 20 | **no** |
-| `module.dashboard` | `DashboardController#kpiTrend` | `INCIDENT_READ` | yes | 29 | **no** |
+| `module.dashboard` | `DashboardController#kpiTrend` | `BCM_READ` | yes | 17 | yes |
 | `module.dashboard` | `DashboardController#kpiTrend` | `COMPLIANCE_READ` | yes | 32 | yes |
 | `module.dashboard` | `DashboardController#kpiTrend` | `CYBER_READ` | yes | 19 | yes |
+| `module.dashboard` | `DashboardController#kpiTrend` | `INCIDENT_READ` | yes | 29 | **no** |
 | `module.dashboard` | `DashboardController#kpiTrend` | `PRIVACY_READ` | yes | 8 | **no** |
+| `module.dashboard` | `DashboardController#kpiTrend` | `RISK_READ` | yes | 20 | **no** |
 | `module.dashboard` | `DashboardController#kpiTrend` | `SCM_READ` | yes | 12 | yes |
-| `module.dashboard` | `DashboardController#kpiTrend` | `BCM_READ` | yes | 17 | yes |
-| `module.dashboard` | `DashboardController#stats` | `RISK_READ` | yes | 20 | **no** |
-| `module.dashboard` | `DashboardController#stats` | `INCIDENT_READ` | yes | 29 | **no** |
 | `module.dashboard` | `DashboardController#stats` | `COMPLIANCE_READ` | yes | 32 | yes |
 | `module.dashboard` | `DashboardController#stats` | `CYBER_READ` | yes | 19 | yes |
+| `module.dashboard` | `DashboardController#stats` | `INCIDENT_READ` | yes | 29 | **no** |
+| `module.dashboard` | `DashboardController#stats` | `RISK_READ` | yes | 20 | **no** |
 
