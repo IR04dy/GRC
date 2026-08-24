@@ -15219,6 +15219,39 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-333 — a save could forge ThreatIntel's SOC-E actioned-ledger summary with no ledger row
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — `ThreatIntelService.copyMutable` (the explicit-update branch of `save`) copied `actioned` / `actionedAt` / `actionedByUserId` / `actionNotes` from the request, and the create path (`orElseGet`) saved the request entity directly. Those four columns are the **denormalised summary** of the append-only `threat_intel_action` ledger, written by exactly one route — `actionIoc()` (POST /{id}/action), which APPENDS an immutable `ThreatIntelAction` row (stamping `actionedByUserId` from `CurrentActor`, `actionedAt` from the clock) BEFORE flipping the parent summary and audits `TI_ACTIONED`; the entity's own comment says *"the full history lives in threat_intel_action."* So a caller could `POST`/`PUT` a `ThreatIntel` marked *actioned by X at T* with **no ledger row and no `TI_ACTIONED` audit** — falsifying the SOC-E record that a Saudi-CERT / NCA / MISP advisory was handled — or flip `actioned` back to `false` to hide that an IOC was handled. It is also a **privilege boundary** ([[F2-330]]): `save` admits `TI_INGEST` (a feed-ingestion role) that `/action` does not, so an ingest caller lacking `SECURITY_ANALYST` could mint a forged actioned-by-analyst record. [[F2-331]]/[[F2-332]]'s ledger-pointer shape, one register over. |
+| **Registers** | `socops.threat_intel` · `socops.threat_intel_action` |
+| **Standards** | SOC-E IOC action record (NCA / Saudi-CERT threat-intel handling; the append-only `threat_intel_action` ledger + `TI_ACTIONED` audit as the record of that a bulletin was actioned, by whom, and against which asset/vuln/detection). |
+| **Found by** | reading the mass-assignment `NEEDS-VERDICT` work list. `ThreatIntelController#save`'s *flagged* fields (`organisationId`/`publishedAt`) were both benign; the forge was in fields the ratchet's authority vocabulary never spells, found by reading the service against `actionIoc()` — exactly as [[F2-331]]/[[F2-332]] were found by reading rather than by the scan flagging the field. |
+| **Verification** | two unit tests (`ThreatIntelServiceTest`): an explicit update carrying a forged summary leaves the loaded row's summary untouched and appends **no** ledger row (`verify(actions, never()).save(...)`); a create is born un-actioned, scrubbing a body-supplied summary. Full hermetic build **4752 → 4754/0/0**; `MassAssignmentRatchetTest` re-derived 8/8 with the surfaced-unadjudicated count = **19**. No live probe: a synchronous scrub, the permission boundary read from the two `@PreAuthorize` annotations ([[F2-325]]…[[F2-332]]'s standard); the FE has no threat-intel save/create client (it actions IOCs only via POST /{id}/action), so `save` is API/ingestion-only. |
+
+### The fix
+
+`save` has three paths. The **dedup-update** path (`.map(existing -> ...)`, when an advisory re-arrives on the same `(source, externalId)`) already copied a safe subset that never touched the summary. The **explicit-update** path (`copyMutable`) copied all four summary columns; it now copies none, so an update **preserves** whatever `actionIoc` last set on the loaded row (the [[F2-332]] scrub-on-update shape — stop copying, keep the ledger-derived value). The **create** path (`orElseGet`) saved the request entity directly; it now scrubs the four so a freshly ingested advisory is born un-actioned. The summary's only writer is `actionIoc`, which appends the immutable ledger row first.
+
+### Census reconciliation (F2-330's rule)
+
+A CEILING does not force the census update its own contract asks for, so closed/inert rows accumulate mislabelled `NEEDS-VERDICT` ([[F2-330]]). Hunting this forge read ten more rows, all already closed/inert/undesigned service-side; each was adjudicated against its service this slice ([[F2-188]]) and `BASELINE_UNADJUDICATED_NEW_CRIT` was re-derived **29 → 19** off the regenerated census (F2-207), never guessed:
+
+- `ThreatIntelController#save` — BY DESIGN (flagged fields) + this fix.
+- `DpiaController#addReview` — CLOSED F2-22b(vii): stamps `reviewerId`/`reviewerName` from `CurrentActor`, `decidedAt` from the clock; the call IS the review.
+- `DpiaController#addMitigation` — BY DESIGN F2-22b(vii): `status` caller-set (no verify endpoint, no state machine); `verifiedAt` a server-value ternary.
+- `RegulatorExaminationController#save` / `#update` — BY DESIGN: an undesigned SAMA/NCA examination tracking register (no dedicated transition route, no state machine); `status`/`closedAt` are milestone fields; org stamped from `TenantContext` / never in `copyMutable`.
+- `SustainabilityEvidenceController#create` / `#update` / `#supersede` — CLOSED SEC-ESG-003 (create scrubs the approval/attribution set) / INERT (update whitelist omits it) / CLOSED (supersede delegates to create).
+- `BcpPlanController#update` — INERT F2-330: `status` via `requireUnchanged`, `lastAttestedAt`/`publishedAt` never in the whitelist.
+- `CorrectiveActionController#update` — INERT: whitelist omits `status`/`closedAt` (`transition()`'s), refuses editing a CLOSED/CANCELLED row.
+
+`IrPlaybookController#save` was **left `NEEDS-VERDICT`** rather than over-reaching: it is the same undesigned-lifecycle shape (no dedicated review/attest route, `recordInvocation` a legacy shim) but was read less deeply than the ten, and a manufactured verdict is worse than an honest gap ([[F2-188]]).
+
+### Filed
+
+The threat-intel `save`/`/action` guards and this fix stand; not addressed here (owner-decisions / read-per-member): the remaining **19** `NEEDS-VERDICT` rows (read per member); whether `TI_INGEST` should reach `save` at all (it is an ingestion role, and its legitimate need is to create advisories, not to action them); and `IrPlaybook`'s undesigned review lifecycle (`status`/`lastReviewedBy` caller-set with no dedicated review route — designing one is a product decision).
+
 ## F2-332 — a PUT could move a forensics artefact's custody with no chain-of-custody ledger row
 
 | | |
