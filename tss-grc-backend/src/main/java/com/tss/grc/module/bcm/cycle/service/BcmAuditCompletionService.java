@@ -23,7 +23,7 @@ import java.util.*;
  *   <li><b>Tier-3 #18</b> — Management Review workflow (ISO 22301 §9.3)</li>
  *   <li><b>Tier-3 #21</b> — SIEM/SOAR inbound webhook handler</li>
  *   <li><b>Tier-4 #24</b> — SAMA OPRES summary (impact-tolerance posture)</li>
- *   <li><b>Tier-4 #29</b> — PDPL Article 23 breach-notification drafter</li>
+ *   <li><b>Tier-4 #29</b> — PDPL Article 20 breach-notification drafter</li>
  * </ul>
  *
  * <p>Kept in one service because each item is a thin orchestrator (≤ 3
@@ -243,10 +243,10 @@ public class BcmAuditCompletionService {
         Map<String, TierStats> tierBreakdown
     ) {}
 
-    // ─── Tier-4 #29: PDPL Article 23 notification draft ─────────
+    // ─── Tier-4 #29: PDPL Article 20 notification draft ─────────
 
     /**
-     * Stamp a crisis event with a PDPL Art. 23 notification draft. Caller
+     * Stamp a crisis event with a PDPL Art. 20 notification draft. Caller
      * passes the regulator reference number once filed. If
      * {@code personalDataAffected} is false on the event, the call refuses
      * — PDPL only applies when there's a personal-data breach.
@@ -258,7 +258,7 @@ public class BcmAuditCompletionService {
             .orElseThrow(() -> new EntityNotFoundException("Crisis event not found: " + crisisEventId));
         if (!Boolean.TRUE.equals(e.getPersonalDataAffected())) {
             throw new IllegalArgumentException(
-                "PDPL Art. 23 only applies when personalDataAffected=true on the crisis event.");
+                "PDPL Art. 20 only applies when personalDataAffected=true on the crisis event.");
         }
         e.setPdplNotificationDraftedAt(LocalDateTime.now());
         if (reference != null && !reference.isBlank()) {
@@ -266,7 +266,7 @@ public class BcmAuditCompletionService {
         }
         CrisisEvent saved = crisisEvents.save(e);
         audit.log("PDPL_DRAFTED", "CrisisEvent", saved.getId(),
-            "PDPL Art. 23 notification drafted for " + saved.getEventCode()
+            "PDPL Art. 20 notification drafted for " + saved.getEventCode()
                 + (reference == null ? "" : " (ref " + reference + ")"));
         eventPublisher.publishEvent(new DomainEvent(
             o, "BCM_PDPL_NOTIFICATION_DRAFTED", "CrisisEvent", saved.getId(), null,

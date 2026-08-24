@@ -231,7 +231,7 @@ export function BuyerGapPage() {
         </Card>
 
         {/* §5.4 Privacy — PDPL 72-hour */}
-        <Card title="§5.4 Privacy — PDPL Article 23 (72h)" Icon={AlertTriangle}>
+        <Card title="§5.4 Privacy — PDPL Article 20 (72h)" Icon={AlertTriangle}>
           <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             Personal-data breach notification window. Sweep computes
             <code> detection_time + 72h</code> for every personal-data crisis and

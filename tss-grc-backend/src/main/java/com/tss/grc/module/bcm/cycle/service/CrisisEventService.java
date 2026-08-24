@@ -123,7 +123,7 @@ public class CrisisEventService {
      * <p>Each row carries only the fields the thumb-sized card needs:
      * id / code / severity / status / openedAt / ownerUserId plus the
      * <b>shortest applicable regulatory deadline</b> across the SAMA-cyber
-     * (4h), SAMA-BCF (6h), NCA (24h), PDPL Art.23 (72h), and NCEMA (24h)
+     * (4h), SAMA-BCF (6h), NCA (24h), PDPL Art.20 (72h), and NCEMA (24h)
      * windows. Sort order:
      * <ol>
      *   <li>highest severity first</li>

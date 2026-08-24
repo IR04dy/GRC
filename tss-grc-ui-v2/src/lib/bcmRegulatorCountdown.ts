@@ -76,7 +76,7 @@ export function regulatorLabel(code: string, ar: boolean): string {
     SAMA_CYBER: ['SAMA Cyber',              'ساما — السيبراني'],
     SAMA_BCF:   ['SAMA BCF',                'ساما — استمرارية الأعمال'],
     NCA:        ['NCA',                     'الهيئة الوطنية للأمن السيبراني'],
-    SDAIA_PDPL: ['SDAIA PDPL Art.23',       'SDAIA — نظام حماية البيانات م.23'],
+    SDAIA_PDPL: ['SDAIA PDPL Art.20',       'SDAIA — نظام حماية البيانات م.20'],
     NCEMA:      ['NCEMA',                   'المركز الوطني لإدارة الطوارئ'],
     NRC:        ['NRC',                     'هيئة الرقابة النووية والإشعاعية'],
     CMA:        ['CMA',                     'هيئة السوق المالية'],

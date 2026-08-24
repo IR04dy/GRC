@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  *       <td>severity ≥ 3 (any operational disruption)</td></tr>
  *   <tr><td>NCA (ECC / OTCC)</td><td>24 hours</td>
  *       <td>cyber_related (any severity)</td></tr>
- *   <tr><td>SDAIA PDPL Art. 23</td><td>72 hours</td>
+ *   <tr><td>SDAIA PDPL Art. 20</td><td>72 hours</td>
  *       <td>personal_data_affected</td></tr>
  *   <tr><td>NCEMA</td><td>24 hours</td>
  *       <td>severity ≥ 4 (CRISIS or NATIONAL_EMERGENCY)</td></tr>
@@ -180,9 +180,9 @@ public class RegulatorCountdownService {
             out.add(new DeadlineSpec(NCA, 24, "NCA — cybersecurity incident notification"));
         }
 
-        // SDAIA PDPL Article 23 — 72h personal data breach
+        // SDAIA PDPL Article 20 — 72h personal data breach
         if (pdpl) {
-            out.add(new DeadlineSpec(SDAIA_PDPL, 72, "SDAIA PDPL Article 23 — personal data breach"));
+            out.add(new DeadlineSpec(SDAIA_PDPL, 72, "SDAIA PDPL Article 20 — personal data breach"));
         }
 
         // NCEMA — civil emergencies / national-impact disruptions
