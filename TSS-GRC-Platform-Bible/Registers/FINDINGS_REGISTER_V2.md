@@ -15219,6 +15219,59 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-321 — my own warning would have named nothing, for 92% of its callers
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — a diagnostic that looks informative and is not. Corrects [[F2-320]], shipped one slice earlier. |
+| **Registers** | `platform.audit_log` |
+| **Standards** | — |
+| **Found by** | Reading the **rows** rather than the code, after the chain was closed |
+| **Verification** | mutations **2/2 killed**; suite **4726/0/0** |
+
+### The measurement
+
+Of **3,809** off-request audit entries in dev, `source_module` is NULL on **3,524** — because the
+`log(...)` convenience method never sets it, and that is what almost every writer uses. So [[F2-320]]'s
+warning, which printed the action type and the source module, would have read *"module null"* for the
+majority of the population it exists to surface.
+
+🔑 **An artefact that looks informative and is not** — the shape this whole chain has been about, in my
+own fix. A warning naming nothing locatable is worse than none, because it looks like an answer and
+the reader stops.
+
+⚙ It names the **calling class** now, walked with `StackWalker` rather than a materialised
+`Throwable` trace, since this runs on every unanchored write. The leg asserts both that the class
+appears **and** that the message contains no `"null"`.
+
+### The blast radius, quantified from data
+
+| | dev | prod |
+|---|---|---|
+| off-request audit rows (`NO_PRINCIPAL`) | 3,809 | 762 |
+| of those, filed under organisation 1 | **3,786** | **762 — every one** |
+| written by the automation engine ([[F2-319]]) | 285 | 44 |
+
+### 🔑 And the sharpest justification for F2-320's shape was in the same method
+
+The actor half already **declared** its absence explicitly — `user_role_source = NO_PRINCIPAL`, 3,809
+rows — while the tenant half silently defaulted. **One method, two absent values, one declared and one
+defaulted.** [[F2-195]]'s shape at the tightest range in this chain, and it is why "make the fallback
+opt-in" was the right fix rather than an invention.
+
+### Refuted on the way
+
+Three dev rows name **organisation 5, which does not exist**. Checked: user 24 is deleted, **no** user
+names a nonexistent org, and prod has **none**. They are residue from a deleted probe tenant that the
+append-only trail correctly outlives ([[F2-281]]'s rule) — not a defect, recorded so nobody re-files it.
+
+### Filed
+
+* Nothing. Whether `log(...)` should set `sourceModule` is a separate question: 3,524 rows would gain
+  a module, which is a **data** improvement rather than a correctness one, and the warning no longer
+  depends on it.
+
 ## F2-320 — the fallback was right for one caller and silent for four, so it is opt-in now
 
 | | |
