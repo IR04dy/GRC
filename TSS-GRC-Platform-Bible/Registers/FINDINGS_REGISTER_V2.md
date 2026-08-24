@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-343 — the fraud dashboard's "Open Cases" headline counted a stale inclusion list, dropping the non-terminal outcome states
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a governance headline KPI wrong in the flattering direction, latent in data. `FraudService.dashboard()` reads `FraudCaseRepository.countOpenByOrg`, which counted `status IN ('DETECTED','TRIAGE','INVESTIGATING')`. That inclusion list had two faults: `'TRIAGE'` is a DEAD token (never persisted — `triage()` sets INVESTIGATING/FALSE_POSITIVE, and its own comment models triage as *"an intermediate state that closes immediately"*), proving the list was not derived from the machine; and it dropped the non-terminal outcome states CONFIRMED/CLEARED/FALSE_POSITIVE, each of which still transitions to CLOSED. So a CONFIRMED fraud case awaiting recovery / SAR filing — an emphatically open matter — read as NOT open, under-counting the SAMA fraud dashboard's "Open Cases" / "قضايا مفتوحة" headline. |
+| **Registers** | `fraud.fraud_case.status` — read by `FraudCaseRepository.countOpenByOrg`, rendered by `FraudDashboardPage`'s "Open Cases" KPI. |
+| **Standards** | SAMA fraud-management dashboard; the [[F2-196]] "open = complement of a declared terminal set, never a second inclusion list" family; [[F2-290]] (the same fix on the `ethics.cases` case register — a substantiated-but-not-closed case is open) and [[F2-341]] (the CAPA one). |
+| **Found by** | asking [[F2-196]]'s question of a financial-sector module not previously swept: is "open" the complement of the machine's terminal set, or an inclusion list that drops states? `countOpenByOrg`'s `{DETECTED, TRIAGE, INVESTIGATING}` was the sharpest — a list with a dead token, dropping three non-terminal states, on a dashboard headline. |
+| **Verification** | hermetic — `FraudOpenCountContractTest` reflects the machine constant and reads the repository source; no DB (the `@Query`'s row selection is SQL, only a live probe could count rows — [[F2-320]] / [[F2-325]]). Three legs: (A) the machine's terminal set, DERIVED from `ALLOWED_TRANSITIONS` (a status with no outgoing edge), is exactly `{CLOSED}`; (B) `countOpenByOrg`'s `@Query` excludes exactly that terminal set (`status <> 'CLOSED'`), never a bare inclusion list, and carries no dead token; plus a self-test that the query-extraction is non-vacuous. Pre-fix control ([[F2-274]] / [[F2-287]]): reverting the query to the old inclusion list turns the two query-dependent legs RED while the machine-only leg stays green; the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). |
+
+### Why the complement, and why "Investigating" being a separate tile settles it
+
+The fraud machine (`ALLOWED_TRANSITIONS`) has one terminal state: `CLOSED → {}`. Every other status — DETECTED, INVESTIGATING, CONFIRMED, CLEARED, FALSE_POSITIVE — has an outgoing edge, so all are non-terminal and, by the platform's ratified convention, open until CLOSED. The dashboard already shows a separate **"Investigating"** tile (`investigatingCount`), so "Open Cases" is meant to be the broader umbrella — but the old `{DETECTED, INVESTIGATING}` list made it barely broader than the Investigating tile, dropping every case that had reached an outcome (fraud confirmed, cleared, or ruled a false positive) but not yet been administratively closed. The complement (`status <> 'CLOSED'`) is what the label means and what the ethics register already does ([[F2-290]]).
+
+### Derive the terminal set; pin the @Query against it
+
+`TERMINAL_STATUSES` is derived from `ALLOWED_TRANSITIONS` (the states with an empty outgoing set), never a second typed list ([[F2-196]]). The `@Query` is a necessary second copy of the vocabulary (JPQL cannot reference the Java constant at runtime), so `FraudOpenCountContractTest` parses the query's excluded token and asserts it equals the derived terminal set — adding a terminal state to the machine fails the build until the query is updated ([[F2-299]]). The adjacent `confirmedLossYtd` query legitimately uses `status IN ('CONFIRMED','CLOSED')` — a distinct "confirmed loss" scope, not an "open" count ([[F2-290]]'s narrower-question exception), and the gate is scoped to `countOpenByOrg` so it is untouched.
+
 ## F2-342 — the access-governance evidence package dropped the DECIDER from its SoD and recertification sheets
 
 | | |
