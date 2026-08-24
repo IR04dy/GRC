@@ -15219,6 +15219,30 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-335 — a case-sensitive control branch skips the NDMO data-quality RED escalation for a lowercase band
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 (latent) — `DataGovernanceService.recordQualityRun` stored a caller-supplied RAG `band` verbatim and fired the `QUALITY_RUN_RED` escalation on a case-sensitive `"RED".equals(req.band())`, so a machine caller sending `band: "red"` skips the escalation the dashboard + automation engine react to. A SECOND reader — `DataOfficerQueryService#qRed30`, the "RED runs (30d)" dashboard KPI — filters `"RED".equals(r.getBand())`, so the same lowercase band also vanishes from the RED count. Reachable only through the API (no `@Pattern`, no CHECK), so latent ([[F2-182]]: reachability is a fact about today). |
+| **Registers** | `data_officer.quality_run.band` (NDMO data-governance quality runs) |
+| **Standards** | NDMO Data Governance (data-quality monitoring); the [[F2-179]] case-insensitive-collation family |
+| **Found by** | asking [[F2-179]]'s question of request-derived control branches (a value stored verbatim then compared case-sensitively to fire a control), narrowed from 389 raw candidates to the request-derived, upstream-ungated ones. |
+| **Verification** | hermetic Mockito unit test (`DataGovernanceServiceTest`, 4 legs) capturing the saved `QualityRun.band` and `verify(support).emit(...)` — the defect is pure Java logic (a case comparison + emit), fully visible to a mocked collaborator, with no DB / tenant / collation dimension, so no live probe ([[F2-320]]/[[F2-325]] calibration). Pre-fix control: 3 of 4 legs fail on the reverted service (the canonicalisation legs), including the load-bearing `lowercaseRed…andEscalates`. Full hermetic build **4758/0/0**. |
+
+### The fix
+
+Normalise the band on write — `String band = req.band() == null ? null : req.band().trim().toUpperCase(Locale.ROOT)` — and use it for both `run.setBand(band)` and `if ("RED".equals(band))`. This is [[F2-302]]'s rule: normalise on write so the stored value is canonical and BOTH readers (the escalation emit and the `qRed30` filter) agree, rather than `equalsIgnoreCase` at the emit site, which would leave the odd casing in the column and miss the dashboard filter. It is `coerce`, not `require` ([[F2-182]]): nothing upstream refuses a non-vocabulary band today (no coercion, no CHECK), so a 400 would break a working request; canonicalising refuses nothing and only RED escalates, correctly.
+
+### Why 389 raw candidates are not 389 defects
+
+A single-line grep for `"UPPER".equals(getX())` in services returns ~389 hits; a regex cannot tell a request-derived value from an entity-derived one ([[F2-182]]: reachability is a dataflow question). The defect bites only when the value comes from the REQUEST, is stored/acted-on with no upstream vocabulary gate, and the wrong branch skips a control. Two high-harm-looking candidates were read and REFUTED: `FraudService.setOutcome` runs `guardTransition(c.getStatus(), req.getOutcome())` FIRST — a machine check that refuses a non-vocabulary token ([[F2-179]]'s safe shape) — and `DrPlanService.recordTest` guards `if (!TEST_OUTCOMES.contains(req.outcome())) throw` on the line above the FAILED/GAP → CAPA escalation. Both are correct; both would read as defects to the naive grep because the guard is on a separate line from the `.equals`.
+
+### Filed
+
+- whether `band` should be server-DERIVED from `passPct` (a quality-rule threshold) rather than caller-supplied — an owner/product decision ([[F2-221]]: do not invent a machine), not this family's defect.
+- any existing non-canonical stored `band` rows — a one-time UPDATE needing a DB measurement in both databases + house rule 6 authorisation, not measurable this slice (no dev backend running); the normalise-on-write fix makes all NEW rows canonical.
+
 ## F2-334 — census reconciliation: eleven mass-assignment NEEDS-VERDICT rows adjudicated (19 → 8)
 
 | | |
