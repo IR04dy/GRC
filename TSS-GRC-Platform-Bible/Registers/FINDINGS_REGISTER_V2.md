@@ -15219,6 +15219,38 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-338 — After-Action Report title composed from a 500-char source into a 300-char column, with no cap: a long-but-legal crisis title 500s AAR generation
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 (latent in data, live in code) — `CrisisAarService.generate` composed the NCEMA / ISO 22301 After-Action Report title as `"After-Action Report — " + crisisEvent.getTitleEn()` (a 22-char fixed prefix plus the crisis title) and stored it in `bcm.crisis_aar.title_en`/`title_ar` (`NVARCHAR(300)`, `@Column(length = 300)`), with no cap on the composition. `bcm.crisis_events.title_en` is `NVARCHAR(500)` (V102 drops the V1 300-char table and re-creates it at 500; the entity is `@Column(length = 500)`), so a crisis with a legal title of 279–500 characters overflows the 300-char AAR column with a raw SQL 8152 → **500 on generating the After-Action Report**. Because the AAR title is server-composed there is no `@Valid`/`@Size` request boundary between the source and the store, so the overflow is a 500 rather than a 400 that names the field. F2-185b's length-budget family, one step out. Latent in data (no stored crisis title measured at that length this slice; no dev backend up) but live in code and reachable through ordinary use, so a latent-hazard closure that is live-reproducible given a long-but-legal crisis title ([[F2-283]]). |
+| **Registers** | `bcm.crisis_aar.title_en` / `title_ar` (NCEMA After-Action Report), composed from `bcm.crisis_events.title_en` / `title_ar` |
+| **Standards** | NCEMA after-action reporting; ISO 22301 §9.1 post-incident review; the [[F2-185b]] length-budget family (a cap must account for everything the code adds, not just the caller's field). |
+| **Found by** | applying [[F2-185b]]'s arithmetic to SERVER-composed strings rather than request `@Size` caps: where does a service store a value it composes (prefix + another entity's field) into a column narrower than the source it composes from? A sweep of `setX("literal" + …)` sites found `CrisisAarService` composing a 22-char prefix onto a 500-char-capable crisis title and storing it in a 300-char AAR column. |
+| **Verification** | hermetic Mockito `CrisisAarTitleLengthTest` (2 legs) drives `generate` with mocked repositories: (1) a crisis whose `title_en`/`title_ar` are at the source ceiling (500 chars, legal there) produces an AAR title that fits the target column — asserted `<= CrisisAar`'s own `@Column(length)` read by reflection, and `TITLE_MAX` asserted equal to that length so the service cap and the column cannot drift ([[F2-185b]] mirror); the fixed prefix survives the cap; (2) an ordinary short title is left intact with no ellipsis. Pure composition logic, fully visible to a mock — no DB / tenant / row_version / collation dimension — so verified hermetically ([[F2-320]]/[[F2-325]] calibration), no live probe. Pre-fix control ([[F2-274]]/[[F2-287]]): a surgical revert of only the two `cap(...)` wraps (keeping the helper so the test compiles, since it references `CrisisAarService.TITLE_MAX`) fails the long-title leg (`522 > 300`) while the short-title leg still passes; a wholesale revert would not compile, which would read as a gate that passed. Full hermetic build **4768/0/0**. |
+
+### The fix
+
+The AAR title is a governance record's title, composed and stored by the server — there is no request DTO, so [[F2-185b]]'s `RequestSizeCapMirrorTest` (which pins request `@Size` caps against `@Column(length)`) has nothing to see. The cap belongs on the composition:
+
+1. **Cap the composed string to the column length** — `cap("After-Action Report — " + safe(ce.getTitleEn()), TITLE_MAX)` and the same for `title_ar`, where `cap(s, max)` returns `s` when it fits and `s.substring(0, max - 1) + "…"` when it does not (the platform's established truncation semantics; the ellipsis is one BMP code unit, so the result is exactly `max` units — `NVARCHAR` and Java `String.length()` agree for BMP characters, and titles are text, not emoji).
+2. **`TITLE_MAX = 300` mirrors `@Column(length = 300)`** on `CrisisAar.titleEn`/`titleAr`, and the test asserts `TITLE_MAX == columnLen("titleEn") == columnLen("titleAr")` by reflection, so widening or narrowing the column without moving the constant fails the build and points at the constant.
+
+No canonical `common/` string-cap utility exists (checked), and the only other copy of this truncation is `ExerciseRunProjections.truncate`, a projection helper in the sibling `bcm.cycle.runtime` sub-package whose semantics are unrelated to AAR titles — so a small private helper here is the right shape, not [[F2-190]] duplication of a shared primitive.
+
+### Why the cap and not a wider column
+
+Widening `crisis_aar.title_en` to 522 would move the boundary rather than remove it — the prefix is fixed but the source column could itself be widened later, and a title is a title, not a body: an AAR whose title is a 500-character sentence is worse UX than a capped one with an ellipsis. Capping to the column is the same call [[F2-185b]] made (fix the arithmetic at the point the code adds length, do not chase the column). The `executive_summary_*`, `timeline_md_*` and the other narrative bodies are already `NVARCHAR(MAX)`, so only the two `title_*` columns are bounded and only they needed the cap.
+
+### Reachability
+
+`POST /api/v1/bcm/aars/generate/{crisisEventId}` → `CrisisAarService.generate` (guarded `hasPermission('BCM','WRITE')`), with a `lib/aar.ts` FE client (`api.post(.../generate/${crisisEventId})`) rendered from the crisis workspace — so the compose path is exercised end-to-end, not dark. The overflow fires on any crisis whose title runs 279 characters or more, which is legal in the source column and realistic for a descriptive crisis title (a multi-region outage sentence, say). State which you have ([[F2-283]]): the code defect is live and reproducible given such a title; whether any crisis title stored in dev or prod reaches that length today was not measured this slice (no dev backend up), so the closure is latent-in-data.
+
+### Filed
+
+- No migration and no CHECK: the fix is pure composition logic and the column widths are unchanged. A broader sweep of the F2-185b server-composition family (a service storing `prefix + anotherEntity.maxLengthField` into a narrower column) is possible — e.g. `ExerciseObserverService` composes a gap title from a caller-supplyable `run_code` (`NVARCHAR(64)`, no `@Size`) plus a truncated observation into a 255-char gap title, whose worst case (`21 + 64 + 180 = 265`) exceeds 255 but requires a pathological 55+ char run code — but those remaining members are narrower/latent and read per site rather than swept, since each needs its own source/target arithmetic (F2-188: do not manufacture a population).
+
 ## F2-337 — open-banking incident reference minted from a COUNT, not a MAX: a collision the filtered unique index turns into a 500
 
 | | |
