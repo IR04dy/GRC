@@ -15219,6 +15219,89 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-315 — three switches decide the report format and none of them compares the others
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — latent. A scheduled report emailed to its recipients as bytes of one format under another format's name and MIME type. |
+| **Registers** | `reporting.report_schedules` (11 live rows, dev = prod) |
+| **Standards** | — |
+| **Found by** | Executing [[F2-293]]'s filing, and re-deriving it ([[F2-221]]) — which showed the filing was **narrower than the defect** |
+| **Verification** | probe **13/13**; mutations **8/8 killed**; suite **4703 → 4711/0/0** |
+
+### One pair, three switches
+
+```
+renderBody   branches on the REPORT TYPE   PDF ? …Pdf : …Xlsx      (BOARD_PACK: PPTX ? pptx : pdf)
+filenameFor  branches on the FORMAT        PPTX -> pptx, XLSX -> xlsx, default -> pdf
+mimeFor      branches on the FORMAT        PPTX, XLSX,               default -> application/pdf
+```
+
+So `DOCX` + `RISK_REGISTER` produced **XLSX bytes** named `.pdf` with an `application/pdf` MIME type,
+and `XLSX` + `BOARD_PACK` produced **PDF bytes** named `.xlsx` with an Excel MIME type — an
+attachment that will not open, from a schedule the console reports as SUCCESS.
+
+🔑 **[[F2-293]] filed the first and missed the second, because it looked for `DOCX`.** The defect is
+not a format: it is **two switches over one pair with nobody comparing them** ([[F2-177]]). And
+`DOCX` was offered by the form while **no report type can emit it at all** — [[F2-193]]'s rule, a
+catalogue must not claim a capability that does not exist.
+
+### Fixed the way F2-293 fixed the sibling column
+
+One declaration (`ReportSchedulerService.SUPPORTED_FORMATS`), two readers, a boundary refusal that
+names the field. Three design points that are not stylistic:
+
+* ⚠⚠ **The pair is validated on the RESULTING row, never the request.** `apply` copies `reportType`
+  and `format` independently, so a partial update may change only the format while the type comes
+  from storage — **checking the request alone passes exactly the update that produces a mislabelled
+  file.** That mutation is killed.
+* ⚠ **A report type this platform cannot render at all is left alone.** Seven of the eleven live
+  schedules hold such a type ([[F2-293]]), one of them with format `XLSX`; refusing here would turn a
+  rendering gap into a **data-entry lockout** ([[F2-183]]).
+* ⚠ **The label carries the restriction, because the select is flat.** It cannot narrow by report
+  type, so *"Excel (not for the board pack)"* is the only thing an operator can read before the
+  server refuses. A gate holds the labels against the matrix **in both directions** — an unqualified
+  partial format invites a 400 nobody could predict, and a qualifier left on a format that became
+  universal states a restriction that is gone ([[F2-212]]).
+
+### The load-bearing gate leg
+
+Every declared **non-PDF** format must have an explicit `case` in `filenameFor` **and** `mimeFor`.
+Both end `default -> pdf`, so a format with no case of its own is labelled a PDF whatever bytes it
+holds — that is the entire mechanism, and `DOCX` had no case in either. `PDF` legitimately *is* the
+default, so it is excluded and `pdfIsRenderableForEveryDeclaredType…` asserts the basis on which
+`requireRenderableFormat` tolerates a null format.
+
+⚙ The keys of `SUPPORTED_FORMATS` must equal `renderBody`'s `case` labels, both ways, so **a new
+report type cannot ship without declaring its formats**.
+
+### Latent, and said so
+
+Every live schedule in both databases is `PDF` — which every declared type handles — or a type with
+no generator. So this is a **latent-hazard closure, not a defect discovery** ([[F2-283]]), and there
+is no pre-fix live behaviour on real data to contrast against: that the checks are load-bearing is
+established by the **mutation harness**, not claimed. `require` rather than `coerce` ([[F2-182]]):
+nothing that succeeds today starts failing.
+
+### One of my own assertions was wrong about the code
+
+I expected a null format to stay null on create. [[F2-293]] removed the entity initialisers and moved
+the default into `create()`, which runs `apply()` first and `DEFAULT_FORMAT` after — so the null
+branch is genuinely reachable and the stored value becomes `PDF`. Corrected against the code rather
+than the reverse ([[F2-206]] applied to an assertion).
+
+⚠ And the route was **guessed** — `/api/v1/report-schedules` where the controller says
+`/api/v1/reporting/schedules` — costing one probe run that read 0/9 with every leg 404. The grep that
+resolves it had printed the answer one line earlier.
+
+### Filed
+
+* The **seven report types with no generator** stand exactly as [[F2-293]] filed them: a build plus a
+  decision about which framework each pack must satisfy.
+* `FORMAT_OPTIONS`' three labels are **literals rather than translation keys**, so the qualifier an
+  operator reads is English-only (house rule 7). Pre-existing; the gate checks the English.
+
 ## F2-314 — the persona guide probes are designed from denied a grant the persona holds
 
 | | |

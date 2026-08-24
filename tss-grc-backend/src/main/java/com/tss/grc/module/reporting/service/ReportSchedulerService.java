@@ -25,6 +25,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.Map;
 
 /**
  * R4 — cron-driven scheduler that runs every minute, picks up due
@@ -65,6 +67,40 @@ public class ReportSchedulerService {
      * ("how many things read this, and which is the server?") assumes the disagreement is between
      * readers. Here every reader agreed and the stored DATA was the outlier.
      */
+    /**
+     * ⚠⚠ F2-315 — the formats {@link #renderBody} can actually produce, per report type.
+     *
+     * <p>Three switches decide what a caller gets and none of them agrees with the others by
+     * construction: {@code renderBody} branches on the <b>report type</b>, while
+     * {@link #filenameFor} and {@link #mimeFor} branch on the <b>format</b>. So before this,
+     * {@code DOCX} + {@code RISK_REGISTER} produced <b>XLSX bytes</b> named {@code .pdf} with an
+     * {@code application/pdf} MIME type, and {@code XLSX} + {@code BOARD_PACK} produced <b>PDF
+     * bytes</b> named {@code .xlsx} with an Excel MIME type — a file that opens as nothing.
+     * 🔑 <b>The form offered {@code DOCX} and no report type can emit it at all</b>, which is
+     * [[F2-193]]'s rule: a catalogue must not claim a capability that does not exist.
+     *
+     * <p>Latent — every live schedule in both databases is {@code PDF}, which every declared type
+     * handles, except one {@code XLSX} row whose type has no generator at all. So this is a
+     * latent-hazard closure, not a defect discovery ([[F2-283]]).
+     *
+     * <p>⚠ Deliberately not a {@code ClosedVocabulary}: that primitive mirrors a {@code CHECK} and
+     * there is none on this table. The claim is about <em>what this service can render</em>, so it
+     * is checkable in Java — {@code ReportFormatContractTest} asserts these keys are exactly
+     * {@code renderBody}'s {@code case} labels, so a new report type cannot ship without declaring
+     * its formats.
+     *
+     * <p>⚠ The <b>seven</b> report types with no generator ([[F2-293]]'s filing) are deliberately
+     * absent, and {@code requireRenderableFormat} therefore leaves them alone: a validation added to
+     * a table holding rows this platform cannot render must not make those rows uneditable
+     * ([[F2-183]]).
+     */
+    public static final Map<String, Set<String>> SUPPORTED_FORMATS = Map.of(
+        "RISK_REGISTER",     Set.of("PDF", "XLSX"),
+        "FINDINGS_AGING",    Set.of("PDF", "XLSX"),
+        "KRI_DASHBOARD",     Set.of("PDF", "XLSX"),
+        "BOARD_PACK",        Set.of("PDF", "PPTX"),
+        "AI_MODEL_REGISTRY", Set.of("PDF", "XLSX"));
+
     public static final List<String> SUPPORTED_CADENCES =
         List.of("DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUAL");
 
