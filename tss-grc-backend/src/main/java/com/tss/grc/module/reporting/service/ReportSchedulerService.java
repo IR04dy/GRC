@@ -25,6 +25,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.Map;
 
@@ -132,9 +133,11 @@ public class ReportSchedulerService {
         Long previousTenant = TenantContext.getCurrentTenant();
         try {
             TenantContext.setCurrentTenant(s.getOrganisationId());
-            byte[] body = renderBody(s);
-            String filename = filenameFor(s);
-            String mime = mimeFor(s.getFormat());
+            // F2-316 — one call, so the bytes and their two labels cannot disagree.
+            Rendered r = render(s);
+            byte[] body = r.body();
+            String filename = r.filename();
+            String mime = r.mime();
             String message = sendEmail(s, filename, mime, body);
 
             long duration = System.currentTimeMillis() - start;
@@ -161,44 +164,79 @@ public class ReportSchedulerService {
         }
     }
 
-    private byte[] renderBody(ReportSchedule s) {
+    /**
+     * What a rendered report is: bytes and the two labels that describe them, produced together.
+     *
+     * <p>⚠⚠ F2-316 — the point of this record is that the three cannot be assigned separately. Before
+     * it, {@code renderBody} branched on the report <b>type</b> while {@code filenameFor} and
+     * {@code mimeFor} branched on the <b>format</b>, so {@code XLSX} + {@code BOARD_PACK} emitted PDF
+     * bytes named {@code .xlsx} with an Excel MIME type. [[F2-315]] closed that at the write
+     * boundary; this closes it at the renderer, because a row can reach the scheduler without
+     * passing a boundary at all — {@code seed_real_data.py} is how [[F2-293]]'s unhandled
+     * {@code SEMIANNUAL} cadence got in.
+     */
+    record Rendered(byte[] body, String filename, String mime) { }
+
+    /**
+     * ⚠⚠ F2-316 — one switch, three outputs per arm, {@code default -> throw}.
+     *
+     * <p>This is not a refactor for tidiness: it is the idiom this platform already uses everywhere
+     * else it streams a download. {@code NdiReportController#streamBytes} assigns
+     * {@code body}, {@code ct} and {@code ext} in the same {@code case} arm;
+     * {@code MlModelController#export} derives all three from one {@code boolean pdf}; and the other
+     * twenty download handlers put the format in the <b>route</b> ({@code /export.pdf},
+     * {@code /export.xlsx}) so the question cannot arise. 🔑 <b>The report scheduler was the only
+     * export surface that put the format in a COLUMN and then consulted it from three separate
+     * switches</b> — [[F2-195]]'s shape, the codebase holding the correct rule beside the one place
+     * it was not applied.
+     *
+     * <p>{@code PDF} is the fallback arm for every type because every reader treated a null or
+     * unrecognised format as PDF, and {@code ReportFormatContractTest} asserts that PDF is
+     * renderable for each declared type rather than assuming it.
+     */
+    private Rendered render(ReportSchedule s) {
         String type = s.getReportType();
-        String fmt  = s.getFormat();
+        String fmt  = s.getFormat() == null ? "PDF" : s.getFormat().toUpperCase(Locale.ROOT);
         String lang = s.getLanguage() == null ? "en" : s.getLanguage();
+        String stem = type.toLowerCase().replace('_', '-') + "-" + LocalDate.now();
         return switch (type) {
-            case "RISK_REGISTER"  -> "PDF".equalsIgnoreCase(fmt)
-                ? exportService.riskRegisterPdf(lang)
-                : exportService.riskRegisterXlsx();
-            case "FINDINGS_AGING" -> "PDF".equalsIgnoreCase(fmt)
-                ? exportService.findingsAgingPdf(lang)
-                : exportService.findingsXlsx();
-            case "KRI_DASHBOARD"  -> "PDF".equalsIgnoreCase(fmt)
-                ? exportService.kriDashboardPdf(lang)
-                : exportService.kriDashboardXlsx();
-            case "BOARD_PACK"     -> "PPTX".equalsIgnoreCase(fmt)
-                ? boardPackPptxService.generatePptx(lang)
-                : boardPackService.generatePdf(lang);
-            case "AI_MODEL_REGISTRY" -> aiRegistryExportService.export(fmt);
+            case "RISK_REGISTER"  -> "XLSX".equals(fmt)
+                ? xlsx(exportService.riskRegisterXlsx(), stem)
+                : pdf(exportService.riskRegisterPdf(lang), stem);
+            case "FINDINGS_AGING" -> "XLSX".equals(fmt)
+                ? xlsx(exportService.findingsXlsx(), stem)
+                : pdf(exportService.findingsAgingPdf(lang), stem);
+            case "KRI_DASHBOARD"  -> "XLSX".equals(fmt)
+                ? xlsx(exportService.kriDashboardXlsx(), stem)
+                : pdf(exportService.kriDashboardPdf(lang), stem);
+            case "BOARD_PACK"     -> "PPTX".equals(fmt)
+                ? pptx(boardPackPptxService.generatePptx(lang), stem)
+                : pdf(boardPackService.generatePdf(lang), stem);
+            case "AI_MODEL_REGISTRY" -> "XLSX".equals(fmt)
+                ? xlsx(aiRegistryExportService.export("XLSX"), stem)
+                : pdf(aiRegistryExportService.export("PDF"), stem);
             default -> throw new IllegalArgumentException("Unknown report type: " + type);
         };
     }
 
-    private String filenameFor(ReportSchedule s) {
-        String date = LocalDate.now().toString();
-        String ext = switch (s.getFormat() == null ? "PDF" : s.getFormat().toUpperCase()) {
-            case "PPTX" -> "pptx";
-            case "XLSX" -> "xlsx";
-            default     -> "pdf";
-        };
-        return s.getReportType().toLowerCase().replace('_', '-') + "-" + date + "." + ext;
+    private static Rendered pdf(byte[] b, String stem) {
+        return new Rendered(b, stem + ".pdf", "application/pdf");
     }
-    private String mimeFor(String format) {
-        return switch (format == null ? "PDF" : format.toUpperCase()) {
-            case "PPTX" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-            case "XLSX" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            default     -> "application/pdf";
-        };
+
+    private static Rendered xlsx(byte[] b, String stem) {
+        return new Rendered(b, stem + ".xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     }
+
+    private static Rendered pptx(byte[] b, String stem) {
+        return new Rendered(b, stem + ".pptx",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    }
+
+    // F2-316 — `filenameFor` and `mimeFor` are gone. They branched on the FORMAT while the
+    // renderer branched on the TYPE, and their shared `default -> pdf` is what labelled every
+    // unrecognised format a PDF whatever bytes it held. The three now come from `render`'s one
+    // switch, so a mismatch is not a bug to catch but a state that cannot be expressed.
 
     /** Returns a status message describing what happened (sent, dry-run, etc.). */
     private String sendEmail(ReportSchedule s, String filename, String mime, byte[] body)
