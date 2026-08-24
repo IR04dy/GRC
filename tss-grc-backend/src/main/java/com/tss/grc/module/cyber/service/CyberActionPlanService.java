@@ -47,6 +47,24 @@ public class CyberActionPlanService {
         ap.setTitleEn(CyberInputValidation.requireText(ap.getTitleEn(), "titleEn"));
         ap.setOrganisationId(orgId);
         ap.setIsDeleted(false);
+        // F2-329 — the escalation + reminder trail (escalatedAt / lastReminderAt / reminderCount) is
+        // the scheduler's (CY-E) and completedAt is the complete route's; a create owns none of them.
+        // The controller binds the entity, so without this a caller could POST escalatedAt already set
+        // — which the overdue sweep reads as "already escalated once" and so NEVER escalates the plan
+        // (CY-E) — or a reminderCount/lastReminderAt chase history that never happened, or be born
+        // COMPLETED with a forged completedAt, skipping completeActionPlan. F2-213 scrubbed exactly
+        // these on the UPDATE path (see applyEditable) and left the create — the two-of-N; F2-328 is
+        // the same shape on the vuln-exception register. The 5-state lifecycle is undesigned (no CHECK,
+        // no machine — F2-221), so only the terminal COMPLETED is withheld; the review states stay
+        // caller-settable.
+        if ("COMPLETED".equalsIgnoreCase(ap.getWorkflowStatus()))
+            throw new IllegalArgumentException(
+                "workflowStatus: an action plan cannot be created already COMPLETED — completion goes "
+                + "through POST /api/v1/cyber/action-plans/{id}/complete, which stamps the completion date.");
+        ap.setEscalatedAt(null);
+        ap.setLastReminderAt(null);
+        ap.setReminderCount(0);
+        ap.setCompletedAt(null);
         return actionPlanRepo.save(ap);
     }
 
