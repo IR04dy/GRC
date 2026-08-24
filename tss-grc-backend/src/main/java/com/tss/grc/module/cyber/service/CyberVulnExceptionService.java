@@ -40,6 +40,19 @@ public class CyberVulnExceptionService {
         e.setTitleEn(CyberInputValidation.requireText(e.getTitleEn(), "titleEn"));
         e.setOrganisationId(orgId);
         e.setIsDeleted(false);
+        // F2-328 — a vulnerability exception (a formal NCA ECC risk-acceptance) cannot be CREATED
+        // already APPROVED. The controller binds the entity, so without this a caller could POST
+        // workflowStatus=APPROVED with a forged approvedAt and skip approveException entirely
+        // (F2-220's shape) — a fabricated approval from a single POST. APPROVED is reachable only
+        // through the approve path, which is the sole writer of approvedAt (F2-213), so approvedAt is
+        // scrubbed here. The 5-state lifecycle is otherwise undesigned (no machine, no CHECK — F2-221),
+        // so the intermediate review states stay caller-settable and only the terminal approval is
+        // withheld.
+        if ("APPROVED".equalsIgnoreCase(e.getWorkflowStatus()))
+            throw new IllegalArgumentException(
+                "workflowStatus: a vulnerability exception cannot be created already APPROVED — approval "
+                + "goes through POST /api/v1/cyber/exceptions/{id}/approve, which stamps the approval date.");
+        e.setApprovedAt(null);
         return exceptionRepo.save(e);
     }
 
