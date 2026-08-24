@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-345 — the incident MTTR KPI averaged over the 200 newest-created incidents, not all resolved
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — a latent-at-scale correctness defect in a dashboard KPI (no wrong figure at current data volumes). `IncidentService.getStats().avgDays` — the NIST SP 800-61r2 mean-time-to-resolve figure — was averaged over `findRecent(orgId, PageRequest.of(0, 200))`, the 200 most-recently-**created** incidents (`ORDER BY createdAt DESC`), then filtered to those with both a discovery and a resolution date. Its six sibling figures in the same `IncidentStats` (`total`, `open`, `investigating`, `resolved`, `critical`, `high`) are exact all-time `countBy…`, so the average was the only windowed figure in the strip. Two defects: (1) once a tenant exceeds 200 incidents, long-resolved older incidents fall out of the window; (2) ordering by `createdAt` over-weights freshly-created incidents — which resolve fast or are still open — biasing MTTR downward (the flattering direction). Latent today (`module/incident` → `cyber.incidents`, ~48 rows < 200, so the window contains everything and the figure is currently correct), wrong at scale. |
+| **Registers** | `cyber.incidents` (via `module/incident`) — the canonical incident register the dashboard KPI reads. No data change. |
+| **Standards** | NIST SP 800-61r2 (incident response; MTTR); [[F2-197]]'s "a capped list is fine to render and wrong to count" family; [[F2-215]]'s two-of-N. |
+| **Found by** | Sweeping backend `findTopN` / `PageRequest.of(0, N)` results feeding a count / sum / aggregate for [[F2-197]]'s capped-then-counted shape. `IncidentService.getStats` computed a mean over a capped `findRecent(200)` while its sibling counts were uncapped `countBy…` — the inconsistency within one stats object is the tell. [[F2-195]] wired this real `avgDays` over a fabricated hardcoded `"4.2h"` and inherited the 200-cap unscrutinised ([[F2-215]]). |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — pure read-path logic, no live probe (no dev backend up). New `IncidentRepository.findResolvedWithDates(orgId)` (org-scoped, uncapped, `WHERE` both dates present — mirroring the old Java filter exactly, fetching only the rows the mean needs); `getStats` averages over it, arithmetic unchanged. `IncidentServiceTest` gains a leg pinning the sourcing (`verify(findResolvedWithDates)` + `verify(never).findRecent`) and the average incl. the `d >= 0` negative-diff drop; the capped `findRecent` is stubbed to a different mean (15.0 vs 3.0) so the leg discriminates on the value too. Pre-fix control ([[F2-274]] / [[F2-287]]): reverting only the service's source line to `findRecent(200)` turns the leg RED (`expected 3.0 but was 15.0`); fix committed first, recoverable by `git checkout` ([[F2-297]]). 24/24 `IncidentServiceTest`. api.ts doc corrected (it had documented the 200-cap — [[F2-184]]). No migration. |
+
+### Why the fix is the uncapped set and not a SQL AVG
+
+The existing computation does the day-diff in Java (`ChronoUnit.DAYS.between`) with a `d >= 0` guard that drops data-error rows where resolution precedes discovery. A pure SQL `AVG(DATEDIFF(...))` would not load rows but would change the arithmetic (DB-specific date math, and the negative-drop would move into a WHERE) — unverifiable hermetically with no DB. The uncapped `findResolvedWithDates` query provably preserves the exact arithmetic (same `ChronoUnit.DAYS.between`, same `d >= 0`, same `.average().orElse(0.0)`), removing only the cap and the `createdAt`-DESC bias, and it fetches a *smaller* set than `findRecent(200)` — only resolved-with-dates rows.
+
+### Scope
+
+`findRecent` is kept — `getRecent()` (the "5 most recent incidents" panel) legitimately uses it. Only `getStats`'s MTTR source changed. `discoveryDate` / `resolutionDate` are `LocalDate` (date-only), so `ChronoUnit.DAYS.between` is exact calendar days.
+
 ## F2-344 — the 72-hour PDPL breach notification was mis-cited as Article 23 (the DSR article) across the crisis module and UI
 
 | | |

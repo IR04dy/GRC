@@ -432,4 +432,38 @@ class IncidentServiceTest {
             "07627381-1268-42EC-8E31-F8ED586093AC");
         assertThat(snap.get("piiClassifiedAt")).isNotNull();
     }
+
+    // ─── F2-345: MTTR (avgDays) averages over ALL resolved incidents, not the capped
+    //             most-recently-created 200 window ─────────────────────────────────────
+    private static Incident withDates(java.time.LocalDate discovery, java.time.LocalDate resolution) {
+        Incident i = new Incident();
+        i.setOrganisationId(ORG_ID);
+        i.setDiscoveryDate(discovery);
+        i.setResolutionDate(resolution);
+        return i;
+    }
+
+    @Test
+    void avgDays_averagesOverAllResolvedWithDates_notTheCappedRecentWindow() {
+        // The uncapped resolved-with-dates set: day-diffs 2, 4, and -1 (a data error, dropped by
+        // the d >= 0 guard) -> mean of {2, 4} = 3.0.
+        java.util.List<Incident> resolved = java.util.List.of(
+            withDates(java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 1, 3)),    // 2
+            withDates(java.time.LocalDate.of(2026, 2, 1), java.time.LocalDate.of(2026, 2, 5)),    // 4
+            withDates(java.time.LocalDate.of(2026, 3, 5), java.time.LocalDate.of(2026, 3, 4)));   // -1, dropped
+        when(repo.findResolvedWithDates(ORG_ID)).thenReturn(resolved);
+        // Had the service kept sourcing MTTR from the capped recent window it would read 15.0.
+        org.mockito.Mockito.lenient().when(repo.findRecent(eq(ORG_ID), any())).thenReturn(java.util.List.of(
+            withDates(java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 1, 11)),   // 10
+            withDates(java.time.LocalDate.of(2026, 2, 1), java.time.LocalDate.of(2026, 2, 21))));  // 20
+
+        var stats = service.getStats();
+
+        assertThat(stats.avgDays()).isEqualTo(3.0);
+        // The sourcing IS the fix: MTTR reads the uncapped resolved-with-dates set, and getStats
+        // no longer touches the 200-capped most-recent window at all.
+        verify(repo).findResolvedWithDates(ORG_ID);
+        verify(repo, org.mockito.Mockito.never()).findRecent(any(), any());
+    }
+
 }
