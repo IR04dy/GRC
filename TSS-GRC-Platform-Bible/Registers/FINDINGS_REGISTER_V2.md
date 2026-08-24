@@ -15219,6 +15219,33 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-340 — a t('key') whose key is never declared rendered the raw key string to the user
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 (localization / UX quality; visible in both languages) — `i18n.tsx`'s translator is `t = (key, fallback?) => dict[key] ?? fallback ?? key`, so a single-literal `t('key')` for a key absent from BOTH dictionaries returned the key STRING itself and rendered it on screen. Three keys were referenced at 24 sites and declared nowhere: `loading` (20×), `loadingEllipsis` (3×), `toastValidationFailed` (1×). The last is the sharpest — `toast.danger(t('toastValidationFailed') ?? 'Required fields missing')` on `IncidentsPage` showed the literal string *"toastValidationFailed"* as a red validation toast, and the author's intended English text was stranded in a `??` JS fallback that `t()` — always returning the truthy key — never reaches. Live and reachable through ordinary use; no backend needed to observe. |
+| **Registers** | frontend i18n: `tss-grc-ui-v2/src/translations/en.ts` + `ar.ts` (the two flat dictionaries) and `tss-grc-ui-v2/src/lib/i18n.tsx` (the `t()` fallback). Call sites span ~15 governance registers — evidence chain, risk scenarios, fourth-party, DR plans, processor / supplier / third-party assessments, contract clauses, data sharing, emerging risk, framework controls, committees, TPRM overview, RCA, signatures, incidents. |
+| **Standards** | house rule 7 (bilingual parity, here the two dictionaries); the [[F2-201]] lineage of translation-key detection — F2-201 found DEAD keys (declared-but-unused); this is the INVERSE (used-but-undeclared, the one that renders a raw key to the user); [[F2-192]] (a key extractor must be string-aware — a line-first regex under-reads a multi-key line). |
+| **Found by** | asking the inverse of [[F2-201]]'s dead-key question: sweeping every single-literal `t('key')` across `.ts`/`.tsx` against the declared key set. 3 undeclared keys / 24 sites, 0 false positives — `\bt\(`'s word boundary never matches `set(`, and no non-i18n `t` was hit on the tree. |
+| **Verification** | hermetic — no DB / tenant / backend dimension ([[F2-320]]/[[F2-325]] calibration). `npx tsc --noEmit` clean; a string-aware tokenizer re-run shows raw-key sites 24 → 0 and the dictionaries balanced (5732 == 5732, 0 missing either direction, 0 dups); full frontend suite **827/827**. New gate `translationKeysDeclared.test.ts` — 4 legs: (A) used single-literal keys ⊆ declared (hard zero), (B) en/ar identical key sets, (C) no duplicate keys, plus a self-test driving both detectors over synthetic input. Pre-fix control ([[F2-274]]/[[F2-287]]): reverting only the two dictionaries fails leg (A) naming exactly `loading` (20), `toastValidationFailed` (1), `loadingEllipsis` (3) while B/C/self-test stay green; the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). |
+
+### Why the raw key rendered
+
+`i18n.tsx`'s `t` returns `typeof dict[key] === 'string' ? dict[key] : (fallback ?? key)`, and the interface doc says so — *"the fallback / key itself if missing."* With the three keys absent from both dictionaries and no fallback argument passed, `t('loading')` returned `'loading'`, `t('loadingEllipsis')` returned `'loadingEllipsis'`, and `t('toastValidationFailed')` returned `'toastValidationFailed'`, each rendered verbatim in whichever language was active. 🔑 The `?? 'Required fields missing'` after the incidents-page call is therefore DEAD code — `t()` never returns a falsy value, so a JS `??` after it can never fire; the fallback has to be `t()`'s own second argument.
+
+### Two invariants nothing guarded
+
+(A) **every single-literal `t('key')` used in a component is declared** — violated at 24 sites. (B) **`en.ts` and `ar.ts` declare identical key sets** — held today (5732 each), but by hand: `BilingualInvariantRatchetTest` ([[F2-271]]) checks entity `*_en`/`*_ar` fields on the BACKEND, and the frontend dictionaries were unguarded. Both are now hard zeros with an empty exemption map, because there is always a correct alternative — declare the key, or pass a 2-arg default `t('key', 'Default')` which renders the default rather than the key ([[F2-214]]). The three keys are declared in both files matching `riskLoading`'s `'Loading risks…'` ellipsis style; `loading` and `loadingEllipsis` are synonyms kept for the two call-site idioms (table-cell placeholder vs `InlineEmpty`).
+
+### The extractor must be string-aware — F2-192 against my own detector
+
+A first-cut `^\s+(\w+):` regex reported `critHigh`/`critMedium`/`critLow` as undeclared. They ARE declared — en.ts packs four keys on line 1012 (`critCritical: 'Critical', critHigh: 'High', ...`) and a line-first regex captures only the first key on the line. So the extractor is a char-scan that skips string and comment spans and captures `<ident>:` at object depth 1, robust to multiple pairs per line and to commas inside string values. It also made an initial en/ar "5726 == 5726, clean" reading a coincidental under-count in both files; re-run string-aware, the true pre-fix count is 5729 and still balanced. This is the eighth-or-so instance in this programme of a source regex measuring its own shape rather than the code, and the first caught mid-slice against a detector I had just written.
+
+### Scope and Filed
+
+Single-literal `t('id')` only. A two-arg `t('id', 'default')` call has a fallback and cannot render a raw key — it is a separate, milder house-rule-7 question (the Arabic user sees the English default) and is **filed, not fixed here**: a cluster on `AuditCommitteeDashboardPage`, `AuditCommitteeSnapshotPage` and `RiskControlFindingPivotPage` uses ad-hoc capitalised keys like `t('Cancel', 'Cancel')`, `t('Annual', …)`, plus one odd `t('en', …)` — ~25 undeclared 2-arg keys. Whether each should become a real bilingual key or is intentional English chrome is a per-site reading job ([[F2-188]]: no manufactured verdicts). Dynamic / concatenated keys are not statically resolvable and are not flagged ([[F2-201]]).
+
 ## F2-339 — a jakarta.persistence.NoResultException escaped every DB handler and surfaced as an opaque 500 instead of a 404
 
 | | |
