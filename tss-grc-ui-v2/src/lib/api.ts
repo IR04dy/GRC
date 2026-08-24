@@ -3353,9 +3353,11 @@ export type SaudiRegulator = 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD
  *
  * F2-195 — `stats` was typed `unknown` and had no caller, so the Incidents KPI strip rendered
  * `"4.2h"` for mean-time-to-resolve while this endpoint was already computing the real figure.
- * `avgDays` is the mean of `ChronoUnit.DAYS.between(discoveryDate, resolutionDate)` over incidents
- * that have both, taken from the 200 most recent — so it is **days**, and the fabricated value was
- * not merely 26× low, it was in the wrong unit.
+ * `avgDays` is the mean of `ChronoUnit.DAYS.between(discoveryDate, resolutionDate)` over **all**
+ * resolved incidents (those carrying both dates) — so it is **days**, and the fabricated value was
+ * not merely 26× low, it was in the wrong unit. (F2-345 — it was previously averaged over the 200
+ * most-recently-created incidents, which windowed and downward-biased the figure at scale while
+ * its sibling counts were all-time.)
  */
 export interface IncidentStatsDto {
   total: number; open: number; investigating: number; resolved: number;

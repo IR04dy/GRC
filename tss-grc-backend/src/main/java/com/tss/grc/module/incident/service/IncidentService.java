@@ -252,8 +252,11 @@ public class IncidentService {
         long high          = incidentRepo.countByOrganisationIdAndSeverity(orgId, "HIGH");
         long total         = open + investigating + resolved + closed;
 
-        // Average resolution time in days (for incidents with both discoveryDate and resolutionDate)
-        List<Incident> resolvedList = incidentRepo.findRecent(orgId, PageRequest.of(0, 200));
+        // Average resolution time in days over ALL resolved incidents (those with both a
+        // discovery and a resolution date) — matching the all-time counts above. F2-345: this
+        // used to average over findRecent(200), the 200 newest-by-createdAt, which windowed the
+        // figure and biased it downward at scale.
+        List<Incident> resolvedList = incidentRepo.findResolvedWithDates(orgId);
         double avgDays = resolvedList.stream()
             .filter(i -> i.getDiscoveryDate() != null && i.getResolutionDate() != null)
             .mapToLong(i -> ChronoUnit.DAYS.between(i.getDiscoveryDate(), i.getResolutionDate()))
