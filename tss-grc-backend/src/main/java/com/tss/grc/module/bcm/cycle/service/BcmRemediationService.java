@@ -67,6 +67,27 @@ public class BcmRemediationService {
     private static final String INITIAL_CAPA_STATUS = "OPEN";
     private static final Set<String> CAPA_PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
 
+    /**
+     * F2-336 — the RESOLVED (terminal-disposition) states of each register, so that "open" is the
+     * COMPLEMENT of a declared set and never a single inclusion token (F2-196). These are the ONE
+     * authoritative definition; readers reference them rather than typing their own list (F2-282: a
+     * concept read by several places must be read the same way).
+     *
+     * <p>{@code CAPA_RESOLVED = {CLOSED}} is the CAPA machine's only no-outgoing-edge state
+     * ({@code case "CLOSED" -> false}); every other status — OPEN (the initial state), ASSIGNED,
+     * IN_PROGRESS, EVIDENCE_SUBMITTED, UNDER_REVIEW, OVERDUE, REOPENED — is an active workflow step,
+     * which is exactly the complement {@link BcmBoardPackService#capaSnapshot} already sums as
+     * {@code activeOpen} (its overdue sweep uses {@code done = List.of("CLOSED")}).
+     *
+     * <p>{@code GAP_RESOLVED = {CLOSED, ACCEPTED_RISK}}: a gap is resolved either by remediation
+     * (CLOSED) or by formally accepting the residual risk (ACCEPTED_RISK). {@code ACCEPTED_RISK} is a
+     * re-openable disposition ({@code ACCEPTED_RISK -> OPEN}), not an active remediation step, and the
+     * platform treats it as resolved everywhere else — {@code AttackSurfaceFindingService.CLOSING_STATUSES}
+     * includes it, and the NDI gap sibling counts "critical open" as {@code not (RESOLVED|CLOSED|ACCEPTED_RISK)}.
+     */
+    public static final Set<String> CAPA_RESOLVED = Set.of("CLOSED");
+    public static final Set<String> GAP_RESOLVED  = Set.of("CLOSED", "ACCEPTED_RISK");
+
     private final BcmLessonLearnedRepository lessons;
     private final BcmGapRepository gaps;
     private final BcmCorrectiveActionRepository capas;
@@ -399,9 +420,9 @@ public class BcmRemediationService {
     public Map<String, Long> stats() {
         Long o = org();
         return Map.of(
-            "openGaps",         gaps.countByOrganisationIdAndStatus(o, "OPEN"),
+            "openGaps",         gaps.countByOrganisationIdAndStatusNotIn(o, GAP_RESOLVED),
             "criticalGaps",     gaps.countByOrganisationIdAndSeverity(o, "CRITICAL"),
-            "openCapas",        capas.countByOrganisationIdAndStatus(o, "OPEN"),
+            "openCapas",        capas.countByOrganisationIdAndStatusNotIn(o, CAPA_RESOLVED),
             "overdueCapas",     capas.countByOrganisationIdAndStatus(o, "OVERDUE"),
             "closedCapas",      capas.countByOrganisationIdAndStatus(o, "CLOSED")
         );

@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmGap;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,8 @@ public interface BcmGapRepository extends JpaRepository<BcmGap, Long> {
         Long organisationId, String relatedRecordType, Long relatedRecordId);
     long countByOrganisationIdAndStatus(Long organisationId, String status);
     long countByOrganisationIdAndSeverity(Long organisationId, String severity);
+    /** F2-336 — "open gaps" is the COMPLEMENT of the resolved set, never a single token. */
+    long countByOrganisationIdAndStatusNotIn(Long organisationId, Collection<String> excludedStatuses);
     List<BcmGap> findByOrganisationIdAndDueDateBeforeAndStatusNotIn(
         Long organisationId, LocalDate cutoff, List<String> excludedStatuses);
 }

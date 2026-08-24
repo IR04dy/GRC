@@ -141,8 +141,10 @@ public class BcmReportService {
         double avgScore = all.stream()
             .mapToDouble(c -> bd(c.getOverallScore()))
             .average().orElse(0);
-        long openGaps  = gaps.countByOrganisationIdAndStatus(org, "OPEN");
-        long openCapas = capas.countByOrganisationIdAndStatus(org, "IN_PROGRESS");
+        // F2-336 — "open" is the complement of the resolved set (BcmRemediationService owns it), so
+        // OVERDUE and freshly-created OPEN corrective actions are no longer invisible on this KPI.
+        long openGaps  = gaps.countByOrganisationIdAndStatusNotIn(org, BcmRemediationService.GAP_RESOLVED);
+        long openCapas = capas.countByOrganisationIdAndStatusNotIn(org, BcmRemediationService.CAPA_RESOLVED);
         return mapOf(
             "totalCycles",     all.size(),
             "activeCycles",    active,
@@ -346,7 +348,7 @@ public class BcmReportService {
                     "residual", r.getResidualRiskScore(),
                     "status", r.getStatus()))
                 .toList(),
-            "openGapsTaggedCyber",   gaps.countByOrganisationIdAndStatus(org, "OPEN"),
+            "openGapsTaggedCyber",   gaps.countByOrganisationIdAndStatusNotIn(org, BcmRemediationService.GAP_RESOLVED),
             "ncaEcc3_5_attestation",
                 "BCM, exercises, and dependency-graph evidence is reconstructible per ECC §3-5. "
                 + "See BCM_READINESS and EXECUTIVE_SUMMARY for headline metrics; this report focuses "
@@ -369,8 +371,8 @@ public class BcmReportService {
             "cycleStatus",         current == null ? "—" : current.getStatus(),
             "cycleApprovedBy",     current == null ? "—" : Optional.ofNullable(current.getApprovedBy()).orElse("—"),
             "cycleApprovedAt",     current == null ? "—" : Optional.ofNullable(current.getApprovedAt()).map(Object::toString).orElse("—"),
-            "openMaterialGaps",    gaps.countByOrganisationIdAndStatus(org, "OPEN"),
-            "openCorrectiveActions", capas.countByOrganisationIdAndStatus(org, "IN_PROGRESS"),
+            "openMaterialGaps",    gaps.countByOrganisationIdAndStatusNotIn(org, BcmRemediationService.GAP_RESOLVED),
+            "openCorrectiveActions", capas.countByOrganisationIdAndStatusNotIn(org, BcmRemediationService.CAPA_RESOLVED),
             "policyVersion",       Optional.ofNullable(governance.findByOrganisationIdOrderByCreatedAtDesc(org).stream()
                                        .findFirst().map(BcmGovernanceRecord::getPolicyVersion).orElse("—")).orElse("—"),
             "policyApprovedBy",    Optional.ofNullable(governance.findByOrganisationIdOrderByCreatedAtDesc(org).stream()

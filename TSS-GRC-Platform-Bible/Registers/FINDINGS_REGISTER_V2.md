@@ -15219,6 +15219,34 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-336 — "open" corrective actions / gaps counted by a single status token, under-reporting the NCA/ISO 22301 readiness KPI
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — the BCM CAPA machine has 8 states, terminal `= {CLOSED}`, so 7 are open: OPEN (the initial state), ASSIGNED, IN_PROGRESS, EVIDENCE_SUBMITTED, UNDER_REVIEW, **OVERDUE**, REOPENED. `BcmReportService#bcmReadiness` (NCA ECC §3-5 / ISO 22301 `BCM_READINESS`), `#cmaAnnualDisclosure` (CMA annual disclosure) and `BcmRemediationService#stats` (dashboard) each defined "open corrective actions" with a DIFFERENT single token — `{IN_PROGRESS}`, `{IN_PROGRESS}`, `{OPEN}` — dropping 6 of the 7 open states, flatteringly. "Open gaps" was consistently `{OPEN}`, dropping the 4 actively-worked states (ASSIGNED, IN_PROGRESS, UNDER_REVIEW, REOPENED). So an OVERDUE corrective action past its deadline, and a freshly-created OPEN one, were invisible on a readiness KPI — the single most important row for such a report. Live on any tenant with a CAPA in a state other than the one counted token. |
+| **Registers** | `bcm.corrective_actions.status`, `bcm.gaps.status` (BCM remediation) |
+| **Standards** | NCA ECC §3-5 / ISO 22301 BCM readiness; CMA annual BCM disclosure; the [[F2-196]] "open = complement of a declared terminal set, never a second list" family, and [[F2-282]] "one concept, one definition." |
+| **Found by** | asking [[F2-196]]'s question of every inclusion-list status count in services — is "open" the COMPLEMENT of a declared terminal set, or a single token that drops states? — then [[F2-282]]'s follow-up: how many readers of this concept exist, and do they agree? |
+| **Verification** | hermetic Mockito `BcmOpenRemediationCountTest` (4 legs): each of the three defective readers now returns the complement count (distinct sentinels stubbed on `countByOrganisationIdAndStatusNotIn`), with `verify(never())` on the old single-token `countByOrganisationIdAndStatus(_, "OPEN"|"IN_PROGRESS")`; a constant-grounding leg pins `CAPA_RESOLVED={CLOSED}` / `GAP_RESOLVED={CLOSED,ACCEPTED_RISK}`, asserts the dropped states are open, and (by reflection) that each resolved token is a member of the register's declared vocabulary so a rename cannot leave it dangling. Pre-fix control: the 3 behavioural legs fail on the reverted readers (`expected 42L but was 0L`). Repurposed `BcmReportServiceTest`'s single-token stub-and-assert ([[F2-159]] shape). Full hermetic build **4762/0/0**. No migration, no DB write, no live probe (pure read-path logic — [[F2-320]]/[[F2-325]] calibration). |
+
+### The fix
+
+Declare the resolved sets ONCE on `BcmRemediationService` (the owner of `CAPA_STATUSES`/`GAP_STATUSES` and both transition machines) and have every reader count the complement via a new `countByOrganisationIdAndStatusNotIn`. This is [[F2-196]]'s rule (open = complement of a declared terminal set, so a state nobody remembered is CHASED rather than excused) with [[F2-282]]'s follow-up (a concept read by several places must be read the same way, from one definition). All readers are in `module/bcm/cycle/service/`, the same package as `BcmRemediationService`, so a reader references `BcmRemediationService.CAPA_RESOLVED` directly — a third reader of the definition, never a third copy of it.
+
+### The authoritative reader was already right, and three others drifted from it
+
+`BcmBoardPackService#capaSnapshot` computes `activeOpen = open + assigned + inProgress + evidence + review + overdue + reopened` — the full complement of `{CLOSED}` — and its overdue sweep uses `done = List.of("CLOSED")`. So the platform already had the correct definition; the readiness report, the CMA disclosure and the dashboard each picked a different single token and disagreed with it. [[F2-205]]'s question (how many things read this, and which is authoritative?) with the answer that the board pack was authoritative and three readers had drifted — and [[F2-290]]'s corollary that consistency among the drifted readers (the gaps were uniformly `{OPEN}`) is not correctness.
+
+### Why ACCEPTED_RISK is resolved, and not a manufactured verdict
+
+For gaps the one judgement is whether `ACCEPTED_RISK` (risk formally accepted, remediation deliberately not pursued) is "open." It is treated as resolved everywhere else in the platform: `AttackSurfaceFindingService.CLOSING_STATUSES` includes it; the NDI gap sibling computes "critical open" as `not (RESOLVED|CLOSED|ACCEPTED_RISK)` (`NdiGapService`, `NdiDashboardService`, `NdiSubmissionPackageService`); and `MassAssignmentRatchetTest` pairs "CLOSED/ACCEPTED_RISK" as the operator dispositions. So `GAP_RESOLVED = {CLOSED, ACCEPTED_RISK}` follows the platform's own consistent treatment ([[F2-205]]) rather than inventing one ([[F2-188]]). CAPAs have no such disposition state — every non-CLOSED CAPA status is an active workflow step, including OVERDUE — so `CAPA_RESOLVED = {CLOSED}`, matching the board pack.
+
+### Filed
+
+- `BcmReportService#ncaCyberContinuity`'s `openGapsTaggedCyber` was also converted to the complement in this slice (it is a gap reader), so the five report readers + the two `stats` readers all converge; the board pack was left as-is (already correct, and its per-state breakdown is legitimate detail).
+- No migration and no CHECK: this is pure read-path counting. `bcm.gaps.status` / `bcm.corrective_actions.status` vocabularies are enforced by the transition machines, not a CHECK — that is [[F2-221]]'s separate question and its writers were not touched here ([[F2-183]]).
+
 ## F2-335 — a case-sensitive control branch skips the NDMO data-quality RED escalation for a lowercase band
 
 | | |
