@@ -165,8 +165,17 @@ class MassAssignmentRatchetTest {
      * flagged fields). Plus nine rows already CLOSED / INERT / BY DESIGN service-side (DPIA ×2,
      * RegulatorExamination ×2, SustainabilityEvidence ×3, BcpPlan#update, CorrectiveAction#update),
      * each read against its service (F2-188). Re-derived 29 → 19.
+     *
+     * <p>⚠ F2-334 — audited the work list further and found NO new live forge
+     * (ControlAssessment and KYC recordHit both read benign). Adjudicated eleven rows already
+     * CLOSED / INERT / BY DESIGN service-side (ControlAssessment ×2, KYC recordHit,
+     * CmaDisclosure#update, TcfdItem#update, Policy#update ×2, PolicyException#updateException,
+     * MaDueDiligence ×2, addSkill), each read against its service (F2-188). Re-derived 19 → 8.
+     * The remaining eight are genuine owner-decisions / filed: Cyber updateActionPlan / updateException
+     * (F2-329 / F2-328, need a state machine), DataSharingAgreement#create’s isActive, four
+     * ControlLibrary lastReviewedAt-on-every-update sites (F2-231), IrPlaybook#save (undesigned review).
      */
-    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 19;
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 8;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -836,7 +845,56 @@ class MassAssignmentRatchetTest {
         Map.entry("CorrectiveActionController#update(CorrectiveAction)",
             "INERT — the update whitelist omits status and closedAt (transition() owns them, "
             + "stamping closedAt on CLOSED / CANCELLED) and refuses editing a CLOSED / CANCELLED row; "
-            + "org is loaded tenant-scoped")
+            + "org is loaded tenant-scoped"),
+
+        // ── F2-334: census reconciliation, no new live forge (ControlAssessment and KYC
+        // recordHit both read benign). Eleven rows already CLOSED / INERT / BY DESIGN service-side,
+        // each read against its service this slice (F2-188). Ceiling re-derived 19 -> 8.
+        Map.entry("CyberController#saveAssessment(ControlAssessment)",
+            "BY DESIGN F2-334 — undesigned assessment lifecycle: approveAssessment (POST "
+            + "/{id}/approve) only sets status=APPROVED with no attribution, SoD or audit, so it is "
+            + "a redundant shortcut rather than a control that save/update bypass. status and "
+            + "reviewerName are undesigned caller-set fields; org is stamped from orgId on create"),
+        Map.entry("CyberController#updateAssessment(ControlAssessment)",
+            "BY DESIGN F2-334 — applyEditable never copies organisationId (existing is loaded "
+            + "tenant-scoped); status/reviewerName are the same undesigned caller-set fields as "
+            + "saveAssessment, with no state machine and no dedicated attribution route to bypass"),
+        Map.entry("KycController#recordHit(ScreeningHit)",
+            "CLOSED F2-288 (re-adjudicated F2-334) — recordHit scrubs decidedAt (and "
+            + "decidedByName / dispositionNotes); the decision belongs to POST /hits/{hitId}/"
+            + "disposition. disposition itself is caller-set by design (the screening feed classifies)"),
+        Map.entry("CmaDisclosureController#update(CmaDisclosure)",
+            "CLOSED / INERT F2-297 (re-adjudicated F2-334) — update never copies approvalStatus, "
+            + "guards disclosureStatus via sameState() (markReviewed fires only on a real change and "
+            + "stamps lastReviewedAt), reviewerName is a partial-update data field, org not copied"),
+        Map.entry("TcfdItemController#update(TcfdItem)",
+            "CLOSED / INERT F2-297 (re-adjudicated F2-334) — as CmaDisclosure#update: create "
+            + "scrubs approvalStatus / lastReviewedAt, update guards disclosureStatus via sameState() "
+            + "/ markReviewed; reviewerName a data field; approve() owns the APPROVED transition"),
+        Map.entry("PolicyController#update(PolicyDocument)",
+            "CLOSED F2-222 (re-adjudicated F2-334) — PolicyManagementService.update whitelist "
+            + "never copies status or publishedAt; approverName is frozen (transition() stamps it "
+            + "from the principal once the C-6 SoD check passes) and owner is editable only in "
+            + "DRAFT; a PUBLISHED plan locks to review-only edits"),
+        Map.entry("CyberPolicyController#update(PolicyDocument)",
+            "CLOSED F2-222 (re-adjudicated F2-334) — routes to the same "
+            + "PolicyManagementService.update as PolicyController#update"),
+        Map.entry("PolicyController#updateException(PolicyException)",
+            "INERT F2-231 (re-adjudicated F2-334) — updateException is a whitelist (title / "
+            + "justification / compensatingControls / riskLevel / riskId / dates / notes); status, "
+            + "reviewerName, reviewedAt, approverName and rejectedAt belong to transitionException(), "
+            + "which stamps the actor from the principal"),
+        Map.entry("MaDueDiligenceController#create(MaDueDiligence)",
+            "BY DESIGN F2-218 (re-adjudicated F2-334) — loiSignedAt is the caller’s (an M&A "
+            + "letter-of-intent signing date the operator records; no dedicated route owns it); org "
+            + "is stamped from TenantContext"),
+        Map.entry("MaDueDiligenceController#update(MaDueDiligence)",
+            "BY DESIGN F2-218 (re-adjudicated F2-334) — as create; copyMutable copies loiSignedAt "
+            + "and never copies organisationId (existing loaded tenant-scoped)"),
+        Map.entry("CommitteeMemberRegistryController#addSkill(CommitteeMemberSkill)",
+            "BY DESIGN F2-334 — lastReviewedAt is a caller-set skill-assessment date (defaulted "
+            + "to today when omitted); no dedicated skill-review route owns it and there is no state "
+            + "machine; org is stamped from TenantContext and id is nulled")
     );
 
     /** Field names that decide tenancy, state or authority — never a caller's to set. */

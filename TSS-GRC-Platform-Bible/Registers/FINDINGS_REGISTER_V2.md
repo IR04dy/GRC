@@ -15219,6 +15219,41 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-334 — census reconciliation: eleven mass-assignment NEEDS-VERDICT rows adjudicated (19 → 8)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 (instrument hygiene) — a CEILING does not force the census update its own contract asks for ([[F2-330]]), so closed / inert / by-design mass-assignment rows accumulate printing `NEEDS-VERDICT`. That is worse than a missing row ([[F2-250]]): it sends the next reviewer to re-read a guarded path, or to "re-fix" it. Continuing [[F2-333]]'s audit, eleven more such rows were read and adjudicated; **no new live forge was found** (the readable set is exhausted — [[F2-333]]'s ThreatIntel actioned-ledger forge was the last clean one). |
+| **Registers** | instrument only — `MassAssignmentRatchetTest.ADJUDICATED` / `BASELINE_UNADJUDICATED_NEW_CRIT` |
+| **Standards** | — (mass-assignment / F2-22b family: [[F2-172]](d)-adjacent hygiene) |
+| **Found by** | continuing [[F2-330]]/[[F2-333]]'s per-member audit of `target/mass-assignment-risk.txt`. |
+| **Verification** | each of the eleven read against its service this slice (F2-188 — a scrub/guard present, a whitelist confirmed, or an undesigned lifecycle with no route to bypass), never trusted from prose. `MassAssignmentRatchetTest` 8/8 with the surfaced-unadjudicated count re-derived `still unadjudicated = 8` (F2-207 — off the regenerated census, not guessed). Full hermetic build **4754/0/0** (unchanged — no production code touched, no new test). |
+
+### The eleven verdicts
+
+- `CyberController#saveAssessment` / `#updateAssessment(ControlAssessment)` — **BY DESIGN**: `approveAssessment` (POST /{id}/approve) only sets `status=APPROVED` with no attribution, SoD or audit, so it is a redundant shortcut rather than a control save/update bypass; `status`/`reviewerName` are undesigned caller-set fields; org is stamped on create and never copied on update.
+- `KycController#recordHit(ScreeningHit)` — **CLOSED [[F2-288]]**: `recordHit` scrubs `decidedAt` (and `decidedByName`/`dispositionNotes`); the decision belongs to `POST /hits/{id}/disposition`. `disposition` itself is caller-set by design (the screening feed classifies).
+- `CmaDisclosureController#update` / `TcfdItemController#update` — **CLOSED / INERT [[F2-297]]**: create scrubs `approvalStatus`/`lastReviewedAt`; update never copies `approvalStatus`, guards `disclosureStatus` via `sameState()` (`markReviewed` fires only on a real change), and `reviewerName` is a partial-update data field.
+- `PolicyController#update` / `CyberPolicyController#update(PolicyDocument)` — **CLOSED [[F2-222]]**: both route to `PolicyManagementService.update`, whose whitelist never copies `status`/`publishedAt`; `approverName` is frozen (transition() stamps it from the principal once the C-6 SoD check passes), owner is editable only in DRAFT, and a PUBLISHED plan locks to review-only edits.
+- `PolicyController#updateException(PolicyException)` — **INERT [[F2-231]]**: `updateException` is a whitelist (title / justification / compensating-controls / risk / dates / notes); `status`, `reviewerName`, `reviewedAt`, `approverName` and `rejectedAt` belong to `transitionException()`, which stamps the actor from the principal.
+- `MaDueDiligenceController#create` / `#update(MaDueDiligence)` — **BY DESIGN [[F2-218]]**: `loiSignedAt` is the caller's (an M&A letter-of-intent signing date the operator records; no dedicated route owns it); org is stamped from `TenantContext` on create and `copyMutable` never copies it on update.
+- `CommitteeMemberRegistryController#addSkill(CommitteeMemberSkill)` — **BY DESIGN**: `lastReviewedAt` is a caller-set skill-assessment date (defaulted to today when omitted); no dedicated skill-review route owns it and there is no state machine; org stamped from `TenantContext`, id nulled.
+
+### Why no code changed, and why that is the slice
+
+The forge hunt is the primary value (it is how [[F2-328]]…[[F2-333]] each found a live defect); when it comes up empty, the reconciliation is what remains, and it is not busywork. F2-330 recorded that a ceiling tolerates a mislabelled row indefinitely, so the census drifts unless a reader adjudicates each member and re-derives the ceiling in the same commit. Eleven rows that were closed/inert/by-design were printing `NEEDS-VERDICT` — each an invitation for the next reviewer to re-read a guarded path. Recording the verdicts and lowering the ceiling 19 → 8 closes exactly that gap. Manufacturing a verdict for a row not read, or forcing a "fix" onto an undesigned lifecycle, would be the ([[F2-188]]) / ([[F2-221]]) trap; the eleven were all read this slice.
+
+### The remaining eight
+
+Left `NEEDS-VERDICT` as genuine owner-decisions / filed items (a manufactured verdict is worse than an honest gap):
+
+- `CyberController#updateActionPlan(CyberActionPlan)` — [[F2-329]]: the update-path status jump needs a state machine designed (owner decision).
+- `CyberController#updateException(VulnException)` — [[F2-328]]: same, on the vuln-exception register.
+- `DataSharingAgreementController#create(DataSharingAgreement)` — the `isActive` question filed since [[F2-331]].
+- `ControlLibraryController#createMapping` / `#updateMapping` / `#linkRiskToControl` / `#updateLink` — [[F2-231]]: `setLastReviewedAt(now())` fires on every update, so recording a review requires designing a review trigger (owner decision).
+- `IrPlaybookController#save(IrPlaybook)` — [[F2-333]] read it and left it: an undesigned review lifecycle (`status`/`lastReviewedBy` caller-set, `recordInvocation` a legacy shim, no dedicated review/attest route), so a fix is a product decision.
+
 ## F2-333 — a save could forge ThreatIntel's SOC-E actioned-ledger summary with no ledger row
 
 | | |
