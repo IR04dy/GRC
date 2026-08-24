@@ -15219,6 +15219,82 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-316 — the platform already had the right idiom, and the reporting module was the one place that broke it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P4 — makes [[F2-315]]'s defect unrepresentable rather than validated. No behaviour change on any working path. |
+| **Registers** | `reporting.report_schedules` |
+| **Standards** | — |
+| **Found by** | Asking [[F2-315]]'s question one level up: across **all 23 download handlers**, is the declared MIME type decided by the same thing as the filename extension? |
+| **Verification** | probe **9/9**; mutations **4/4 killed** (one after closing a real residual); suite **4711 → 4712/0/0** |
+
+### The generalisation answered itself
+
+| | |
+|---|---|
+| `NdiReportController#streamBytes` | **one switch**, each arm assigning `body` + `ct` + `ext` together, `default -> throw` |
+| `MlModelController#export` | one `boolean pdf` feeding the bytes, the MIME and the extension |
+| the other **20** handlers | the format is in the **route** (`/export.pdf`, `/export.xlsx`), so the question cannot arise |
+
+🔑 **The report scheduler was the only export surface that put the format in a COLUMN and then read
+it from three separate switches** — [[F2-195]]'s shape, the codebase holding the correct rule beside
+the one place it was not applied. `ClimateReportController` is the clearest contrast: two endpoints,
+each appending the extension as a literal matching its own hard-coded type.
+
+### Why do this having just validated it
+
+[[F2-315]] refuses an unrenderable pair at the **write boundary**. A row can reach the scheduler
+without passing one: `seed_real_data.py` is exactly how [[F2-293]]'s unhandled `SEMIANNUAL` cadence
+got in, and it produced **13 consecutive daily failures** in both databases. So the boundary check is
+necessary and not sufficient — `renderBody`/`filenameFor`/`mimeFor` become one `render` returning a
+`Rendered` record, built only by three factories that each pair **one** extension with **one** MIME
+type.
+
+⚙ The two label switches are **deleted**. Their shared `default -> pdf` is the entire mechanism: a
+format with no case of its own was labelled a PDF whatever bytes it held.
+
+### The gate leg is replaced, not weakened
+
+F2-315's leg asserted that every declared non-PDF format had an explicit `case` in `filenameFor`
+**and** `mimeFor`. Those methods no longer exist, so its **subject** is gone — and the leg replacing
+it fails if either switch comes back, and requires that only the three factories may construct a
+`Rendered`.
+
+### ⚠⚠ The mutation harness found a real residual
+
+Three factories make a mismatched label **pair** unrepresentable. They do **not** stop an arm handing
+XLSX bytes to `pdf(...)` — the original defect, moved upstream of the factories. That mutation
+**survived**, and the mutated code is genuinely wrong, so it was a hole rather than an equivalent
+mutant ([[F2-206]]).
+
+🔑 **Collapsing switches removes the disagreement between labels and leaves the disagreement between
+bytes and label** — ask which one a collapse actually closes. Now every factory call inside `render`
+must be handed bytes from a generator naming the same format, in its method-name suffix
+(`riskRegisterXlsx`, `generatePptx`) or as a literal argument (`export("XLSX")`).
+
+⚠ That is a **naming** rule, which [[F2-217]] warns measures the list its author knew. Stated as a
+limitation rather than hidden: a generator naming no format is reported **unresolvable** rather than
+passed, so the answer cannot quietly shrink.
+
+### The honest observable
+
+With SMTP unconfigured in dev the filename and MIME **never leave the process**, so the probe cannot
+see them. What it can see is *which generator ran*: all six renderable pairs render, and each type's
+two formats produce different byte counts (`RISK_REGISTER` 31 400 / 9 758, `BOARD_PACK` 40 407 /
+34 906, `AI_MODEL_REGISTRY` 27 042 / 6 767). My first probe asserted the filename from the response
+and read 5/10 — **an assertion about something the observable does not carry**, corrected rather than
+explained away.
+
+### Filed
+
+* Nothing new. The seven un-rendered report types stand as [[F2-293]] filed them.
+
+⚙ One slip: the patch script used a `\` line continuation inside a **non-raw** Python triple-quoted
+string, so Python ate the Java text-block joiners and three assertion messages shipped with runs of
+embedded spaces. Repaired; scripts are raw strings now.
+
 ## F2-315 — three switches decide the report format and none of them compares the others
 
 | | |
