@@ -85,8 +85,11 @@ class BcmReportServiceTest {
         BcmAssessmentCycle c1 = cycle("APPROVED",  BigDecimal.valueOf(85));
         BcmAssessmentCycle c2 = cycle("IN_PROGRESS", BigDecimal.valueOf(60));
         when(cycles.findByOrganisationIdOrderByReportingYearDesc(ORG_ID)).thenReturn(List.of(c1, c2));
-        when(gaps.countByOrganisationIdAndStatus(ORG_ID, "OPEN")).thenReturn(4L);
-        when(capas.countByOrganisationIdAndStatus(ORG_ID, "IN_PROGRESS")).thenReturn(2L);
+        // F2-336 — "open" is the COMPLEMENT of the resolved set, not a single token. This test used
+        // to stub countByStatus(OPEN)=4 / countByStatus(IN_PROGRESS)=2 and assert them, which locked
+        // in the under-count (an OVERDUE or freshly-created OPEN corrective action was invisible).
+        when(gaps.countByOrganisationIdAndStatusNotIn(ORG_ID, BcmRemediationService.GAP_RESOLVED)).thenReturn(4L);
+        when(capas.countByOrganisationIdAndStatusNotIn(ORG_ID, BcmRemediationService.CAPA_RESOLVED)).thenReturn(2L);
 
         Map<String, Object> out = service.generate("BCM_READINESS");
 
