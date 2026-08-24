@@ -17,6 +17,7 @@ import com.tss.grc.module.iam.governance.repository.AccessReviewCampaignReposito
 import com.tss.grc.module.iam.governance.repository.AccessReviewItemRepository;
 import com.tss.grc.module.iam.governance.repository.SodViolationRepository;
 import com.tss.grc.module.iam.repository.RoleRepository;
+import com.tss.grc.module.iam.service.TenantUserDirectory;
 import com.tss.grc.module.platform.branding.service.BrandThemeService;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
@@ -44,6 +45,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -62,6 +64,13 @@ public class AccessEvidencePackageService {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_ROWS = 5000;
 
+    // F2-342 — the disposition/recertification decider is the four-eyes attribution the evidence
+    // sheets exist to prove; the WHO travels beside the WHEN the sheets already carried.
+    static final String[] SOD_HEADERS = {"Rule", "Severity", "User", "Conflict", "Source", "Status",
+        "Detected (UTC)", "Accepted Until", "Disposition Note", "Dispositioned By", "Dispositioned (UTC)"};
+    static final String[] RECERT_HEADERS = {"Campaign", "Scope", "Window", "Window (Hijri)", "Campaign Status",
+        "User", "Role", "Decision", "Decided By", "Decided (UTC)", "Note"};
+
     private final RoleRepository roleRepo;
     private final AccessRequestRepository assignments;
     private final SodViolationRepository violationRepo;
@@ -69,6 +78,11 @@ public class AccessEvidencePackageService {
     private final AccessReviewItemRepository itemRepo;
     private final OrganisationRepository orgRepo;
     private final BrandThemeService brandThemeService;
+    /** F2-342 — resolve a disposition/recertification decider id → display label for the
+     *  evidence sheets, so the file that leaves the platform names WHO accepted an SoD risk
+     *  and WHO recertified an assignment (the four-eyes attribution an NCA ECC 2-2 / SAMA CSF
+     *  3.3.5 access review reads). Blank-safe: an absent or unresolvable id renders "". */
+    private final TenantUserDirectory directory;
 
     public record Package(byte[] bytes, String filename) {}
 
@@ -132,36 +146,28 @@ public class AccessEvidencePackageService {
                 str(a[0]), str(a[1]), str(a[2]), str(a[3]), str(a[4]), str(a[5]), str(a[6]), str(a[7])
             });
 
+        // F2-342 — resolve a decider id → display label once per id (a campaign/register is
+        // dispositioned by a handful of people, so memoise), blank-safe: a null id (undecided
+        // row) or an id resolving to nobody renders "" rather than throwing or fabricating.
+        Map<Long, String> deciderCache = new HashMap<>();
+        Function<Long, String> decider = id -> id == null ? ""
+            : deciderCache.computeIfAbsent(id, k -> directory.resolve(k).map(directory::labelFor).orElse(""));
+
         byte[] sodSheet = writeXlsx(brandColor, "SoD Violations",
-            new String[]{"Rule", "Severity", "User", "Conflict", "Source", "Status",
-                "Detected (UTC)", "Accepted Until", "Disposition Note"},
-            violations, v -> new String[]{
-                nz(v.getRuleCode()), nz(v.getSeverity()), nz(v.getUsername()), nz(v.getDetailEn()),
-                nz(v.getDetectionSource()), nz(v.getStatus()),
-                v.getDetectedAt() == null ? "" : v.getDetectedAt().format(TS),
-                v.getAcceptedUntil() == null ? "" : v.getAcceptedUntil().toString(),
-                nz(v.getDispositionNote())
-            });
+            SOD_HEADERS, violations, v -> sodRow(v, decider));
 
         List<String[]> recertRows = new ArrayList<>();
         Map<Long, AccessReviewCampaign> byId = new HashMap<>();
         campaigns.forEach(c -> byId.put(c.getId(), c));
         for (AccessReviewCampaign c : campaigns) {
             for (AccessReviewItem i : itemRepo.findByCampaignIdAndIsDeletedFalseOrderByUsernameAscRoleNameAsc(c.getId())) {
-                recertRows.add(new String[]{
-                    nz(c.getTitleEn()), nz(c.getScope()),
-                    c.getWindowStart() + " → " + c.getWindowEnd(), nz(c.getWindowHijri()),
-                    nz(c.getStatus()), nz(i.getUsername()), nz(i.getRoleName()), nz(i.getDecision()),
-                    i.getDecidedAt() == null ? "" : i.getDecidedAt().format(TS), nz(i.getNote())
-                });
+                recertRows.add(recertRow(c, i, decider));
                 if (recertRows.size() >= MAX_ROWS) break;
             }
             if (recertRows.size() >= MAX_ROWS) break;
         }
         byte[] recert = writeXlsx(brandColor, "Recertification Evidence",
-            new String[]{"Campaign", "Scope", "Window", "Window (Hijri)", "Campaign Status",
-                "User", "Role", "Decision", "Decided (UTC)", "Note"},
-            recertRows, x -> x);
+            RECERT_HEADERS, recertRows, x -> x);
 
         long openSod = violations.stream().filter(v -> "OPEN".equals(v.getStatus())).count();
         byte[] readme = readmePdf(orgName, o == null ? null : o.getNameAr(), brand, brandColor, now,
@@ -333,6 +339,34 @@ public class AccessEvidencePackageService {
     private static String str(Object o) { return o == null ? "" : String.valueOf(o); }
 
     private static String nz(String s) { return s == null ? "" : s; }
+
+    /** SoD_Violations row — order matches {@link #SOD_HEADERS}. The disposition attribution
+     *  (WHO accepted the risk + WHEN) is co-stamped with the note/accepted-until by
+     *  {@code SodService}, so it is present on exactly the rows this sheet already surfaces. */
+    static String[] sodRow(SodViolation v, Function<Long, String> decider) {
+        return new String[]{
+            nz(v.getRuleCode()), nz(v.getSeverity()), nz(v.getUsername()), nz(v.getDetailEn()),
+            nz(v.getDetectionSource()), nz(v.getStatus()),
+            v.getDetectedAt() == null ? "" : v.getDetectedAt().format(TS),
+            v.getAcceptedUntil() == null ? "" : v.getAcceptedUntil().toString(),
+            nz(v.getDispositionNote()),
+            decider.apply(v.getDispositionBy()),
+            v.getDispositionAt() == null ? "" : v.getDispositionAt().format(TS)
+        };
+    }
+
+    /** Recertification_Evidence row — order matches {@link #RECERT_HEADERS}. The decider
+     *  ({@code decidedBy}) is co-stamped with {@code decidedAt} by {@code RecertificationService},
+     *  so the WHO travels beside the WHEN the sheet already carried. */
+    static String[] recertRow(AccessReviewCampaign c, AccessReviewItem i, Function<Long, String> decider) {
+        return new String[]{
+            nz(c.getTitleEn()), nz(c.getScope()),
+            c.getWindowStart() + " → " + c.getWindowEnd(), nz(c.getWindowHijri()),
+            nz(c.getStatus()), nz(i.getUsername()), nz(i.getRoleName()), nz(i.getDecision()),
+            decider.apply(i.getDecidedBy()),
+            i.getDecidedAt() == null ? "" : i.getDecidedAt().format(TS), nz(i.getNote())
+        };
+    }
 
     private static String esc(String s) {
         if (s == null) return "";
