@@ -15219,6 +15219,74 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-331 — a forensics artefact could be born VERIFIED, and a PUT could un-corrupt court evidence
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — `ForensicsArtefactController#create` and `#update` both route to `ForensicsArtefactService.save`, whose `copyMutable` copied `integrityStatus` AND `integrityVerifiedAt` straight from the request. Those two are the `verifyIntegrity()` attestation — owned by `POST /{id}/verify-integrity`, which emits `FORENSICS_INTEGRITY_LOST` (paging legal + CISO) and audits the check. All three routes carry `hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')`, so a same-permission caller could `PUT` a `CORRUPTED` artefact — court evidence flagged unusable — back to `VERIFIED` with no event and no integrity audit. A **same-permission control-defeat** ([[F2-328]]/[[F2-329]]'s shape, not [[F2-330]]'s privilege boundary), on *"the table whose history might end up in court"*. And the entity carried the [[F2-238]] landmine in the flattering direction (`integrity_status NOT NULL = "VERIFIED"`), so a created artefact was born asserting a verification that never ran. |
+| **Registers** | `socops.forensics_artefact` |
+| **Standards** | chain-of-custody integrity (ISO/IEC 27037 acquisition/verification; the `verifyIntegrity` attestation + `FORENSICS_INTEGRITY_LOST` escalation to legal + CISO) |
+| **Found by** | auditing the `mass-assignment-risk.txt` work-list ([[F2-218]]) — `ForensicsArtefactController#create(ForensicsArtefact) :: integrityVerifiedAt`, read against `save`/`copyMutable` and `verifyIntegrity()`; the entity initialiser was the second half. |
+| **Verification** | three unit tests (a create is born `UNVERIFIED`; a create scrubs a forged `VERIFIED` + timestamp; a `PUT` cannot flip a `CORRUPTED` artefact to `VERIFIED`); full hermetic build 4747 → 4750/0/0; census gate re-derived to 29; `tsc` clean. **Latent in data, live in code** ([[F2-283]]): dev and prod both hold 4 artefacts, all legitimately `VERIFIED` with a real `integrity_verified_at`, so 0 rows are born-VERIFIED-never-checked today — but the create default and the update copy are reachable by any of the four privileged roles via the API (the register has no UI create/update client). No live probe: a synchronous scrub, the permission boundary read from the `@PreAuthorize` annotations ([[F2-325]]…[[F2-330]]'s standard); no CHECK on the column, so no migration ([[F2-183]]). |
+
+### The forge: a dedicated attestation route's fields, copied from the request beside it
+
+`integrity_status`/`integrity_verified_at` are written by exactly one route — `verifyIntegrity(id, verified)`,
+which sets `VERIFIED`/`CORRUPTED` + `now()` and, on failure, publishes `FORENSICS_INTEGRITY_LOST` (AR-140:
+page legal counsel + CISO before any further handling) and audits an integrity check. `copyMutable`
+copied both columns unconditionally, so an ordinary `PUT /{id}` could rewrite the attestation with no
+event and no integrity audit — most sharply, flip a `CORRUPTED` artefact back to `VERIFIED`, erasing the
+record that the evidence was compromised. `create` was the same shape from the other side (a caller could
+`POST` a `VERIFIED` artefact with a chosen timestamp). Same-permission throughout, so the object-level
+`verifyIntegrity` route was the only control and `copyMutable` bypassed it — [[F2-328]]/[[F2-329]]'s shape,
+and [[F2-213]]'s create-side blind spot for the create half (the update-shape gate cannot see a create that
+binds a new entity). The fix removes both columns from `copyMutable` (they are `verifyIntegrity()`'s alone).
+
+### F2-238 in the flattering direction, on court evidence
+
+`integrity_status` is `NOT NULL` and the entity initialised it `= "VERIFIED"`. `save` persists the request
+entity on create, so an omitted `integrityStatus` deserialised to `"VERIFIED"` — every artefact born
+asserting a re-verification that never happened, with `integrity_verified_at` null and no
+`FORENSICS_INTEGRITY_LOST`/audit. The vocabulary V152 documents (`VERIFIED/CORRUPTED/UNVERIFIED`) has a
+distinct `UNVERIFIED` for exactly the "captured, hash recorded, not yet re-verified" state, so
+birth-`VERIFIED` was the defect and not a domain intent. The fix removes the initialiser and owns
+`UNVERIFIED` on the create path ([[F2-238]]'s remedy), registered in
+`NeverFiringNullGuardContractTest.everyRemovedInitialiserHasAWriterOnTheCreatePath` so a create that stops
+owning it fails rather than 500s on the NOT NULL column.
+
+### The FE renders a backend value it did not know
+
+`ForensicsPage`'s `INTEGRITY_TONE`/`INTEGRITY_LABEL` handled `VERIFIED/UNKNOWN/COMPROMISED/CORRUPTED` and
+**not** `UNVERIFIED`, so the new birth state would have rendered as a raw token with a neutral badge
+([[F2-205]]'s browser-after-green, pre-empted by reading rather than a running server). `UNVERIFIED` is
+added to both maps (`warning` / *Unverified* / *غير مُحقَّقة*), and the `socops.ts` vocabulary comment is
+corrected. The FE and backend vocabularies are otherwise disjoint — `UNKNOWN`/`COMPROMISED` are FE tokens
+the backend never writes ([[F2-196]]) — which is an owner decision, filed rather than reconciled.
+
+### The census reconciliation (F2-330's meta-finding, continued)
+
+Auditing the create-side work-list per member ([[F2-188]]) found nine more rows already CLOSED or INERT
+while printing NEEDS-VERDICT, because `BASELINE_UNADJUDICATED_NEW_CRIT` is a ceiling that does not force
+the census update its own contract asks for ([[F2-330]]). Each verdict was read against its service — a
+scrub or guard present, or a whitelist confirmed not to write the field — never trusted from prose:
+`PolicyController#create`/`createAttestation` and `DataSharingAgreementController#create` ([[F2-219]]),
+`BcmBiaAssessmentController#create` ([[F2-22b]]) and `#update` ([[F2-297]]),
+`BcmRemediationController#createCapa` ([[F2-234]]) and `#updateCapa` (INERT whitelist). `reviewerId` on the
+two BCM registers is an **assignment** (no `reviewedAt`/`reviewerName` column, no route stamps it —
+[[F2-226]]/[[F2-236]]), so legitimately caller-set. Ceiling re-derived 38 → 29 off the regenerated census
+([[F2-207]]/[[F2-258]]).
+
+### Filed
+
+`DataSharingAgreementController#create` stays NEEDS-VERDICT: its `isActive` (`Short NOT NULL = 1`) has no
+reader/writer in the `dsa` module, so it is likely inert, but it was not verified this slice and a wrong
+CLOSED is worse than a NEEDS-VERDICT ([[F2-188]]). The FE/backend integrity vocabulary is disjoint
+([[F2-196]]). The sibling custody pair (`currentCustodian`/`currentLocation`, owned by `transferCustody`,
+which appends a custody-ledger event) is copied by `copyMutable` on update, bypassing the ledger append — a
+completeness gap of a different shape (create-legitimate, update-questionable), filed. And the remaining
+**29** NEEDS-VERDICT rows are read per member, not swept.
+
 ## F2-330 — a BCP plan could be born with a forged attestation trail, and a ceiling let nine closed rows sit mislabelled
 
 | | |
