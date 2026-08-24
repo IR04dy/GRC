@@ -297,18 +297,27 @@ public class DataGovernanceService {
         // SEC-NDI-004: the referenced quality rule must belong to the caller's org.
         qualityRuleRepo.findByOrganisationIdAndId(o, req.qualityRuleId())
             .orElseThrow(() -> new EntityNotFoundException("Quality rule " + req.qualityRuleId() + " not found"));
+        // F2-335: canonicalise the RAG band on write. `band` is caller-supplied free text
+        // (no @Pattern, no CHECK, length 8) and TWO readers compare it case-sensitively — the
+        // QUALITY_RUN_RED escalation emit below AND DataOfficerQueryService#qRed30 (the "RED runs
+        // (30d)" dashboard count). A caller-supplied "red" would be stored verbatim, skip the
+        // escalation the dashboard + automation engine react to, AND vanish from the RED count.
+        // Normalise on write so both readers agree (F2-302, not equalsIgnoreCase); coerce not
+        // require (F2-182 — nothing upstream refuses a non-vocabulary band today, so a 400 would
+        // break a working request).
+        String band = req.band() == null ? null : req.band().trim().toUpperCase(java.util.Locale.ROOT);
         QualityRun run = new QualityRun();
         run.setOrganisationId(o);
         run.setQualityRuleId(req.qualityRuleId());
         run.setRecordsChecked(req.recordsChecked());
         run.setRecordsFailed(req.recordsFailed());
         run.setPassPct(req.passPct());
-        run.setBand(req.band());
+        run.setBand(band);
         run.setNotesEn(req.notesEn());
         run.setNotesAr(req.notesAr());
         qualityRunRepo.save(run);
         // Emit RED-band signal so the dashboard + automation engine react.
-        if ("RED".equals(req.band())) {
+        if ("RED".equals(band)) {
             support.emit("QUALITY_RUN_RED", "QUALITY_RULE", req.qualityRuleId(),
                 Map.of("passPct", req.passPct() == null ? "0" : req.passPct().toPlainString()));
         }
