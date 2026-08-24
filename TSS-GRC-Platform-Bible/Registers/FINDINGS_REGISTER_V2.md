@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-342 — the access-governance evidence package dropped the DECIDER from its SoD and recertification sheets
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 — an evidence-completeness defect on a regulator-facing EXPORT ([[F2-199]] harm ladder): no crash and no wrong value, but an omission of the load-bearing attribution. `AccessEvidencePackageService` builds the one-click access-evidence ZIP a SAMA/NCA inspector reads (NCA ECC 2-2 / SAMA CSF 3.3.5). Its `SoD_Violations.xlsx` sheet emitted the disposition note and accepted-until but **neither `dispositionBy` (WHO accepted the segregation-of-duties risk) nor `dispositionAt` (WHEN)**; its `Recertification_Evidence.xlsx` sheet emitted the decision and `decidedAt` (WHEN) but **not `decidedBy` (WHO recertified)** — a decision timestamp with no decider. For a four-eyes / maker-checker access review the decider identity IS the evidence, and the file left the platform stating *"a decision was made at T"* without saying by whom. |
+| **Registers** | `iam.governance` — `SodViolation.dispositionBy`/`dispositionAt` and `AccessReviewItem.decidedBy`, emitted by `AccessEvidencePackageService`'s SoD_Violations and Recertification_Evidence sheets. |
+| **Standards** | NCA ECC 2-2 (access management) / SAMA CSF 3.3.5 (access review); the [[F2-325]] / [[F2-326]] "the file that leaves the platform drops the actor" family; [[F2-249]] (`TenantUserDirectory`, the one person-reference resolver); [[F2-236]] / [[F2-256]] (the decider is the attribution an auditor reads). |
+| **Found by** | [[F2-215]]'s two-of-N applied to the multi-sheet regulator bundles — F2-325/F2-326 made the audit-trail sheet of `BcmEvidencePackageService` / `RegulatorPackageService` whole; the OTHER package services' OTHER sheets were unexamined. `AccessEvidencePackageService`'s two governance sheets emitted a decision WHEN with no WHO. |
+| **Verification** | hermetic — the two row-builders + header arrays extracted as package-private units and unit-tested over a stub resolver; no DB / PDF / ZIP / brand ([[F2-320]] / [[F2-325]] calibration). The decider is a real column, not a blank: `SodService` co-stamps `dispositionBy` + `dispositionAt` + `acceptedUntil` and `RecertificationService` co-stamps `decidedBy` + `decidedAt`, so the WHO is present on exactly the rows carrying the WHEN the sheets already showed ([[F2-198]] satisfied via the writer, not a DB query — the [[F2-325]] "co-populated, 0 divergent" precedent taken at the writer). Pre-fix control ([[F2-274]] / [[F2-287]]): reverting the decider columns turns all 5 legs RED (header absent + row/header size mismatch); the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). 5/5 legs; no migration. |
+
+### Blank-safe, never fabricated
+
+The decider ids resolve through `TenantUserDirectory` (F2-249) via `resolve(id).map(labelFor).orElse("")` — an undisposed/undecided row (null id) or an id resolving to nobody (a deleted user, a foreign-tenant id) renders `""`, never a throw and never an invented name ([[F2-213]] / [[F2-209]]: an honest blank beats a fabricated actor, and an evidence export must not 500 on one stale id). Memoised per id, since a campaign is dispositioned by a handful of reviewers.
+
+### Why the audit-trail-sheet fix did not cover this
+
+F2-325 added the actor to `BcmEvidencePackageService`'s `audit_log.csv`; F2-326 swept the *same entity* (`AuditLogEntry`) across `RegulatorPackageService`'s audit-trail sheet. Neither touched the access-governance package, whose decider lives on different entities (`SodViolation`, `AccessReviewItem`) in different sheets. [[F2-215]]'s two-of-N: the mechanism that made the audit-trail sheets whole was visibly present, so the sibling package's sibling sheets read as covered.
+
+### Filed
+
+The other multi-sheet package services were NOT swept this slice ([[F2-326]]'s rule — check every other bundle before calling the family done): `NdiSubmissionPackageService` (NDI/NDMO submission), `CommitteeFormExportService`, `AiRegistryExportService`. Each should be read for a sheet that emits a decision/status without its actor.
+
 ## F2-341 — the annual IFRS S2 / TCFD climate report counted outstanding CAPAs with a two-token list, dropping COMPLETED + VERIFIED
 
 | | |
