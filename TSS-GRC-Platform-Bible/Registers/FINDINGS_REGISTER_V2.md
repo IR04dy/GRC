@@ -15219,6 +15219,81 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-317 — a cross-tenant sweep whose audit rows all landed in tenant 1
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | **P2** — latent. A cross-tenant audit mis-attribution: one tenant's log gains entries about other tenants' risks, and those tenants get none. |
+| **Registers** | `risk.risks`, `platform.audit_log` |
+| **Standards** | multi-tenancy; audit integrity |
+| **Found by** | Asking F2-191's question — *which scheduled sweeps abort on one bad row?* — which was **refuted at 0 of 33**, and reading the four that delegate one hop |
+| **Verification** | 5 unit legs; mutations **3/3 killed**; suite **4712 → 4717/0/0** |
+
+### Two callers, one of them with no tenant
+
+```
+runOverdueSweepForTenant()   tenant-scoped query, called from RiskReviewController
+runOverdueSweepAllTenants()  cross-tenant query,  called from RiskReviewScheduler
+```
+
+Both delegate to one private `flag(List<Risk>)`. `AuditLogService.recordEvent` does
+`org != null ? org : 1L` — *"fall back to tenant 1 (system events)"* — so on the scheduler path every
+`RISK_REVIEW_OVERDUE` row was stamped **organisation 1** whatever tenant's risk it described.
+
+🔑 **The `DomainEvent` two lines below already passed `r.getOrganisationId()` explicitly. Within one
+loop body the event was org-explicit and the audit row beside it was not** — that asymmetry is the
+whole tell.
+
+### Latent, and the configuration is what made it so
+
+`grc.risk.review-scheduler-enabled` defaults **false** and is set in no profile, so the sweep has
+never run; all 7 existing rows came from the per-tenant path (org 1, no mismatch). Measured
+identically in both databases: **24 risks are past their review date and unflagged — 4 in org 1, 10
+in org 2, 10 in org 3.** So enabling one flag would have mis-stamped twenty audit rows. What made it
+harmless was the configuration, not the code ([[F2-182]]).
+
+### RESTORE, not clear — and the naive fix is a mutation that gets killed
+
+`runOverdueSweepForTenant` is called from a **controller**, so the request continues after this
+returns; a plain `finally { clear(); }` would strip its tenant mid-request. `EvidenceItemService
+.expireStaleEvidence` clears and is **right** to — its only caller is a scheduler with no ambient
+tenant to lose. 🔑 **Restore-versus-clear is a property of the callers, not a house style.**
+
+### The per-item catch this slice set out to add is deliberately absent
+
+`audit.log` is `@Transactional` and joins this transaction, so catching its failure still leaves the
+transaction rollback-only and the whole batch fails at commit. 🔑 **The catch would create the
+appearance of resilience while changing nothing** — the decoy shape this register keeps finding. Doing
+it properly needs a per-row `REQUIRES_NEW` boundary (the recorded engine-wiring rule) and is filed.
+
+### The population is exactly two, and the other one was already right
+
+Two cross-tenant finders exist in the platform. `expireStaleEvidence` anchors the tenant on the row
+and carries an [[F2-242]] comment explaining why. **The correct idiom was in the tree beside the one
+place it was not applied** — [[F2-195]]'s shape, third slice running.
+
+⚠ A gate leg holds the shape because the population will grow. **My first draft failed on this very
+fix**: it looked forward a fixed number of characters from the call site, and the per-row setter lives
+in `flag`, which the long javadoc above it pushed past the window. A gate that fails on correct code
+trains the next reader to edit the assertion ([[F2-214]]), so it is class-scoped now with that
+limitation **stated** — it catches a cross-tenant sweep in a class that never anchors a tenant and
+would miss one anchoring in a different method.
+
+### No live probe, deliberately
+
+The only reachable path is the per-tenant sweep, which would flag **four real overdue risks** and
+write four **irreversible** audit rows on a customer-shaped database (house rule 6, [[F2-206]]). The
+unit leg captures `TenantContext` at the moment of each audit call — 🔑 **a mock that records only its
+arguments cannot see this defect, because the organisation is never an argument.**
+
+### Filed
+
+* Per-row `REQUIRES_NEW` for this and the sibling sweep, so one bad row genuinely does not abort the
+  batch rather than appearing not to.
+* The **24 unflagged overdue risks** and whether `grc.risk.review-scheduler-enabled` should be on —
+  an owner decision, now safe to make.
+
 ## F2-316 — the platform already had the right idiom, and the reporting module was the one place that broke it
 
 | | |
