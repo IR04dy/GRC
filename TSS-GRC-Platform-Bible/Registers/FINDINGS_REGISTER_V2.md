@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-332 — a PUT could move a forensics artefact's custody with no chain-of-custody ledger row
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P2 — `ForensicsArtefactService.copyMutable` copied `currentCustodian` AND `currentLocation` straight from the request. Those are the denormalised pointer to the latest row of the SOC-D append-only custody ledger, written by exactly one route — `transferCustody(id, newCustodian, newLocation, notes)`, which APPENDS an immutable `forensics_custody_event` TRANSFER row *before* moving the pointer and audits `FORENSICS_CUSTODY_TRANSFER` so the chain can be reconstructed verbatim in court. `copyMutable` runs **only on the update branch** of `save` (a create uses the request entity directly and seeds a CAPTURE ledger row from these fields), so a `PUT /{id}` moved the custodian/location of court-bound evidence with **no ledger row and no audit** — the chain-of-custody invariant `current_custodian == latest ledger row` broken silently. The `transferCustody`, `create` and `update` routes all carry `hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO', ...)`, so it is a **same-permission control-defeat** — [[F2-331]]'s forge one field-pair over, on the same register. |
+| **Registers** | `socops.forensics_artefact` · `socops.forensics_custody_event` |
+| **Standards** | chain-of-custody integrity (ISO/IEC 27037 acquisition/handling; the append-only SOC-D custody ledger + `FORENSICS_CUSTODY_TRANSFER` audit reconstructed verbatim in a courtroom) |
+| **Found by** | [[F2-331]]'s own filed *"custody pair"* item — reading `ForensicsArtefactService.copyMutable` against `transferCustody()` and the CAPTURE-seed on the create path. |
+| **Verification** | two unit tests (an update leaves the custody pointer unchanged and appends **no** ledger row; a create keeps the request custodian and seeds the CAPTURE row); full hermetic build 4750 → 4752/0/0; `tsc` clean (no FE change — the custodian already rendered). **Latent in data, live in code** ([[F2-283]]): all **4** artefacts in dev **and** prod carry a custodian with **0 ledger rows** — seeded by direct SQL, bypassing `save()`, so no CAPTURE row exists and no pointer has been silently moved — but the `PUT` path is reachable by any of the four privileged roles. No live probe: a synchronous copy removal, the permission boundary read from the controller's `@PreAuthorize` annotations ([[F2-325]]…[[F2-331]]'s standard); the FE has no create/update client (only `forensicsTransferCustody`), so the route is API-only. No initialiser removed (both columns are nullable), so no `Moved` gate entry — a pure `copyMutable` scrub. |
+
+### The sibling forge, one field-pair over
+
+[[F2-331]] closed the integrity attestation pair (`integrityStatus`/`integrityVerifiedAt`) in `copyMutable` and **filed the custody pair beside it**. This is that pair. `transferCustody`'s own comment states the design: *"APPEND an immutable custody-transfer row to the ledger BEFORE moving the artefact's current-holder pointer — the chain is only ever extended, never overwritten. The artefact's current_custodian is a denormalised pointer to the latest ledger row."* `copyMutable` copying `currentCustodian`/`currentLocation` from a `PUT` body wrote the pointer with no ledger extension — the one operation the SOC-D design exists to make impossible. 🔑 **[[F2-215]]'s two-of-N: F2-331 fixed the pair it noticed and the mechanism that fixed it (the `copyMutable` scrub) was visibly present, so the sibling pair looked covered. The reusable lesson is to sweep *every* field-pair a shared create-or-update `save`/`copyMutable` shares with a dedicated route, in the same slice — not just the one that motivated the finding.**
+
+### Create is legitimate; only update is the forge
+
+`save` branches on `isNew`: a create uses the request entity as `target` (so the initial custodian/location come from the request) and then **seeds a CAPTURE ledger row** from `saved.getCurrentCustodian()`/`getCurrentLocation()` (lines 79–84), so the pointer and the ledger agree from acquisition. Only the `else` (update) branch calls `copyMutable`. So the fix is simply to stop copying the two fields in `copyMutable`: an update now leaves the pointer where `transferCustody` last set it, and a create is unchanged. The `update_cannotMoveCustodyWithoutLedger` test asserts both halves that matter — the pointer is untouched **and** `verify(ledger, never()).save(...)` — and `create_keepsRequestCustodian_andSeedsCaptureLedger` pins the create-legitimate half so a future over-zealous scrub cannot break acquisition.
+
+### Filed
+
+The seed gap is real and separate: all 4 seeded artefacts have a `current_custodian` but **0 custody-ledger rows**, because `seed_real_data.py` inserts them by direct SQL rather than through `save()` (which writes the CAPTURE row) — *"Don't 'seed' an empty table before checking it's wired."* Back-filling a CAPTURE row into a customer database is a destructive write on a court-bound register (house rule 6), so it is reported, not done. The remaining forensics filings from [[F2-331]] stand: `DataSharingAgreementController#create`'s `isActive`, the FE/BE integrity-vocabulary mismatch ([[F2-196]]), and the **29** remaining mass-assignment `NEEDS-VERDICT` rows (read per member, [[F2-188]]).
+
 ## F2-331 — a forensics artefact could be born VERIFIED, and a PUT could un-corrupt court evidence
 
 | | |

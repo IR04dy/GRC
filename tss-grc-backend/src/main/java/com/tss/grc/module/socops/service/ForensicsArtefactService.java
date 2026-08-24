@@ -115,8 +115,13 @@ public class ForensicsArtefactService {
         // verifyIntegrity()'s alone. Copying them let a same-permission caller PUT a CORRUPTED
         // artefact (court evidence flagged unusable, legal + CISO paged via FORENSICS_INTEGRITY_LOST)
         // back to VERIFIED with no event and no integrity audit — a silent chain-of-custody forge.
-        target.setCurrentCustodian(in.getCurrentCustodian());
-        target.setCurrentLocation(in.getCurrentLocation());
+        // F2-332 — currentCustodian / currentLocation are NOT copied from the request: they are
+        // transferCustody()'s alone, which APPENDS an immutable custody-ledger TRANSFER row before
+        // moving the pointer (SOC-D chain of custody; current_custodian is a denormalised pointer to
+        // the latest ledger row). copyMutable runs only on the update branch, so a PUT that changed
+        // the custodian moved court-bound evidence with no ledger row and no FORENSICS_CUSTODY_TRANSFER
+        // audit — the F2-331 forge, one field-pair over. Create sets both from the request directly
+        // (save's isNew branch) and seeds the CAPTURE ledger row from them, so create is unaffected.
         target.setRetentionUntil(in.getRetentionUntil());
         target.setDisposedAt(in.getDisposedAt());
         target.setDisposalMethod(in.getDisposalMethod());
