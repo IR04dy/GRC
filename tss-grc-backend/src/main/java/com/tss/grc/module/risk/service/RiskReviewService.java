@@ -133,21 +133,62 @@ public class RiskReviewService {
         return flag(riskRepository.findReviewOverdueAllOrgs(LocalDate.now()));
     }
 
+    /**
+     * ⚠⚠ F2-317 — the tenant is set <b>per row</b>, because this method has two callers and only
+     * one of them arrives with an ambient tenant.
+     *
+     * <p>{@link #runOverdueSweepForTenant()} is called from {@code RiskReviewController}, so
+     * {@code TenantContext} holds the caller's organisation. {@link #runOverdueSweepAllTenants()} is
+     * called from {@code RiskReviewScheduler}, where nothing sets it — and
+     * {@code AuditLogService.recordEvent} does {@code org != null ? org : 1L}, falling back to
+     * <b>tenant 1</b> for "system events". So every {@code RISK_REVIEW_OVERDUE} row the scheduler
+     * wrote would be stamped organisation 1 whatever tenant's risk it described: tenant 1's audit log
+     * gains entries naming other tenants' risk codes, and those tenants get no record that their
+     * risks were flagged at all.
+     *
+     * <p>🔑 The {@code DomainEvent} two lines down already passes {@code r.getOrganisationId()}
+     * explicitly. <b>Within one loop body the event was org-explicit and the audit row beside it was
+     * not</b> — that asymmetry is the tell.
+     *
+     * <p>Latent when found: the scheduler is off by default
+     * ({@code grc.risk.review-scheduler-enabled:false}, set in no profile) so it had never run, and
+     * all seven existing rows came from the per-tenant path. Measured, <b>24 risks are past their
+     * review date and unflagged — 4 in org 1, 10 in org 2, 10 in org 3</b>, so enabling one flag
+     * would have mis-stamped 20 of them. What made it harmless was the configuration, not the code
+     * ([[F2-182]]).
+     *
+     * <p>⚠ The ambient tenant is <b>restored</b>, never cleared: the controller path continues
+     * inside the same request after this returns, and clearing would strip its tenant mid-request.
+     * {@code KriSchedulerService} clears in its {@code finally} and is right to — it has no ambient
+     * tenant to lose.
+     *
+     * <p>⚠ Deliberately <b>no per-row try/catch</b>, which is what this slice set out to add.
+     * {@code audit.log} is {@code @Transactional} and joins this transaction, so catching its failure
+     * still leaves the transaction rollback-only and the whole batch fails at commit: the catch would
+     * create the <em>appearance</em> of resilience while changing nothing. Doing it properly needs a
+     * per-row {@code REQUIRES_NEW} boundary — the recorded engine-wiring rule — and is filed.
+     */
     private int flag(List<Risk> overdue) {
         LocalDate today = LocalDate.now();
         int flagged = 0;
-        for (Risk r : overdue) {
-            if ("OVERDUE".equals(r.getReviewStatus())) continue;  // already flagged — idempotent
-            r.setReviewStatus("OVERDUE");
-            riskRepository.save(r);
-            flagged++;
-            long days = r.getReviewDate() == null ? 0 : Math.max(0, ChronoUnit.DAYS.between(r.getReviewDate(), today));
-            audit.log("RISK_REVIEW_OVERDUE", "Risk", r.getId(),
-                    "Risk " + riskCode(r.getId()) + " review overdue by " + days + " day(s) (due " + r.getReviewDate() + ")");
-            events.publishEvent(new DomainEvent(
-                    r.getOrganisationId(), "RISK_REVIEW_OVERDUE",
-                    "Risk", r.getId(), riskCode(r.getId()),
-                    overduePayload(r, days)));
+        Long ambient = TenantContext.getCurrentTenant();
+        try {
+            for (Risk r : overdue) {
+                if ("OVERDUE".equals(r.getReviewStatus())) continue;  // already flagged — idempotent
+                TenantContext.setCurrentTenant(r.getOrganisationId());
+                r.setReviewStatus("OVERDUE");
+                riskRepository.save(r);
+                flagged++;
+                long days = r.getReviewDate() == null ? 0 : Math.max(0, ChronoUnit.DAYS.between(r.getReviewDate(), today));
+                audit.log("RISK_REVIEW_OVERDUE", "Risk", r.getId(),
+                        "Risk " + riskCode(r.getId()) + " review overdue by " + days + " day(s) (due " + r.getReviewDate() + ")");
+                events.publishEvent(new DomainEvent(
+                        r.getOrganisationId(), "RISK_REVIEW_OVERDUE",
+                        "Risk", r.getId(), riskCode(r.getId()),
+                        overduePayload(r, days)));
+            }
+        } finally {
+            TenantContext.setCurrentTenant(ambient);
         }
         return flagged;
     }
