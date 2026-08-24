@@ -33,4 +33,16 @@ public interface ObIncidentRepository extends JpaRepository<ObIncident, Long> {
      *  {@code Boolean.TRUE.equals(...)} guard. */
     long countByOrganisationIdAndSamaReportableAndStatusNotIn(
             Long organisationId, Boolean samaReportable, java.util.Collection<String> statuses);
+
+    /** F2-337 — the reference minter seeds from the highest existing ordinal for this org+year
+     *  (a MAX, never a COUNT: a count re-mints a used ordinal after a gap or beyond the window).
+     *  {@code @Where(is_deleted = 0)} scopes this to live rows, matching the filtered unique index
+     *  {@code ux_ob_incident_reference}. Reference ordinals are zero-padded, so a lexicographic
+     *  DESC is a numeric DESC within the format's domain. */
+    Optional<ObIncident> findTopByOrganisationIdAndReferenceStartingWithOrderByReferenceDesc(
+            Long organisationId, String referencePrefix);
+
+    /** F2-337 — collision guard for the mint skip-loop; live rows only, so it agrees with the
+     *  filtered unique index (a soft-deleted reference is free to be re-used). */
+    boolean existsByOrganisationIdAndReference(Long organisationId, String reference);
 }
