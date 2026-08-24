@@ -15219,6 +15219,41 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-339 — a jakarta.persistence.NoResultException escaped every DB handler and surfaced as an opaque 500 instead of a 404
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-24 |
+| **Severity** | P3 (diagnostic quality; live in code) — `GlobalExceptionHandler` had no `@ExceptionHandler(NoResultException.class)`. `jakarta.persistence.NoResultException` (thrown by `em.getSingleResult()` when a query returns zero rows) is a `jakarta.persistence.PersistenceException`, **not** a Spring `DataAccessException`, so it did not match `handleMissingDbObject(DataAccessException)` or any other DB handler, and Spring's `PersistenceExceptionTranslationPostProcessor` — which would have translated it into a Spring exception — fires only for `@Repository`-annotated beans, not a `@Service` calling the `EntityManager` directly. The raw jakarta type therefore matched only `@ExceptionHandler(Exception.class)` → `handleGeneral` → **HTTP 500** with the bare *"An unexpected database error occurred."* body, for what is really a "record not found" condition. Live in code and reachable through ordinary use; not measured against a running backend this slice. |
+| **Registers** | platform-wide error mapping (`common/exception/GlobalExceptionHandler`); reachable throwers today: `EvidenceChainService.verifyChain` / `getChainStatus` (`GET /evidence-chain/{id}`, `POST /evidence-chain/{id}/verify`), and `CyberPdplBridgeService.triggerForIncident` ([[F2-281]]'s filed instance). |
+| **Standards** | RFC 7807 problem responses; the [[F2-227]] lineage — an opaque 500 that cannot be diagnosed from the response gets rediscovered instead of fixed (F2-180: a wrong-but-specific diagnostic at least sends the reader somewhere; a generic diagnostic from a specific handler sends them nowhere). |
+| **Found by** | asking [[F2-227]]'s question of the other opaque-500 families: a sweep for `getSingleResult()` (which throws `NoResultException` on empty) found `EvidenceChainService` selecting an evidence row by id, and the handler carried no mapping for the jakarta type — so it fell to the catch-all. [[F2-281]] had already observed the same behaviour on `CyberPdplBridgeService` and filed it. |
+| **Verification** | hermetic — the fix is pure handler logic with no DB / tenant / row_version / collation dimension ([[F2-320]]/[[F2-325]] calibration), so no live probe. Extends the existing `GlobalExceptionHandlerTest` ([[F2-190]], not a new class) with three legs: (1) `handleNoResult` returns 404 with title *"Resource Not Found"* and no leaked exception class or root message under `verboseErrors=false` (SEC-CFG-001); (2) under `verboseErrors=true` the class name and JPA root message are surfaced while the status stays 404; (3) — the load-bearing one — `new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(new NoResultException(...)).getName()` is `handleNoResult`, i.e. Spring's own resolution now routes the exception to the dedicated handler rather than to `handleGeneral`. Pre-fix control ([[F2-274]]/[[F2-287]]): disabling only the `@ExceptionHandler(NoResultException.class)` annotation (leaving the method so the two direct-call legs still compile and stay green — they test the method body) fails the resolver leg alone, `expected: "handleNoResult" but was: "handleGeneral"`; the fix was committed first so the control is recoverable by `git checkout` ([[F2-297]]). Full hermetic build **4771/0/0**. |
+
+### The defect is one of routing, and why the routing was wrong
+
+`@ExceptionHandler` methods on a `@RestControllerAdvice` are resolved by Spring's `ExceptionHandlerMethodResolver`, which picks the handler whose declared exception type is the *nearest supertype* of the thrown exception. Before this slice the only ancestor of `NoResultException` with a handler was `Exception` (via `handleGeneral`), because:
+
+1. `NoResultException` extends `jakarta.persistence.PersistenceException` extends `RuntimeException` — none of which had a handler.
+2. It is **not** a `org.springframework.dao.DataAccessException`, so `handleMissingDbObject(DataAccessException)` (which F2-227 established was the handler that swallowed DB exceptions into a generic 500) never matched it either.
+3. Spring only translates a raw `PersistenceException` into a `DataAccessException` for beans it wraps with `PersistenceExceptionTranslationPostProcessor` — i.e. `@Repository` beans. The throwers here are `@Service` classes calling `EntityManager.getSingleResult()` directly, so no translation happened and the raw jakarta type propagated all the way to the advice.
+
+So the exception surfaced as `handleGeneral`'s catch-all 500. The fix adds `@ExceptionHandler(NoResultException.class)` returning a 404, which the resolver now prefers (exact match beats the `Exception` supertype).
+
+### Why 404 is unambiguously correct here (no policy choice)
+
+A blanket "map exception X to a friendlier status" is usually a product decision, because X may arise from several conditions. Not here: `getSingleResult()` is the **only** thing that throws `NoResultException`, and it throws it in exactly one situation — a query that expected a single row got zero. Every reachable thrower in the tree is a lookup of a governance record by its id (with a tenant filter), so zero rows means the id is unknown, belongs to another tenant, or is soft-deleted — i.e. *not found*. There is no thrower for which the old 500 was the right answer, so there is nothing to weigh: 404 is honest for every case, and no working request is broken (nobody depends on a 500).
+
+### Reachability
+
+`EvidenceChainController` exposes `GET /evidence-chain/{evidenceId}` (`EVIDENCE:READ`) → `getChainStatus` and `POST /evidence-chain/{evidenceId}/verify` (`EVIDENCE:WRITE`) → `verifyChain`, both taking `evidenceId` straight from the path, and the underlying `SELECT … FROM evidence.evidence_items WHERE id = :id AND organisation_id = :org AND is_deleted = 0` `.getSingleResult()` throws `NoResultException` on any id that is unknown, foreign-tenant or soft-deleted. So the opaque 500 is reachable through ordinary use — e.g. opening the chain view for a record that was just deleted. State which you have ([[F2-283]]): the code defect is live; it was not re-measured against a running backend this slice (none up), and the fix does not change the isolation behaviour (a foreign id still returns nothing, now as a 404 rather than a 500).
+
+### Filed
+
+- The per-site `getSingleResult()` calls (`EvidenceChainService`, `CyberPdplBridgeService`) are left as-is: the handler fix covers them platform-wide, and rewriting each to `getResultStream().findFirst().orElseThrow(...)` would be churn for no additional behaviour. `CyberPdplBridgeService`'s instance was [[F2-281]]'s filed item and is now closed by this handler.
+- `NonUniqueResultException` (the sibling `getSingleResult()` throws when a by-id query returns more than one row) is deliberately **not** remapped: that is a genuine data-integrity bug where a named 500 is the honest answer, not a 404, and no reachable thrower produces it today.
+- `org.springframework.dao.EmptyResultDataAccessException` (the `JdbcTemplate.queryForObject` equivalent) is a `DataAccessException` and so is already caught by `handleMissingDbObject`; it is a different family and nothing in the tree throws it on a by-id lookup, so it is out of scope here.
+
 ## F2-338 — After-Action Report title composed from a 500-char source into a 300-char column, with no cap: a long-but-legal crisis title 500s AAR generation
 
 | | |
