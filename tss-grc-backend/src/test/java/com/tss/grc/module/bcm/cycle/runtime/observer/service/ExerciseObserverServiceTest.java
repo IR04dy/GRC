@@ -89,6 +89,8 @@ class ExerciseObserverServiceTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
     @Mock private RealtimeBroadcaster realtime;
+    @Mock private com.tss.grc.module.bcm.cycle.service.BcmRemediationService remediation;
+    @Mock private com.tss.grc.module.bcm.cycle.repository.BcmGapRepository gaps;
     @InjectMocks private ExerciseObserverService service;
 
     @BeforeEach
@@ -647,5 +649,55 @@ class ExerciseObserverServiceTest {
     private ExerciseObservation observationLookup(Long id, boolean flagged) {
         ExerciseObservation o = observationFixture(id, OBSERVER_USER_ID, "COMPLIANCE", "MODERATE", flagged);
         return o;
+    }
+
+    // ─── F2-347: a gap title composed from a caller-supplied run_code + a 180-char observation
+    //             excerpt must be capped to BcmGap.title_en (@Column(length = 255)) ───────────
+    @Test
+    void promoteObservationToGap_capsTitleToTheColumnLengthWhenRunCodeIsLong() {
+        // run_code is caller-supplied (StartRunRequest.runCode, no @Size) up to its 64-char column;
+        // 18 (prefix) + 60 + 3 + 180 (observation excerpt) = 261 > 255 without a cap.
+        String longRunCode = "RUN-" + "A".repeat(56);   // 60 chars
+        ExerciseRun run = new ExerciseRun();
+        run.setId(RUN_ID);
+        run.setOrganisationId(ORG_ID);
+        run.setRunCode(longRunCode);
+
+        ExerciseObservation o = new ExerciseObservation();
+        o.setId(8100L);
+        o.setExerciseRunId(RUN_ID);
+        o.setSeverity("MAJOR");
+        o.setObservationTextEn("x".repeat(300));
+        o.setObservationTextAr("y".repeat(300));
+
+        when(runRepo.findByIdAndOrganisationId(RUN_ID, ORG_ID)).thenReturn(Optional.of(run));
+        when(observationRepo.findByIdAndOrganisationId(8100L, ORG_ID)).thenReturn(Optional.of(o));
+        when(remediation.createGap(any())).thenAnswer(inv -> {
+            com.tss.grc.module.bcm.cycle.entity.BcmGap g = inv.getArgument(0);
+            g.setId(500L);
+            return g;
+        });
+
+        service.promoteObservationToGap(RUN_ID, 8100L);
+
+        ArgumentCaptor<com.tss.grc.module.bcm.cycle.entity.BcmGap> cap =
+            ArgumentCaptor.forClass(com.tss.grc.module.bcm.cycle.entity.BcmGap.class);
+        verify(remediation).createGap(cap.capture());
+        com.tss.grc.module.bcm.cycle.entity.BcmGap g = cap.getValue();
+        assertThat(g.getTitleEn().length()).isLessThanOrEqualTo(255);
+        assertThat(g.getTitleEn()).startsWith("Exercise finding (");   // the run reference is not truncated away
+        assertThat(g.getTitleAr().length()).isLessThanOrEqualTo(255);
+    }
+
+    @Test
+    void gapTitleMax_mirrorsTheBcmGapColumnLength() throws Exception {
+        java.lang.reflect.Field f = ExerciseObserverService.class.getDeclaredField("GAP_TITLE_MAX");
+        f.setAccessible(true);
+        int cap = (int) f.get(null);
+        int col = com.tss.grc.module.bcm.cycle.entity.BcmGap.class
+            .getDeclaredField("titleEn").getAnnotation(jakarta.persistence.Column.class).length();
+        assertThat(cap)
+            .as("F2-347: GAP_TITLE_MAX must mirror BcmGap.title_en @Column(length) so the cap and the column cannot drift")
+            .isEqualTo(col).isEqualTo(255);
     }
 }

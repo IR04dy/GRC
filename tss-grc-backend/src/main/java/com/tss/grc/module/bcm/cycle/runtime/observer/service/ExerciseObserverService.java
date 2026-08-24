@@ -441,9 +441,9 @@ public class ExerciseObserverService {
         gap.setRelatedRecordType("ExerciseObservation");
         gap.setRelatedRecordId(o.getId());
         String text = o.getObservationTextEn() != null ? o.getObservationTextEn() : o.getObservationTextAr();
-        gap.setTitleEn("Exercise finding (" + run.getRunCode() + "): " + truncate(text, 180));
+        gap.setTitleEn(truncate("Exercise finding (" + run.getRunCode() + "): " + truncate(text, 180), GAP_TITLE_MAX));
         gap.setTitleAr(o.getObservationTextAr() != null
-            ? "ملاحظة تمرين (" + run.getRunCode() + "): " + truncate(o.getObservationTextAr(), 180) : null);
+            ? truncate("ملاحظة تمرين (" + run.getRunCode() + "): " + truncate(o.getObservationTextAr(), 180), GAP_TITLE_MAX) : null);
         gap.setDescription(text);
         gap.setRootCause(o.getRecommendationEn() != null
             ? "Observer recommendation: " + o.getRecommendationEn() : null);
@@ -682,6 +682,11 @@ public class ExerciseObserverService {
     private static String nullSafe(String s) {
         return ExerciseRunProjections.nullSafe(s);
     }
+
+    /** F2-347 — BcmGap.title_en is @Column(length = 255). The gap title composes a
+     *  caller-supplied run_code (@Column(length = 64), no @Size) with a 180-char observation
+     *  excerpt, so run_code + prefix + 180 can exceed 255; cap the whole title to the column. */
+    private static final int GAP_TITLE_MAX = 255;
 
     private static String truncate(String s, int max) {
         return ExerciseRunProjections.truncate(s, max);
