@@ -47,6 +47,9 @@ public class EsgHorizonService {
 
     private static final MathContext MC = new MathContext(12, RoundingMode.HALF_UP);
     private static final BigDecimal TOLERANCE = new BigDecimal("0.05");   // 5 % trajectory tolerance
+    /** F2-346 — CorrectiveAction.title_en is @Column(length = 255); an auto-raised CAPA
+     *  title composed from a free-text field must be capped to it or the INSERT 8152s. */
+    private static final int CA_TITLE_MAX = 255;
 
     private final EsgTargetRepository targets;
     private final EsgTargetActualRepository actuals;
@@ -263,7 +266,7 @@ public class EsgHorizonService {
         ca.setOrganisationId(org);
         ca.setSourceType("ENV_PERMIT");                       // whitelisted in ck_ca_source (V289)
         ca.setSourceRef("ENV_PERMIT_VIOLATION:" + saved.getId());
-        ca.setTitleEn("NCEC violation on permit " + p.getPermitNumber() + ": " + descriptionEn);
+        ca.setTitleEn(cap("NCEC violation on permit " + p.getPermitNumber() + ": " + descriptionEn, CA_TITLE_MAX));
         ca.setTitleAr("مخالفة بيئية على التصريح " + p.getPermitNumber());
         ca.setDescriptionEn("Facility " + p.getFacilityEn() + " — violation dated " + violationDate
             + ". Remediate and evidence closure to NCEC.");
@@ -276,6 +279,14 @@ public class EsgHorizonService {
         audit.log("CREATE", "EnvPermitViolation", saved.getId(),
             "Violation recorded on permit " + p.getPermitNumber() + " (CAPA " + ca.getId() + ")");
         return saved;
+    }
+
+    /** Cap a server-composed string to a column length (F2-346 / F2-338 idiom). The full
+     *  violation text is preserved on EnvPermitViolation.description_en (NVARCHAR(500)) and
+     *  the CAPA links back via source_ref, so truncating the title loses nothing recoverable. */
+    private static String cap(String v, int max) {
+        if (v == null) return null;
+        return v.length() <= max ? v : v.substring(0, max - 1) + "\u2026";
     }
 
     private EnvPermit mustPermit(Long id) {
