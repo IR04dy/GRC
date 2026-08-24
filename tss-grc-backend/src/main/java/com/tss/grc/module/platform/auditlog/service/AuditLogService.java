@@ -160,6 +160,25 @@ public class AuditLogService {
             .message(message));
     }
 
+    /**
+     * ⚠⚠ F2-321 — the first frame outside this class, for the F2-320 warning.
+     *
+     * <p>{@code sourceModule} was the obvious thing to print and is <b>null on 3,524 of the 3,809</b>
+     * off-request rows in dev, because the {@code log(...)} convenience method never sets it. A
+     * warning naming nothing locatable is worse than none: it looks informative, so the reader stops.
+     *
+     * <p>⚠ {@code StackWalker} is used rather than {@code new Throwable().getStackTrace()} because it
+     * does not materialise the whole trace — this runs on every unanchored audit write.
+     */
+    private static String callerOf() {
+        return StackWalker.getInstance()
+            .walk(frames -> frames
+                .map(StackWalker.StackFrame::getClassName)
+                .filter(c -> !c.equals(AuditLogService.class.getName()))
+                .findFirst()
+                .orElse("unknown caller"));
+    }
+
     /** Full builder path. */
     @Transactional
     public AuditLogEntry recordEvent(AuditEventBuilder b) {
@@ -182,10 +201,17 @@ public class AuditLogService {
             // enumerated statically (listener registration, reflection, SpEL), so refusing would
             // risk breaking a path nobody has seen — the one failure a fix must not have. The
             // default is unchanged; only its visibility is.
-            log.warn("[audit] no tenant in context for action {} (module {}) — filing under "
-                     + "organisation 1. If this event genuinely belongs to no tenant, say so with "
-                     + "AuditEventBuilder.systemEvent(); otherwise anchor the tenant on the row "
-                     + "(F2-317/318/319).", b.actionType, b.sourceModule);
+            // ⚠⚠ F2-321 — the CALLER is named, not the source module. F2-320's first version
+            // printed `b.sourceModule`, and measured over the live rows that is NULL on 3,524 of the
+            // 3,809 off-request entries in dev, because the `log(...)` convenience method never sets
+            // it and that is what almost every writer uses. So the warning would have read
+            // "module null" for 92% of the population it exists to surface — an artefact that looks
+            // informative and is not, which is the shape this whole chain is about.
+            log.warn("[audit] no tenant in context for action {} from {} — filing under organisation "
+                     + "1. If this event genuinely belongs to no tenant, say so with "
+                     + "AuditLogService.logSystem(...) or AuditEventBuilder.systemEvent(); otherwise "
+                     + "anchor the tenant on the row it describes (F2-317/318/319).",
+                     b.actionType, callerOf());
         }
         e.setOrganisationId(org != null ? org : 1L);
 

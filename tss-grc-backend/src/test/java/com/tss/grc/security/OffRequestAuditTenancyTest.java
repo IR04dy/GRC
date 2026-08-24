@@ -341,6 +341,18 @@ class OffRequestAuditTenancyTest {
                 An audit write with no tenant produced no warning, so a row filed under organisation                 1 by mistake stays indistinguishable from one filed there on purpose — which is how                 F2-317, F2-318 and F2-319 each stayed invisible.""")
                 .anyMatch(m -> m.contains("PROBE_UNANCHORED") && m.contains("systemEvent"));
 
+            // F2-321 — the warning must name the CALLING CLASS. Its first version printed
+            // b.sourceModule, which is NULL on 3,524 of the 3,809 off-request rows in dev because
+            // the log(...) convenience method never sets it — so it would have read "module null"
+            // for 92% of the population it exists to surface. A warning naming nothing locatable is
+            // worse than none: it looks informative, so the reader stops.
+            assertThat(appender.list.stream()
+                    .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .toList())
+                .as("the warning must name a class the reader can go and fix, never a null module")
+                .anyMatch(m -> m.contains(getClass().getName()))
+                .noneMatch(m -> m.contains("null"));
+
             appender.list.clear();
             service.recordEvent(new com.tss.grc.module.platform.auditlog.service.AuditLogService
                 .AuditEventBuilder().actionType("PROBE_SYSTEM").sourceModule("test")
