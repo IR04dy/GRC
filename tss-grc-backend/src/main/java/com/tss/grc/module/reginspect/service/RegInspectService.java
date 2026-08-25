@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Regulatory Inspection Workspace service — Sprint 15 PR #1.
@@ -353,19 +354,32 @@ public class RegInspectService {
                 && dr.getDueDate().isBefore(LocalDate.now());
     }
 
+    /**
+     * F2-354 — mint {@code <regulator>-OSI-<year>-Q<q>-NNN} from {@code MAX(ordinal) + 1}, not a
+     * {@code count(...) + 1} over a capped {@code PageRequest.of(0, 200)} window. The old seed was
+     * wrong two ways: the derived finder respects {@code @Where(is_deleted = 0)}, so a soft-delete
+     * gap re-minted a live ordinal; and the 200-row cap re-minted once a quarter exceeded 200
+     * inspections. Either way the INSERT then violated the filtered unique index
+     * {@code ux_reginspect_external_reference} → a 500 on opening a SAMA/NCA on-site inspection (the
+     * F2-337 / F2-351 / F2-353 collision shape). A MAX-over-all-rows seed never re-issues a used
+     * ordinal (the ordinal is a shared per-(org, year, quarter) sequence across regulators — the
+     * reference stays unique because the full string carries the regulator prefix); the skip-loop
+     * absorbs the residual concurrency race, backstopped by the unique index and a random suffix.
+     */
     private String generateReference(String regulator) {
         LocalDate today = LocalDate.now();
         int q = ((today.getMonthValue() - 1) / 3) + 1;
-        // Count existing inspections this quarter for ordinal — racy but
-        // good enough for human-readable ref; uniqueness enforced by DB.
-        long ordinal = inspectionRepo.findByOrganisationIdOrderByCreatedAtDesc(
-                org(), PageRequest.of(0, 200)).stream()
-                .filter(x -> x.getCreatedAt() != null
-                        && x.getCreatedAt().getYear() == today.getYear()
-                        && (((x.getCreatedAt().getMonthValue() - 1) / 3) + 1) == q)
-                .count() + 1L;
-        return regulator + "-OSI-" + today.getYear() + "-Q" + q + "-"
-                + String.format("%03d", ordinal);
+        Long org = org();
+        String prefix = regulator + "-OSI-" + today.getYear() + "-Q" + q + "-";
+        String pat = "%-OSI-" + today.getYear() + "-Q" + q + "-%";
+        int next = inspectionRepo.findMaxOsiOrdinal(org, pat) + 1;
+        for (int seq = next; seq < next + 1000; seq++) {
+            String candidate = prefix + String.format("%03d", seq);
+            if (!inspectionRepo.existsByOrganisationIdAndExternalReference(org, candidate)) {
+                return candidate;
+            }
+        }
+        return prefix + String.format("%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
     }
 
     private void timeline(Long inspectionId, String updateType, String statusFrom,
