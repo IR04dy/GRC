@@ -113,7 +113,7 @@ public class OutsourcingService {
         a.setServiceDescriptionEn(req.serviceDescriptionEn());
         a.setServiceDescriptionAr(req.serviceDescriptionAr());
         a.setServiceCategory(req.serviceCategory());
-        a.setMateriality(req.materiality());
+        a.setMateriality(normaliseMateriality(req.materiality()));
         a.setIsCoreActivity(Boolean.TRUE.equals(req.isCoreActivity()));
         a.setStatus("PROPOSED");
         a.setContractStart(req.contractStart());
@@ -573,6 +573,26 @@ public class OutsourcingService {
     }
 
     private static Long org() { return TenantContext.requireOrganisationId(); }
+
+    /**
+     * F2-366 — canonicalise the SAMA §4 materiality flag on write so every reader agrees.
+     *
+     * <p>{@code materiality} is caller-supplied ({@code CreateArrangementRequest} declares it
+     * {@code @NotBlank} with no {@code @Pattern}) and the column carries no {@code CHECK}, so a
+     * machine caller can store {@code "material"} in any casing. Three readers then disagree:
+     * {@link #transitionArrangement} gates on a case-<b>sensitive</b>
+     * {@code "MATERIAL".equals(a.getMateriality())}, so a lower-case value slips LIVE with no SAMA
+     * notification; but {@code OutsourcingArrangementRepository.countActiveMaterial /
+     * findActiveMaterial} run {@code = 'MATERIAL'} under this database's case-<b>insensitive</b>
+     * collation and still count it as material; and the V208 automation rule keys on
+     * {@code {"materiality":{"eq":"MATERIAL"}}}. Normalising casing here (F2-179 / F2-335) makes the
+     * statutory gate, the KPI and the automation rule agree. Deliberately a canonicalise and not a
+     * refuse: nothing upstream rejects a non-vocabulary value today (no CHECK, no coercion), so a
+     * 400 would break a request that succeeds today (F2-182).
+     */
+    private static String normaliseMateriality(String m) {
+        return m == null ? null : m.trim().toUpperCase(Locale.ROOT);
+    }
 
     /**
      * F2-257 — the display half of the actor pair, from the same primitive as {@link
