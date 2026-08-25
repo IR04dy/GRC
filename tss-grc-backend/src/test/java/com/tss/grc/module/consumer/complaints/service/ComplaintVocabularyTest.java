@@ -1,6 +1,7 @@
 package com.tss.grc.module.consumer.complaints.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -253,10 +254,80 @@ class ComplaintVocabularyTest {
                 .isEqualTo(3);
     }
 
-    /** The aggregate reads {@code submittedOn}; the capture-based helper does not set it. */
+    /**
+     * The aggregate now scopes to the report period's quarter (F2-368), so the fixture pins
+     * {@code submittedOn} to a fixed instant inside 2026-Q3 rather than leaving it at the service's
+     * {@code now()} — otherwise this test would pass only while run within that quarter.
+     */
+    private static final LocalDateTime IN_Q3_2026 = LocalDateTime.of(2026, 8, 15, 10, 0);
+
     private static Complaint stored(Complaint c) {
-        if (c.getSubmittedOn() == null) c.setSubmittedOn(LocalDateTime.now().minusDays(3));
+        c.setSubmittedOn(IN_Q3_2026);
         return c;
+    }
+
+    /** A complaint received at a chosen instant, built directly (no now()-stamping submit path). */
+    private static Complaint received(LocalDateTime submittedOn, String category) {
+        Complaint c = new Complaint();
+        c.setOrganisationId(ORG);
+        c.setCategory(category);
+        c.setStatus("RECEIVED");
+        c.setSubmittedOn(submittedOn);
+        return c;
+    }
+
+    // ── F2-368: the quarterly report must cover its quarter ──────────────────────────
+
+    @Test
+    @DisplayName("F2-368: the quarterly report counts only complaints RECEIVED in that quarter")
+    void theQuarterlyReportIsScopedToItsQuarter() {
+        TenantContext.setCurrentTenant(ORG);
+        // Two complaints in Q3-2026 (incl. the last instant before the quarter ends) and three
+        // outside it: the first instant of Q4, a later Q4 one, and the last instant of Q2. The
+        // Q3 report must count exactly 2 — the missing filter counted all 5.
+        List<Complaint> all = List.of(
+                received(LocalDateTime.of(2026, 7, 5, 9, 0), "CARDS_DISPUTES"),
+                received(LocalDateTime.of(2026, 9, 30, 23, 0), "ATM_ISSUES"),
+                received(LocalDateTime.of(2026, 10, 1, 0, 0), "FEES_CHARGES"),    // Q4 — endExclusive
+                received(LocalDateTime.of(2026, 11, 15, 9, 0), "FEES_CHARGES"),   // Q4
+                received(LocalDateTime.of(2026, 6, 30, 23, 0), "LOAN_FINANCING"));// Q2 — before start
+        when(complaintRepo.findByOrganisationIdAndIsDeletedFalseOrderBySubmittedOnDesc(ORG))
+                .thenReturn(all);
+        when(reportRepo.findByOrganisationIdAndReportPeriod(ORG, "Q3-2026")).thenReturn(Optional.empty());
+        when(reportRepo.save(any(ComplaintAggregateReport.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.generateQuarterlyReport("Q3-2026");
+
+        ArgumentCaptor<ComplaintAggregateReport> cap =
+                ArgumentCaptor.forClass(ComplaintAggregateReport.class);
+        verify(reportRepo).save(cap.capture());
+        assertThat(cap.getValue().getTotalReceived())
+                .as("only complaints received within Q3-2026 [Jul 1 00:00, Oct 1 00:00) count")
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("F2-368: both period spellings (Qn-YYYY and YYYY-Qn) resolve to the same half-open window")
+    void bothPeriodSpellingsResolveToTheSameWindow() {
+        ComplaintService.QuarterWindow a = ComplaintService.quarterWindow("Q3-2026");
+        ComplaintService.QuarterWindow b = ComplaintService.quarterWindow("2026-Q3");
+        assertThat(a.start()).isEqualTo(LocalDateTime.of(2026, 7, 1, 0, 0));
+        assertThat(a.endExclusive()).isEqualTo(LocalDateTime.of(2026, 10, 1, 0, 0));
+        assertThat(b).isEqualTo(a);
+        assertThat(a.contains(LocalDateTime.of(2026, 9, 30, 23, 59))).isTrue();
+        assertThat(a.contains(LocalDateTime.of(2026, 10, 1, 0, 0))).isFalse();
+        assertThat(a.contains(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("F2-368: a period that names no quarter is refused, not silently reported all-time")
+    void aMalformedPeriodIsRefused() {
+        assertThatThrownBy(() -> ComplaintService.quarterWindow("2026"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Qn-YYYY");
+        assertThatThrownBy(() -> ComplaintService.quarterWindow("Q5-2026"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ComplaintService.quarterWindow(null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     // ── the two lists that must not drift ────────────────────────────────────────────
