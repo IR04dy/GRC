@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-361 — the committee overdue sweep's query excluded DEFERRED, its own writer's accepted state
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a governance-accountability blind spot on the committee action register (`admin.committee`, CMA CG / SAMA RGov). `CommitteeActionItemRepository.findShouldBeOverdue` (the query feeding the scheduled overdue sweep) selected `status IN ('OPEN','IN_PROGRESS')`. But `defer(id, newDueDate, reason)` reschedules the deadline and moves the item to DEFERRED ("revisit by newDueDate"), `startProgress` accepts only OPEN/OVERDUE (so a DEFERRED item cannot be resumed), and `markOverdue` — the sole writer that flips an item to OVERDUE — bars only `{COMPLETED, CANCELLED, OVERDUE}`, i.e. it ACCEPTS DEFERRED. So when a deferred committee/board action's revised deadline passed, the sweep never selected it, `markOverdue` was never called, no F8 escalation fired, and it never returned to matters-arising (which lists OVERDUE). Deferral became a permanent escape from overdue accountability. |
+| **Registers** | none — a repository `@Query` (`tss-grc-backend/.../admin/committee/repository/CommitteeActionItemRepository.java`) + a hermetic contract gate. No data change, no migration. |
+| **Standards** | [[F2-177]] (two artefacts — here a query and its writer — that disagree, with nobody maintaining the agreement); [[F2-196]] ("open/should-be-overdue" is the complement of a declared closed set, never a hand-typed inclusion list); [[F2-343]] (the hermetic `@Query`-vs-machine contract idiom); [[F2-299]] (a second copy of a vocabulary must be pinned so it cannot drift); [[F2-322]] / [[F2-324]] (the same sweep's transaction boundary and audit row — fixed earlier, its query scope untouched). |
+| **Found by** | An inclusion-list status-count sweep ([[F2-196]]) across cold modules: reading the committee action-item machine (create → OPEN, start, complete, cancel, defer, markOverdue) against the sweep query showed `markOverdue` accepts DEFERRED while `findShouldBeOverdue` excludes it. |
+| **Verification** | hermetic (source contract, no DB — the `@Query`'s row selection is SQL and only a live probe could count rows, [[F2-320]]/[[F2-325]]). `CommitteeOverdueSweepScopeTest`: derives the vocabulary (every `setStatus("X")` literal + the resolved `INITIAL_STATUS` constant) and `markOverdue`'s barred set (its `"X".equals(prev)` guard, scoped to that method's brace-balanced body), then asserts the sweep `@Query`'s `status IN (...)` set equals `vocabulary − barred` — both derived, so a new status forces the assertion and the `@Query` cannot silently drift. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting only the query makes both legs RED (sweep `{OPEN, IN_PROGRESS}` ≠ accepted `{DEFERRED, IN_PROGRESS, OPEN}`). |
+
+### Fix
+
+Add `DEFERRED` to `findShouldBeOverdue`'s `@Query` so the sweep selects exactly the states `markOverdue` accepts. `findOpenByCommittee` / `findOpenByOwner` (the "matters arising" / "my open actions" lists, `{OPEN, IN_PROGRESS, OVERDUE}`) are deliberately left unchanged: a not-yet-due DEFERRED item should stay dormant until its rescheduled date, and once that date passes the fixed sweep flips it to OVERDUE — which those lists already include — so it resurfaces then. Only the sweep query needed the state.
+
+### Note on the gate's first draft
+
+The vocabulary extraction initially missed OPEN, because the create assigns the initial state via `ServerOwnedState.requireInitial(in.getStatus(), INITIAL_STATUS, …)` — a declared CONSTANT, not a string literal. Resolving `INITIAL_STATUS = "OPEN"` (rather than parsing the `requireInitial` call) fixed it — a reminder that the action-item "machine" here is implicit and its initial state hides behind a constant reference.
+
+### Filed (deferred)
+
+- **The outsourcing "active material" inclusion list** (`OutsourcingArrangementRepository.findActiveMaterial` / `countActiveMaterial`, `status IN ('BOARD_APPROVED','SAMA_NOTIFIED','LIVE','UNDER_REVIEW')`) excludes `SUSPENDED`, a non-terminal state. Whether a *suspended* material outsourcing arrangement counts as "active" for SAMA oversight is a semantic/owner call (no dead token, no obviously-active state dropped), so it was read and left rather than forced ([[F2-188]]).
+
 ## F2-360 — three readers of "open" on IncidentsPage disagreed; one isIncidentOpen predicate over the declared terminal set
 
 | | |
