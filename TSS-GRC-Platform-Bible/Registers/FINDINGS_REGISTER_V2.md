@@ -15219,6 +15219,30 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-368 — the SAMA quarterly complaints report was computed over all-time, ignoring its period
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 — the SAMA Banking Consumer Protection quarterly submission (`POST /api/v1/complaints/reports/quarterly/generate`, `hasPermission('CONSUMER','WRITE')`). `ComplaintService.generateQuarterlyReport(reportPeriod)` fetched every complaint for the tenant (`findByOrganisationIdAndIsDeletedFalse...`, unpaged) and computed all figures — `totalReceived`, `totalResolved`, `totalEscalatedSama`, `avgResolutionDays`, the ack/resolution SLA-breach percentages, `topCategory`/count, `compensationTotalSar` — over that whole set, never filtering by `reportPeriod`. The period string was used only as the storage key on the upserted `ComplaintAggregateReport`. So `generateQuarterlyReport("Q4-2025")` and `("Q1-2026")` produced **identical all-time figures**, each mislabelled by its quarter — on the artefact the entity documents as "one row per (tenant, period)" backing the regulator's quarterly submission. |
+| **Registers** | none — one service (`.../consumer/complaints/service/ComplaintService.java`) + three tests added to `ComplaintVocabularyTest`. No data change, no migration. |
+| **Standards** | [[F2-199]] (a regulator-facing artefact is the highest-stakes surface — the report leaves the platform for SAMA); [[F2-197]] (a figure computed the same way for every period, ignoring the period that is supposed to scope it); [[F2-188]] (reframed as a missing-WHERE-clause bug, not a manufactured cohort decision — the code's own cohort is "received", so the fix applies the filter the report already implies rather than choosing new semantics); [[F2-230]] (the report-period format is `Qn-YYYY` in the stored data it measured, e.g. `Q4-2025`, while the tests use `YYYY-Qn`, e.g. `2026-Q3` — the parser accepts both so no caller breaks); [[F2-178]] (the existing top-category test's fixture is pinned to a fixed in-quarter instant so scoping does not make it quarter-of-run dependent); [[F2-282]] (the parser is the single source of the format — no DTO `@Pattern` to drift from it); [[F2-283]] (latent in data / live in code); [[F2-320]] / [[F2-325]] (hermetic — the aggregation and the parser are pure logic over a mocked repository). |
+| **Found by** | Sweeping the `consumer` complaints module (SAMA consumer-protection, regulator-facing) after the risk/ERM quantitative surface, the capped-aggregate shape ([[F2-345]] / [[F2-365]]) and the [[F2-196]] inclusion-list shape in fresh modules all came up clean or correct-complements. `ComplaintService`'s minter is the reference sequential idiom ([[F2-337]]) and its vocabularies are closed ([[F2-183]]); the one substantive defect was `generateQuarterlyReport` reading `all` and never the period. Confirmed the period is used only as the upsert key (never a filter), the entity javadoc mandates per-(tenant, period) `Qn-YYYY`, and the code frames its cohort as "received" (`total_received` is the headline count and the breach-% denominator). |
+| **Verification** | hermetic (Mockito over a mocked repository, no Spring / DB — [[F2-320]] / [[F2-325]]). `ComplaintVocabularyTest` (+3): `theQuarterlyReportIsScopedToItsQuarter` — the load-bearing leg: five complaints across Q2/Q3/Q4-2026 (including the last instant before the quarter and the first instant of the next) and the Q3-2026 report counts exactly the two received in Q3, proving the half-open `[Jul 1 00:00, Oct 1 00:00)` window; `bothPeriodSpellingsResolveToTheSameWindow` (`Q3-2026` and `2026-Q3` → one window); `aMalformedPeriodIsRefused` (a period naming no quarter is a 400, not a silent all-time report). The pre-existing `aCaseVariantCategoryDoesNotSplitTheSamaReportBucket` was pinned to a fixed in-Q3-2026 instant. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): a surgical revert of only the cohort filter (`cohort = all`, keeping the `QuarterWindow` / `quarterWindow` symbols so the class and tests compile) makes exactly the scoping leg RED (`expected 2` but was 5, the all-time bug) while the parse-tolerance and malformed-period pins and the top-category test stay green ([[F2-225]]: label which legs discriminate). |
+
+### Fix
+
+`generateQuarterlyReport` now resolves `reportPeriod` to a `QuarterWindow` (`[start, endExclusive)` instants) via a tolerant `quarterWindow` parser that accepts `Qn-YYYY` and `YYYY-Qn` (case-insensitive), filters the tenant's complaints to those RECEIVED (`submittedOn`) in that window, and computes every figure over that `cohort`. A period naming no quarter throws `IllegalArgumentException` → 400 naming the expected format. `all` is still the raw tenant fetch; `cohort` is the period-scoped set. No migration, and no `@Pattern` on the DTO — the parser is the single source of the format, so the two cannot drift ([[F2-282]]).
+
+### Note — the cohort reading, and latent in data ([[F2-283]])
+
+The cohort is "complaints RECEIVED in the quarter", which is the code's own framing (`total_received`) and the standard SAMA quarterly complaints cohort — not a manufactured decision. If SAMA's definition were instead "resolved in the quarter", that is an owner refinement — but any period-scoping is strictly correct where the previous all-time behaviour was not. Not re-measured against a running backend (none this slice); the defect is unconditional in code (every period produced all-time figures).
+
+### Filed (deferred)
+
+- Whether the SAMA cohort should be "received in the quarter" (this fix) or "resolved in the quarter" is an owner refinement — recorded so an owner can confirm against the SAMA definition ([[F2-188]]).
+- The report-period format is genuinely used two ways across the codebase — `Qn-YYYY` in the stored data ([[F2-230]]) and `YYYY-Qn` in the tests — which the parser tolerates; settling on one documented contract and adding a DTO `@Pattern` is a tightening for an owner.
+
 ## F2-367 — the SOC dashboard's "open events" set was a hand-typed inclusion list that dropped ESCALATED
 
 | | |
