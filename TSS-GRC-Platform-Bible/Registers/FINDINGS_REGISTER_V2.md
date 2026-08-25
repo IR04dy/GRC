@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-352 — the counterparty-risk dashboard aggregated exposure over a capped page, not all counterparties
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a KPI computed over a capped list presented as an all-time figure, on the SAMA counterparty-risk dashboard. `CptyService.dashboard()` reports `totalCounterparties` / status / limit-band figures as exact `countBy…` queries, but summed `totalExposureSarM` and grouped `bySector` / `byInternalGrade` over `findByOrganisationIdOrderByReferenceAsc(org(), PageRequest.of(0, 50))` — the first 50 counterparties by reference. On a tenant with more than 50 counterparties the SAMA total credit exposure (a large-exposure / concentration figure) is understated and the sector/grade distributions are incomplete — a windowed figure beside all-time ones, in the flattering direction. |
+| **Registers** | none — a read-path aggregation defect on `cpty.counterparty`. No data change, no migration. |
+| **Standards** | SAMA large-exposure / concentration reporting; [[F2-197]] / [[F2-345]] (a capped list is fine to render, wrong to aggregate). |
+| **Found by** | Asking [[F2-345]]'s / [[F2-197]]'s capped-list-then-aggregate question of BACKEND aggregates — sweeping `PageRequest.of(0, N)` / `findRecent` / `.limit(N)` sources feeding a sum / group / count. Most hits were correct: `PageRequest.of(0, 1).getTotalElements()` minters read the FULL total, and `recentCounterparties` / `topUtilisedLimits` are legitimate capped previews ([[F2-197]]). `CptyService.dashboard()`'s `totalExposureSarM` / `bySector` / `byInternalGrade` were the aggregate over a capped page. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — the defect is which set the aggregate reads, so `CptyServiceTest` (new — the service had NO test, [[F2-248]]) pins the SOURCING: `totalExposureSarM` sums all rows (null exposure ignored), `bySector` / `byInternalGrade` cover all rows (null grade skipped), and `verify(never())` the capped `Pageable` overload. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting to the capped body makes the legs RED (the capped overload returns a null `Page` the reverted body dereferences; the uncapped stub goes unused). `CptyServiceTest` 2/2 + full backend suite green. Latent (needs > 50 counterparties); no dev backend to live-probe. No migration. |
+
+### Fix
+
+Replace the capped `findByOrganisationIdOrderByReferenceAsc(org(), PageRequest.of(0, 50))` with a new uncapped overload `List<Counterparty> findByOrganisationIdOrderByReferenceAsc(Long organisationId)` and iterate ALL counterparties. The grouping arithmetic (sum `totalExposureSarM`, `merge` into `bySector` / `byInternalGrade`, skip null grade / null exposure) is byte-identical; only the source is uncapped. The `recentCounterparties` preview keeps its `.limit(10)` (a capped list is fine to render — [[F2-197]]), now taken from the same uncapped list. Not a SQL `SUM` / `GROUP BY`: that would move the null-grade skip and grouping into SQL, unverifiable hermetically ([[F2-345]]'s rule). The new finder respects the entity's `@Where(is_deleted = 0)`, so it agrees with the existing capped finder's soft-delete scoping.
+
+**Filed / not done.** The DTO field `recentCounterparties` is populated from a finder ordered `OrderByReferenceAsc` (alphabetical), not by date — an [[F2-197]] mislabel, left because changing the ordering to by-date is a product decision on what the preview shows; behaviour is unchanged by this slice.
+
 ## F2-351 — a run-code minter seeded from a COUNT re-mints a live ordinal, 500ing on the unique index
 
 | | |

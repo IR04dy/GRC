@@ -15,6 +15,15 @@ public interface CounterpartyRepository extends JpaRepository<Counterparty, Long
     Page<Counterparty> findByOrganisationIdOrderByReferenceAsc(
             Long organisationId, Pageable pageable);
 
+    /**
+     * Uncapped, org-scoped — the source for the dashboard's exposure/sector/grade AGGREGATES.
+     * F2-352: {@code dashboard()} summed total exposure and grouped by sector/grade over a capped
+     * {@code PageRequest.of(0, 50)}, so on a tenant with more than 50 counterparties the SAMA
+     * total-exposure and concentration figures were computed over the first 50 by reference only.
+     * Respects the entity's {@code @Where(is_deleted = 0)}.
+     */
+    List<Counterparty> findByOrganisationIdOrderByReferenceAsc(Long organisationId);
+
     Optional<Counterparty> findByIdAndOrganisationId(Long id, Long organisationId);
 
     Optional<Counterparty> findByReferenceAndOrganisationId(
