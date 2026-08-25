@@ -45,8 +45,9 @@ public final class ExerciseRuntimeDtos {
         Integer participantCount,
         String facilitatorNotesEn,
         String facilitatorNotesAr,
-        /** Optional override; otherwise auto-generated. */
-        String runCode
+        /** Optional override; otherwise auto-generated. F2-350: capped at the run_code column
+         *  width (NVARCHAR(64)) so a long override is a 400 naming the field, not an 8152 → 500. */
+        @Size(max = 64) String runCode
     ) {}
 
     /** {@code POST .../custom-inject} — facilitator throws an on-the-fly inject. */

@@ -2,6 +2,8 @@ package com.tss.grc.common.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos;
+import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRun;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos;
 import com.tss.grc.module.cyber.vuln_sla.dto.VulnSlaDtos;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos;
@@ -94,7 +96,14 @@ class RequestSizeCapMirrorTest {
             PrivacyNotice.class, "archiveReasonAr",
             "PrivacyNoticeService#archive — the Arabic half added by F2-272 (V388). The cap "
             + "mirrors the column exactly BECAUSE V388 asserts the two columns' widths match, "
-            + "so a longer English archive reason cannot be untranslatable.")
+            + "so a longer English archive reason cannot be untranslatable."),
+        new Landing(ExerciseRuntimeDtos.StartRunRequest.class, "runCode",
+            ExerciseRun.class, "runCode",
+            "ExerciseRuntimeService#startRun line 176 stores req.runCode().trim() directly when "
+            + "non-blank (else auto-generates). F2-350: the field had no @Size while every sibling "
+            + "text field in the DTO did, so a > 64-char override 8152'd on the run_code insert. "
+            + "The stored value is a trim() of the raw, so @Size(max = 64) on the raw never accepts "
+            + "an overflow — it only turns that 500 into a 400 naming the field.")
         // F2-223 — the BowTieDtos.ApproveRequest#approverName landing is DELETED with its field.
         // `approvedByName` is now stamped from CurrentActor, so there is no caller-supplied value
         // for a cap to guard. This gate's own reverse leg is what required the entry to go in the
@@ -145,6 +154,7 @@ class RequestSizeCapMirrorTest {
         VendorBcpAttestationDtos.AttestationReviewRequest.class,
         OutsourcingDtos.MonitoringEventResolveRequest.class,
         PdplExtensionDtos.NoticeArchiveRequest.class,
+        ExerciseRuntimeDtos.StartRunRequest.class,
         BowTieDtos.ApproveRequest.class,
         AsmDtos.ShadowItBlockRequest.class,
         VulnSlaDtos.RemediatedRequest.class);
@@ -281,8 +291,11 @@ class RequestSizeCapMirrorTest {
         // now stamped from the authenticated principal, so there is no caller value left to cap.
         // A population that FALLS after a fix is not automatically rot, but it is always worth
         // asking which (F2-213). Both times the answer was "the field is gone, not the check".
-        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(7);
-        assertThat(COVERED).hasSizeGreaterThanOrEqualTo(7);
+        // F2-350 then ADDED one — StartRunRequest#runCode → ExerciseRun.run_code(64) — so the
+        // floor rises with the population it tracks (7 → 8); an increase needs no defence, but a
+        // floor left below its population is a weaker anti-vacuity guard than it looks.
+        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(8);
+        assertThat(COVERED).hasSizeGreaterThanOrEqualTo(8);
         Map<String, Integer> caps = new LinkedHashMap<>();
         for (Landing l : MIRRORED) caps.put(key(l.requestType(), l.component()), capOf(l.requestType(), l.component()));
         assertThat(caps.values()).allMatch(v -> v != null && v > 0);
