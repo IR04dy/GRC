@@ -1,6 +1,8 @@
 package com.tss.grc.module.sust.sgi.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.evidence.entity.EvidenceItem;
+import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -62,6 +64,7 @@ class SgiCommitmentServiceTest {
     @Mock private CorrectiveActionService capaService;
     @Mock private EsgMetricReadingRepository metricReadings;
     @Mock private GhgEmissionRecordRepository ghgRecords;
+    @Mock private EvidenceItemRepository evidenceItems;
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -218,6 +221,8 @@ class SgiCommitmentServiceTest {
         SgiCommitment c = commitment(new BigDecimal("4.2"), new BigDecimal("3.0"), new BigDecimal("3.15"));
         c.setId(7L); c.setStatus("ACTIVE");
         c.setEvidenceItemId(99L);                 // Rule D — real evidence FK
+        when(evidenceItems.findUsableAsEvidence(eq(99L), eq(ORG_ID), any()))
+            .thenReturn(Optional.of(new EvidenceItem()));   // F2-362 — a usable (APPROVED, in-date) item
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
         when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
         authAs("lina", false);
@@ -250,6 +255,58 @@ class SgiCommitmentServiceTest {
         assertThatThrownBy(() -> service.achieve(7L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("evidence");
+    }
+
+    // ── Rule D (F2-362) — presence of an evidence FK is not the same as a USABLE item ──
+
+    @Test
+    void achieve_refusesWhenEvidenceItemIsNotUsable() {
+        // A rejected/expired evidence item is a valid FK target but must not discharge Rule D:
+        // presence is not state. The message names the state (F2-180) so the caller knows to
+        // chase a review, not re-attach.
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceItemId(99L);
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(evidenceItems.findUsableAsEvidence(eq(99L), eq(ORG_ID), any())).thenReturn(Optional.empty());
+        EvidenceItem rejected = new EvidenceItem();
+        rejected.setStatus("REJECTED");
+        when(evidenceItems.findByIdAndOrganisationId(99L, ORG_ID)).thenReturn(Optional.of(rejected));
+        authAs("sara", false);
+
+        assertThatThrownBy(() -> service.achieve(7L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Rule D")
+            .hasMessageContaining("REJECTED");
+    }
+
+    @Test
+    void achieve_acceptsWhenEvidenceItemIsUsable() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceItemId(99L);
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(evidenceItems.findUsableAsEvidence(eq(99L), eq(ORG_ID), any()))
+            .thenReturn(Optional.of(new EvidenceItem()));   // APPROVED + in date
+        authAs("sara", false);
+
+        assertThat(service.achieve(7L).getStatus()).isEqualTo("ACHIEVED");
+    }
+
+    @Test
+    void achieve_viaLegacyEvidenceRefDoesNotConsultTheItemRepo() {
+        // F2-182 — the legacy free-text branch is untouched: a request naming an external
+        // assurance statement keeps working, and the evidence-item repo is not even consulted.
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceRef("BV assurance statement 2026");
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("sara", false);
+
+        assertThat(service.achieve(7L).getStatus()).isEqualTo("ACHIEVED");
+        verify(evidenceItems, org.mockito.Mockito.never()).findUsableAsEvidence(any(), any(), any());
     }
 
     // ── Rule C — Achieve blocked for the last editor (SGI-A, SoD) ────

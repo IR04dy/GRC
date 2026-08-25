@@ -4,6 +4,8 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ClosedVocabulary;
+import com.tss.grc.module.evidence.entity.EvidenceItem;
+import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -90,6 +92,7 @@ public class SgiCommitmentService {
     private final CorrectiveActionService capaService;
     private final EsgMetricReadingRepository metricReadings;   // SGI-C — ESG_METRIC source
     private final GhgEmissionRecordRepository ghgRecords;      // SGI-C — GHG_TOTAL source
+    private final EvidenceItemRepository evidenceItems;        // F2-362 — Rule D usable-evidence check
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -230,18 +233,63 @@ public class SgiCommitmentService {
             throw new IllegalStateException(
                 "Self-approval blocked: the achiever must differ from the last editor (SoD).");
         }
-        // Rule D — no public "target met" claim without attached evidence.
-        if (cur.getEvidenceItemId() == null
-                && (cur.getEvidenceRef() == null || cur.getEvidenceRef().isBlank())) {
-            throw new IllegalArgumentException(
-                "Achieving a commitment requires evidence (Rule D): attach an evidence item (evidenceItemId) or set evidence_ref.");
-        }
+        // Rule D — no public "target met" claim without USABLE evidence (F2-362).
+        requireRuleDEvidence(cur);
         cur.setStatus("ACHIEVED");
         cur.setAchievedAt(LocalDateTime.now());
         cur.setAchievedBy(achiever);
         SgiCommitment saved = repo.save(cur);
         audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment ACHIEVED by " + achiever);
         return saved;
+    }
+
+    /**
+     * Rule D — a Saudi Green Initiative commitment may not be publicly declared ACHIEVED
+     * ("target met") without USABLE evidence.
+     *
+     * <p>F2-362 (sibling closure of F2-243) — this used to ask {@code getEvidenceItemId() == null},
+     * a PRESENCE test. A presence test on a foreign key is not a check on the thing it names, so the
+     * gate was discharged by any non-null id {@code FK_sgi_evidence_item} (V250, → {@code
+     * evidence.evidence_items}) would accept — including a REJECTED, EXPIRED, DRAFT or PENDING_REVIEW
+     * item, i.e. the evidence module's own rejected output. Its GHG twin
+     * ({@link GhgEmissionRecordService#requireRule2Evidence}, same module, same V250 FK) was fixed by
+     * F2-243 and this one was left (F2-215's two-of-N). F2-243 measured 51 of 78 live evidence items
+     * NOT APPROVED (31 EXPIRED / 15 PENDING_REVIEW / 4 DRAFT / 1 REJECTED, dev = prod), so the
+     * population that discharged this gate is real.
+     *
+     * <p>The state is checked HERE, at consumption, not when the item was attached, because an item
+     * can be APPROVED on the day it is linked and EXPIRED by the time the pledge is declared met. The
+     * resolution is {@code module/evidence}'s own — via the same
+     * {@link EvidenceItemRepository#findUsableAsEvidence} predicate GHG uses (F2-282: one predicate,
+     * N readers; a caller cannot invent its own idea of what counts as evidence, F2-196).
+     *
+     * <p>⚠ The legacy free-text {@code evidence_ref} branch is deliberately untouched (F2-182): a
+     * request naming an external assurance statement rather than a platform evidence item keeps
+     * working; only the {@code evidenceItemId} path is tightened to require a usable item, and a
+     * request that discharges a public "target met" claim with a rejected item is not one that
+     * "works today".
+     */
+    private void requireRuleDEvidence(SgiCommitment cur) {
+        String ref = cur.getEvidenceRef();
+        if (ref != null && !ref.isBlank()) return;              // legacy free-text branch (F2-182)
+        Long itemId = cur.getEvidenceItemId();
+        if (itemId == null) {
+            throw new IllegalArgumentException(
+                "Achieving a commitment requires evidence (Rule D): attach an evidence item (evidenceItemId) or set evidence_ref.");
+        }
+        evidenceItems.findUsableAsEvidence(itemId, org(), LocalDate.now()).orElseThrow(() -> {
+            // Name the state, so the caller knows whether to chase a review or a re-collection
+            // (F2-180: a diagnostic that names the column is worth more than one that is merely correct).
+            String state = evidenceItems.findByIdAndOrganisationId(itemId, org())
+                .map(e -> "status=" + e.getStatus()
+                          + (e.getValidTo() == null ? "" : ", validTo=" + e.getValidTo()))
+                .orElse("not found in this organisation");
+            return new IllegalArgumentException(
+                "Achieving a commitment requires evidence (Rule D): evidence item " + itemId
+                + " cannot support a public 'target met' claim (" + state + "). It must be "
+                + EvidenceItem.APPROVED + " and still in date — have it reviewed at POST "
+                + "/api/v1/evidence/reviews, or attach a current item instead.");
+        });
     }
 
     /**
