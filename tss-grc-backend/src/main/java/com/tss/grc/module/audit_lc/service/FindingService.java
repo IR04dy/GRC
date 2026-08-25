@@ -43,6 +43,27 @@ public class FindingService {
         "AWAITING_VERIFICATION", Set.of("CLOSED")
     );
 
+    /**
+     * DERIVED terminal set — the states with no outgoing edge (F2-370; never a second hand-typed
+     * list, F2-196/F2-336). {@link #ALLOWED} deliberately OMITS terminal states as keys — a
+     * terminal is a target with no entry, so {@code getOrDefault} returns empty — and
+     * {@code AuditFindingMachineParityTest} pins {@code ALLOWED} at exactly four keys, so this must
+     * derive over the state vocabulary (keys ∪ targets) rather than by adding {@code CLOSED} as an
+     * empty-value key. Yields {@code [CLOSED]}.
+     *
+     * <p>{@code public} because {@code governance.threelines.ThreeLinesService} (the 3LoD Line-3
+     * band) reads {@code audit_lc.findings} and used to hand-type {@code List.of("CLOSED")} for its
+     * "open findings" filter — a copy of this machine that drifts if a terminal state is added. It
+     * now reads this ONE derived set (F2-336).
+     */
+    public static final List<String> TERMINAL = java.util.stream.Stream.concat(
+            ALLOWED.keySet().stream(),
+            ALLOWED.values().stream().flatMap(Set::stream))
+        .distinct()
+        .filter(s -> ALLOWED.getOrDefault(s, Set.of()).isEmpty())
+        .sorted()
+        .toList();
+
     private final FindingRepository       repo;
     private final AuditLogService         audit;
     private final ApplicationEventPublisher eventPublisher;
