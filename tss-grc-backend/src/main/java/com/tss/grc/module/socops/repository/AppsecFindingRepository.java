@@ -32,4 +32,9 @@ public interface AppsecFindingRepository extends JpaRepository<AppsecFinding, Lo
         ORDER BY f.slaDueAt ASC
     """)
     List<AppsecFinding> findSlaBreached(Long organisationId, LocalDateTime now);
+
+    /** F2-376 — SOC-ops sweep tenant discovery: a tenant that uses this surface but has
+     *  never ingested a SecurityEvent must still be swept for its escalations. */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT e.organisationId FROM AppsecFinding e")
+    java.util.List<Long> findDistinctOrganisationIds();
 }

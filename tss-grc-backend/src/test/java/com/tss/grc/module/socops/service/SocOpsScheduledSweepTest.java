@@ -87,6 +87,30 @@ class SocOpsScheduledSweepTest {
     @AfterEach
     void clear() { TenantContext.clear(); }
 
+    /**
+     * F2-376 — a tenant with a SOC-ops tracker but no SecurityEvent must still be discovered.
+     * Pre-fix {@code discoverTenants} unioned SecurityEvent alone, so a tenant whose only SOC-ops
+     * data is (say) a SAMA regulator examination with a response due never got swept and none of
+     * its escalations fired.
+     */
+    @Test
+    void discoverTenantsUnionsEverySweptSurfaceNotJustSecurityEvents() {
+        // securityEvents → [1] (from @BeforeEach). Tracker-only tenants: a regulator exam (99),
+        // cyber insurance (88, plus an overlap on 1 to prove dedup), a TLS cert (77).
+        when(regulatorExams.findDistinctOrganisationIds()).thenReturn(List.of(99L));
+        when(cyberInsurance.findDistinctOrganisationIds()).thenReturn(List.of(1L, 88L));
+        when(cryptoAssets.findDistinctOrganisationIds()).thenReturn(List.of(77L));
+
+        List<Long> tenants = sweep.discoverTenants();
+
+        assertThat(tenants)
+            .as("a tenant whose only SOC-ops data is a regulator exam / cyber insurance / cert "
+              + "must still be swept — not just SecurityEvent tenants")
+            .contains(99L, 88L, 77L)   // the tracker-only tenants (the discriminator)
+            .contains(1L)              // the SecurityEvent tenant is still there
+            .doesNotHaveDuplicates();  // 1L appeared in two sources → deduped
+    }
+
     @Test
     void breachedSecurityEvent_firesSlaBreachedTrigger() {
         SecurityEvent e = new SecurityEvent();

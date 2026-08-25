@@ -135,16 +135,31 @@ public class SocOpsScheduledSweep {
         }
     }
 
-    /** Union the SOC-ops tenant set. Tiny lists — no need for fancy
-     *  aggregation. We dedupe with a set comprehension by going through
-     *  java.util.LinkedHashSet so iteration order stays stable. */
-    private List<Long> discoverTenants() {
+    /**
+     * Union the SOC-ops tenant set across EVERY surface the tick sweeps. Tiny lists — no need
+     * for fancy aggregation; a {@code LinkedHashSet} dedupes while keeping iteration order stable.
+     *
+     * <p>F2-376 — this used to union {@code SecurityEvent} alone, on the theory that it is the
+     * canonical "this tenant uses SOC ops" signal. But the compliance/governance trackers (a SAMA
+     * regulator examination with a response due, a cyber-insurance renewal, a TLS cert, a pentest
+     * retest, a forensics hold, an appsec SLA, a privileged-review recertification …) are used
+     * independently of SIEM ingest, so a tenant with any of those but no {@code SecurityEvent} was
+     * invisible to discovery and NONE of its escalations fired. Now every swept surface contributes
+     * its own {@code findDistinctOrganisationIds()} — mirrors {@code ComplianceDeadlineScheduler},
+     * which unions two surfaces for exactly this reason. Package-private for the unit test.
+     */
+    List<Long> discoverTenants() {
         java.util.LinkedHashSet<Long> set = new java.util.LinkedHashSet<>();
         set.addAll(securityEvents.findDistinctOrganisationIds());
-        // Other repos don't have their own findDistinctOrganisationIds yet —
-        // SecurityEvent is the canonical "this tenant uses SOC ops" signal
-        // so it covers >99% of the population. Add per-table discovery if
-        // a tenant ever onboards (say) cyber insurance before SIEM ingest.
+        set.addAll(regulatorExams.findDistinctOrganisationIds());
+        set.addAll(cyberInsurance.findDistinctOrganisationIds());
+        set.addAll(iamJml.findDistinctOrganisationIds());
+        set.addAll(cryptoAssets.findDistinctOrganisationIds());
+        set.addAll(pentests.findDistinctOrganisationIds());
+        set.addAll(seasonalOverlays.findDistinctOrganisationIds());
+        set.addAll(forensics.findDistinctOrganisationIds());
+        set.addAll(appsec.findDistinctOrganisationIds());
+        set.addAll(dlp.findDistinctOrganisationIds());
         return new java.util.ArrayList<>(set);
     }
 
