@@ -258,8 +258,17 @@ public class CcmService {
         // openConsecutiveFailureIssue reads only the run's failureReason, never its id, so
         // nothing here needed the run to exist first (F2-175: do the other work FIRST, then
         // save once).
+        // F2-371 — fire EXACTLY at the threshold-crossing, not on every failure at or past it.
+        // The counter only ever increments by 1 (above) or resets to 0 (on PASS / create), so a
+        // streak passes through the threshold exactly once — `==` opens exactly one Issue per
+        // streak. It was `>=`, which called openConsecutiveFailureIssue() — an UNCONDITIONAL
+        // issueService.create() with no dedup — on the 3rd, 4th, 5th … failure, so a persistently
+        // failing CRITICAL control (driven by the 60-second CcmSchedulerService tick) opened a new
+        // CRITICAL/URGENT Issue every minute. The title hardcoded "3" while the description showed
+        // the real count (e.g. 47), which is the tell it was meant to fire once; at `==` the two
+        // agree because the counter IS the threshold when it fires.
         if (isFailureLike && "CRITICAL".equals(d.getSeverity())
-                && d.getConsecutiveFailures() >= CONSECUTIVE_FAILURE_THRESHOLD) {
+                && d.getConsecutiveFailures() == CONSECUTIVE_FAILURE_THRESHOLD) {
             Long issueId = openConsecutiveFailureIssue(d, run);
             if (issueId != null) {
                 run.setCapaTaskId(issueId);
