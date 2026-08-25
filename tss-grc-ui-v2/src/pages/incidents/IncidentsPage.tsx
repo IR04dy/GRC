@@ -467,10 +467,7 @@ export function IncidentsPage() {
     });
   }, [incidents.data, t]);
 
-  // F2-360 — "open" is the complement of the declared terminal set { RESOLVED, CLOSED }
-  // (isIncidentOpen), never a hand-typed exclusion. The old open_count excluded the phantom
-  // RECOVERED (0 rows) and so counted the 10/44 RESOLVED incidents as open; critical excluded
-  // only CLOSED. Both now agree with the regulator picker below.
+  // F2-360 — "open" = complement of {RESOLVED, CLOSED} (isIncidentOpen), not a hand-typed exclusion; the old open_count leaked the 10/44 RESOLVED rows in via the phantom RECOVERED (lib/incidentStatus.ts).
   const open_count = allIncidents.filter(i => isIncidentOpen(i.status)).length;
   const critical = allIncidents.filter(i => i.severity === 'CRITICAL' && isIncidentOpen(i.status)).length;
   const closed = allIncidents.filter(i => i.status === 'CLOSED').length;
@@ -591,11 +588,9 @@ export function IncidentsPage() {
         processBarTitle={t('incidentsProcessBarTitle')}
         processBarSubtitle={t('incidentsProcessBarSub')}
         lifecycles={[
-          // F2-197 — `open_count` is the same figure the "Open" KPI above shows, and
-          // the register this tile links to. The other two tiles stay unmeasured: the
-          // regulator-notification queue and the lessons-learned archive are neither
-          // fetched on this page nor derivable from the incident list, and the
-          // catalogue's old 0 / 0 asserted "nothing outstanding" for both.
+          // F2-197 — `open_count` (now via isIncidentOpen, F2-360) matches the "Open" KPI and the
+          // register this tile links to. The other two tiles stay unmeasured: not fetched here nor
+          // derivable from the incident list (the catalogue's old 0/0 asserted "nothing outstanding").
           { ...INCIDENT_LIFECYCLES[0], activeCount: open_count },
           INCIDENT_LIFECYCLES[1],
           INCIDENT_LIFECYCLES[2],
