@@ -89,7 +89,14 @@ public class SustainabilityDashboardService {
         // Each component contributes its weight × normalised score.
         // Missing data → 0 contribution (conservative: a year with no
         // GHG records can't claim verification credit).
-        BigDecimal ghgVerifPct      = ghgVerificationRate(year);     // 0..100
+        // F2-365 — verified / total, BOTH read from the same full-year aggregate
+        // (`ghg`, already fetched above). Previously the numerator was counted over a
+        // result page capped at 1000 rows while the denominator was the all-pages
+        // count, so a tenant with more than 1000 GHG records in one year had verified
+        // rows beyond the first page silently dropped from the numerator (still counted
+        // in the denominator) — understating this 0.20-weighted score component.
+        BigDecimal ghgVerifPct      = pctOf(asInt(ghg.get("verifiedCount")),
+                                            asInt(ghg.get("recordCount"))); // 0..100
         BigDecimal sgiOnTrackPct    = sgiOnTrackRate(sgi);            // 0..100
         BigDecimal cmaPct           = asPct(cma.get("readinessPct"));
         BigDecimal tcfdPct          = asPct(tcfd.get("alignmentPct"));
@@ -186,18 +193,6 @@ public class SustainabilityDashboardService {
     }
 
     // ── Score components ─────────────────────────────────────────────
-
-    /** Verified GHG records / total. Counts every status as denominator. */
-    private BigDecimal ghgVerificationRate(Short year) {
-        // Lean on the existing aggregate keyed result if available; the
-        // GHG aggregate exposes recordCount but not verification rate.
-        // Pull a slim count via the service's page helper.
-        var page = ghgService.listByYear(year, org.springframework.data.domain.PageRequest.of(0, 1000));
-        long total = page.getTotalElements();
-        if (total == 0) return BigDecimal.ZERO;
-        long verified = page.getContent().stream().filter(r -> Boolean.TRUE.equals(r.getVerified())).count();
-        return new BigDecimal(verified * 100.0 / total).setScale(1, RoundingMode.HALF_UP);
-    }
 
     /** Active SGI commitments on-track rate. */
     @SuppressWarnings("unchecked")
@@ -306,5 +301,16 @@ public class SustainabilityDashboardService {
         if (v instanceof BigDecimal bd) return bd;
         if (v instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
         return BigDecimal.ZERO;
+    }
+
+    /**
+     * F2-365 — {@code part} of {@code whole} as a 0..100 percentage (1 dp);
+     * 0 when {@code whole} is 0. Package-private so it can be unit-tested directly:
+     * both arguments come from the same full-year aggregate, so the caller cannot
+     * divide a numerator and denominator drawn from two different populations.
+     */
+    static BigDecimal pctOf(int part, int whole) {
+        if (whole == 0) return BigDecimal.ZERO;
+        return new BigDecimal(part * 100.0 / whole).setScale(1, RoundingMode.HALF_UP);
     }
 }

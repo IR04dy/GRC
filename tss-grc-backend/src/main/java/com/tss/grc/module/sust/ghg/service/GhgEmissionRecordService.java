@@ -302,8 +302,13 @@ public class GhgEmissionRecordService {
         List<GhgEmissionRecord> all = repo.findByOrganisationIdAndReportingYear(org(), year);
         BigDecimal s1 = BigDecimal.ZERO, s2 = BigDecimal.ZERO, s3 = BigDecimal.ZERO;
         BigDecimal s3Weighted = BigDecimal.ZERO, s3Total = BigDecimal.ZERO;
+        // F2-365 — verifiedCount is the numerator of the dashboard's GHG verification
+        // rate; it MUST be counted over the same full list as recordCount (below), so
+        // both terms of that rate come from this single unpaged loop.
+        int verified = 0;
         for (GhgEmissionRecord r : all) {
             BigDecimal v = nz(r.getEmissionValueTco2e());
+            if (Boolean.TRUE.equals(r.getVerified())) verified++;
             switch (r.getScope()) {
                 case 1 -> s1 = s1.add(v);
                 case 2 -> s2 = s2.add(v);
@@ -337,6 +342,8 @@ public class GhgEmissionRecordService {
         out.put("scope3PartialFlag", coverage.compareTo(s3Threshold) < 0);
         out.put("scope3PartialThreshold", s3Threshold);
         out.put("recordCount", all.size());
+        // F2-365 — same population as recordCount by construction (both from `all`).
+        out.put("verifiedCount", verified);
         return out;
     }
 

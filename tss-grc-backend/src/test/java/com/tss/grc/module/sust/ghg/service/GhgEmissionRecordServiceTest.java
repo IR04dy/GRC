@@ -133,6 +133,27 @@ class GhgEmissionRecordServiceTest {
         assertThat(((BigDecimal) out.get("grandTotal")).intValue()).isEqualTo(250);
     }
 
+    /**
+     * F2-365 — the dashboard's GHG verification rate is {@code verifiedCount / recordCount}.
+     * Both must be counted over the same full-year population; the load-bearing property is
+     * that {@code verifiedCount} is over the whole list, not a subset. Four records across
+     * scopes, three verified.
+     */
+    @Test
+    void aggregate_countsVerifiedOverTheFullPopulation() {
+        stubScope3Threshold("70.00");
+        when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025)).thenReturn(List.of(
+            verified(scope(1, "10.00", "100.00"), true),
+            verified(scope(2, "20.00", "100.00"), false),
+            verified(scope(3, "30.00", "100.00"), true),
+            verified(scope(3, "40.00", "100.00"), true)));
+
+        Map<String, Object> out = service.aggregate((short) 2025);
+
+        assertThat(out.get("recordCount")).isEqualTo(4);
+        assertThat(out.get("verifiedCount")).isEqualTo(3);
+    }
+
     // ── Rule 2 — VERIFIED transition requires evidenceRef ────────────
 
     @Test
@@ -433,6 +454,12 @@ class GhgEmissionRecordServiceTest {
         r.setScope((short) scope);
         r.setEmissionValueTco2e(new BigDecimal(tco2e));
         r.setCoveragePercent(new BigDecimal(coverage));
+        return r;
+    }
+
+    /** F2-365 — set the verified flag on a scope() record. */
+    private static GhgEmissionRecord verified(GhgEmissionRecord r, boolean v) {
+        r.setVerified(v);
         return r;
     }
 }
