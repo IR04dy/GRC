@@ -44,6 +44,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Sprint 13 — Customer Complaints service.
@@ -202,6 +204,15 @@ public class ComplaintService {
             Map.entry("ESCALATED_TO_SAMA",   Set.of("CLOSED", "RESOLVED")),
             Map.entry("REJECTED",            Set.of())
     );
+
+    /*
+     * F2-368 — the report period names a quarter, and the two spellings the codebase uses are both
+     * accepted so no caller breaks: {@code Qn-YYYY} (the entity javadoc + the stored data measured in
+     * F2-230, e.g. {@code Q4-2025}) and {@code YYYY-Qn} (the fixture the tests use, e.g.
+     * {@code 2026-Q3}). Case-insensitive, whitespace-trimmed.
+     */
+    private static final Pattern QUARTER_QN_YYYY = Pattern.compile("(?i)\\s*Q([1-4])-(\\d{4})\\s*");
+    private static final Pattern QUARTER_YYYY_QN = Pattern.compile("(?i)\\s*(\\d{4})-Q([1-4])\\s*");
 
     private final ComplaintRepository complaintRepo;
     private final ComplaintUpdateRepository updateRepo;
@@ -445,30 +456,41 @@ public class ComplaintService {
     @Transactional
     public QuarterlyReportResponse generateQuarterlyReport(String reportPeriod) {
         Long orgId = org();
+        // F2-368: a quarterly report must cover its quarter. Every figure below was computed over
+        // ALL of the tenant's complaints regardless of `reportPeriod` — so "Q4-2025" and "Q1-2026"
+        // produced identical all-time numbers, keyed by a label the aggregation never read. The
+        // report's own cohort is "received" (total_received is the headline count and the breach-%
+        // denominator), so the fix is the missing filter: scope to complaints RECEIVED (submittedOn)
+        // in the report period's quarter. `all` is still the raw tenant fetch; `cohort` is the
+        // period-scoped set every figure is derived from.
+        QuarterWindow window = quarterWindow(reportPeriod);
         List<Complaint> all = complaintRepo
                 .findByOrganisationIdAndIsDeletedFalseOrderBySubmittedOnDesc(orgId);
+        List<Complaint> cohort = all.stream()
+                .filter(c -> window.contains(c.getSubmittedOn()))
+                .toList();
 
-        int totalReceived = all.size();
-        int totalResolved = (int) all.stream()
+        int totalReceived = cohort.size();
+        int totalResolved = (int) cohort.stream()
                 .filter(c -> "RESOLVED".equals(c.getStatus()) || "CLOSED".equals(c.getStatus()))
                 .count();
-        int totalEscalated = (int) all.stream()
+        int totalEscalated = (int) cohort.stream()
                 .filter(c -> c.getEscalatedToSamaOn() != null)
                 .count();
 
         // Average resolution days (calendar days between submitted and resolved).
-        double avgResolution = all.stream()
+        double avgResolution = cohort.stream()
                 .filter(c -> c.getResolvedOn() != null)
                 .mapToLong(c -> ChronoUnit.DAYS.between(c.getSubmittedOn(), c.getResolvedOn()))
                 .average().orElse(0);
 
-        long ackBreaches = all.stream()
+        long ackBreaches = cohort.stream()
                 .filter(c -> c.getAckSlaDueOn() != null
                         && (c.getAcknowledgedOn() == null
                             ? LocalDateTime.now().isAfter(c.getAckSlaDueOn())
                             : c.getAcknowledgedOn().isAfter(c.getAckSlaDueOn())))
                 .count();
-        long resBreaches = all.stream()
+        long resBreaches = cohort.stream()
                 .filter(c -> c.getResolutionSlaDueOn() != null
                         && (c.getResolvedOn() == null
                             ? LocalDateTime.now().isAfter(c.getResolutionSlaDueOn())
@@ -482,14 +504,14 @@ public class ComplaintService {
                     .setScale(2, RoundingMode.HALF_UP);
 
         Map<String, Long> byCategory = new HashMap<>();
-        for (Complaint c : all) {
+        for (Complaint c : cohort) {
             byCategory.merge(c.getCategory(), 1L, Long::sum);
         }
         Map.Entry<String, Long> top = byCategory.entrySet().stream()
                 .max(Comparator.comparingLong(Map.Entry::getValue))
                 .orElse(null);
 
-        BigDecimal totalCompensation = all.stream()
+        BigDecimal totalCompensation = cohort.stream()
                 .map(Complaint::getCompensationAmountSar)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -533,6 +555,41 @@ public class ComplaintService {
 
     private static Long org() {
         return TenantContext.requireOrganisationId();
+    }
+
+    /** F2-368 — the half-open instant window {@code [start, endExclusive)} a report period names. */
+    record QuarterWindow(LocalDateTime start, LocalDateTime endExclusive) {
+        boolean contains(LocalDateTime dt) {
+            return dt != null && !dt.isBefore(start) && dt.isBefore(endExclusive);
+        }
+    }
+
+    /**
+     * F2-368 — resolve a report period ({@code Qn-YYYY} or {@code YYYY-Qn}) to its quarter window.
+     * Both spellings are accepted (see {@link #QUARTER_QN_YYYY}); a period naming no quarter is a 400
+     * naming the expected format, not a silent all-time report. Package-visible so the parse is unit
+     * tested directly.
+     */
+    static QuarterWindow quarterWindow(String period) {
+        int quarter = -1;
+        int year = -1;
+        if (period != null) {
+            Matcher qy = QUARTER_QN_YYYY.matcher(period);
+            Matcher yq = QUARTER_YYYY_QN.matcher(period);
+            if (qy.matches()) {
+                quarter = Integer.parseInt(qy.group(1));
+                year = Integer.parseInt(qy.group(2));
+            } else if (yq.matches()) {
+                year = Integer.parseInt(yq.group(1));
+                quarter = Integer.parseInt(yq.group(2));
+            }
+        }
+        if (quarter < 1) {
+            throw new IllegalArgumentException(
+                    "reportPeriod must name a quarter as Qn-YYYY (e.g. Q4-2025); got '" + period + "'");
+        }
+        LocalDateTime start = LocalDateTime.of(year, (quarter - 1) * 3 + 1, 1, 0, 0);
+        return new QuarterWindow(start, start.plusMonths(3));
     }
 
     /**
