@@ -30,7 +30,9 @@ export function tlabel(
   return isAr ? entry.ar : entry.en;
 }
 
-const STATUS_KEY: Record<string, string> = {
+/** Status → i18n label key. Exported so the tone-completeness gate can assert every
+ *  labellable status also has a STATUS_TONE entry (F2-357). */
+export const STATUS_KEY: Record<string, string> = {
   OPEN: 'statusOpen', IN_PROGRESS: 'statusInProgress', CLOSED: 'statusClosed',
   APPROVED: 'statusApproved', PENDING: 'statusPending', UNDER_REVIEW: 'statusReview',
   ACTIVE: 'statusActive', EXPIRED: 'statusExpired', DRAFT: 'statusDraft',
@@ -76,6 +78,17 @@ export const STATUS_TONE: Record<string, BadgeTone> = {
   RECOVERED: 'success',
   IMPLEMENTED: 'success',
   NOT_IMPLEMENTED: 'danger',
+  // F2-357 — the five PDPL breach statuses F2-211 added to STATUS_KEY (so statusLabel
+  // localises them) were never added here, so on the privacy.data_breaches register
+  // (PrivacyPage) and PdplBreachConsole a `STATUS_TONE[status] ?? 'neutral'` badge rendered
+  // GREY for them — an ESCALATED breach looked like a CLOSED one, INVESTIGATING/NOTIFIED lost
+  // their warning/info tone, REMEDIATED lost its success tone. Tones follow the existing
+  // convention (danger = urgent/bad, warning = active, info = in-progress, success = done).
+  NOTIFIED: 'info',
+  INVESTIGATING: 'warning',
+  INVESTIGATED: 'info',
+  ESCALATED: 'danger',
+  REMEDIATED: 'success',
 };
 
 /** Map a severity value to a Badge tone on the 6-step --risk-* ramp, so HIGH,
