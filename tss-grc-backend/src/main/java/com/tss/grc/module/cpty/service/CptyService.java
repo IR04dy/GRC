@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Counterparty Credit Rating Registry service — Sprint 18 PR #1.
@@ -492,9 +493,26 @@ public class CptyService {
                         "Counterparty " + id + " not found in tenant"));
     }
 
+    /**
+     * F2-353 — mint {@code CP-NNNNN} from {@code MAX(existing ordinal) + 1}, not
+     * {@code count + 1}. A derived {@code countByOrganisationId} respects the entity's
+     * {@code @Where(is_deleted = 0)}, so a soft-delete gap or a concurrent create re-minted a live
+     * ordinal, which the filtered unique index {@code ux_cpty_reference} then 500'd on the INSERT
+     * (the F2-337 / F2-351 collision shape). A MAX-over-all seed never re-issues a used ordinal; the
+     * skip-loop absorbs the residual concurrency race (a peer create grabbing the same ordinal in the
+     * window between the seed read and this INSERT), backstopped by the unique index and, after 1000
+     * live collisions, a random suffix. Mirrors {@code ComplaintService#generateNextComplaintNo}.
+     */
     private String generateReference() {
-        long n = cptyRepo.countByOrganisationId(org()) + 1L;
-        return "CP-" + String.format("%05d", n);
+        Long org = org();
+        int next = cptyRepo.findMaxReferenceSeq(org) + 1;
+        for (int seq = next; seq < next + 1000; seq++) {
+            String candidate = String.format("CP-%05d", seq);
+            if (!cptyRepo.existsByOrganisationIdAndReference(org, candidate)) {
+                return candidate;
+            }
+        }
+        return String.format("CP-%05d-%s", next, UUID.randomUUID().toString().substring(0, 6));
     }
 
     static BigDecimal computeUtilisationPct(BigDecimal limit, BigDecimal utilised) {
