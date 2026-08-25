@@ -15219,6 +15219,31 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-364 — the SAMA reg-reporting "in flight" set was a hand-typed subset that dropped ACKNOWLEDGED
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a board/operator-facing SAMA regulatory-reporting dashboard indicator (`regreporting.reg_report_filing`). `RegReportingService.dashboard()` counted `inFlightFilingCount` and built the `inFlightByStatus` / `inFlightByRegulator` breakdowns over `IN_FLIGHT_STATUSES`, a hand-typed 6-status list. The declared machine (`ALLOWED`) has terminal set `{CLOSED, EXEMPTED}`, so the non-terminal complement is 7 states; the hand-typed list was that complement MINUS `ACKNOWLEDGED` (`ACKNOWLEDGED → CLOSED`, a declared non-terminal state). So a filing the regulator has acknowledged but that is not yet CLOSED was absent from the in-flight count and could never appear in the by-status breakdown — under-reporting open regulatory-reporting work in the flattering direction, until the filing was closed. |
+| **Registers** | none — a service (`tss-grc-backend/.../regreporting/service/RegReportingService.java`) + a new unit test (`RegReportingInFlightStatusContractTest`, the service's first). No data change, no migration. |
+| **Standards** | [[F2-196]] ("open / in-flight" is the COMPLEMENT of a declared terminal set, never a second hand-typed list — an inclusion list silently drops the state nobody remembered); [[F2-343]] (derive the terminal set FROM the machine, never type it — the fraud open-count precedent); [[F2-336]] / [[F2-361]] (the same complement rule on BCM CAPAs and the committee overdue sweep); [[F2-205]] / [[F2-282]] (which reader is authoritative and do they agree — `countOverdue`, `countSubmittedSince` and `upcoming` all treat SUBMITTED + ACKNOWLEDGED as peers / use the terminal complement; `IN_FLIGHT_STATUSES` was the lone outlier); [[F2-283]] (latent in data / live in code); [[F2-248]] (the service had no test); [[F2-320]] / [[F2-325]] (hermetic — reflection over the constants; the query's row selection is SQL). |
+| **Found by** | Fanning out a scout over the cold modules (knowledge, board_pack, governance, regreporting, sharia, openbanking, aml, fraud, consumer, nca_ecc) for the F2-196 inclusion-list shape, then re-deriving its top candidate ([[F2-221]]). The scout flagged `IN_FLIGHT_STATUSES` dropping ACKNOWLEDGED plus a residual "in flight = not yet acknowledged" reading. Refuted by the set's own contents — it also includes SCHEDULED / IN_PREPARATION / IN_REVIEW / APPROVED / REJECTED, none of which is "in transit to the regulator," so it plainly means "all non-terminal work," and dropping only ACKNOWLEDGED is a drift rather than a narrower question. Confirmed the machine's terminal set is exactly `{CLOSED, EXEMPTED}` and that three sibling readers treat SUBMITTED + ACKNOWLEDGED as peers. |
+| **Verification** | hermetic (reflection over the private static constants, no Spring / DB — [[F2-320]] / [[F2-325]]). `RegReportingInFlightStatusContractTest` (3 tests): `terminalSetIsExactlyTheMachinesEmptyOutgoingStates`, `inFlightIsExactlyTheComplementOfTheTerminalSet`, `acknowledgedIsInFlight_notDropped`. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting only `IN_FLIGHT_STATUSES` to the hand-typed 6-set (keeping `TERMINAL_STATUSES` derived so it still compiles) makes the complement leg and the ACKNOWLEDGED leg RED (`to contain "ACKNOWLEDGED" but could not find`), while the terminal-set leg stays green — a surgical revert that isolates the finding. |
+
+### Fix
+
+Derive both `TERMINAL_STATUSES` (the declared states with no outgoing edge) and `IN_FLIGHT_STATUSES` (the complement) from the `ALLOWED` machine, so neither can drift and the in-flight view can never again silently drop a non-terminal state. Behaviour-identical for every reader except the in-flight view, which now includes ACKNOWLEDGED. `overdueRecent` re-filters its input by `OVERDUE_APPLICABLE` (which excludes ACKNOWLEDGED), so it is unaffected; `inFlightByStatus` is a dynamically-keyed map, so an ACKNOWLEDGED bucket surfaces automatically — no DTO or FE change.
+
+### Note — latent in data, live in code ([[F2-283]])
+
+Not re-measured against a running backend (none this slice); reachable through ordinary use the moment a filing reaches ACKNOWLEDGED — a real lifecycle step between SUBMITTED and CLOSED (the regulator has acknowledged receipt, the org has not yet closed the filing out).
+
+### Filed (deferred)
+
+- `OVERDUE_APPLICABLE`, `countOverdue`'s `{SUBMITTED, ACKNOWLEDGED, CLOSED, EXEMPTED}` and `countSubmittedSince`'s `{SUBMITTED, ACKNOWLEDGED, CLOSED}` are left as hand-typed sets — each asks a genuinely NARROWER question than "in flight" ([[F2-290]]'s exception: a narrower question is not a dropped-state bug), so they are not complement-of-terminal counts and were read and left.
+- (From the same scout sweep, and NOT this shape) `CcmService`: the runner status vocabulary is `{PASS, FAIL, ERROR, SKIPPED, TIMEOUT}` — `LdapGroupMembershipRunner` emits `SKIPPED` when `grc.ccm.ldap.enabled=false` — but the consecutive-failure ladder (`isFailureLike` / `"PASS"`) and the dashboard's four status counts both handle only `{PASS, FAIL, ERROR, TIMEOUT}`, so a SKIPPED run neither increments nor resets the failure counter and is invisible on the dashboard ([[F2-293]]'s produced-token-no-reader-handles). Surfacing SKIPPED needs a `DashboardSnapshot` field + FE, and how a skip should affect the failure ladder is a policy judgment — a product / owner decision ([[F2-188]]), not a hermetic fix.
+- `sharia.ShariaService.dashboard()` counts open Sharia findings as `{OPEN, REMEDIATION}`, dropping `VERIFIED` (declared non-terminal, `VERIFIED → CLOSED`) — but there is no declared `TERMINAL_STATUSES` constant and every reader consistently excludes VERIFIED, so "an open finding still needs remediation; VERIFIED is done-pending-closure" is a defensible narrower reading. Owner decision, filed not forced.
+
 ## F2-363 — the SAMA Op-Res completeness denominator was hard-coded /5, not the tenant's active-pillar count
 
 | | |
