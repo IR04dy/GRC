@@ -6,6 +6,7 @@ import com.tss.grc.module.audit_eng.dto.AuditEngagementDto;
 import com.tss.grc.module.audit_eng.entity.AuditEngagement;
 import com.tss.grc.module.audit_eng.repository.AuditEngagementRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.util.CsvTokens;
 import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -119,7 +120,7 @@ public class AuditEngagementService {
         if (req.getActualHours() != null) e.setActualHours(req.getActualHours());
         if (req.getLinkedFindingIds() != null) {
             e.setLinkedFindingIds(req.getLinkedFindingIds());
-            e.setFindingsCount(req.getLinkedFindingIds().split(",").length);
+            e.setFindingsCount(CsvTokens.countNonBlank(req.getLinkedFindingIds())); // F2-369: "".split(",") is 1, not 0
         }
         AuditEngagementDto out = AuditEngagementDto.from(repo.save(e));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "audit_engagement", externalId, out);

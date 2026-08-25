@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-369 — split(",").length counted an empty id list as 1, not 0, on two regulator-facing counts
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — two denormalised counts on regulator/governance-facing registers. `NcaEccFilingService` (the NCA ECC self-assessment return, `capaCount`) and `AuditEngagementService` (an IIA audit engagement, `findingsCount`) each derived the count as `req.getLinkedX().split(",").length`. `"".split(",")` returns `[""]` — a one-element array holding the empty token, not an empty array — so a linked-ids field arriving as `""` made the count read **1 for a list of 0 ids**. Both are written only under `if (req.getLinkedX() != null)`, so it fires when the field is empty rather than null/omitted (F2-283: latent-in-data — a caller sending `""` for "none"). |
+| **Registers** | none — one new shared primitive (`common/util/CsvTokens`), two call sites (`.../nca_ecc/service/NcaEccFilingService.java`, `.../audit_eng/service/AuditEngagementService.java`) + a new `CsvTokensTest`. No data change, no migration. |
+| **Standards** | [[F2-190]] (a shape used in two modules gets one shared primitive, not two hand-rolled copies — `common/util/CsvTokens`, beside `ExternalIds`); [[F2-205]] / [[F2-216]] (a source scan proves both sites call the helper and the `.split(",").length` idiom is gone — wiring + mechanism removal); [[F2-283]] (latent in data / live in code); [[F2-320]] / [[F2-325]] (hermetic — pure string logic + a source scan). |
+| **Found by** | Sweeping `nca_ecc` (NCA ECC filing) and `audit_eng` for a bounded defect after the risk/ERM quantitative surface, the capped-aggregate shape, the [[F2-196]] inclusion-list shape and the [[F2-179]] case-sensitivity shape all came up clean or owner-decision in the fresh modules sampled this firing (`RegulatoryHorizonService.ACTIVE_STATUSES` and `EmergingRiskService.ACTIVE` are correct complements; `BoardPackAggregateService.IN_FLIGHT_STATUSES` is a curated board subset, [[F2-290]]'s narrower-question exception). `NcaEccFilingService`'s scoring/attribution and `AuditEngagementService`'s lifecycle are sound; the one clean, unambiguous bug was the shared `.split(",").length` count idiom — grepped platform-wide, exactly these two sites carry it, both feeding a denormalised count a regulator/committee reads. |
+| **Verification** | hermetic (no Spring / DB — [[F2-320]] / [[F2-325]]). `CsvTokensTest` (3): the count legs are load-bearing — `countNonBlank("")` is 0 (the defect was 1), `null`/blank → 0, `"a,,b"` → 2 (interior blanks do not inflate), `"a,b"` → 2; and a source-scan leg proves both service files call `setCapaCount(CsvTokens.countNonBlank(` / `setFindingsCount(CsvTokens.countNonBlank(` and no longer contain `.split(",").length` ([[F2-205]] wiring / [[F2-216]] removal). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): a surgical revert of only the two call sites back to `.split(",").length` (keeping the `CsvTokens` symbol so both classes still compile) makes exactly the source-scan leg RED (the file still holds `.split(",").length`, lacks the helper call) while the count legs — which exercise the unchanged helper — stay green ([[F2-225]]: label which legs discriminate). |
+
+### Fix
+
+`common/util/CsvTokens.countNonBlank(String)` (null/blank → 0; counts the non-blank comma-separated tokens) is the one home for the count, and both sites route through it. `"".split(",").length` was 1; `countNonBlank("")` is 0. Strictly more correct on every input — the only behavioural changes are the empty-string case (1 → 0, the fix) and interior blank tokens (`"a,,b"`: 3 → 2), both toward the true id count.
+
+### Note — latent in data ([[F2-283]])
+
+Not re-measured against a running backend (none this slice). The miscount fires only when `linkedCapaIds` / `linkedFindingIds` arrives as an empty (non-null) string; a null or omitted field leaves the count untouched. Whether any live filing/engagement holds an empty linked-ids string was not measured.
+
 ## F2-368 — the SAMA quarterly complaints report was computed over all-time, ignoring its period
 
 | | |
