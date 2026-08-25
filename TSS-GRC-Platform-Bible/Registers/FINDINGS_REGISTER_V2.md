@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-350 — a long run-code override returned an opaque 500 instead of a 400
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a client-input boundary error surfacing as an opaque 500, on the BCM exercise-runtime create path. `ExerciseRuntimeService#startRun` (line 176) stores a caller-supplied `runCode` (`req.runCode().trim()`) directly into `ExerciseRun.run_code` `@Column(length = 64)` when non-blank (else auto-generates), and `StartRunRequest.runCode` carried no `@Size` — so a > 64-char override on `POST /api/v1/bcm/exercise-runs` (`BCM:WRITE`, routed, FE client) hits `NVARCHAR(64)` → SQL Server error 8152 → opaque 500 (in prod SEC-CFG-001 strips the class, so it reads as an outage rather than "your run code is too long"). A 400 naming the field is due. |
+| **Registers** | none — a request-validation defect on `bcm.exercise_run`. No data change. |
+| **Standards** | RFC 7807 ProblemDetail; the F2-185(b) request-`@Size`-mirror family, sibling of the [[F2-338]] / [[F2-346]] / [[F2-347]] server-composed-overflow family. |
+| **Found by** | Executing [[F2-347]]'s own filing (*"`StartRunRequest.runCode` has no `@Size`, so a > 64-char code 8152s on the `ExerciseRun` insert itself — a milder [[F2-185b]] boundary question, a 500 where a 400 naming the field is due"*), after a diligent-negative sweep of `BigDecimal.divide` (all guarded by `scale, RoundingMode` / a bounded `MathContext` and `signum()==0` / ternary checks; only a pathological −100 % discount rate in `StrategyRoiService` is theoretically unguarded — not fixed, F2-188). |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — a unit test cannot trigger a real 8152, so `RequestSizeCapMirrorTest` registers the mirror `StartRunRequest#runCode` → `ExerciseRun.run_code` and asserts `@Size(max)` equals `@Column(length)` (64) by reflection, exactly as [[F2-346]] / [[F2-347]] proved their caps. Pre-fix control ([[F2-274]] / [[F2-287]]): removing ONLY the `@Size` annotation (fix committed first — [[F2-297]]) turns `everyEnabledSizeCapEqualsTheColumnItGuards` RED (*"StartRunRequest#runCode declares no @Size — the mapping is stale"*). `RequestSizeCapMirrorTest` + `InertValidationConstraintTest` + `NestedRequestCascadeTest` green; full backend suite green. Latent until a > 64-char override; no dev backend to live-probe. No migration. |
+
+### Fix
+
+`@Size(max = 64)` on `StartRunRequest.runCode`, mirroring `ExerciseRun.run_code`'s `@Column(length = 64)`. This is F2-184's "cap == column → enable" case: the database already refuses a longer value, so the only change is a 400 that names `runCode` instead of a truncation 500 — no request that works today can start failing. The service additionally stores a `trim()` of the raw value, so `@Size(max = 64)` on the raw never accepts an overflow (stored ≤ raw ≤ 64); it may reject a value padded past 64 with whitespace that would have trimmed-to-fit, which is the safe direction and consistent with every sibling `@Size` in the file.
+
+**F2-215 sweep.** The other uncapped text fields on `StartRunRequest` are safe: `channel` is a closed vocabulary that `normaliseChannel` refuses (→ 400) or coerces to `IN_PERSON`, its members ≤ 12 chars; `facilitatorNotesEn`/`facilitatorNotesAr` are `NVARCHAR(MAX)`, correctly uncapped (F2-184). So `runCode` is the sole overflow field.
+
 ## F2-349 — an oversized file upload returned an opaque 500 instead of a 413
 
 | | |
