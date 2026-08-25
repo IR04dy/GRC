@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-377 — four-eyes SoD bypassed by delegating an approval request back to its raiser
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-26 |
+| **Severity** | P2 — a segregation-of-duties bypass on the universal approval workflow engine. `ApprovalRequestService.create` enforces the four-eyes control (`assignedTo != requestedBy`, F2-226 leg 2), but `transition(DELEGATED)` reassigned `assignedTo` with **no equivalent check**. Since `assignedTo` **is** the authorisation input `transition()` checks (SEC-IAM-002, `callerUsername.equals(assignedTo)`), a request could be delegated back to its RAISER, who then re-pends it (`DELEGATED → PENDING`) and approves their own request — `requestedBy == decidedBy` on the final record, the exact self-approval the create check exists to prevent. |
+| **Registers** | none — one service method (`.../approvals/service/ApprovalRequestService.java`, `transition()` DELEGATED branch gains an SoD guard) + two `ApprovalRequestServiceTest` legs. No schema change, no migration. |
+| **Standards** | [[F2-215]] (two-of-N — the four-eyes mechanism is visibly present at create, so the delegate path read as covered; an invariant that must hold at all times must be re-checked wherever the field it constrains is written); [[F2-222]] / [[F2-226]] (the create-time four-eyes control this extends across delegation; a server-enforced SoD control must not rely on the assignee's discretion — the audit trail told the truth about who acted while nothing stopped them); [[F2-179]] (case-insensitive comparison — `requested_by` collates CI, so a capitalisation must not walk through the gate); [[F2-283]] (latent in code, reachable through ordinary use; not re-measured against a backend, none up); [[F2-320]] / [[F2-325]] (hermetic — Mockito). |
+| **Found by** | Reading the heavily-remediated `ApprovalRequestService` (F2-206/226/172d/48/275, SEC-IAM-002) and asking whether the four-eyes SoD invariant (raiser ≠ decider), enforced at create, survives delegation. The `create` check's own comment names why `assignedTo` matters ("it IS the authorisation input transition() checks"), and the DELEGATED branch writes that exact field with no guard. Reached after four clean SOC-ops reads (prior firing) and the sanctions/knowledge/rrp/board_pack/controlmap reads — the mature core is well-remediated ([[F2-216]]). |
+| **Verification** | hermetic (Mockito, no Spring/DB — [[F2-320]] / [[F2-325]]). `ApprovalRequestServiceTest` (+2): delegating to the raiser (`admin`, and a differently-cased/padded `  ADMIN `) throws the SoD `IllegalStateException` ("Segregation of duties") and `verify(never()).save`; the existing "delegate to a different reviewer" test still succeeds (no regression). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): surgically remove only the delegate SoD `if` block (keeping the `newAssignee` local + setter so the class compiles) → both delegate-to-raiser legs RED ("Expecting actual throwable" — no throw), the other 17 green. |
+
+### Fix
+
+The `transition(DELEGATED)` branch now refuses `newAssignedTo == requestedBy` — the same segregation-of-duties invariant `create` enforces, extended across delegation. It uses the SAME 409 (`IllegalStateException` → CONFLICT, the platform's four-eyes convention — matching `NdiEvidenceItemService`'s SEC-NDI-003 gate and the create check, not the outlier `BusinessRuleException` 403) and the SAME case-insensitive comparison (`requested_by` collates CI, [[F2-179]]). No legitimate flow is broken: delegating to anyone except the raiser is a normal reassignment; delegating to the raiser is exactly what four-eyes forbids. No schema change, no migration.
+
+The reusable rule: **when a four-eyes / SoD check appears on a create, grep every OTHER path that writes the constrained field (delegate, reassign, transition) — the invariant is only as strong as its weakest writer.**
+
 ## F2-376 — the SOC-ops sweep missed every tenant with no SecurityEvent
 
 | | |
