@@ -443,12 +443,18 @@ public class CptyService {
         long red = limitRepo.countByOrganisationIdAndBand(org(), "RED");
         long amber = limitRepo.countByOrganisationIdAndBand(org(), "AMBER");
 
-        Page<Counterparty> recent = cptyRepo.findByOrganisationIdOrderByReferenceAsc(
-                org(), PageRequest.of(0, 50));
+        // F2-352 — aggregate over ALL counterparties, not a capped page. This block previously read
+        // findByOrganisationIdOrderByReferenceAsc(org(), PageRequest.of(0, 50)), so on a tenant with
+        // more than 50 counterparties the SAMA total exposure and the sector/grade concentration
+        // breakdowns were computed over the first 50 by reference only — understating exposure (the
+        // flattering direction) beside an all-time totalCounterparties count (F2-197 / F2-345: a
+        // capped list is fine to render, wrong to aggregate). The grouping arithmetic is
+        // byte-identical; only the source is now uncapped.
+        List<Counterparty> all = cptyRepo.findByOrganisationIdOrderByReferenceAsc(org());
         Map<String, Long> bySector = new LinkedHashMap<>();
         Map<String, Long> byGrade = new LinkedHashMap<>();
         BigDecimal totalExp = BigDecimal.ZERO;
-        for (Counterparty c : recent.getContent()) {
+        for (Counterparty c : all) {
             bySector.merge(c.getSector(), 1L, Long::sum);
             if (c.getCurrentInternalGrade() != null) {
                 byGrade.merge(c.getCurrentInternalGrade(), 1L, Long::sum);
@@ -473,7 +479,7 @@ public class CptyService {
                 .totalExposureSarM(totalExp)
                 .bySector(bySector)
                 .byInternalGrade(byGrade)
-                .recentCounterparties(recent.stream().limit(10).map(this::toCounterparty).toList())
+                .recentCounterparties(all.stream().limit(10).map(this::toCounterparty).toList())
                 .topUtilisedLimits(top)
                 .build();
     }
