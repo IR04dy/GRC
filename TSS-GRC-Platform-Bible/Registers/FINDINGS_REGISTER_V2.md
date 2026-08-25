@@ -15219,6 +15219,26 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-359 — the FE status vocabulary carried the phantom RECOVERED and not the real RESOLVED, so 10/44 incident rows rendered a grey, raw-token badge
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a status-badge honesty gap on the incident register (`module/incident` → `cyber.incidents`, [[F2-345]]'s register). `IncidentService.legalStatus` coerces `status` to exactly `{OPEN, INVESTIGATING, RESOLVED, CLOSED}` ("CK_incidents_status is strict"; `mapPhaseToStatus` sends the NIST RECOVERY/POST_INCIDENT phases to `RESOLVED`), so `RESOLVED` is the real recovery-phase terminal and `RECOVERED` is not a legal status at all. Yet `lib/labels.ts` carried `RECOVERED` in BOTH `STATUS_KEY` and `STATUS_TONE` (a phantom — 0 rows) and `RESOLVED` in NEITHER. So a `RESOLVED` incident (10 of 44 register rows, dev = prod per [[F2-345]]) rendered `STATUS_TONE['RESOLVED'] ?? 'neutral'` = a GREY badge indistinguishable from `CLOSED`/`DRAFT`, labelled with the raw English token `RESOLVED` (`statusLabel` falls back to the token) on an Arabic-primary UI (house rule 7). |
+| **Registers** | none — a frontend shared vocabulary map (`tss-grc-ui-v2/src/lib/labels.ts`) + the two i18n dictionaries (`src/translations/en.ts`, `ar.ts`). No data change, no migration. |
+| **Standards** | [[F2-357]] (the sibling "fixed the label, left the lookup" family — F2-357 completed `STATUS_TONE` for the five PDPL breach statuses and built the completeness gate; this is the same family, one register over); [[F2-211]] (a status in the data with no label key → raw token); [[F2-196]] / [[F2-180]] (FE/BE vocabulary drift — the screen knows a token the column never stores and not one it does); [[F2-198]] (the F2-357 gate's population is the keys of one map, so a status in neither map is invisible to it). |
+| **Found by** | Re-verifying [[F2-358]]'s filed incident-KPI candidate against the code ([[F2-188]]): reading the three `IncidentsPage` "open" readers surfaced the backend vocabulary (`legalStatus` / `mapPhaseToStatus`), which showed `RESOLVED` real and `RECOVERED` phantom — and grepping `lib/labels.ts` showed `RESOLVED` absent from both maps while `RECOVERED` was present in both. |
+| **Verification** | hermetic (`tsc --noEmit` + vitest — no backend). Additive: `STATUS_KEY.RESOLVED = 'statusResolved'`, `STATUS_TONE.RESOLVED = 'success'`, `statusResolved` in en (`Resolved`) and ar (`محلولة`). `breachStatusToneCompleteness.test.ts` extended with a `RESOLVED` pin (label key + tone); `translationKeysDeclared.test.ts` green (en/ar key sets stay identical). Full FE suite green. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): removing both `RESOLVED` entries from `labels.ts` makes the pin leg RED (`expected "statusResolved", received undefined`) while the completeness leg stays GREEN — demonstrating the [[F2-198]] blind spot in the same run (RESOLVED removed from `STATUS_KEY` → outside `STATUS_KEY ⊆ STATUS_TONE`'s population). |
+
+### Fix
+
+Add `RESOLVED` to the two shared status maps in `lib/labels.ts` and the label key to both dictionaries — the exact [[F2-357]] shape (a status live in the data, missing from the FE vocabulary). Tone `'success'` follows the platform convention (done, awaiting formal closure — matching `RECOVERED`, distinct from `CLOSED`'s `neutral` for archived). `RECOVERED` is deliberately LEFT in both maps: `STATUS_TONE`/`STATUS_KEY` are platform-wide shared maps and `RECOVERED` may be a legal status in another register, so removing it is not this slice's call. Additive and behaviour-preserving for every working row — a `RESOLVED` badge goes from grey/raw to green/localised; nothing else changes.
+
+### Filed (deferred)
+
+- **The incident "open" KPI over-count** ([[F2-358]]'s original filed candidate): `IncidentsPage.tsx` has THREE readers of "open/active" that disagree — `open_count` (line 469) excludes `{CLOSED, RECOVERED}` and so counts the 10 `RESOLVED` incidents as open (a pessimistic over-report), `critical` (line 470) excludes only `{CLOSED}`, and the regulator picker (line 282) correctly excludes `{CLOSED, RESOLVED}`. The [[F2-196]] fix is to route all three through one `isIncidentOpen` predicate keyed on the declared terminal set `{RESOLVED, CLOSED}` — but a proper [[F2-205]] wiring proof needs the inline KPI strip (lines 567–582) extracted into an exported leaf component, because every render test in this codebase mounts a leaf/tab (`SubmissionAnalyticsCard`, `MatrixTab`, `OverviewTab`), never the monolithic self-fetching page. That extraction is a page-structure decision, so it is its own slice, not a side effect of a labels fix.
+- **`STATUS_OPTIONS` (the incident edit form) offers `CONTAINED`/`ERADICATED`/`RECOVERED` and omits `RESOLVED`** — tokens `legalStatus` silently coerces to `OPEN` on save (F2-180's shape on a form vocabulary). A form-behaviour change, deferred.
+
 ## F2-358 — the "Open for review" KPI read 0 / "No pending submissions" on the reviewer's own pending queue (openCount swept into the review-mean's divide-by-zero guard)
 
 | | |
