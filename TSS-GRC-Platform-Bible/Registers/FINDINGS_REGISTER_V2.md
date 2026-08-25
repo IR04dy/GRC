@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-353 — the counterparty reference minter seeded from a COUNT re-mints a live ordinal, 500ing on the filtered unique index
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 (latent in data, live in code) — `CptyService.generateReference()` minted `CP-NNNNN` from `countByOrganisationId(org()) + 1L`. A Spring Data derived `countBy…` runs against the entity, so it respects `@Where(is_deleted = 0)` and counts LIVE rows only — while `cpty.counterparty` carries the FILTERED unique index `ux_cpty_reference (organisation_id, reference) WHERE ([is_deleted] = (0))` (V341). So a soft-delete gap or a concurrent create makes the count re-mint an ordinal already in use by a live row, and the INSERT then violates the unique index → **HTTP 500 on registering a SAMA counterparty**. The F2-337 / F2-351 count-minter collision shape, in the counterparty-risk register. |
+| **Registers** | `cpty.counterparty` — read-path minting defect; no data change, no migration. |
+| **Standards** | SAMA counterparty / large-exposure register; [[F2-337]] / [[F2-351]] (a count seed re-mints after a gap; a filtered unique index turns that into a 500); [[F2-310]] (format-preserving → no owner decision). |
+| **Found by** | Sweeping `.divide(` sites for an unguarded denominator (a distinct dashboard-robustness question) — `CptyService.computeUtilisationPct` guards `limit == 0`, but the adjacent `generateReference()` seeds from `countByOrganisationId + 1`, the count-minter shape. Confirmed live in code: the filtered unique index exists (V341:463) and the count respects `@Where`. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — a unit test cannot trigger a real unique-index 500, so `CptyServiceTest` (+4 legs) pins the minting logic: seeds from `findMaxReferenceSeq`, not the count (`verify(never()).countByOrganisationId`); skips a live collision via the `existsBy` skip-loop; a caller-supplied reference bypasses generation (`verify(never()).findMaxReferenceSeq`). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting to the count body makes the seed/skip legs RED (the count seed is unstubbed → 0 → `CP-00001`, and the MAX/exists stubs go unused under strict stubbing); the caller-override leg correctly stays green (unchanged bypass). `CptyServiceTest` 6/6 + full backend suite green. Latent (needs a soft-delete gap or concurrent create); no dev backend to live-probe. No migration. |
+
+### Fix
+
+Mirror `ComplaintService#generateNextComplaintNo` (the platform's correct sequential-minter idiom). Two new `CounterpartyRepository` finders: a native `findMaxReferenceSeq(org)` = `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(reference, 4, 29) AS INT)), 0) FROM cpty.counterparty WHERE organisation_id = :org AND reference LIKE 'CP-%'` — the MAX ordinal across ALL rows including soft-deleted ones, so a used ordinal is never re-issued (`TRY_CAST` ignores a caller-supplied reference that only happens to start `CP-`; `ISNULL(…, 0)` seeds an empty register at 1) — and a derived `existsByOrganisationIdAndReference` (live-only, `@Where`-scoped) for the skip-loop. `generateReference()` seeds `next = MAX + 1`, steps over any live collision (the residual concurrency race: a peer create grabbing the same ordinal in the window between the seed read and the INSERT), backstopped by the unique index and, after 1000 attempts, a random suffix. Format-preserving (`CP-NNNNN`), so no owner decision ([[F2-310]]) — the question was collision-safety, not authorship, and MAX + skip-loop is a strict improvement over count + 1.
+
+**Filed / not done.** Count-based reference minters against a filtered unique index are now a measured POPULATION ([[F2-266]] — filings one at a time is what a population looks like when nothing counts it): F2-337 (`OBI-`), F2-351 (`RUN-`), F2-353 (`CP-`). A gate correlating a `count…() + 1` reference seed with a filtered unique index on that column would find the rest — deferred as its own slice (it must also fix each instance it finds, [[F2-188]]).
+
 ## F2-352 — the counterparty-risk dashboard aggregated exposure over a capped page, not all counterparties
 
 | | |
