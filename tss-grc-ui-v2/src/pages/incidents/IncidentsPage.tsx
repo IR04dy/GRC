@@ -25,6 +25,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
+import { isIncidentOpen } from '../../lib/incidentStatus';
 import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
@@ -279,7 +280,7 @@ export function IncidentsPage() {
     if (incidents.loading || allIncidents.length === 0) return;
     const SEV_RANK: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
     const candidate = [...allIncidents]
-      .filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED')
+      .filter(i => isIncidentOpen(i.status))   // F2-360: same predicate as the KPIs (was already {CLOSED,RESOLVED})
       .sort((a, b) => (SEV_RANK[b.severity ?? ''] ?? 0) - (SEV_RANK[a.severity ?? ''] ?? 0))
       [0];
     if (!candidate) {
@@ -466,8 +467,12 @@ export function IncidentsPage() {
     });
   }, [incidents.data, t]);
 
-  const open_count = allIncidents.filter(i => i.status !== 'CLOSED' && i.status !== 'RECOVERED').length;
-  const critical = allIncidents.filter(i => i.severity === 'CRITICAL' && i.status !== 'CLOSED').length;
+  // F2-360 — "open" is the complement of the declared terminal set { RESOLVED, CLOSED }
+  // (isIncidentOpen), never a hand-typed exclusion. The old open_count excluded the phantom
+  // RECOVERED (0 rows) and so counted the 10/44 RESOLVED incidents as open; critical excluded
+  // only CLOSED. Both now agree with the regulator picker below.
+  const open_count = allIncidents.filter(i => isIncidentOpen(i.status)).length;
+  const critical = allIncidents.filter(i => i.severity === 'CRITICAL' && isIncidentOpen(i.status)).length;
   const closed = allIncidents.filter(i => i.status === 'CLOSED').length;
 
   async function onSubmit(values: IncidentRequest) {
