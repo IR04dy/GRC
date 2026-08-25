@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.regex.Pattern;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.support.GuardExpressions;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.CloudServiceTransitionRequest;
+import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.CreateArrangementRequest;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.ExitPlanTransitionRequest;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.TransitionRequest;
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.TransitionReviewRequest;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -283,6 +286,56 @@ class OutsourcingLifecycleTest {
         assertThat(a.getSamaNonObjectionRef()).isEqualTo("SAMA/NO/2026/0007");
     }
 
+    // ── F2-366: the SAMA materiality flag is canonicalised on write ──────────
+
+    @Test
+    @DisplayName("F2-366: a lower-case `material` is stored canonical, so the §4 gate cannot be bypassed by casing")
+    void materialityIsCanonicalisedOnWrite_soTheSamaGateCannotBeBypassedByCasing() {
+        // A machine caller supplies the SAMA materiality flag in lower case. The column has no CHECK
+        // and the DTO no @Pattern, so pre-fix it was stored verbatim — and transitionArrangement gates
+        // on a case-SENSITIVE `"MATERIAL".equals(...)`, so `"material"` slipped LIVE unnotified while
+        // countActiveMaterial (`= 'MATERIAL'`, case-insensitive SQL) still counted it as material.
+        when(arrangementRepo.findByOrganisationIdAndReference(eq(ORG), any())).thenReturn(Optional.empty());
+        ArgumentCaptor<OutsourcingArrangement> cap = ArgumentCaptor.forClass(OutsourcingArrangement.class);
+
+        svc.createArrangement(createReq("material"));
+
+        verify(arrangementRepo).save(cap.capture());
+        OutsourcingArrangement created = cap.getValue();
+        assertThat(created.getMateriality())
+            .as("materiality is normalised on write so the §4 gate, the countActiveMaterial KPI and "
+                + "the V208 automation rule all read the same token")
+            .isEqualTo("MATERIAL");
+
+        // End-to-end: the very record that was created lower-case still hits the §4 gate, because the
+        // value the gate reads is now canonical. This is the bypass, closed.
+        created.setId(1L);
+        created.setStatus("BOARD_APPROVED");
+        when(arrangementRepo.findByOrganisationIdAndId(eq(ORG), eq(1L))).thenReturn(Optional.of(created));
+        assertThatThrownBy(() -> svc.transitionArrangement(1L,
+                new TransitionRequest("LIVE", null, null, null, null)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("SAMA_NOTIFIED")
+            .hasMessageContaining("MATERIAL");
+    }
+
+    @Test
+    @DisplayName("F2-366: an unrecognised materiality is upper-cased, not refused (canonicalise, not a 400)")
+    void anUnrecognisedMaterialityIsUppercasedNotRefused() {
+        // F2-182: nothing upstream refuses a non-vocabulary value today (no CHECK, no coercion), so a
+        // require() would break a request that succeeds today. The fix normalises casing only, and an
+        // out-of-vocabulary token stays out of vocabulary (it is legitimately not "material").
+        when(arrangementRepo.findByOrganisationIdAndReference(eq(ORG), any())).thenReturn(Optional.empty());
+        ArgumentCaptor<OutsourcingArrangement> cap = ArgumentCaptor.forClass(OutsourcingArrangement.class);
+
+        assertThatCode(() -> svc.createArrangement(createReq("important")))
+            .as("a canonicalise must not become a refuse — this request succeeds today")
+            .doesNotThrowAnyException();
+
+        verify(arrangementRepo).save(cap.capture());
+        assertThat(cap.getValue().getMateriality()).isEqualTo("IMPORTANT");
+    }
+
     // ── the authorisation branches the row asks for ──────────────────────────
 
     /**
@@ -361,6 +414,22 @@ class OutsourcingLifecycleTest {
         a.setMateriality(materiality);
         a.setIsCoreActivity(core);
         return a;
+    }
+
+    /** A minimal valid create request: only the fields the service reads need be non-null, and
+     *  emit()'s Map.of forbids a null reference / materiality / isCoreActivity. */
+    private static CreateArrangementRequest createReq(String materiality) {
+        return new CreateArrangementRequest(
+            "OUT-REVIEW-TEST-mat",          // reference
+            "Provider EN", "Provider AR",   // provider legal names
+            null, null,                     // country, jurisdiction
+            "Service EN", "Service AR",     // service titles
+            null, null,                     // descriptions
+            "IT_INFRASTRUCTURE",            // serviceCategory
+            materiality,                    // ← the field under test
+            false,                          // isCoreActivity
+            null, null, null, null, null,   // contract start/end, renewal days, spend, cadence
+            null, null, null);              // relationship/risk owner ids, linkedVendorId
     }
 
     @SuppressWarnings("unchecked")
