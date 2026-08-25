@@ -95,8 +95,17 @@ public class DataclassService {
         DataAsset a = loadAsset(id);
         if (!"DRAFT".equals(a.getStatus()) && !"RECLASSIFY".equals(a.getStatus()))
             throw new IllegalStateException("Asset must be DRAFT or RECLASSIFY to be classified");
-        String prev = a.getClassification();
-        a.setClassification(req.classification());
+        // F2-372 — normalise the caller-supplied classification to the canonical NDMO token. The
+        // column has no CHECK and is case-insensitively collated, but the value is read
+        // case-SENSITIVELY by classOrder() (the RECLASSIFIED_UP ladder), by the V210 automation rule
+        // ({"classification":{"in":["CONFIDENTIAL","TOP_SECRET"]}}, matched with Objects.equals in
+        // AutomationRuleEngine), and by the frontend label map — so a caller (or machine integration)
+        // sending "confidential" would store it verbatim, bypass the high-classification automation
+        // gate, mis-rank the upgrade ladder, and render unlabelled. Coerce, not require (F2-182): no
+        // upstream coercion and no CHECK, so a 400 would break a request that succeeds today.
+        String classification = normaliseClassification(req.classification());
+        String prev = normaliseClassification(a.getClassification());
+        a.setClassification(classification);
         if (req.pdplSpecialCategory() != null) a.setPdplSpecialCategory(req.pdplSpecialCategory());
         if (req.pdplLawfulBasis() != null) a.setPdplLawfulBasis(req.pdplLawfulBasis());
         if (req.nextReviewDue() != null) a.setNextReviewDue(req.nextReviewDue());
@@ -104,18 +113,23 @@ public class DataclassService {
         a.setClassifiedAt(LocalDateTime.now());
         assetRepo.save(a);
         timeline(a.getId(), null, null, "ASSET_CLASSIFIED", "CLASSIFIED",
-                "Classification " + req.classification() + ".",
-                "تصنيف " + req.classification() + ".");
+                "Classification " + classification + ".",
+                "تصنيف " + classification + ".");
         // Reclassification upward (e.g. INTERNAL → CONFIDENTIAL or higher) emits an extra flag
-        if (prev != null && classOrder(req.classification()) > classOrder(prev)) {
+        if (prev != null && classOrder(classification) > classOrder(prev)) {
             emit("DATA_ASSET_RECLASSIFIED_UP", "DATA_ASSET", a.getId(),
-                    Map.of("from", prev, "to", req.classification()));
+                    Map.of("from", prev, "to", classification));
         }
         emit("DATA_ASSET_CLASSIFIED", "DATA_ASSET", a.getId(),
-                Map.of("classification", req.classification(),
+                Map.of("classification", classification,
                         "specialCategory",
                         a.getPdplSpecialCategory() == null ? "NONE" : a.getPdplSpecialCategory()));
         return toAsset(a);
+    }
+
+    /** F2-372 — the canonical NDMO classification token (trim + upper-case, null-safe). */
+    private static String normaliseClassification(String c) {
+        return c == null ? null : c.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     public AssetResponse transitionAsset(Long id, TransitionAssetRequest req) {

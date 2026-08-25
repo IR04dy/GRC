@@ -20,6 +20,7 @@ import java.util.TreeSet;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.support.GuardExpressions;
+import com.tss.grc.module.dataclass.dto.DataclassDtos.ClassifyAssetRequest;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.DashboardResponse;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.TransitionAssetRequest;
 import com.tss.grc.module.dataclass.dto.DataclassDtos.TransitionExceptionRequest;
@@ -278,6 +279,48 @@ class DataclassLifecycleTest {
             .isZero();
         assertThat(svcSrc).as("and no scheduler sweeps them")
             .doesNotContain("Schedul");
+    }
+
+    /**
+     * F2-372 — {@code classifyAsset} stored {@code req.classification()} verbatim on a CHECK-less,
+     * case-insensitively-collated column, while every reader is case-SENSITIVE: {@code classOrder()}
+     * (the RECLASSIFIED_UP ladder), the V210 automation rule
+     * ({@code {"classification":{"in":["CONFIDENTIAL","TOP_SECRET"]}}}, matched with
+     * {@code Objects.equals}), and the frontend label map. So a machine caller sending
+     * {@code "confidential"} bypassed the high-classification automation gate, mis-ranked the ladder,
+     * and rendered unlabelled. The fix normalises on write (coerce, not require — F2-182).
+     */
+    @Test
+    @DisplayName("F2-372: a lowercase classification is normalised, so the automation gate matches and the ladder ranks it")
+    void classificationIsNormalisedToTheCanonicalNdmoToken() {
+        // Previously PUBLIC, now being reclassified with a lowercase, whitespace-padded token.
+        when(assetRepo.findByOrganisationIdAndId(eq(ORG), eq(1L)))
+            .thenReturn(Optional.of(asset("RECLASSIFY", "PUBLIC")));
+
+        svc.classifyAsset(1L, new ClassifyAssetRequest(" confidential ", null, null, null));
+
+        // 1. The stored value is canonical — the column has no CHECK and every reader is case-sensitive.
+        org.mockito.ArgumentCaptor<DataAsset> saved = org.mockito.ArgumentCaptor.forClass(DataAsset.class);
+        org.mockito.Mockito.verify(assetRepo).save(saved.capture());
+        assertThat(saved.getValue().getClassification())
+            .as("the caller sent ' confidential ' — it must be stored as the canonical CONFIDENTIAL")
+            .isEqualTo("CONFIDENTIAL");
+
+        // 2. The event payload the V210 automation rule matches against is normalised, and the upgrade
+        //    ladder ranks PUBLIC(1) → CONFIDENTIAL(3) (classOrder saw a case-mismatched token as 0 before).
+        org.mockito.ArgumentCaptor<com.tss.grc.module.platform.automation.event.DomainEvent> ev =
+            org.mockito.ArgumentCaptor.forClass(com.tss.grc.module.platform.automation.event.DomainEvent.class);
+        org.mockito.Mockito.verify(publisher, org.mockito.Mockito.atLeastOnce()).publishEvent(ev.capture());
+        var classified = ev.getAllValues().stream()
+            .filter(e -> "DATA_ASSET_CLASSIFIED".equals(e.triggerEvent())).findFirst().orElseThrow();
+        assertThat(classified.payload().get("classification"))
+            .as("the automation gate matches the payload case-sensitively, so it must be canonical")
+            .isEqualTo("CONFIDENTIAL");
+        assertThat(ev.getAllValues().stream()
+                .anyMatch(e -> "DATA_ASSET_RECLASSIFIED_UP".equals(e.triggerEvent())))
+            .as("PUBLIC → CONFIDENTIAL is an upgrade; the RECLASSIFIED_UP event must fire (a "
+                + "case-mismatched token ranked 0, so a real upgrade went undetected before the fix)")
+            .isTrue();
     }
 
     // ── the authorisation branches ───────────────────────────────────────────
