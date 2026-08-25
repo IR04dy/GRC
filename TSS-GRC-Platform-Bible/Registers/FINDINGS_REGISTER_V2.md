@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-376 — the SOC-ops sweep missed every tenant with no SecurityEvent
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-26 |
+| **Severity** | P2 — a scheduled-sweep tenant-discovery gap on regulatory surfaces. `SocOpsScheduledSweep.discoverTenants()` unioned distinct org-ids from `SecurityEvent` **alone**, then the hourly tick swept 9 other surfaces (SAMA regulator examinations, cyber-insurance renewals, TLS cert expiry, pentest retests, forensics holds, appsec SLAs, privileged-review recertifications, DLP criticals, seasonal overlays) for only those tenants. So a tenant that uses a compliance/governance tracker but has never ingested a `SecurityEvent` was invisible to discovery and **NONE of its escalations fired** — including a SAMA regulator-examination response deadline. |
+| **Registers** | none — 9 repositories gain the platform-standard `findDistinctOrganisationIds()` query (`.../socops/repository/*Repository.java`), and `SocOpsScheduledSweep.discoverTenants()` unions all 10 swept surfaces + is made package-private for the test. No schema change, no migration. |
+| **Standards** | [[F2-178]] (re-measure a recorded estimate before believing it — the ">99% SecurityEvent covers it" comment was optimistic; the trackers are used independently of SIEM ingest); [[F2-282]] / [[F2-336]] (one concept — "which tenants use SOC ops" — with two readers, and the discovery reader had drifted from the sweep's actual surfaces); [[F2-283]] (latent in data, live in code — reachable for any tenant with tracker data but no security event; not re-measured against a backend, none up); [[F2-320]] / [[F2-325]] (hermetic — mock the 10 repos, assert the union; JPQL validity confirmed structurally). |
+| **Found by** | Reading the cold, untested SOC-ops feature services (IamJml, Dlp, Pentest — all clean SEC-CYB-002 ingestion registers) and then the shared `SocOpsScheduledSweep`. The `discoverTenants()` comment named the gap itself: "Other repos don't have their own findDistinctOrganisationIds yet — SecurityEvent … covers >99% … add per-table discovery if a tenant onboards cyber insurance before SIEM ingest." The `ComplianceDeadlineScheduler` precedent (unioning two surfaces) confirmed the correct pattern. Reached after four clean SOC-ops service reads this firing (plus controlmap/knowledge/rrp/board_pack/sanctions in prior firings — the mature core is well-remediated, [[F2-216]]). |
+| **Verification** | hermetic (Mockito, no Spring/DB — [[F2-320]] / [[F2-325]]). `SocOpsScheduledSweepTest.discoverTenantsUnionsEverySweptSurfaceNotJustSecurityEvents`: a tenant whose only SOC-ops data is a regulator exam (99) / cyber insurance (88) / cert (77) is discovered, and an org-id appearing in two sources dedupes. JPQL validity confirmed structurally — all 9 entities are `@Entity` (no name override) with an `organisationId` field, and 13 repos across the platform already use the identical query form. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert only the union body to `SecurityEvent` alone (keeping the 9 repo methods so the test compiles) → the union leg RED ("could not find" the tracker-only tenants 99/88/77), the other 5 green. |
+
+### Fix
+
+`discoverTenants()` now unions `findDistinctOrganisationIds()` across all 10 surfaces the tick sweeps, not just `SecurityEvent` — the platform-standard tenant-discovery pattern (`ComplianceDeadlineScheduler` unions two surfaces for exactly this reason; 13 repos across the platform already expose the method). The 9 SOC-ops repos that lacked it gain the established `@Query("SELECT DISTINCT e.organisationId FROM <Entity> e")`, mirroring `SecurityEventRepository`. Because a `@Query` fails at STARTUP on a wrong entity/property and the hermetic suite boots no context to catch it, JPQL validity was confirmed structurally (all 9 entities are `@Entity` with no name override and an `organisationId` field, so `FROM <SimpleName> e … e.organisationId` resolves). No schema change, no migration.
+
+Filed: `sweepIamPrivilegedReviewsDue`, `sweepPentestRetestDue` and `sweepForensicsHoldDisposalDue` fire a forward-only warning (`now → now+N`) with no OVERDUE band, unlike `sweepCryptoCertExpiry`/`sweepAppsecSlaBreached` which handle the past band — so an overdue privileged-access recertification (NCA ECC 2-2 / SAMA CSF 3.3.5) escalates once (its 14-day warning) and then goes silent. Adding an overdue trigger is a new event type + inbox routing (a feature — [[F2-293]]'s produced-token-needs-a-reader), deferred as an owner decision.
+
 ## F2-375 — a sanctions check-code minter collides under concurrency, losing a screening — and F2-356's gate missed it
 
 | | |
