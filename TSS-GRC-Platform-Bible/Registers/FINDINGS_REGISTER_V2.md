@@ -15219,6 +15219,21 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-373 — a future breach detected-at pushed the PDPL Art.20 72-hour SDAIA clock into the future
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 — latent statutory-clock defect on the PDPL Art. 20 personal-data-breach path (Data Officer toolkit). `PrivacyAssuranceService.createBreach` sets `sdaiaDeadline = req.detectedAt().plusHours(72)` — the 72-hour SDAIA notification clock — from the caller-supplied detection moment, but does **not** bound it. So a breach recorded with a **future** `detectedAt` (an API/machine caller, or a mistyped form year — e.g. 2027 for 2026) silently pushes the statutory deadline into the future, so the breach never surfaces as overdue for SDAIA notification. The DSR path **next door** (`DataSubjectRightsService.createDsr`) already refuses a future `receivedAt` ([[F2-123]], the mirror defect — a future receipt extending the 30-day clock); the breach sibling was left unbounded ([[F2-215]] two-of-N). |
+| **Registers** | none — one method (`.../data_officer/service/PrivacyAssuranceService.java`, `createBreach` gains a fail-fast future-date guard) + a new `DataOfficerLifecycleTest` leg. No data change, no migration, no schema. |
+| **Standards** | [[F2-121]] / [[F2-123]] (bound a caller-supplied real-world moment that feeds a statutory deadline — refuse a future value, allow a past one; do NOT stamp `now()`, which would corrupt the deadline the disclosure is judged against); [[F2-215]] (two-of-N — the DSR fix was applied and the breach sibling in the same service was left, the classic "the mechanism that fixed the first is visibly present so the sibling reads as covered"); [[F2-283]] (latent in data — a normal operator enters a past/present detection time; API/machine-caller reachable; not re-measured against a backend); [[F2-320]] / [[F2-325]] (hermetic — Mockito, no Spring/DB). |
+| **Found by** | Sampling the un-read `data_officer` module (PDPL/NDMO Data Officer toolkit — DPIA/breach/ethics-review; [[F2-363]] filed only an attribution gap). The DSR path's own F2-123 comment was the tell: it says "the breach path next door already did this correctly — `sdaiaDeadline` is `req.detectedAt().plusHours(72)`," which is true about *using* `detectedAt` rather than `now()`, but the breach path lacks the future-date *bound* the DSR path adds (its line 100). Same regulation family, same caller-supplied real-world moment, one guarded and one not. |
+| **Verification** | hermetic (Mockito, no Spring/DB — [[F2-320]] / [[F2-325]]). `DataOfficerLifecycleTest.aFutureDetectionMomentIsRefused` (new): `createBreach` with `detectedAt = now().plusDays(1)` throws `IllegalStateException` naming "future" (the discriminating leg), and `detectedAt = now().minusDays(2)` (a legitimate past detection) is accepted. The existing `theSdaiaDeadlineRunsFromDetection` source-scan pins the `req.detectedAt().plusHours(72)` clock itself. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): `git checkout fb0cad4d -- PrivacyAssuranceService.java` (public API unchanged, so the test compiles) makes ONLY the new leg RED ("Expecting code to raise a throwable" — a future `detectedAt` did not throw) while the other 11 stay green. |
+
+### Fix
+
+`createBreach` gains a fail-fast guard right after the reference-exists check: `if (req.detectedAt().isAfter(LocalDateTime.now())) throw new IllegalStateException("Detected-at … is in the future — a breach cannot be detected before it occurs, and the PDPL Art.20 72-hour SDAIA notification clock runs from detection.")`. `detectedAt` is `@NotNull` (so no NPE — a null is a 400 before the service). A past value is deliberately allowed: a breach found last week and entered today has a clock — possibly already breached — that correctly runs from then. Inline, mirroring the DSR path's own inline future-refusal (line 100); a shared `DataOfficerSupport.requireNotFuture(moment, message)` could consolidate the two but is deferred as beyond the fix ([[F2-190]] / [[F2-188]]).
+
 ## F2-372 — the NDMO asset classification was stored verbatim, so a lowercase token bypassed the high-classification automation gate
 
 | | |
