@@ -15219,6 +15219,29 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-360 — three readers of "open" on IncidentsPage disagreed; one isIncidentOpen predicate over the declared terminal set
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a pessimistic KPI over-report on the incident register (`module/incident` → `cyber.incidents`, [[F2-345]]'s register). `IncidentsPage.tsx` had THREE readers of "open/active" that disagreed: the regulator-template picker (line 282) excluded the correct terminal set `{CLOSED, RESOLVED}`; `open_count` — the "Open" KPI tile AND the OverviewStrip lifecycle it feeds — excluded `{CLOSED, RECOVERED}`, where `RECOVERED` is a phantom (0 rows, not a legal status per `IncidentService.legalStatus`, [[F2-359]]) so the 10/44 `RESOLVED` incidents leaked in; and the `critical` KPI excluded only `{CLOSED}`. So the "Open" KPI over-counted open incidents by the RESOLVED count and the critical KPI counted RESOLVED criticals as open — flatteringly the wrong direction for a governance register ([[F2-196]]'s warned direction). |
+| **Registers** | none — a frontend page (`tss-grc-ui-v2/src/pages/incidents/IncidentsPage.tsx`) + a new shared predicate (`src/lib/incidentStatus.ts`) + a hermetic gate. No data change, no migration. |
+| **Standards** | [[F2-196]] ("open" = complement of a declared terminal set, never a hand-typed inclusion/exclusion list); [[F2-282]] (one predicate, N readers, never a third copy); [[F2-359]] (the sibling — `RESOLVED` is the real recovery-phase terminal, `RECOVERED` the phantom the FE knew and the backend never writes); [[F2-205]] (a leg exercising a primitive says nothing about whether the code CALLS it — the wiring proof is what matters); [[F2-180]] (FE/BE vocabulary drift). |
+| **Found by** | Executing [[F2-359]]'s filed incident-KPI candidate ([[F2-188]]): reading the three `IncidentsPage` "open" readers against the backend authority `IncidentService.legalStatus` (which coerces `status` to `OPEN | INVESTIGATING | RESOLVED | CLOSED`, terminal `{RESOLVED, CLOSED}`). |
+| **Verification** | hermetic (`tsc --noEmit` + vitest — no backend). New `lib/incidentStatus.ts` declares `INCIDENT_TERMINAL_STATUSES = {RESOLVED, CLOSED}` (mirroring the backend authority) and `isIncidentOpen`; `open_count`, `critical` and the regulator picker all call it. `incidentOpenPredicate.test.ts`: unit legs (terminal set = {CLOSED, RESOLVED}; RESOLVED/CLOSED terminal; OPEN/INVESTIGATING/absent open) + a source-scan wiring leg (every open-reader calls `isIncidentOpen`, `>=3` sites) + a phantom-`!== 'RECOVERED'` ban (comments stripped). Full FE suite green. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting ONLY the page (predicate lib unchanged) makes the two source-scan legs RED (wiring 0<3; `!== 'RECOVERED'` present) while the two unit legs stay GREEN — the [[F2-205]] point in one run. |
+
+### Fix
+
+Route the three "open/active" readers through one `isIncidentOpen(status) = !{RESOLVED, CLOSED}.has(status)`. The picker's behaviour is preserved (it already excluded exactly that set); `open_count` and `critical` are corrected (they no longer count `RESOLVED` as open). `closed` (`=== 'CLOSED'`) is left counting only archived rows — `RESOLVED` is done-awaiting-formal-closure, a distinct state ([[F2-359]]). `INCIDENT_TERMINAL_STATUSES` is a MIRROR of the backend `IncidentService.legalStatus` vocabulary (the frontend cannot see the Java state machine), declared once with the authority cited — not a copy of `openbanking.ts`'s unrelated SAMA open-banking `IncidentStatus` ([[F2-282]]).
+
+### Why a source-scan wiring gate, not a KPI-strip leaf extraction
+
+The [[F2-359]] filing scoped this as needing "the inline KPI strip extracted to an exported leaf component ... because every render test here mounts a leaf/tab, never the monolithic self-fetching page — a page-structure decision, its own slice." That assumed the wiring proof had to be a RENDER test. It does not. A source-scan gate that asserts every open-reader calls `isIncidentOpen` (and no bare `!== 'RECOVERED'` open-comparison remains) is a valid [[F2-205]] wiring proof AND a stronger one: it covers all three readers — including the regulator picker at line 282 — where a single render test would have covered only the KPI strip. So the extraction is not required to verify the fix, and this slice needs no page-structure change.
+
+### Filed (deferred, unchanged from [[F2-359]])
+
+- **`STATUS_OPTIONS` (the incident edit form) offers `CONTAINED`/`ERADICATED`/`RECOVERED` and omits `RESOLVED`** — tokens `legalStatus` silently coerces to `OPEN` on save ([[F2-180]]'s shape on a form vocabulary). A form-behaviour change, deferred.
+
 ## F2-359 — the FE status vocabulary carried the phantom RECOVERED and not the real RESOLVED, so 10/44 incident rows rendered a grey, raw-token badge
 
 | | |
