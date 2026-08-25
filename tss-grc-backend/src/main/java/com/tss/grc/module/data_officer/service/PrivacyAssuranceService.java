@@ -140,6 +140,20 @@ public class PrivacyAssuranceService {
         Long o = DataOfficerSupport.org();
         if (breachRepo.findByOrganisationIdAndReference(o, req.reference()).isPresent())
             throw new IllegalStateException("Breach " + req.reference() + " already exists");
+        // ── F2-373: bound the caller-supplied detection moment — the PDPL Art.20 72-hour SDAIA clock
+        // runs from it (below). A FUTURE detected-at pushes the statutory deadline into the future, so
+        // the breach never surfaces as overdue for notification — the mirror of F2-123's DSR defect
+        // (a future receipt extending the 30-day clock), which the DSR path next door already refuses.
+        // A PAST value is legitimate (a breach found last week, entered today — the clock, possibly
+        // already breached, runs from then). F2-121's reasoning: bound a caller-supplied real-world
+        // moment when the caller is its only source, rather than stamping now() (which would corrupt
+        // the deadline the disclosure is judged against).
+        if (req.detectedAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException(
+                "Detected-at " + req.detectedAt() + " is in the future — a breach cannot be detected "
+                + "before it occurs, and the PDPL Art.20 72-hour SDAIA notification clock runs from "
+                + "detection.");
+        }
         Breach b = new Breach();
         b.setOrganisationId(o);
         b.setReference(req.reference());
