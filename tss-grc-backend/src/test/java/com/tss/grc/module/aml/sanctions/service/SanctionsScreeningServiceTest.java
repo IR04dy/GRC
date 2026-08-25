@@ -318,6 +318,37 @@ class SanctionsScreeningServiceTest {
         assertThat(SanctionsScreeningService.documentMatches("12", idDocs)).isFalse();
     }
 
+    // ─── F2-375: check-code minter skips a collision rather than 500-ing ───────────────
+
+    /**
+     * The discriminating leg. Pre-fix {@code nextCheckCode} was a bare {@code count(...) + 1},
+     * so a code already taken (a concurrent screen that committed first) produced a colliding
+     * SCR-code → an INSERT violation on the filtered unique index and a lost sanctions screening.
+     * Post-fix it skips the taken ordinal and returns the next free one.
+     */
+    @Test
+    void nextCheckCodeSkipsATakenOrdinalRatherThanColliding() {
+        int year = java.time.Year.now().getValue();
+        when(checkRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(41L);
+        when(checkRepo.existsByOrganisationIdAndCheckCodeAndIsDeletedFalse(
+                ORG_ID, String.format("SCR-%d-%06d", year, 42))).thenReturn(true);   // count+1 already taken
+        when(checkRepo.existsByOrganisationIdAndCheckCodeAndIsDeletedFalse(
+                ORG_ID, String.format("SCR-%d-%06d", year, 43))).thenReturn(false);  // next is free
+
+        assertThat(service.nextCheckCode(ORG_ID))
+                .isEqualTo(String.format("SCR-%d-%06d", year, 43));
+    }
+
+    /** Regression guard: with no collision the code is still the count+1 seed. */
+    @Test
+    void nextCheckCodeMintsTheCountSeedWhenNoCollision() {
+        int year = java.time.Year.now().getValue();
+        when(checkRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(41L);
+        // existsBy defaults to false under LENIENT strictness → the count+1 candidate is free
+        assertThat(service.nextCheckCode(ORG_ID))
+                .isEqualTo(String.format("SCR-%d-%06d", year, 42));
+    }
+
     // Mockito eq() helper that compiles cleanly with diamond inference
     @SuppressWarnings("unused")
     private static Long eqOrg() { return org.mockito.ArgumentMatchers.eq(ORG_ID); }
