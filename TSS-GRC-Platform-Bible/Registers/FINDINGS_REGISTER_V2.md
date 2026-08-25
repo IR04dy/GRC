@@ -15219,6 +15219,21 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-358 — the "Open for review" KPI read 0 / "No pending submissions" on the reviewer's own pending queue (openCount swept into the review-mean's divide-by-zero guard)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 — a KPI that under-reports pending work in the flattering direction, on the reviewer's own queue. `SubmissionAnalyticsCard` computes `ttrStats` in one `useMemo` returning both the mean time-to-review (`avgHours`, denominator `reviewed.length`) and `openCount` (submissions `SUBMITTED`/`UNDER_REVIEW`, independent of any review). `openCount` was computed AFTER `if (reviewed.length === 0) return { avgHours: null, count: 0, openCount: 0 }` — the mean's divide-by-zero guard — so whenever the visible set held no reviewed row, the "Open for review" KPI read **0** with the sub-label **"No pending submissions"** while submissions were genuinely pending. ⚠ Not merely a fresh tenant: `WorkflowSubmissionsPage:485` passes the *client-side-filtered* `visibleItems`, and its `OPEN` status filter is exactly `SUBMITTED \| UNDER_REVIEW` (`matchesStatus`, line 56). So selecting the reviewer's own pending queue (`?status=OPEN` or `?status=SUBMITTED`) yields a set with zero reviewed rows, and the KPI read "Open for review: 0 / No pending submissions" directly above a table full of pending rows. The card hides itself only when `items.length === 0`, so the state renders. Flattering under-report ([[F2-193]] / [[F2-195]] / [[F2-210]]): the queue says "nothing to do" when there is. |
+| **Registers** | none — a frontend KPI computation (`tss-grc-ui-v2/src/components/workflows/SubmissionAnalyticsCard.tsx`). No data change, no migration. |
+| **Standards** | [[F2-357]] (filed this exact defect — the "Filed / not done" of the same read-only sweep); [[F2-193]] / [[F2-195]] / [[F2-210]] (an aggregate that errs in the flattering direction); the same-directory `ProcessLifecycleBar` precedent (KPIs computed from the already-fetched list are extracted as pure, exported, unit-tested functions). |
+| **Found by** | Executing [[F2-357]]'s filing and re-verifying it against the code ([[F2-188]]): the `openCount` line (a filter over `items`, no dependency on `reviewed`) sits below the `reviewed.length === 0` early return that exists only for the mean. Re-verification also sharpened the live path — the card receives the filtered `visibleItems`, so the `OPEN`/`SUBMITTED` filter is the primary trigger, not just a fresh tenant. |
+| **Verification** | hermetic (`tsc --noEmit` + vitest — no backend). `computeTtrStats` extracted as an exported pure function; `SubmissionAnalyticsCard.test.tsx` 5/5 — four pure legs (openCount survives the no-review path; openCount counts only `SUBMITTED`/`UNDER_REVIEW`; a genuine zero stays 0; the mean averages over the reviewed set only) and one render leg proving the "Open for review" KPI reads `openCount` (5 pending / 0 reviewed renders "5" + "awaiting reviewer decision", not "0" / "No pending submissions"). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): moving `openCount` back below the early return makes exactly the two discriminating legs RED (`expected +0 to be 5`; the render leg renders "No pending submissions") while the other three stay green. Full frontend suite green. |
+
+### Fix
+
+Extract `computeTtrStats(items)` as an exported pure function — the same-directory `ProcessLifecycleBar` idiom, where KPIs computed from the already-fetched list are pure functions of `items` and therefore testable without a render — and compute `openCount` BEFORE the mean's `reviewed.length === 0` guard. That guard is scoped to `avgHours`, whose denominator is `reviewed.length`; `openCount` (a filter over `items`) never needed it. The component's `useMemo` now just calls `computeTtrStats(items)`; the KPI wiring is unchanged. The extraction is what makes the invariant testable — the defect lived precisely because the KPI computation had no test.
+
 ## F2-357 — the five PDPL breach statuses localised but rendered a GREY badge (STATUS_KEY completed, STATUS_TONE not)
 
 | | |
