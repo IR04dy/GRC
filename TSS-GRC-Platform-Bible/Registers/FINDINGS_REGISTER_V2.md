@@ -15219,6 +15219,30 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-363 — the SAMA Op-Res completeness denominator was hard-coded /5, not the tenant's active-pillar count
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a board-facing SAMA Operational-Resilience self-assessment completeness indicator (`opres.opres_assessment`, SAMA Op-Res 2024). `OpResService.createAssessment` set `completeness = "0/5"` while `upsertCell` recomputes the denominator from `pillarRepo.findActiveForOrg(org).size()` — shared catalog rows (`organisation_id IS NULL`) plus tenant-specific extensions, filtered `isActive = true` (the repository's own javadoc). The active-pillar count is genuinely variable per tenant, so a freshly created assessment on a tenant with ≠ 5 active pillars showed a denominator that contradicted both the real count and the value the first cell edit recomputes — understating (6 shown as 5) or overstating (4 shown as 5) the work the board's Risk Committee sees, until the first cell upsert corrected it. |
+| **Registers** | none — a service (`tss-grc-backend/.../opres/service/OpResService.java`) + a new unit test (`OpResServiceTest`, the service's first). No data change, no migration. |
+| **Standards** | [[F2-197]] (a figure computed one way on create and another on update, disagreeing with reality until touched — F2-197 built the KPI-tile version of this); [[F2-195]] (the correct dynamic rule sat in `upsertCell` beside the create that hard-coded a constant — the `|| N` shape, a codebase holding the right rule next to the place it was not applied); [[F2-282]] (one predicate, N readers — a single `completeness(scored, orgId)` helper computes the denominator for both create and every edit, so they cannot drift); [[F2-283]] (latent in data / live in code — correct at exactly 5 active pillars, wrong the moment a tenant's count differs); [[F2-248]] (the service had no test at all — a path with no test is not a path somebody decided was safe); [[F2-320]] / [[F2-325]] (hermetic — mocked repos; the pillar query's row selection is SQL, only a live probe could count rows). |
+| **Found by** | Reading a cold Saudi-module service end-to-end against the battery — `module/opres`, one service, SAMA Op-Res 2024, no prior test. Most was sound (declared machine with an explicit terminal set, DTO-bound create so no mass-assignment, `approvedByUserId` from the principal, a cross-tenant pillar check, an uncapped cell aggregate). The one inconsistency was `createAssessment`'s hard-coded `"0/5"` against `upsertCell`'s dynamic `findActiveForOrg(...).size()`. `OpResPillarRepository`'s own javadoc — "shared catalog rows plus any tenant-specific extensions" — confirmed the count varies per tenant, so the hard-code defeats the very query it sits beside. |
+| **Verification** | hermetic (mocked repos, no DB — [[F2-320]] / [[F2-325]]). `OpResServiceTest` (3 tests, the service's first): `createAssessment_completenessDenominatorIsTheActivePillarCount_notHardcodedFive` (6 active pillars → `"0/6"`), `createAssessment_completenessTracksAThreePillarTenant` (3 → `"0/3"`, so a hard-coded constant of any value fails, not just 5), `createAssessment_numeratorIsZeroBeforeAnyCellIsScored`. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting only the create-site to `"0/5"` (keeping the helper so it still compiles) makes both `isEqualTo` legs RED (`expected "0/6" / "0/3" but was "0/5"`); the third errs on `UnnecessaryStubbingException` because the reverted literal body never consults the pillar query at all — which is itself the defect. |
+
+### Fix
+
+Extract one `completeness(long scored, Long orgId)` returning `scored + "/" + pillarRepo.findActiveForOrg(orgId).size()`. `createAssessment` now calls `completeness(0, orgId)`; `upsertCell` calls `completeness(withCurrent, a.getOrganisationId())` (behaviour-identical — the reader the create is being aligned to). One source of the denominator, so create and every subsequent edit agree ([[F2-282]]).
+
+### Note — latent in data, live in code ([[F2-283]])
+
+Correct today wherever a tenant has exactly the five-pillar SAMA catalog active; wrong the moment a tenant activates a sixth pillar or deactivates one — which `findActiveForOrg` and `upsertCell`'s recompute exist precisely to handle. Not re-measured against a running backend (none this slice); the migration only CREATEs `opres.opres_pillar` (V341), so the catalog is seeded outside Flyway and the current per-tenant count was not read.
+
+### Filed (deferred)
+
+- `submit()` and `close()` stamp `submitted_at` / `closed_at` from the server clock, but `OpResAssessment` declares **no `submitted_by` / `closed_by` column** — so those lifecycle acts record WHEN with no WHO. This is NOT [[F2-256]] (the columns do not exist to be left unwritten); adding attribution is a migration plus a design decision about the Op-Res sign-off model, not a hermetic fix. The SAME shape holds for `data_officer` DPIA / Breach / EthicsReview, which stamp `decided_at` with no `decided_by` column.
+- `upsertCell` counts `withCurrent` over cell ROWS while the denominator is the active-PILLAR count, so deactivating a pillar that already has a scored cell can momentarily yield `withCurrent > total` (`"6/5"`). A rare mid-assessment operator action; noted, not fixed (scope).
+
 ## F2-362 — the SGI "target met" evidence gate checked FK presence, not the evidence item's state
 
 | | |
