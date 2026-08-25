@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-351 — a run-code minter seeded from a COUNT re-mints a live ordinal, 500ing on the unique index
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a reference minter that can collide, on the BCM exercise-runtime create path. `ExerciseRuntimeService#generateRunCode` seeded `RUN-<org>-EX<ex>-NNN` from `countByOrganisationIdAndExerciseId + 1`. The count respects the entity's `@Where(is_deleted = 0)`, and `run_code` carries a FILTERED unique index `UX_exercise_run_run_code (organisation_id, run_code) WHERE is_deleted = 0` — so a soft-deleted run lowered the count and the next mint re-used a live ordinal → unique-index violation → HTTP 500 on `startRun`; and two racing `startRun` calls for the same exercise both count N and both mint N+1. The concurrency race is live; the soft-delete gap is latent (no run soft-delete route today, only observer assignments). [[F2-337]] / [[F2-48]] shape. |
+| **Registers** | none — a minting-logic defect on `bcm.exercise_run`. No data change, no migration. |
+| **Standards** | reference-integrity; format-preserving ([[F2-310]]) — the fix keeps `RUN-<org>-EX<ex>-NNN`, so no owner decision. |
+| **Found by** | Executing [[F2-350]]'s own filing (*"`generateRunCode` mints `RUN-<org>-EX<ex>-<count+1>`, the [[F2-337]] / [[F2-48]] count-based collision shape … scoped by (org, exercise) — a distinct, [[F2-337]]-warm concern"*). Re-derived first ([[F2-221]]): confirmed the filtered unique index in V175, and confirmed there is NO run soft-delete route (the only `softDelete` in the runtime package is on an observer *assignment*), so the gap-collision is latent like [[F2-337]]'s OBI while the concurrency race is live. |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — a unit test cannot hit a real unique-index 500, so `ExerciseRunCodeMintTest` (5 legs) proves the MINTING logic: the code is derived from the MAX row's ordinal (`verify(never()).countBy…`), the skip-loop steps over a live code, a caller override bypasses generation, and a non-auto-format MAX leaves the seed at 1. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting `generateRunCode` to the count body makes the max/skip legs FAIL (the STRICT stubs on the new finders go unused and the reverted body hits the un-stubbed `countBy…`). `ExerciseRunCodeMintTest` 5/5 + `ExerciseRuntimeServiceTest` 22/22 unchanged; full backend suite green. Latent (concurrency race) / no dev backend to live-probe. No migration. |
+
+### Fix
+
+Mirror `ComplaintService#generateNextComplaintNo` (the platform's established sequential-minter idiom): seed from the MAX ordinal via a new `findTopByOrganisationIdAndExerciseIdOrderByRunCodeDesc` (regex-guarded so a caller override that sorts higher — [[F2-350]] — leaves `next = 1`), then a skip-loop against a new `existsByOrganisationIdAndRunCode`, with a UUID-suffixed backstop. A MAX never drops on a mid-sequence delete, so a used ordinal is not re-issued; the skip-loop absorbs the residual concurrency race ([[F2-267]]); and because the unique index is FILTERED (`WHERE is_deleted = 0`), a soft-deleted code is free to be re-used and the `@Where`-scoped finders agree with it.
+
+Format-preserving ([[F2-310]]): [[F2-266]] / [[F2-267]]'s `ReferenceCodeMint` (entropy) would change `RUN-…-001` → `RUN-…-<entropy>`, a visible change to a reference an NCEMA after-action record cites; the server already mints this code, so the question was collision-safety, not authorship, and MAX + skip-loop is a strict improvement that keeps the format.
+
+**Filed / not done.** `generateRunCode`'s override path ([[F2-350]]) is unchanged. `bcm.exercise_run` has no soft-delete route today, so the gap-collision is not API-reachable — a latent-hazard closure for that half ([[F2-283]]), plus a live fix for the concurrency race.
+
 ## F2-350 — a long run-code override returned an opaque 500 instead of a 400
 
 | | |

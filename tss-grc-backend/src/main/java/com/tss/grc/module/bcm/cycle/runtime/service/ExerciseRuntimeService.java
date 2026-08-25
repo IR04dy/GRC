@@ -49,7 +49,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -702,9 +704,43 @@ public class ExerciseRuntimeService {
         return c;
     }
 
+    /**
+     * F2-351 — mint {@code RUN-<org>-EX<ex>-NNN} from the MAX ordinal, not a COUNT, then skip-loop
+     * against the filtered unique index.
+     *
+     * <p>The old body seeded from {@code countByOrganisationIdAndExerciseId + 1}. That count
+     * respects the entity's {@code @Where(is_deleted = 0)}, so a soft-deleted run lowered it and the
+     * next mint re-used a live ordinal → unique-index violation on {@code UX_exercise_run_run_code
+     * (organisation_id, run_code) WHERE is_deleted = 0} → HTTP 500 on {@code startRun}. Two racing
+     * {@code startRun} calls for the same exercise are the live form (both count N, both mint N+1);
+     * the soft-delete gap is latent today (no run soft-delete route). Same shape as F2-337 / F2-48;
+     * the fix mirrors {@code ComplaintService#generateNextComplaintNo}.
+     *
+     * <p>A MAX never drops on a mid-sequence delete, so a used ordinal is not re-issued; the
+     * skip-loop absorbs the residual concurrency race; and because the unique index is FILTERED, a
+     * soft-deleted code is free to be re-used — the {@code @Where}-scoped finders agree with it.
+     */
     private String generateRunCode(Long orgId, Long exerciseId) {
-        long n = runRepo.countByOrganisationIdAndExerciseId(orgId, exerciseId) + 1;
-        return String.format("RUN-%d-EX%d-%03d", orgId, exerciseId, n);
+        String prefix = String.format("RUN-%d-EX%d-", orgId, exerciseId);
+        int next = 1;
+        Optional<ExerciseRun> top =
+            runRepo.findTopByOrganisationIdAndExerciseIdOrderByRunCodeDesc(orgId, exerciseId);
+        if (top.isPresent()) {
+            String existing = top.get().getRunCode();
+            // Only parse the tail of a code in the auto-format; a caller override that sorts higher
+            // (F2-350) leaves next = 1 and the skip-loop steps over the live ordinals.
+            if (existing != null && existing.matches("RUN-" + orgId + "-EX" + exerciseId + "-\\d+")) {
+                next = Integer.parseInt(existing.substring(prefix.length())) + 1;
+            }
+        }
+        for (int seq = next; seq < next + 1000; seq++) {
+            String candidate = String.format("%s%03d", prefix, seq);
+            if (!runRepo.existsByOrganisationIdAndRunCode(orgId, candidate)) {
+                return candidate;
+            }
+        }
+        return prefix + String.format("%03d", next) + "-"
+            + UUID.randomUUID().toString().substring(0, 6);
     }
 
     private void emit(Long orgId, String trigger, String entityType, Long entityId,
