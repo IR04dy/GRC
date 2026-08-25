@@ -280,11 +280,28 @@ public class ApprovalRequestService {
             if (req.getDecisionCommentAr() != null) r.setDecisionCommentAr(req.getDecisionCommentAr());
         }
         if ("DELEGATED".equals(req.getStatus())) {
-            if (req.getNewAssignedTo() == null) {
+            String newAssignee = req.getNewAssignedTo();
+            if (newAssignee == null) {
                 throw new IllegalArgumentException("DELEGATED requires newAssignedTo");
             }
+            // ⚠⚠ F2-377 — the create-time four-eyes check (assignedTo != requestedBy) is not
+            // enough on its own: delegation reassigns assignedTo, and assignedTo IS the
+            // authorisation input transition() checks (SEC-IAM-002), so delegating a request back
+            // to its RAISER lets them re-pend it (DELEGATED → PENDING) and then approve their own
+            // request — the exact self-approval the create check exists to prevent. The SoD
+            // invariant "the raiser may never be the decider" must hold across delegation, not only
+            // at creation (F2-215: the four-eyes mechanism is visibly present at create, so this
+            // path read as covered). Same 409 and the same case-insensitive comparison as create —
+            // the requested_by column collates CI (F2-179), so a capitalisation must not walk through.
+            if (newAssignee.trim().equalsIgnoreCase(r.getRequestedBy())) {
+                throw new IllegalStateException(
+                    "Segregation of duties: an approval request may not be delegated back to "
+                    + r.getRequestedBy() + ", who raised it. The assignee is the only principal "
+                    + "permitted to decide it, so delegating to the raiser would let them approve "
+                    + "their own request. Delegate it to a different reviewer.");
+            }
             r.setDelegatedFrom(r.getAssignedTo());
-            r.setAssignedTo(req.getNewAssignedTo());
+            r.setAssignedTo(newAssignee);
             if (req.getDelegationReasonEn() != null) r.setDelegationReasonEn(req.getDelegationReasonEn());
             // F2-275 - the Arabic half of the same reason, under its OWN null guard so an
             // omitted Arabic reason leaves the stored one alone rather than clearing it.
