@@ -58,17 +58,8 @@ public class SocOpsDashboardService {
         LocalDateTime past24h = now.minusHours(24);
 
         // ── Headline event counters ──────────────────────────────────
-        long openCritical = events.countByOrganisationIdAndSeverity(org, "CRITICAL")
-            - countResolvedAtSeverity(org, "CRITICAL");
-        // The above isn't exact — use status-based count instead via a
-        // narrower repository call. Simplify: count NEW + TRIAGED at each
-        // severity by listing then filtering — small queue, cheap in
-        // practice. For tenants with massive queues we'd add a dedicated
-        // count-by-severity-and-status query; not critical for v1.
-        List<SecurityEvent> openEvents = events.findByOrganisationIdAndStatusOrderByEventTimeDesc(org, "NEW");
-        openEvents.addAll(events.findByOrganisationIdAndStatusOrderByEventTimeDesc(org, "TRIAGED"));
-        openEvents.addAll(events.findByOrganisationIdAndStatusOrderByEventTimeDesc(org, "IN_ANALYSIS"));
-        openEvents.addAll(events.findByOrganisationIdAndStatusOrderByEventTimeDesc(org, "CONTAINED"));
+        // Open security events = the COMPLEMENT of the terminal set (F2-196); see openEvents().
+        List<SecurityEvent> openEvents = openEvents(org);
 
         long oCritical = openEvents.stream().filter(e -> "CRITICAL".equalsIgnoreCase(e.getSeverity())).count();
         long oHigh     = openEvents.stream().filter(e -> "HIGH".equalsIgnoreCase(e.getSeverity())).count();
@@ -190,11 +181,19 @@ public class SocOpsDashboardService {
         );
     }
 
-    /** Placeholder — kept so the headline-counter signature compiles
-     *  before we wire the dedicated count-by-status-and-severity repo
-     *  query. The dashboard already uses the {@code openEvents} list
-     *  directly so this is currently unused. */
-    private long countResolvedAtSeverity(Long org, String severity) {
-        return 0L;
+    /**
+     * F2-367 — the tenant's OPEN security events, most-recent first. "Open" is the COMPLEMENT of
+     * {@link SecurityEventService#TERMINAL_STATUSES} (F2-196), never a hand-typed inclusion list.
+     *
+     * <p>The prior code listed {@code NEW / TRIAGED / IN_ANALYSIS / CONTAINED} — it <b>dropped
+     * ESCALATED</b> (a real, actively-escalated state that a hand-typed list forgot) and named two
+     * tokens ({@code IN_ANALYSIS}, {@code CONTAINED}) no writer ever sets. Escalated events —
+     * exactly the ones promoted to a cyber incident — therefore vanished from the open counts and
+     * the leadership top-5. Reading the complement makes any non-terminal state count, including a
+     * future one, and matches the SLA sweep's own {@code NOT IN ('RESOLVED', 'FALSE_POSITIVE')}.
+     */
+    List<SecurityEvent> openEvents(Long org) {
+        return events.findByOrganisationIdAndStatusNotInOrderByEventTimeDesc(
+            org, SecurityEventService.TERMINAL_STATUSES);
     }
 }
