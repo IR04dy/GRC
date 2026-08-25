@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-371 — the CCM consecutive-failure ladder opened a duplicate URGENT Issue on every failure past the threshold
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P2 — Issue-register pollution + alert fatigue on a governance control. `CcmService.recordRunInternal` opened its auto-escalation Issue on `consecutiveFailures >= CONSECUTIVE_FAILURE_THRESHOLD` (3), and `openConsecutiveFailureIssue` unconditionally `issueService.create()`s with no dedup — so a persistently failing CRITICAL control test, driven by the 60-second `CcmSchedulerService` tick, opened a new CRITICAL/URGENT Issue **every minute** from the 3rd failure onward (~57/hour, ~1,400/day). The `platform.issues` register — which only `PLATFORM_ADMIN` can read ([[F2-313]]) — floods with duplicate "CCM: X failed 3 consecutive runs" Issues, and only the 3rd run gets a `capaTaskId` link (the 4th, 5th … each got a fresh duplicate Issue). |
+| **Registers** | none — one comparison (`.../ccm/service/CcmService.java`, `>=` → `==`) + a new `CcmServiceTest` leg. No data change, no migration, no schema. |
+| **Standards** | [[F2-188]] (the minimal, provably-correct fix — not the more elaborate dedup, which needs a judgement about which Issue statuses are "reuse-able"); [[F2-283]] (latent in data — a persistently-failing CRITICAL control triggers it; not re-measured against a backend); [[F2-225]] (the new leg is the discriminator; the two existing threshold-crossing legs are unaffected); [[F2-320]] / [[F2-325]] (hermetic — Mockito, no Spring/DB). |
+| **Found by** | Sampling the `ccm` module's consecutive-failure escalation ladder (fresh — [[F2-228]] fixed a ROWVERSION double-save there, [[F2-364]] filed the SKIPPED-status question, but the ladder's *counting/firing logic* was un-audited) after the divide-by-zero, openbanking (`ObService`), tprm-questionnaire, digital-signature and frontend-KPI (`ConsentTab`, capped-slice, `window.prompt`-attribution) veins came up clean / guarded / by-design / already-fixed this firing. The tell was structural: the escalation fires on `>=` while `openConsecutiveFailureIssue` has no dedup, and the Issue title hardcodes "3" while its body renders `d.getConsecutiveFailures()` (the real count) — an internal contradiction that only makes sense if the author believed it fired once. |
+| **Verification** | hermetic (Mockito, no Spring/DB — [[F2-320]] / [[F2-325]]). `CcmServiceTest.aFailurePastTheThresholdDoesNotOpenADuplicateIssue` (new): a CRITICAL control already AT the threshold (counter 3), next FAIL → 4, asserts `verify(issueService, never()).create(...)` (no duplicate) and that the streak counter still increments to 4. The two existing threshold-crossing legs (`thirdConsecutiveCriticalFailureOpensIssue`, `runTestNow_atTheConsecutiveFailureThreshold_savesTheRunOnceCarryingTheIssueId`) — which set the counter to 2 and cross to 3 — stay green under both `>=` and `==`, so nothing regressed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): `git checkout a82ae227 -- CcmService.java` (restoring `>=`) makes ONLY the new leg RED (`IssueService.create` IS called on the 4th failure → `verify(never())` fails) while the other 17 stay green (1 of 18 discriminates). |
+
+### Fix
+
+`recordRunInternal`'s escalation guard changes `d.getConsecutiveFailures() >= CONSECUTIVE_FAILURE_THRESHOLD` to `== CONSECUTIVE_FAILURE_THRESHOLD`. The counter only ever increments by 1 (on failure) or resets to 0 (on PASS / create / enable — verified, no other writer), so a streak passes through the threshold **exactly once** — `==` opens exactly one Issue per streak. It also removes the title/body contradiction for free: at the moment it fires, `consecutiveFailures` IS the threshold, so both read "3".
+
+### Note — why `==` and not a dedup ([[F2-188]])
+
+The `>=` was not an intentional retry mechanism (the Issue title hardcodes "3" and the code's own comment declares Issue-open best-effort). A more elaborate alternative — dedup inside `openConsecutiveFailureIssue` against an existing non-terminal Issue for `(sourceModule='ccm', sourceEntityType='ControlTestDefinition', sourceEntityId)` and reuse it — would additionally preserve a best-effort retry if the 3rd-failure open throws and link runs 4,5… to the one open Issue; it was weighed and rejected because it needs a new `IssueRepository` finder and a judgement about whether a `RESOLVED` Issue (non-terminal — [[F2-370]]'s `IssueService.TRANSITIONS` terminal is only `{CLOSED, CANCELLED}`) counts as "reuse-able," which is an owner call. The `==` fix is minimal, provably fires once, and needs no status judgement. Filed: grep for a `count >= threshold` escalation feeding a create/notify with no dedup (the sibling `KriBreachService` sustained-RED-KRI escalation uses a size threshold and is worth checking for the same shape, though it appears keyed on a single breach record rather than fired per-measurement).
+
 ## F2-370 — two governance dashboards hand-typed a copy of a register's terminal set its own machine derives
 
 | | |

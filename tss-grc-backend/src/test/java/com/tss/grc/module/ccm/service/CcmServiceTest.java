@@ -405,6 +405,43 @@ class CcmServiceTest {
         assertThat(saved.getConsecutiveFailures()).isZero();
     }
 
+    /**
+     * F2-371 — a failure PAST the threshold-crossing must NOT open a duplicate Issue. It fired on
+     * {@code consecutiveFailures >= THRESHOLD}, calling an UNCONDITIONAL {@code issueService.create()}
+     * with no dedup, so a persistently failing CRITICAL control — driven by the 60-second scheduler
+     * tick — opened a new CRITICAL/URGENT Issue on the 4th, 5th, 6th … run: one per minute. The fix
+     * fires at exactly the crossing ({@code == THRESHOLD}), so a streak opens exactly one Issue.
+     */
+    @Test
+    void aFailurePastTheThresholdDoesNotOpenADuplicateIssue() {
+        ControlTestDefinition d = def("CRITICAL");
+        // Already at the threshold — the Issue was opened when the streak first crossed it. This is
+        // the 4th consecutive failure (counter THRESHOLD → THRESHOLD+1), which the old `>=` re-escalated.
+        d.setConsecutiveFailures(CcmService.CONSECUTIVE_FAILURE_THRESHOLD);
+        when(defRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, DEF_EX))
+                .thenReturn(Optional.of(d));
+        when(defRepo.save(any(ControlTestDefinition.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ControlTestRunner runner = new TestRunnerStub("LDAP_GROUP_MEMBERSHIP",
+                ControlTestRunner.RunResult.fail("{\"members\":99}", "still failing", 5));
+        when(runners.find("LDAP_GROUP_MEMBERSHIP")).thenReturn(Optional.of(runner));
+
+        AtomicLong seq = new AtomicLong(900);
+        when(runRepo.save(any(ControlTestRun.class))).thenAnswer(assignId(seq));
+
+        TestRunResponse out = service.runTestNow(DEF_EX);
+
+        assertThat(out.status()).isEqualTo("FAIL");
+        verify(issueService, never()).create(any(Issue.class));   // no duplicate escalation
+
+        ArgumentCaptor<ControlTestDefinition> cap = ArgumentCaptor.forClass(ControlTestDefinition.class);
+        verify(defRepo, atLeastOnce()).save(cap.capture());
+        ControlTestDefinition saved = cap.getAllValues().get(cap.getAllValues().size() - 1);
+        assertThat(saved.getConsecutiveFailures())
+                .as("the streak counter still increments past the threshold")
+                .isEqualTo(CcmService.CONSECUTIVE_FAILURE_THRESHOLD + 1);
+    }
+
     // ─── Evidence hash determinism ───────────────────────────────
 
     @Test
