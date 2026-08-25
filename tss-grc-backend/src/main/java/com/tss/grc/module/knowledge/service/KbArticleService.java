@@ -95,9 +95,19 @@ public class KbArticleService {
     @Transactional
     public KbArticleDto create(KbArticleDto req, String author) {
         Long org = TenantContext.requireOrganisationId();
-        // Slug uniqueness check (per-org)
+        // Slug uniqueness (per-org). F2-374 — the derived finder respects @Where(is_deleted=0),
+        // but uk_kb_slug (V21) is a PLAIN unique constraint that counts soft-deleted rows too, so
+        // a slug freed only in the app's view (deleted, not gone) still violates the physical
+        // index. Check both: a live duplicate keeps the "already exists" message, and a slug held
+        // only by a since-deleted article returns this clean 400 rather than an opaque
+        // unique-index 500 (a slug is a permanent URL, so a since-deleted one stays reserved).
         if (repo.findByOrganisationIdAndSlug(org, req.getSlug()).isPresent()) {
             throw new IllegalArgumentException("Article with slug '" + req.getSlug() + "' already exists");
+        }
+        if (repo.countBySlugIncludingDeleted(org, req.getSlug()) > 0) {
+            throw new IllegalArgumentException(
+                "Slug '" + req.getSlug() + "' was used by a since-deleted article and remains reserved "
+                + "(slugs are permanent URLs); choose a different slug.");
         }
         KbArticle a = new KbArticle();
         // F2-208 — swept. See ClientSuppliedReferenceRatchetTest. The slug is the caller's to
