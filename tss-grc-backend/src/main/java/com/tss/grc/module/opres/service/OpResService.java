@@ -94,7 +94,7 @@ public class OpResService {
         a.setDueDate(req.getDueDate());
         a.setSponsorUserId(req.getSponsorUserId());
         a.setStatus("DRAFT");
-        a.setCompleteness("0/5");
+        a.setCompleteness(completeness(0, orgId));   // F2-363 — real active-pillar count, not a hard-coded /5
         OpResAssessment saved = assessmentRepo.save(a);
 
         audit.log("OPRES_ASSESSMENT_CREATED", "OpResAssessment", saved.getId(),
@@ -158,8 +158,7 @@ public class OpResService {
         // Re-compute aggregate scores
         List<OpResAssessmentCell> all = loadCells(a.getId());
         long withCurrent = all.stream().filter(x -> x.getCurrentScore() != null).count();
-        long totalPillars = pillarRepo.findActiveForOrg(a.getOrganisationId()).size();
-        a.setCompleteness(withCurrent + "/" + totalPillars);
+        a.setCompleteness(completeness(withCurrent, a.getOrganisationId()));
         a.setAvgCurrentScore(mean(all, OpResAssessmentCell::getCurrentScore));
         a.setAvgTargetScore(mean(all, OpResAssessmentCell::getTargetScore));
         assessmentRepo.save(a);
@@ -269,6 +268,18 @@ public class OpResService {
 
     private List<OpResAssessmentCell> loadCells(Long assessmentId) {
         return cellRepo.findByAssessmentIdAndOrganisationIdOrderByPillarId(assessmentId, org());
+    }
+
+    /**
+     * Completeness label {@code "scored/total"}. The denominator is the
+     * tenant's ACTIVE pillar count — shared catalog rows plus any tenant
+     * extensions, less deactivated ones — via the same query {@code upsertCell}
+     * recomputes from, so create and every subsequent edit agree (F2-363).
+     * The count is genuinely variable per tenant, so a hard-coded {@code /5}
+     * understated (or overstated) the denominator until the first cell edit.
+     */
+    private String completeness(long scored, Long orgId) {
+        return scored + "/" + pillarRepo.findActiveForOrg(orgId).size();
     }
 
     private void guardTransition(String from, String to) {
