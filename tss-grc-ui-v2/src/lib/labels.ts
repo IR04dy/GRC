@@ -38,6 +38,15 @@ export const STATUS_KEY: Record<string, string> = {
   ACTIVE: 'statusActive', EXPIRED: 'statusExpired', DRAFT: 'statusDraft',
   CONTAINED: 'statusContained', ERADICATED: 'statusEradicated', RECOVERED: 'statusRecovered',
   IMPLEMENTED: 'statusActive', NOT_IMPLEMENTED: 'statusDraft',
+  // F2-359 — RESOLVED is the incident status the backend actually writes
+  // (IncidentService.legalStatus coerces to OPEN | INVESTIGATING | RESOLVED | CLOSED;
+  // the NIST RECOVERY / POST_INCIDENT phases map to it). It was absent from BOTH this map and
+  // STATUS_TONE while the phantom RECOVERED (0 rows, not a legal status) carried both — so a
+  // RESOLVED incident (10 of 44 register rows) rendered a grey, raw-token badge on an
+  // Arabic-primary UI. The F2-357 completeness gate could not catch it: absent from STATUS_KEY,
+  // it sat outside that gate's population (STATUS_KEY ⊆ STATUS_TONE says nothing about a status
+  // in neither map).
+  RESOLVED: 'statusResolved',
   // F2-211 — the five PDPL breach statuses this map did not carry. `statusLabel`
   // falls back to the raw token, so these printed `NOTIFIED` / `INVESTIGATING` /
   // `ESCALATED` / `INVESTIGATED` / `REMEDIATED` in an Arabic-primary UI on 11 of the
@@ -76,6 +85,7 @@ export const STATUS_TONE: Record<string, BadgeTone> = {
   CONTAINED: 'info',
   ERADICATED: 'success',
   RECOVERED: 'success',
+  RESOLVED: 'success',   // F2-359 — recovery-phase terminal; 'success' (done, awaiting formal closure) matches RECOVERED and stays distinct from CLOSED's neutral (archived).
   IMPLEMENTED: 'success',
   NOT_IMPLEMENTED: 'danger',
   // F2-357 — the five PDPL breach statuses F2-211 added to STATUS_KEY (so statusLabel

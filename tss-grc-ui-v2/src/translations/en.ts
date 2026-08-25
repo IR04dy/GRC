@@ -4001,6 +4001,7 @@ export const en = {
   statusRemediated: 'Remediated',
   statusEradicated: 'Eradicated',
   statusRecovered: 'Recovered',
+  statusResolved: 'Resolved',
 
   severityCritical: 'Critical',
   severityHigh: 'High',
