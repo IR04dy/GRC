@@ -159,6 +159,38 @@ class ApprovalRequestServiceTest {
             .hasMessageContaining("DELEGATED requires newAssignedTo");
     }
 
+    /**
+     * F2-377 — the four-eyes SoD invariant (raiser != decider) is enforced at create; it must also
+     * hold across delegation. Delegating a request back to its RAISER lets them re-pend it and
+     * approve their own request. {@code req()} has requestedBy="admin", assignedTo="riskmanager";
+     * the assignee delegates to "admin" (the raiser), which must be refused.
+     */
+    @Test
+    void transition_DELEGATED_back_to_the_raiser_is_refused_as_self_approval() {
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
+        ApprovalRequestDto.TransitionRequest t = tx("DELEGATED");
+        t.setNewAssignedTo("admin");   // the raiser
+
+        assertThatThrownBy(() -> service.transition(EXT_ID, t, "riskmanager", false))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duties")
+            .hasMessageContaining("admin");
+        verify(repo, never()).save(any());
+    }
+
+    /** Compared case-INSENSITIVELY, like the create check — the requested_by column collates CI. */
+    @Test
+    void transition_DELEGATED_to_the_raiser_is_case_insensitive() {
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
+        ApprovalRequestDto.TransitionRequest t = tx("DELEGATED");
+        t.setNewAssignedTo("  ADMIN ");   // the raiser, differently cased + padded
+
+        assertThatThrownBy(() -> service.transition(EXT_ID, t, "riskmanager", false))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duties");
+        verify(repo, never()).save(any());
+    }
+
     @Test
     void transition_APPROVED_to_PENDING_rejected_terminal() {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("APPROVED")));
