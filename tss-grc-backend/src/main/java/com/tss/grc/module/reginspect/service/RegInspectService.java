@@ -186,13 +186,10 @@ public class RegInspectService {
                     "Inspection is CLOSED — cannot add document requests");
         }
 
-        long ordinal = drRepo.findByInspectionIdAndOrganisationIdOrderByRequestedAtDesc(
-                i.getId(), org()).size() + 1L;
-
         RegDocumentRequest dr = new RegDocumentRequest();
         dr.setOrganisationId(org());
         dr.setInspectionId(i.getId());
-        dr.setReference(i.getExternalReference() + "-DR-" + String.format("%03d", ordinal));
+        dr.setReference(nextDrReference(i));
         dr.setTitleEn(req.getTitleEn());
         dr.setTitleAr(req.getTitleAr());
         dr.setDescriptionEn(req.getDescriptionEn());
@@ -376,6 +373,28 @@ public class RegInspectService {
         for (int seq = next; seq < next + 1000; seq++) {
             String candidate = prefix + String.format("%03d", seq);
             if (!inspectionRepo.existsByOrganisationIdAndExternalReference(org, candidate)) {
+                return candidate;
+            }
+        }
+        return prefix + String.format("%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
+    }
+
+    /**
+     * F2-355 — mint {@code <inspRef>-DR-NNN} from {@code MAX(ordinal) + 1}, not from
+     * {@code findBy…OrderByRequestedAtDesc(...).size() + 1}. The derived finder respects
+     * {@code @Where(is_deleted = 0)}, so a soft-delete gap or a concurrent create re-mints an ordinal
+     * already held by a live DR — and because {@code reginspect_document_request.reference} carries no
+     * unique index, the collision is a silent DUPLICATE reference (milder than the 500 F2-354 fixed,
+     * but a regulator citing {@code <inspRef>-DR-003} would then be ambiguous). A MAX-over-all-rows
+     * seed never re-issues a used ordinal; the skip-loop is the concurrency backstop.
+     */
+    private String nextDrReference(RegInspection i) {
+        String prefix = i.getExternalReference() + "-DR-";
+        Long org = org();
+        int next = drRepo.findMaxDrOrdinal(i.getId(), org) + 1;
+        for (int seq = next; seq < next + 1000; seq++) {
+            String candidate = prefix + String.format("%03d", seq);
+            if (!drRepo.existsByInspectionIdAndOrganisationIdAndReference(i.getId(), org, candidate)) {
                 return candidate;
             }
         }

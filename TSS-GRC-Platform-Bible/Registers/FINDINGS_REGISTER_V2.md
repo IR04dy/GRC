@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-355 — the document-request reference minter seeded from a live COUNT re-mints an ordinal, producing a DUPLICATE reference (no unique index)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 (latent, concurrency-only, no 500) — `RegInspectService.createDocumentRequest()` minted the document-request reference `<inspRef>-DR-NNN` from `findByInspectionIdAndOrganisationIdOrderByRequestedAtDesc(i.getId(), org()).size() + 1L`. The derived finder respects `@Where(is_deleted = 0)` (LIVE rows only), so a soft-delete gap or a concurrent create re-mints an ordinal already held by a live DR. Unlike F2-354's inspection reference, `reginspect.reginspect_document_request.reference` carries **no unique index**, so the collision is a **silent DUPLICATE** reference — a regulator citing `<inspRef>-DR-003` would then be ambiguous — rather than a 500. The F2-337 / F2-351 / F2-353 / F2-354 count-minter shape, completing the actionable members of the measured population. |
+| **Registers** | `reginspect.reginspect_document_request` — read-path minting defect; no data change, no migration. |
+| **Standards** | SAMA / NCA on-site-inspection document-request workspace; [[F2-354]] (same service, same idiom, the inspection-reference sibling); [[F2-310]] (format-preserving → no owner decision). |
+| **Found by** | Executing [[F2-353]] / [[F2-354]]'s filed count-minter population. F2-354 classified `RegInspectService:189` as the milder member (no unique index → silent duplicate, not a 500). Confirmed: `RegDocumentRequest` soft-deletes (`@Where`), the reference has no unique index, and there is no DR delete route — so the gap-collision is concurrency-only (two DRs added to one inspection at once both read the same live count). |
+| **Verification** | hermetic ([[F2-320]] / [[F2-325]]) — a unit test cannot exercise a real concurrency race, so `RegInspectServiceTest` (+3 DR legs) pins the minting logic: the ordinal seeds from `findMaxDrOrdinal` (value 8 from MAX 7, not 1 from the empty live-count list), and the skip-loop steps over a live collision. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): reverting to the `.size() + 1` body makes the three DR legs RED (the MAX/exists stubs go unused under strict stubbing; the reverted `.size()` over the empty list yields ordinal 1, not the asserted 8/007) while the four inspection legs stay green. `RegInspectServiceTest` 7/7 + full backend suite green. Latent (concurrency-only, no 500); no dev backend to live-probe. No migration. |
+
+### Fix
+
+Mirror F2-354's MAX-seed idiom in the same service. Two new `RegDocumentRequestRepository` finders: a native `findMaxDrOrdinal(inspectionId, org)` = `SELECT ISNULL(MAX(TRY_CAST(RIGHT(reference, CHARINDEX('-', REVERSE(reference)) - 1) AS INT)), 0) FROM reginspect.reginspect_document_request WHERE inspection_id = :insp AND organisation_id = :org` — the MAX of the last `-NNN` segment across ALL DRs for the inspection including soft-deleted ones, so a used ordinal is never re-issued (every DR reference ends `-NNN`; `TRY_CAST` ignores a non-numeric backstop tail; `ISNULL(…, 0)` seeds the first DR at 1) — and a derived `existsByInspectionIdAndOrganisationIdAndReference` (live-only, `@Where`-scoped) for the skip-loop. `createDocumentRequest` calls a new private `nextDrReference(RegInspection)` that seeds `MAX + 1`, steps over any live collision, backstopped by a random suffix. Format-preserving (`<inspRef>-DR-NNN`), so no owner decision ([[F2-310]]).
+
+**Filed / not done.** The remaining count-minter members are mitigated or milder and are recorded rather than forced ([[F2-188]]): `CrisisAarService.nextReportCode` and `MtpdInheritanceService.generateAssessmentCode` are count-seeded but already carry bounded skip-loops (author-accepted for their cadence); `RrpService.nextOrdinal` is one-per-fiscal-year. With F2-337 (`OBI-`), F2-351 (`RUN-`), F2-353 (`CP-`), F2-354 (`OSI-`) and F2-355 (`DR-`), every genuine unmitigated count-minter is now closed; the durable resolution for the mitigated tail is a gate correlating a `count…() + 1` reference seed with a filtered unique index on that column ([[F2-266]]), deferred as its own slice.
+
 ## F2-354 — the on-site-inspection reference minter seeded from a capped COUNT re-mints a live ordinal, 500ing on the filtered unique index
 
 | | |

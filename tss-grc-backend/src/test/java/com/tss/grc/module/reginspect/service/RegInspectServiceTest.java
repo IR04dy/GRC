@@ -1,7 +1,9 @@
 package com.tss.grc.module.reginspect.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateDocumentRequestRequest;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateInspectionRequest;
+import com.tss.grc.module.reginspect.entity.RegDocumentRequest;
 import com.tss.grc.module.reginspect.entity.RegInspection;
 import com.tss.grc.module.reginspect.repository.RegDocumentRequestRepository;
 import com.tss.grc.module.reginspect.repository.RegInspectionRepository;
@@ -17,6 +19,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +49,13 @@ import static org.mockito.Mockito.when;
  * makes these legs fail (the MAX/exists stubs go unused under strict stubbing, and the reverted body
  * calls the un-stubbed capped finder — a null {@code Page} it dereferences). F2-248: the service had
  * no test.
+ *
+ * <p>F2-355 — the same MAX-seed rule for the document-request reference {@code <inspRef>-DR-NNN},
+ * which {@code createDocumentRequest} seeded from {@code findBy…OrderByRequestedAtDesc(...).size() +
+ * 1} (live-only, {@code @Where}-scoped). Milder than the inspection reference: the DR reference
+ * carries no unique index, so a soft-delete gap or a concurrent create yields a silent DUPLICATE
+ * rather than a 500. The DR legs assert the ordinal seeds from {@code findMaxDrOrdinal} (value 8 from
+ * MAX 7, not 1 from the empty live-count list) and steps over a live collision.
  */
 @ExtendWith(MockitoExtension.class)
 class RegInspectServiceTest {
@@ -127,5 +139,69 @@ class RegInspectServiceTest {
         // The MAX seed is scoped to every regulator's inspection this year+quarter (the ordinal is a
         // shared per-quarter sequence), so the pattern is %-OSI-<year>-Q<q>-%.
         assertThat(pat.getValue()).contains("-OSI-").contains("-Q").startsWith("%").endsWith("-%");
+    }
+
+    // ── F2-355: document-request reference seeds from MAX, not the live count ──────────
+
+    private RegInspection inspection(long id, String externalReference) {
+        RegInspection i = new RegInspection();
+        i.setId(id);
+        i.setOrganisationId(ORG);
+        i.setExternalReference(externalReference);
+        i.setRegulator("SAMA");
+        i.setStatus("PLANNED");
+        return i;
+    }
+
+    /** Drives createDocumentRequest with a save stub, returning the DR reference the service minted. */
+    private String mintedDrReference(RegInspection insp) {
+        when(inspectionRepo.findByIdAndOrganisationId(insp.getId(), ORG)).thenReturn(Optional.of(insp));
+        when(drRepo.save(any(RegDocumentRequest.class))).thenAnswer(inv -> {
+            RegDocumentRequest dr = inv.getArgument(0);
+            dr.setId(55L);
+            return dr;
+        });
+        service.createDocumentRequest(insp.getId(), CreateDocumentRequestRequest.builder()
+                .titleEn("Provide the policy").titleAr("قدّم السياسة")
+                .dueDate(LocalDate.now().plusDays(7)).build());
+        ArgumentCaptor<RegDocumentRequest> cap = ArgumentCaptor.forClass(RegDocumentRequest.class);
+        verify(drRepo).save(cap.capture());
+        return cap.getValue().getReference();
+    }
+
+    @Test
+    void firstDocumentRequestOrdinalIsOne() {
+        RegInspection insp = inspection(10L, "SAMA-OSI-2026-Q1-001");
+        when(drRepo.findMaxDrOrdinal(10L, ORG)).thenReturn(0);
+        when(drRepo.existsByInspectionIdAndOrganisationIdAndReference(eq(10L), eq(ORG), anyString()))
+                .thenReturn(false);
+
+        assertThat(mintedDrReference(insp)).isEqualTo("SAMA-OSI-2026-Q1-001-DR-001");
+    }
+
+    @Test
+    void documentRequestOrdinalSeedsFromMaxNotLiveCount() {
+        // Seven DR ordinals issued (some rows may be soft-deleted, so the live-count seed would be
+        // lower and re-mint a live ordinal — the duplicate). MAX + 1 is the next free ordinal.
+        RegInspection insp = inspection(10L, "SAMA-OSI-2026-Q1-001");
+        when(drRepo.findMaxDrOrdinal(10L, ORG)).thenReturn(7);
+        when(drRepo.existsByInspectionIdAndOrganisationIdAndReference(eq(10L), eq(ORG), anyString()))
+                .thenReturn(false);
+
+        // 8 (from MAX 7), not 1 (which the empty live-count list would have produced).
+        assertThat(mintedDrReference(insp)).isEqualTo("SAMA-OSI-2026-Q1-001-DR-008");
+    }
+
+    @Test
+    void documentRequestSkipsAnExistingLiveReference() {
+        // A peer create grabbed ordinal 6; the skip-loop (live-only existsBy) steps over it.
+        RegInspection insp = inspection(10L, "SAMA-OSI-2026-Q1-001");
+        when(drRepo.findMaxDrOrdinal(10L, ORG)).thenReturn(5);
+        when(drRepo.existsByInspectionIdAndOrganisationIdAndReference(
+                eq(10L), eq(ORG), argThat(s -> s != null && s.endsWith("-DR-006")))).thenReturn(true);
+        when(drRepo.existsByInspectionIdAndOrganisationIdAndReference(
+                eq(10L), eq(ORG), argThat(s -> s != null && s.endsWith("-DR-007")))).thenReturn(false);
+
+        assertThat(mintedDrReference(insp)).isEqualTo("SAMA-OSI-2026-Q1-001-DR-007");
     }
 }
