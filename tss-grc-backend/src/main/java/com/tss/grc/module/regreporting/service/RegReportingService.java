@@ -89,12 +89,21 @@ public class RegReportingService {
             "CLOSED",          Set.of(),
             "EXEMPTED",        Set.of());
 
-    private static final Set<String> TERMINAL_STATUSES = Set.of(
-            "CLOSED", "EXEMPTED");
+    /** Terminal states — the declared states with no outgoing transition. Derived from the
+     *  machine, never typed (F2-196/F2-343), so it cannot drift from {@link #ALLOWED}. */
+    private static final Set<String> TERMINAL_STATUSES = ALLOWED.entrySet().stream()
+            .filter(e -> e.getValue().isEmpty())
+            .map(Map.Entry::getKey)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
-    private static final Set<String> IN_FLIGHT_STATUSES = Set.of(
-            "SCHEDULED", "IN_PREPARATION", "IN_REVIEW",
-            "APPROVED", "SUBMITTED", "REJECTED");
+    /** "In flight" = every declared state that is not terminal — the COMPLEMENT of the terminal
+     *  set, not a hand-typed subset. A hand-typed list had dropped ACKNOWLEDGED (a filing the
+     *  regulator has acknowledged but that is not yet CLOSED — {@code ACKNOWLEDGED → CLOSED}),
+     *  so an acknowledged-awaiting-closure filing was absent from the in-flight count and could
+     *  never appear in the by-status breakdown (F2-364). */
+    private static final Set<String> IN_FLIGHT_STATUSES = ALLOWED.keySet().stream()
+            .filter(s -> !TERMINAL_STATUSES.contains(s))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /** Statuses where overdue applies — not submitted/closed/exempted. */
     private static final Set<String> OVERDUE_APPLICABLE = Set.of(
