@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -334,10 +335,27 @@ public class SanctionsScreeningService {
             .orElseThrow(() -> new EntityNotFoundException("Screening check not found: " + id));
     }
 
-    /** Generate the next SCR-{year}-{6-digit-seq} code for the tenant. */
+    /**
+     * Generate the next SCR-{year}-{6-digit-seq} code for the tenant.
+     *
+     * <p>F2-375 — a bare {@code count(...) + 1} seed collides on the filtered unique index
+     * {@code UX_screening_check_org_code} when two screens run concurrently for the same tenant
+     * (both read the same count, both mint the same code) → an opaque 500 and a LOST sanctions
+     * screening. Skip-loop backstopped by the unique index (mirrors
+     * {@code WhistleblowerCaseService#generateCode}): the loser retries the next free ordinal, and
+     * a random-suffix fallback guarantees termination. {@code existsBy...IsDeletedFalse} and the
+     * filtered index agree, so the check sees exactly what the constraint enforces.
+     */
     String nextCheckCode(Long orgId) {
+        int year = Year.now().getValue();
         long total = checkRepo.countByOrganisationIdAndIsDeletedFalse(orgId);
-        return String.format("SCR-%d-%06d", Year.now().getValue(), total + 1);
+        for (long seq = total + 1; seq < total + 1000; seq++) {
+            String candidate = String.format("SCR-%d-%06d", year, seq);
+            if (!checkRepo.existsByOrganisationIdAndCheckCodeAndIsDeletedFalse(orgId, candidate)) {
+                return candidate;
+            }
+        }
+        return "SCR-" + year + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     CheckResponse toResponse(ScreeningCheck c) {
