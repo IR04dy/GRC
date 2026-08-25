@@ -1,6 +1,7 @@
 package com.tss.grc.module.cpty.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.cpty.dto.CptyDtos.CreateCounterpartyRequest;
 import com.tss.grc.module.cpty.dto.CptyDtos.DashboardResponse;
 import com.tss.grc.module.cpty.entity.Counterparty;
 import com.tss.grc.module.cpty.repository.CounterpartyRepository;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +26,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,6 +49,16 @@ import static org.mockito.Mockito.when;
  * Reverting to the capped body makes these legs fail (the capped overload returns a null
  * {@code Page} that the reverted body dereferences, and the uncapped stub goes unused under strict
  * stubbing) — F2-274, the test is coupled to the uncapped contract.
+ *
+ * <p>F2-353 — {@code generateReference()} must mint {@code CP-NNNNN} from {@code MAX(ordinal) + 1},
+ * not {@code countByOrganisationId() + 1}. A derived {@code countBy…} respects the entity's
+ * {@code @Where(is_deleted = 0)}, so a soft-delete gap or a concurrent create re-minted a live
+ * ordinal, which the filtered unique index {@code ux_cpty_reference} then 500'd on INSERT (the
+ * F2-337 / F2-351 collision shape). A unit test cannot trigger a real unique-index 500, so the
+ * proof is the SEEDING (MAX, not count — {@code verify(never()).countByOrganisationId}), the
+ * skip-loop over a live collision, and the caller-override bypass. Reverting to the count body makes
+ * the seed/skip legs fail (the count seed is unstubbed → 0 → {@code CP-00001}, and the MAX/exists
+ * stubs go unused under strict stubbing).
  */
 @ExtendWith(MockitoExtension.class)
 class CptyServiceTest {
@@ -116,5 +129,64 @@ class CptyServiceTest {
         assertThat(dto.getLimitsBreach()).isEqualTo(3L);
         // With no counterparties the exposure aggregate is zero (not null).
         assertThat(dto.getTotalExposureSarM()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // ── F2-353: reference mint seeds from MAX, not count ──────────────────────
+
+    private static CreateCounterpartyRequest req(String reference) {
+        return CreateCounterpartyRequest.builder()
+                .reference(reference)
+                .legalNameEn("Acme Bank").legalNameAr("بنك أكمي")
+                .sector("CORPORATE_LARGE").build();
+    }
+
+    /** Drives the public create with a save stub, returning the reference the service minted. */
+    private String mintedReference(CreateCounterpartyRequest req) {
+        when(cptyRepo.save(any(Counterparty.class))).thenAnswer(inv -> {
+            Counterparty c = inv.getArgument(0);
+            c.setId(99L);
+            return c;
+        });
+        service.createCounterparty(req);
+        ArgumentCaptor<Counterparty> cap = ArgumentCaptor.forClass(Counterparty.class);
+        verify(cptyRepo).save(cap.capture());
+        return cap.getValue().getReference();
+    }
+
+    @Test
+    void firstReferenceMintsCP00001() {
+        when(cptyRepo.findMaxReferenceSeq(ORG)).thenReturn(0);
+        when(cptyRepo.existsByOrganisationIdAndReference(ORG, "CP-00001")).thenReturn(false);
+
+        assertThat(mintedReference(req(null))).isEqualTo("CP-00001");
+    }
+
+    @Test
+    void referenceSeedsFromMaxSeq_notCount() {
+        // Seven ordinals have been issued (some rows may be soft-deleted, so a live count would be
+        // lower and would re-mint a live ordinal — the collision). MAX + 1 is the next free code.
+        when(cptyRepo.findMaxReferenceSeq(ORG)).thenReturn(7);
+        when(cptyRepo.existsByOrganisationIdAndReference(ORG, "CP-00008")).thenReturn(false);
+
+        assertThat(mintedReference(req(null))).isEqualTo("CP-00008");
+        // The seed is the MAX ordinal, never the live count (the F2-337 / F2-351 defect).
+        verify(cptyRepo, never()).countByOrganisationId(anyLong());
+    }
+
+    @Test
+    void referenceSkipsAnExistingLiveCode() {
+        // A peer create grabbed CP-00006 in the window between the seed read and this INSERT; the
+        // skip-loop (live-only existsBy) steps over it to the next free code.
+        when(cptyRepo.findMaxReferenceSeq(ORG)).thenReturn(5);
+        when(cptyRepo.existsByOrganisationIdAndReference(ORG, "CP-00006")).thenReturn(true);
+        when(cptyRepo.existsByOrganisationIdAndReference(ORG, "CP-00007")).thenReturn(false);
+
+        assertThat(mintedReference(req(null))).isEqualTo("CP-00007");
+    }
+
+    @Test
+    void callerSuppliedReferenceBypassesGeneration() {
+        assertThat(mintedReference(req("CUSTOM-9"))).isEqualTo("CUSTOM-9");
+        verify(cptyRepo, never()).findMaxReferenceSeq(anyLong());
     }
 }
