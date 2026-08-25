@@ -15219,6 +15219,23 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-357 — the five PDPL breach statuses localised but rendered a GREY badge (STATUS_KEY completed, STATUS_TONE not)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | P3 — a wrong badge TONE (not a wrong label) on the PDPL Article 20 breach register. `lib/labels.ts` has two maps: `STATUS_KEY` (status → i18n label) and `STATUS_TONE` (status → badge colour). F2-211 added the five breach statuses `NOTIFIED` / `INVESTIGATING` / `INVESTIGATED` / `ESCALATED` / `REMEDIATED` to `STATUS_KEY` (so `statusLabel` localises them) but never to `STATUS_TONE`. Badges render `STATUS_TONE[status] ?? 'neutral'`, so on the `privacy.data_breaches` register (`PrivacyPage.tsx:293`) and `PdplBreachConsole` all five rendered a grey/neutral badge — an `ESCALATED` breach visually indistinguishable from a `CLOSED` one, `INVESTIGATING`/`NOTIFIED` stripped of their warning/info tone, `REMEDIATED` of its success tone — on a register where an operator scans tone to spot the urgent rows. F2-211 measured these statuses on 11 of 17 live breaches, so it was live in both databases. |
+| **Registers** | none — a frontend label/tone map (`tss-grc-ui-v2/src/lib/labels.ts`). No data change, no migration. |
+| **Standards** | PDPL Article 20 (breach register); [[F2-205]] / [[F2-211]] (the "fixed the label, left the lookup" half-fix — a status→map completed on one map and not its sibling); [[F2-266]] (count the population — here, gate the completeness). |
+| **Found by** | A read-only frontend sweep for label-vs-predicate and status-map-gap defects. `STATUS_TONE` (14 keys) was exactly `STATUS_KEY` (19 keys) minus the five F2-211 breach statuses; `PrivacyPage` and `PdplBreachConsole` both consume it via `STATUS_TONE[status] ?? 'neutral'`, and no breach-specific tone map exists anywhere, so the grey fallback was the only tone those five ever got. |
+| **Verification** | hermetic (`tsc --noEmit` + vitest — no backend). `breachStatusToneCompleteness.test.ts` 3/3: a completeness leg (every `STATUS_KEY` status has a `STATUS_TONE` entry — the durable invariant, so a future label-only addition fails here), a pin leg (the five breach tones), and an anti-vacuity floor (≥ 15 keys, so a rotted import cannot pass vacuously — [[F2-195]]). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): removing the five tones makes all three legs RED (the completeness leg names the five missing statuses, the pin fails on `undefined`, the floor drops to 14). Full frontend suite green. |
+
+### Fix
+
+Add the five tones to `STATUS_TONE` in `lib/labels.ts`, following the existing convention (`danger` = urgent/bad, `warning` = active, `info` = in-progress, `success` = done): `ESCALATED` → danger, `INVESTIGATING` → warning, `NOTIFIED` / `INVESTIGATED` → info, `REMEDIATED` → success. Export `STATUS_KEY` (previously private) so the completeness gate can assert `STATUS_KEY ⊆ STATUS_TONE` with types rather than parsing the source. One source of truth fixes both the register and the console.
+
+**Filed / not done.** A separate genuine frontend defect surfaced by the same sweep, in `components/workflows/SubmissionAnalyticsCard.tsx` (rendered by `WorkflowSubmissionsPage`): the "Open for review" KPI is computed as `openCount` inside a `useMemo` whose FIRST statement is `if (reviewed.length === 0) return { avgHours: null, count: 0, openCount: 0 }` — but `openCount` (count of `SUBMITTED`/`UNDER_REVIEW`) does not depend on `reviewed`; it was swept into the divide-by-zero guard meant for `avgHours`. So when nothing has been reviewed yet (a fresh tenant, or a `SUBMITTED`-filtered view), the KPI reads **"Open for review: 0"** with the sub-label **"No pending submissions"** — a false statement, in the state where the KPI matters most. The fix is to move the `openCount` computation above the early return; verifiable with a render test. Deferred to keep this slice to one bounded fix.
+
 ## F2-356 — a gate: a server-minted reference ordinal seeds from a MAX, never from a live COUNT (the count-minter capstone)
 
 | | |
