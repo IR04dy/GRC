@@ -32,4 +32,9 @@ public interface DlpEventRepository extends JpaRepository<DlpEvent, Long> {
         ORDER BY d.eventTime ASC
     """)
     List<DlpEvent> findCriticalUnreviewedBefore(Long organisationId, LocalDateTime cutoff);
+
+    /** F2-376 — SOC-ops sweep tenant discovery: a tenant that uses this surface but has
+     *  never ingested a SecurityEvent must still be swept for its escalations. */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT e.organisationId FROM DlpEvent e")
+    java.util.List<Long> findDistinctOrganisationIds();
 }

@@ -25,4 +25,9 @@ public interface CyberInsuranceRepository extends JpaRepository<CyberInsurance, 
         ORDER BY p.renewalDueAt ASC
     """)
     List<CyberInsurance> findRenewalsDueBetween(Long organisationId, LocalDate from, LocalDate to);
+
+    /** F2-376 — SOC-ops sweep tenant discovery: a tenant that uses this surface but has
+     *  never ingested a SecurityEvent must still be swept for its escalations. */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT e.organisationId FROM CyberInsurance e")
+    java.util.List<Long> findDistinctOrganisationIds();
 }

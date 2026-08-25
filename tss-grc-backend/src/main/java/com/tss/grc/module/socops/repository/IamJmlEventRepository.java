@@ -29,4 +29,9 @@ public interface IamJmlEventRepository extends JpaRepository<IamJmlEvent, Long> 
         ORDER BY e.reviewDueAt ASC
     """)
     List<IamJmlEvent> findPrivilegedReviewsDueBetween(Long organisationId, LocalDateTime from, LocalDateTime to);
+
+    /** F2-376 — SOC-ops sweep tenant discovery: a tenant that uses this surface but has
+     *  never ingested a SecurityEvent must still be swept for its escalations. */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT e.organisationId FROM IamJmlEvent e")
+    java.util.List<Long> findDistinctOrganisationIds();
 }

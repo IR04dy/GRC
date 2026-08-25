@@ -32,4 +32,9 @@ public interface CryptoAssetRepository extends JpaRepository<CryptoAsset, Long> 
         ORDER BY c.validUntil ASC
     """)
     List<CryptoAsset> findExpiringBetween(Long organisationId, LocalDateTime from, LocalDateTime to);
+
+    /** F2-376 — SOC-ops sweep tenant discovery: a tenant that uses this surface but has
+     *  never ingested a SecurityEvent must still be swept for its escalations. */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT e.organisationId FROM CryptoAsset e")
+    java.util.List<Long> findDistinctOrganisationIds();
 }
