@@ -15219,6 +15219,25 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-356 — a gate: a server-minted reference ordinal seeds from a MAX, never from a live COUNT (the count-minter capstone)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-25 |
+| **Severity** | N/A — a preventive instrument, not a defect fix. The F2-266 capstone for the count-minter population: five registers were fixed one slice at a time (F2-337 `OBI-`, F2-351 `RUN-`, F2-353 `CP-`, F2-354 `OSI-`, F2-355 `DR-`) for the same collision — a `count(...) + 1` ordinal seed re-mints an in-use ordinal past a query window, after a soft-delete gap (the derived `countBy…` respects `@Where(is_deleted = 0)`), or under a concurrent create → a 500 on a filtered unique index, a silent duplicate without one. This gate sweeps the shape so the sixth instance fails the build instead of waiting for a sixth slice. |
+| **Registers** | none — a hermetic test-source gate over `src/main/java`. No production code changed, no data change, no migration. |
+| **Standards** | [[F2-266]] (filings one at a time is what a population looks like when nothing counts it); [[F2-208]] (`ClientSuppliedReferenceRatchetTest` — the sibling source-reading reference-minter ratchet, the precedent); [[F2-195]] (a corpus assertion needs a self-test or it passes when the detector rots); [[F2-205]] (say what the instrument cannot see). |
+| **Found by** | [[F2-355]] filed the durable resolution: "a gate correlating a `count…() + 1` reference seed with a filtered unique index on that column." This is that gate, in its pragmatic form — it gates the count-seed-minter SHAPE (a method that both count-seeds and builds a reference), without the migration correlation, because the shape alone is what all five fixes shared and the shape is what a sixth would repeat. |
+| **Verification** | hermetic — the gate itself. `CountBasedReferenceMinterRatchetTest` 3/3: an exact-set leg (the detected count-seed minters equal the two enumerated survivors, both directions), a reverse leg (each enumerated survivor is still detected, so the map cannot rot), and a synthetic self-test driving the extracted `scan()` over count-seed / MAX-seed / array-size / count-without-reference input so the corpus assertion is not vacuous ([[F2-195]]). Control ([[F2-274]] / [[F2-287]]): dropping a `KNOWN_COUNT_SEED_MINTERS` entry makes the exact-set leg RED (the detector still finds it, the expected set no longer lists it) while the other two legs stay green. Full backend suite green. |
+
+### The gate
+
+`CountBasedReferenceMinterRatchetTest` (in `com.tss.grc.security`, beside `ClientSuppliedReferenceRatchetTest`) walks `*Service.java`, strips comments (one left-to-right alternation, preserving newlines — [[F2-198]]), and flags any method whose brace-balanced body BOTH computes a count-seed (`count…() + 1`, `.size() + 1`, `.count() + 1`) AND builds a reference in the same method (a zero-padded `String.format("…%0Nd…")` or a `set…Reference` / `set…Code` call). The current matches are exactly the two mitigated survivors — `CrisisAarService#nextReportCode` and `MtpdInheritanceService#generateAssessmentCode` — enumerated with a reason each (both carry bounded skip-loops and their authors accepted the residual race for their cadence). The correct idiom to reach for instead is `ComplaintService#generateNextComplaintNo` (MAX seed + skip-loop).
+
+**Two documented blind spots ([[F2-205]]).** (1) A split-method minter — `RrpService#nextOrdinal` computes `.count() + 1L` and returns a long its caller formats, so the count-seed and the reference build are in different methods and no single-method scan matches it; it is one-per-fiscal-year, filed low-risk. (2) A match is not by itself a defect — the two survivors are mitigated, so the gate counts them with reasons rather than banning them; the point is that a NEW count-seed minter (or a mitigated one whose cadence rises) is surfaced at build time.
+
+**Filed / not done.** The stronger form — correlating the count-seed with a filtered unique index on the target column, and reshaping the two mitigated survivors + `RrpService` to MAX seeds — is deferred: it must fix each instance it reshapes ([[F2-188]]), which is its own slice. This gate's value is that the population is now counted and a regression fails the build.
+
 ## F2-355 — the document-request reference minter seeded from a live COUNT re-mints an ordinal, producing a DUPLICATE reference (no unique index)
 
 | | |
