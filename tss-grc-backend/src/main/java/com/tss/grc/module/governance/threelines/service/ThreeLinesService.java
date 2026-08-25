@@ -3,8 +3,10 @@ package com.tss.grc.module.governance.threelines.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
+import com.tss.grc.module.audit_lc.service.FindingService;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
+import com.tss.grc.module.capa.service.CapaTaskService;
 import com.tss.grc.module.governance.threelines.dto.RoleMappingUpdateRequest;
 import com.tss.grc.module.governance.threelines.dto.ThreeLinesArtefactDto;
 import com.tss.grc.module.governance.threelines.dto.ThreeLinesOverviewDto;
@@ -69,11 +71,22 @@ public class ThreeLinesService {
     private static final List<String> BAND_PRECEDENCE =
             List.of(LINE_1, LINE_2, LINE_3, BOARD);
 
-    /** Statuses that are NOT counted as open in their respective module. */
-    private static final List<String> RISK_CLOSED_STATUSES    = List.of("CLOSED", "CANCELLED");
-    private static final List<String> CAPA_CLOSED_STATUSES    = List.of("CLOSED", "CANCELLED");
-    private static final List<String> FINDING_CLOSED_STATUSES = List.of("CLOSED");
-    private static final List<String> DSR_CLOSED_STATUSES     = List.of("DELIVERED", "REJECTED");
+    /**
+     * Statuses that are NOT counted as open, per register.
+     *
+     * <p>F2-370: the CAPA and FINDING closed-sets were hand-typed copies of their registers' own
+     * state machines. They now derive from the ONE declared terminal set each register owns —
+     * {@link CapaTaskService#TERMINAL} ({@code capa.tasks}) and {@link FindingService#TERMINAL}
+     * ({@code audit_lc.findings}) — so a new terminal state is reflected here automatically rather
+     * than silently dropped (F2-196/F2-336). The {@code DSR_CLOSED_STATUSES} list was already dead
+     * (F2-196 replaced its use with {@code dsrRepo.countOpen}, which derives the complement of the
+     * DSR machine's terminal set) and is removed.
+     *
+     * <p>RISK stays hand-typed: {@code risk} has no declared {@code Map<state,edges>} machine (its
+     * lifecycle is five hand-coded transition methods), so there is no single terminal set to
+     * derive from. Filed rather than forced (F2-188).
+     */
+    private static final List<String> RISK_CLOSED_STATUSES = List.of("CLOSED", "CANCELLED");
 
     /** Finding severity that triggers Audit Committee / Board escalation. */
     private static final String CRITICAL = "CRITICAL";
@@ -476,13 +489,13 @@ public class ThreeLinesService {
 
     private List<Finding> openFindingsFor(Long orgId) {
         return findingRepo.findByOrganisationIdOrderByRaisedAtDesc(orgId).stream()
-            .filter(f -> !FINDING_CLOSED_STATUSES.contains(f.getStatus()))
+            .filter(f -> !FindingService.TERMINAL.contains(f.getStatus()))
             .toList();
     }
 
     private List<CapaTask> openCapasFor(Long orgId) {
         return capaRepo.findByOrganisationIdOrderByCreatedAtDesc(orgId).stream()
-            .filter(c -> !CAPA_CLOSED_STATUSES.contains(c.getStatus()))
+            .filter(c -> !CapaTaskService.TERMINAL.contains(c.getStatus()))
             .toList();
     }
 

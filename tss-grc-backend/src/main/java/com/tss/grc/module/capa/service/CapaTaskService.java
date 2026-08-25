@@ -66,8 +66,14 @@ public class CapaTaskService {
      * over the same vocabulary drifts from the machine, and here it feeds the "open" and "overdue"
      * queries, so a drift would silently exclude a state from the overdue sweep. F2-205 made the
      * identical conversion in {@code VulnerabilityService}.
+     *
+     * <p>F2-370: {@code public} because the governance dashboards (3LoD {@code ThreeLinesService},
+     * Audit Committee {@code AuditCommitteeDashboardService}) each read {@code capa.tasks} and used
+     * to hand-type {@code List.of("CLOSED", "CANCELLED")} for its "open CAPA" filter — two more
+     * copies of exactly the second list this comment warns about. They now read this ONE derived
+     * set, so a new terminal CAPA state is reflected in every reader at once (F2-336).
      */
-    private static final List<String> TERMINAL = ALLOWED.entrySet().stream()
+    public static final List<String> TERMINAL = ALLOWED.entrySet().stream()
         .filter(e -> e.getValue().isEmpty())
         .map(Map.Entry::getKey)
         .sorted()

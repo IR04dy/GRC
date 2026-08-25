@@ -35,6 +35,7 @@ import com.tss.grc.module.ai.governance.repository.MlModelDriftObservationReposi
 import com.tss.grc.module.ai.governance.repository.MlModelRepository;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
+import com.tss.grc.module.capa.service.CapaTaskService;
 import com.tss.grc.module.ccm.repository.ControlTestDefinitionRepository;
 import com.tss.grc.module.ccm.repository.ControlTestRunRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
@@ -121,8 +122,13 @@ public class AuditCommitteeDashboardService {
     /** Risks at residual level CRITICAL or HIGH are treated as "above appetite". */
     static final List<String> ABOVE_APPETITE_LEVELS = List.of("CRITICAL", "HIGH");
     static final List<String> RISK_CLOSED_STATUSES = List.of("CLOSED", "CANCELLED");
+    // F2-370: FINDING here reads compliance.findings (AuditFinding), which has NO declared state
+    // machine, so its closed-set is hand-typed (and whether RESOLVED is terminal is an owner/data
+    // question — filed). RISK likewise has no Map<state,edges> machine to derive from. The CAPA
+    // closed-set, by contrast, was a hand-typed copy of capa.tasks's own machine and now reads the
+    // ONE derived CapaTaskService.TERMINAL (F2-196/F2-336), so a new terminal CAPA state is
+    // reflected here and in ThreeLinesService at once.
     static final List<String> FINDING_CLOSED_STATUSES = List.of("CLOSED", "RESOLVED");
-    static final List<String> CAPA_CLOSED_STATUSES = List.of("CLOSED", "CANCELLED");
     static final List<String> INCIDENT_OPEN_STATUSES = List.of("OPEN", "INVESTIGATING");
 
     private final DashboardSnapshotRepository snapshotRepo;
@@ -347,7 +353,7 @@ public class AuditCommitteeDashboardService {
     private CapaSection capaSection(Long orgId) {
         List<CapaTask> all = capaRepo.findByOrganisationIdOrderByCreatedAtDesc(orgId);
         List<CapaTask> open = all.stream()
-                .filter(c -> !CAPA_CLOSED_STATUSES.contains(safe(c.getStatus())))
+                .filter(c -> !CapaTaskService.TERMINAL.contains(safe(c.getStatus())))
                 .toList();
         LocalDate today = LocalDate.now();
         long overdue = open.stream()
