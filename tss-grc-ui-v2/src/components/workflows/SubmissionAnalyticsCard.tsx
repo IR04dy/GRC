@@ -30,23 +30,41 @@ const STATUS_COLOR: Record<string, string> = {
   DRAFT:        '#d1d5db',
 };
 
+export interface TtrStats {
+  /** Mean (reviewedAt − submittedAt) in hours, or null when nothing has been reviewed. */
+  avgHours: number | null;
+  /** Number of submissions that have been reviewed (the mean's denominator). */
+  count: number;
+  /** Number of submissions awaiting a reviewer decision (SUBMITTED | UNDER_REVIEW). */
+  openCount: number;
+}
+
+/**
+ * F2-358 — `openCount` (submissions awaiting a reviewer decision) is independent of whether
+ * anything has yet been reviewed. Only `avgHours` needs `reviewed.length > 0` as its denominator,
+ * so the divide-by-zero guard is scoped to the mean. Computing `openCount` BEFORE that early
+ * return is what stops the "Open for review" KPI reading 0 / "No pending submissions" on a fresh
+ * tenant (or a SUBMITTED-only view) that holds pending-but-unreviewed submissions.
+ */
+export function computeTtrStats(items: WorkflowSubmissionDto[]): TtrStats {
+  const openCount = items.filter(s => s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW').length;
+  const reviewed = items.filter(s => s.reviewedAt);
+  if (reviewed.length === 0) return { avgHours: null, count: 0, openCount };
+  const totalMs = reviewed.reduce((acc, s) => {
+    const sub = new Date(s.submittedAt).getTime();
+    const rev = new Date(s.reviewedAt!).getTime();
+    return Number.isNaN(sub) || Number.isNaN(rev) ? acc : acc + (rev - sub);
+  }, 0);
+  const avgHours = (totalMs / reviewed.length) / 3_600_000;
+  return { avgHours, count: reviewed.length, openCount };
+}
+
 export function SubmissionAnalyticsCard({ items }: { items: WorkflowSubmissionDto[] }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
 
-  // ── Time-to-review average ──────────────────────────────────────
-  const ttrStats = useMemo(() => {
-    const reviewed = items.filter(s => s.reviewedAt);
-    if (reviewed.length === 0) return { avgHours: null, count: 0, openCount: 0 };
-    const totalMs = reviewed.reduce((acc, s) => {
-      const sub = new Date(s.submittedAt).getTime();
-      const rev = new Date(s.reviewedAt!).getTime();
-      return Number.isNaN(sub) || Number.isNaN(rev) ? acc : acc + (rev - sub);
-    }, 0);
-    const avgHours = (totalMs / reviewed.length) / 3_600_000;
-    const openCount = items.filter(s => s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW').length;
-    return { avgHours, count: reviewed.length, openCount };
-  }, [items]);
+  // ── Time-to-review average + open-for-review count ─────────────
+  const ttrStats = useMemo(() => computeTtrStats(items), [items]);
 
   // ── Per-module breakdown ───────────────────────────────────────
   const byModule = useMemo(() => {
