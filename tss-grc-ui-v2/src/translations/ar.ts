@@ -3960,6 +3960,7 @@ export const ar = {
   statusRemediated: 'تمت المعالجة',
   statusEradicated: 'منزَّلة',
   statusRecovered: 'متعافية',
+  statusResolved: 'محلولة',
 
   severityCritical: 'حرجة',
   severityHigh: 'عالية',

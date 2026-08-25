@@ -38,6 +38,17 @@ describe('F2-357 — STATUS_TONE is complete for every labellable status', () =>
     expect(STATUS_TONE.REMEDIATED).toBe('success');
   });
 
+  it('F2-359 — RESOLVED (the recovery-phase incident terminal) carries its label key and success tone', () => {
+    // RESOLVED is the status IncidentService.legalStatus actually writes
+    // (OPEN | INVESTIGATING | RESOLVED | CLOSED; RECOVERY/POST_INCIDENT map to it). It was absent
+    // from BOTH maps while the phantom RECOVERED (0 rows, not a legal status) carried both, so a
+    // RESOLVED incident rendered a grey, raw-token badge. A revert to that state must fail here.
+    // (The completeness leg above cannot catch it: absent from STATUS_KEY, RESOLVED was outside
+    // that leg's population — STATUS_KEY ⊆ STATUS_TONE says nothing about a status in neither map.)
+    expect(STATUS_KEY.RESOLVED).toBe('statusResolved');
+    expect(STATUS_TONE.RESOLVED).toBe('success');
+  });
+
   it('the maps are non-trivial (anti-vacuity — a broken import cannot pass this file)', () => {
     // If the import rots to {} both legs above pass vacuously; this floor is the guard.
     expect(Object.keys(STATUS_KEY).length).toBeGreaterThanOrEqual(15);
