@@ -34,13 +34,22 @@ public interface CommitteeActionItemRepository extends JpaRepository<CommitteeAc
     """)
     List<CommitteeActionItem> findOpenByCommittee(Long organisationId, Long committeeId);
 
-    /** Actions where due_date has passed but status is still OPEN/IN_PROGRESS —
-     *  the scheduled sweep flips them to OVERDUE and fires the F8 escalation. */
+    /** Actions where due_date has passed but the status is still one that {@code markOverdue}
+     *  accepts as an OVERDUE source — OPEN, IN_PROGRESS or DEFERRED. The scheduled sweep flips
+     *  them to OVERDUE and fires the F8 escalation.
+     *
+     *  <p>F2-361: DEFERRED was missing. {@code defer(id, newDueDate)} reschedules the deadline
+     *  ("revisit by newDueDate"), and {@code markOverdue} bars only COMPLETED/CANCELLED/OVERDUE —
+     *  so it accepts DEFERRED. But this query excluded it, so a deferred committee action whose
+     *  revised deadline passed was never swept to OVERDUE, never escalated, and never returned to
+     *  matters-arising (startProgress cannot resume a DEFERRED item either). Deferral became a
+     *  permanent escape from accountability. The query's set must equal markOverdue's accepted set
+     *  (F2-196 / F2-177): the sweep is pinned to that agreement by CommitteeOverdueSweepScopeTest. */
     @Query("""
         SELECT a FROM CommitteeActionItem a
         WHERE a.organisationId = :organisationId
           AND a.dueDate < :today
-          AND a.status IN ('OPEN', 'IN_PROGRESS')
+          AND a.status IN ('OPEN', 'IN_PROGRESS', 'DEFERRED')
         ORDER BY a.dueDate ASC
     """)
     List<CommitteeActionItem> findShouldBeOverdue(Long organisationId, LocalDate today);
