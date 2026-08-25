@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.data_officer.dto.DataOfficerDtos.CreateBreachRequest;
 import com.tss.grc.module.data_officer.dto.DataOfficerDtos.CreateDsrRequest;
 import com.tss.grc.module.data_officer.dto.DataOfficerDtos.TransitionBreachRequest;
 import com.tss.grc.module.data_officer.dto.DataOfficerDtos.TransitionDpiaRequest;
@@ -255,6 +256,29 @@ class DataOfficerLifecycleTest {
         assertThat(dsrSrc).as("and the DSR window must stay anchored to receipt, not to now()")
             .contains("receivedAt.plusDays(30)")
             .doesNotContain("LocalDateTime.now().plusDays(30)");
+    }
+
+    @Test
+    @DisplayName("F2-373: a future detected-at is refused; a past one is legitimate and accepted")
+    void aFutureDetectionMomentIsRefused() {
+        when(breachRepo.findByOrganisationIdAndReference(eq(ORG), any())).thenReturn(Optional.empty());
+
+        // Future — impossible, and it would push the PDPL Art.20 72-hour SDAIA clock into the future so
+        // the breach never surfaces as overdue for notification. The DSR path next door (F2-123) already
+        // refuses a future receipt; this is the same shape on the breach sibling (F2-215 two-of-N).
+        assertThatThrownBy(() -> privacy.createBreach(breachReq(LocalDateTime.now().plusDays(1))))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("future");
+
+        // Past is legitimate — a breach found last week, entered today; the clock runs from detection.
+        assertThatCode(() -> privacy.createBreach(breachReq(LocalDateTime.now().minusDays(2))))
+            .doesNotThrowAnyException();
+    }
+
+    private CreateBreachRequest breachReq(LocalDateTime detectedAt) {
+        return new CreateBreachRequest("BR-TEST", "Breach", "خرق", detectedAt,
+            "UNAUTHORISED_ACCESS", "PHISHING", "HIGH", 100L, 50L, "[]",
+            false, false, "desc", "وصف", null);
     }
 
     // ── the clock is actually consulted, which F2-119's module could not claim ──
