@@ -27,6 +27,12 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
 
     List<SecurityEvent> findByOrganisationIdAndStatusOrderByEventTimeDesc(Long organisationId, String status);
 
+    /** F2-367 — open (non-terminal) events, most-recent first. The dashboard passes
+     *  {@code SecurityEventService.TERMINAL_STATUSES}, so "open" is the COMPLEMENT of the terminal
+     *  set (F2-196) — including ESCALATED, which a hand-typed inclusion list dropped. */
+    List<SecurityEvent> findByOrganisationIdAndStatusNotInOrderByEventTimeDesc(
+        Long organisationId, java.util.Collection<String> statuses);
+
     long countByOrganisationIdAndStatus(Long organisationId, String status);
 
     long countByOrganisationIdAndSeverity(Long organisationId, String severity);

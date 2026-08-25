@@ -46,6 +46,17 @@ public class SecurityEventService {
         return "INFO".equals(v) ? "LOW" : "MEDIUM";
     }
 
+    /**
+     * F2-367 — the two terminal statuses {@link #resolve} writes. A security event is
+     * <em>open</em> when its status is NOT in this set, so "open" is the COMPLEMENT of this set
+     * (F2-196) and never a hand-typed inclusion list: NEW, TRIAGED and — the state a hand-typed
+     * list dropped — ESCALATED all count as open. This mirrors the SLA sweep's own
+     * {@code NOT IN ('RESOLVED', 'FALSE_POSITIVE')} in {@code SecurityEventRepository}; the two
+     * copies are pinned together by {@code SocOpsDashboardServiceTest}.
+     */
+    public static final java.util.Set<String> TERMINAL_STATUSES =
+        java.util.Set.of("RESOLVED", "FALSE_POSITIVE");
+
     @Transactional(readOnly = true)
     public Page<SecurityEvent> list(Pageable pageable) {
         return repo.findByOrganisationIdOrderByEventTimeDesc(
