@@ -3,6 +3,7 @@ package com.tss.grc.module.nca_ecc.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.util.CsvTokens;
 import com.tss.grc.module.nca_ecc.dto.NcaEccFilingDto;
 import com.tss.grc.module.nca_ecc.entity.NcaEccFiling;
 import com.tss.grc.module.nca_ecc.repository.NcaEccFilingRepository;
@@ -186,7 +187,7 @@ public class NcaEccFilingService {
         }
         if (req.getLinkedCapaIds() != null) {
             f.setLinkedCapaIds(req.getLinkedCapaIds());
-            f.setCapaCount(req.getLinkedCapaIds().split(",").length);
+            f.setCapaCount(CsvTokens.countNonBlank(req.getLinkedCapaIds())); // F2-369: "".split(",") is 1, not 0
         }
         if (req.getLinkedEvidence() != null) f.setLinkedEvidence(req.getLinkedEvidence());
 
