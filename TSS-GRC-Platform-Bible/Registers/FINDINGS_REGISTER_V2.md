@@ -15219,6 +15219,28 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-382 — NDI improvement-plan rollup averaged CAPA progress_pct with integer division, truncating a governance completion figure
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-26 |
+| **Severity** | P2 — a precision defect on a governance completion figure, not a catastrophic one. `NdiImprovementPlanService` averaged CAPA `progress_pct` (an `Integer` 0–100) with plain `int / int` division at two sites: `rollup()` (the `PlanRollup.progressPct` field returned to callers) and `recomputeRollup()` (the stored `ndi_improvement_plan.progress_pct` column). Integer division truncates toward zero, so a mean of 50.5 stored **50** — a consistent downward bias of up to ~1 percentage point on the NDI (NDMO) improvement-plan completion percentage. `progress_pct` is display-only: the plan's auto-complete gate keys on `completed == total`, not on progress, and no reader applies a `>= N` threshold to it, so the truncation biased a shown figure without flipping a gate. |
+| **Registers** | none — one service (`.../ndi/plan/service/NdiImprovementPlanService.java`: the two mean-progress expressions round half-up) + a new `NdiImprovementPlanRollupRoundingTest` (3 legs). No schema, no migration. |
+| **Standards** | [[F2-215]] (two-of-N — the sibling `NdiGapService#aggregate` computes the same "mean of CAPA `progress_pct`" correctly, so the correct idiom was in the module the whole time); [[F2-282]] (one concept, several readers — the plan rollup and the gap aggregate; the drifted rounding is the tell); [[F2-188]] (the differing denominators — plan-item count here vs CAPA count in the gap aggregate — are deliberate modeling choices, left alone; only the rounding was fixed); [[F2-369]] (a comparable small-arithmetic wrongness on a governance figure with the correct idiom nearby); [[F2-248]] (the service had no test at all); [[F2-320]] / [[F2-325]] (hermetic — pure service arithmetic, so assert the average directly). |
+| **Found by** | An Explore-agent sweep for integer-division truncation in percentage/rate/score computations (the "KPI reads wrong" shape), then re-derived against the code ([[F2-221]]). The catastrophic `a / b * 100 → 0` form does NOT exist in the backend — every percentage promotes to `double`/`float`/`BigDecimal` before dividing (confirmed near-misses: `CompliancePostureService`, `BcmReadinessScoreService`, `CyberDashboardService`, `SocOpsDashboardService`, `GreenFinanceMath`, `FinancedEmissionsService`, `CptyService.computeUtilisationPct`, and the `* 100.0` percentage methods across the audit-committee / sust / dashboard packages). This mean-of-integers form in `NdiImprovementPlanService` was the only genuine instance the sweep surfaced. Reached after seven consecutive clean sweeps ([[F2-216]]). |
+| **Verification** | hermetic (Mockito, no DB — [[F2-320]] / [[F2-325]]). `NdiImprovementPlanRollupRoundingTest` (the service's first test, [[F2-248]]): a mean of 50.5 rounds to 51 at the DTO (`rollup()`) and at the stored column (`recomputeAllForOrg()` → `recomputeRollup()` → captured `plans.save`), where pre-fix truncation gave 50; and a round-DOWN guard (mean 10.33 → 10) proving the fix is round-half-up, not a blanket increment (it passes on both trees, round == truncate there). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert only the two `(int) Math.round((double) …)` expressions to `sum / total` (the test uses only public API — `rollup()`, `recomputeAllForOrg()`, `PlanRollup.progressPct()` — so it still compiles) → the 2 mean legs RED (`expected 51 but was 50`), the round-down guard green. Full backend build 4874 tests, 0/0. |
+
+### Fix
+
+Both mean-progress computations round half-up, matching the module's established idiom in `NdiGapService#aggregate` (`(int) Math.round((double) progSum / all.size())`):
+
+- `rollup()`: `int avg = total == 0 ? 0 : (int) Math.round((double) sumProgress / total);`
+- `recomputeRollup()`: `p.setProgressPct(total == 0 ? 0 : (int) Math.round((double) sum / total));`
+
+The denominator is unchanged. The plan rollup divides by the plan's **item count** (`rows.size()`, treating an item whose CAPA is missing as 0% — a deliberate "unactioned item is 0% done" choice) while the gap aggregate divides by the **CAPA count**; those are different populations by design, so aligning the rounding without touching the denominator is the bounded fix ([[F2-188]]). No schema, no migration — the column is already `Integer` and the value stays in 0–100.
+
+🔑 **The reusable rule: when a metric is computed as `int / int` and its result is meant to be a fraction, percentage, rate or score, check the sibling that computes the same quantity — a rounding-convention drift between two readers of one concept (here truncate vs `Math.round`) is the tell, and the correct idiom is usually already in the tree ([[F2-215]]).**
+
 ## F2-381 — SIEM/scanner push-ingest stored oversized descriptive fields raw into bounded columns and lost the ingestion
 
 | | |
