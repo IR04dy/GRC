@@ -61,6 +61,10 @@ public class ObligationAttestationService {
     private final ObligationService obligationService;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    /** F2-385 — recompute the parent campaign's status rollups after a child attestation changes
+     *  (record / review), so stats()/CampaignResponse do not report frozen counts (0% completion)
+     *  mid-campaign. Shared component to avoid a service→service cycle (see ObligationCampaignRollups). */
+    private final ObligationCampaignRollups rollups;
 
     private Long org() {
         return TenantContext.requireOrganisationId();
@@ -164,6 +168,12 @@ public class ObligationAttestationService {
 
         ObligationAttestation saved = repo.save(a);
 
+        // F2-385 — recompute the parent campaign's status rollups now the child status changed.
+        // No-op for an ad-hoc attestation (null campaignId). Same transaction, so the count sees
+        // the row just saved above; stats() reads these stored columns, so without this the
+        // campaign reported 0% completion until it was closed.
+        rollups.recompute(orgId, saved.getCampaignId());
+
         // Roll the parent obligation's next_due_date forward when the
         // attestation is genuine (ATTESTED / ATTESTED_WITH_EXCEPTIONS).
         if ("ATTESTED".equals(saved.getAttestationStatus())
@@ -223,6 +233,9 @@ public class ObligationAttestationService {
         }
 
         ObligationAttestation saved = repo.save(a);
+        // F2-385 — recompute the parent campaign's rollups: REQUEST_CHANGES moved this row back to
+        // IN_PROGRESS, which changes the campaign's attested/in-progress counts (no-op if ad-hoc).
+        rollups.recompute(org(), saved.getCampaignId());
         audit.log("REVIEW", "ObligationAttestation", saved.getId(),
             "Attestation reviewed: obligation " + saved.getObligationId()
                 + ", decision " + saved.getReviewerDecision()

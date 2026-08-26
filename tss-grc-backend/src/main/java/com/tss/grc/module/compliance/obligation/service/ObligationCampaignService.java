@@ -70,6 +70,9 @@ public class ObligationCampaignService {
     private final ObligationRepository obligationRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    /** F2-385 — the single writer of the campaign status rollups, shared with the attestation
+     *  service so every child-status change (record / review / close) recomputes through one path. */
+    private final ObligationCampaignRollups rollups;
 
     private Long org() {
         return TenantContext.requireOrganisationId();
@@ -262,7 +265,7 @@ public class ObligationCampaignService {
         ObligationAttestationCampaign c = loadOrThrow(campaignId);
         guardTransition(c.getStatus(), "CLOSED");
 
-        recomputeRollups(c);
+        rollups.recompute(c);
 
         LocalDateTime now = LocalDateTime.now();
         c.setStatus("CLOSED");
@@ -299,27 +302,6 @@ public class ObligationCampaignService {
         return toResponse(saved);
     }
 
-    @Transactional
-    public void recomputeRollups(ObligationAttestationCampaign c) {
-        Long orgId = c.getOrganisationId();
-        Long cid = c.getId();
-        long inProgress = attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
-            orgId, cid, "IN_PROGRESS");
-        long attested = attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
-            orgId, cid, "ATTESTED");
-        long withExcs = attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
-            orgId, cid, "ATTESTED_WITH_EXCEPTIONS");
-        long overdue = attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
-            orgId, cid, "OVERDUE");
-        long na = attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
-            orgId, cid, "NOT_APPLICABLE");
-        c.setTotalInProgress((int) inProgress);
-        c.setTotalAttested((int) attested);
-        c.setTotalAttestedWithExcs((int) withExcs);
-        c.setTotalOverdue((int) overdue);
-        c.setTotalNa((int) na);
-        campaignRepo.save(c);
-    }
 
     // ─── Guards ─────────────────────────────────────────────────────
 
