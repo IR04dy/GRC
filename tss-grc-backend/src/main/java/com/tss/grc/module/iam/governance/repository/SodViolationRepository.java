@@ -117,11 +117,29 @@ public interface SodViolationRepository extends JpaRepository<SodViolation, Long
         """, nativeQuery = true)
     List<Object[]> roleGrantPairs(@Param("roleId") Long roleId);
 
-    /** Does the user hold the named role? (GRC_ADMINISTRATOR override / closure checks.) */
+    /**
+     * Does the user hold the named role as an ACTIVE grant to a LIVE (not soft-deleted) role?
+     * (GRC_ADMINISTRATOR / PLATFORM_ADMIN override + exception-closure checks via
+     * {@code SodService#isGovernanceAdmin}.)
+     *
+     * <p>F2-384 — the {@code AND r.is_deleted = 0} aligns this authz gate with the platform's authz
+     * SOURCE OF TRUTH: {@code RoleRepository#findRoleNamesByUserId}, the native query
+     * {@code CustomUserDetailsService} uses to build a user's JWT authorities, filters retired roles,
+     * so a soft-deleted role confers no authority anywhere. Without the filter this gate treated a
+     * retired admin role's surviving grant as still conferring governance-admin power — the drifted
+     * lone outlier among the role readers ({@code privilegedRoleIds} / {@code countActiveHoldersByRole}
+     * filter too). Latent today (GRC_ADMINISTRATOR / PLATFORM_ADMIN are system roles that
+     * {@code AccessGovernanceService#deleteRole} refuses to retire, so no such row is reachable via the
+     * API), and the alignment is provably non-breaking: the filter can only exclude a role the JWT
+     * authz path already excludes, so no live governance admin loses status. The detective-scan queries
+     * above deliberately keep their unfiltered {@code iam.roles} joins — whether a dangling grant to a
+     * retired role is a live SoD signal ("the live grant landscape") is a governance-policy call, filed
+     * for the IAM owner rather than changed here.
+     */
     @Query(value = """
         SELECT COUNT(1) FROM iam.user_roles ur
         JOIN iam.roles r ON r.id = ur.role_id
-        WHERE ur.user_id = :userId AND r.role_name = :roleName
+        WHERE ur.user_id = :userId AND r.role_name = :roleName AND r.is_deleted = 0
         """, nativeQuery = true)
     int countUserRole(@Param("userId") Long userId, @Param("roleName") String roleName);
 
