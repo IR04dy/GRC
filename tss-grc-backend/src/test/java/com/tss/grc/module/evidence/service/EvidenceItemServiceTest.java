@@ -232,6 +232,68 @@ class EvidenceItemServiceTest {
         assertThat(existing.getStatus()).isEqualTo("APPROVED");
     }
 
+    // ─── F2-378: replacing an APPROVED item's file forces re-review ────
+
+    private static EvidenceStorageService.StoredFile stored() {
+        return new EvidenceStorageService.StoredFile(
+            "q2-pentest.pdf", "evd/1/q2-pentest.pdf", 2048L,
+            "application/pdf", "0123456789abcdef0123456789abcdef");
+    }
+
+    @Test
+    void attachFile_to_APPROVED_item_resets_to_PENDING_REVIEW() {
+        // SEC-EVD-002 / F2-378: a reviewer signed off a specific evidenceHash. Replacing
+        // the bytes of an APPROVED item must send it back for re-review — leaving
+        // un-reviewed content in an APPROVED state is a four-eyes bypass on the assurance
+        // core (approve() re-applies the creator≠approver SoD gate on the new content).
+        EvidenceItem e = item("APPROVED");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(storage.store(eq(ORG_ID), any())).thenReturn(stored());
+
+        EvidenceItemResponse resp = service.attachFile(ID, null);
+
+        assertThat(resp.status()).isEqualTo("PENDING_REVIEW");
+        assertThat(e.getStatus()).isEqualTo("PENDING_REVIEW");
+    }
+
+    @Test
+    void attachFile_to_APPROVED_item_emits_re_review_trigger() {
+        // The reset must re-enter the reviewer queue: EVIDENCE_SUBMITTED fires with the
+        // real previous status so downstream re-review workflows pick the item up again.
+        EvidenceItem e = item("APPROVED");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(storage.store(eq(ORG_ID), any())).thenReturn(stored());
+
+        service.attachFile(ID, null);
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher, org.mockito.Mockito.atLeastOnce()).publishEvent(ev.capture());
+        DomainEvent submitted = ev.getAllValues().stream()
+            .filter(x -> "EVIDENCE_SUBMITTED".equals(x.triggerEvent()))
+            .findFirst().orElseThrow();
+        assertThat(submitted.payload()).containsEntry("previousStatus", "APPROVED");
+        assertThat(submitted.payload()).containsEntry("status", "PENDING_REVIEW");
+    }
+
+    @Test
+    void attachFile_to_DRAFT_item_leaves_status_DRAFT() {
+        // Working states (DRAFT/NEEDS_REVISION/REJECTED) and an in-flight PENDING_REVIEW
+        // are content-editable — only a reviewed (APPROVED) item resets. No spurious
+        // EVIDENCE_SUBMITTED fires here.
+        EvidenceItem e = item("DRAFT");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(storage.store(eq(ORG_ID), any())).thenReturn(stored());
+
+        assertThat(service.attachFile(ID, null).status()).isEqualTo("DRAFT");
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        assertThat(ev.getValue().triggerEvent()).isEqualTo("EVIDENCE_FILE_ATTACHED");
+    }
+
     @Test
     void delete_soft_deletes_via_save() {
         EvidenceItem e = item("APPROVED");
