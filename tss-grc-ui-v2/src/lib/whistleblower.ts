@@ -107,7 +107,8 @@ export interface CaseSubmissionResponse {
 export interface CaseResponse {
   id: number;
   caseCode: string;
-  submissionToken: string;
+  // F2-383: no submissionToken — the server no longer serves the reporter's credential to staff.
+  // It remains on CaseSubmissionResponse (shown once to the submitter on the public portal).
   submissionChannel: Channel;
   reporterType: ReporterType;
   reporterName?: string;

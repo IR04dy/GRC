@@ -110,10 +110,12 @@ public final class ComplaintDtos {
 
     // ─── Responses — internal (full record) ─────────────────────────
 
+    // F2-383: submissionToken is deliberately NOT here — it is the anonymous submitter's tracking
+    // credential and this DTO is returned to CONSUMER:READ staff. It stays on SubmitComplaintResponse
+    // (returned once to the submitter) and off every staff shape; PublicTrackingResponse omits it too.
     public record ComplaintResponse(
             Long id,
             String complaintNo,
-            UUID submissionToken,
             String channel,
             String category,
             String subcategory,
@@ -150,7 +152,6 @@ public final class ComplaintDtos {
             return new ComplaintResponse(
                     c.getId(),
                     c.getComplaintNo(),
-                    c.getSubmissionToken(),
                     c.getChannel(),
                     c.getCategory(),
                     c.getSubcategory(),

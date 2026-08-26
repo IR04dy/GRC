@@ -277,7 +277,7 @@ public class VendorBcpAttestationService {
             a.getCampaignId(), a.getVendorId(),
             v != null ? v.getVendorName() : null,
             v != null ? v.getVendorNameAr() : null,
-            a.getSubmissionToken(),
+            // F2-383: submissionToken no longer on AttestationResponse (vendor credential; staff-readable).
             a.getInvitedAt(), a.getFirstReminderAt(), a.getSecondReminderAt(),
             a.getEscalatedAt(), a.getOverdueAt(),
             a.getSubmittedAt(), a.getSubmittedByContactEmail(), a.getSubmittedByContactName(),

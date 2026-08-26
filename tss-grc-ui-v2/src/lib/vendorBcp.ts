@@ -85,7 +85,8 @@ export interface VendorBcpAttestation {
   vendorId: number;
   vendorName?: string;
   vendorNameAr?: string;
-  submissionToken: string;
+  // F2-383: no submissionToken — the server no longer serves the vendor's portal credential in this
+  // staff-readable response; the vendor receives it out-of-band in its invitation URL.
   invitedAt?: string;
   firstReminderAt?: string;
   secondReminderAt?: string;

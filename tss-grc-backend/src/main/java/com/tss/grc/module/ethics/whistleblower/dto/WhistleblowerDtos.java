@@ -103,10 +103,14 @@ public final class WhistleblowerDtos {
 
     // ─── Full responses ─────────────────────────────────────────────
 
+    // F2-383: submissionToken is deliberately NOT here. It is the anonymous reporter's ONLY
+    // credential — it authenticates the permitAll POST /public/reply/{token} — so serving it to
+    // staff (this DTO is returned to ETHICS:READ_CASES / TRIAGE holders) let any case reader post
+    // replies AS the reporter and track them, defeating the hotline's anonymity guarantee. It stays
+    // on CaseSubmissionResponse (returned ONCE to the submitter, by design) and off every staff shape.
     public record CaseResponse(
             Long id,
             String caseCode,
-            UUID submissionToken,
             String submissionChannel,
             String reporterType,
             String reporterName,
@@ -141,7 +145,7 @@ public final class WhistleblowerDtos {
     ) {
         public static CaseResponse from(WhistleblowerCase c) {
             return new CaseResponse(
-                    c.getId(), c.getCaseCode(), c.getSubmissionToken(),
+                    c.getId(), c.getCaseCode(),
                     c.getSubmissionChannel(), c.getReporterType(),
                     c.getReporterName(), c.getReporterEmail(),
                     c.getReporterPhone(), c.getReporterEmployeeId(),
