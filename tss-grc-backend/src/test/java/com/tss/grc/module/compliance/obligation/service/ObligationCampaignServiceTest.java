@@ -74,8 +74,11 @@ class ObligationCampaignServiceTest {
 
     @BeforeEach void setUp() {
         TenantContext.setCurrentTenant(ORG_ID);
+        // F2-385 — a REAL rollups over the mocked repos, so closeCampaign's recompute assertions
+        // still exercise the real recount (F2-237: a mock here would make the count legs vacuous).
+        ObligationCampaignRollups rollups = new ObligationCampaignRollups(attestationRepo, campaignRepo);
         service = new ObligationCampaignService(campaignRepo, attestationRepo, attestationService,
-            obligationRepo, audit, publisher);
+            obligationRepo, audit, publisher, rollups);
     }
 
     @AfterEach void tearDown() { TenantContext.clear(); }

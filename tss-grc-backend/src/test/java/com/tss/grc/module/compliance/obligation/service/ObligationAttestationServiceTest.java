@@ -61,6 +61,7 @@ class ObligationAttestationServiceTest {
     @Mock private ObligationService obligationService;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private ObligationCampaignRollups rollups;
 
     private ObligationAttestationService service;
 
@@ -68,7 +69,7 @@ class ObligationAttestationServiceTest {
         // F2-224 — the service resolves the actor from CurrentActor now.
         authAs("compliance.officer", 31L);
         TenantContext.setCurrentTenant(ORG_ID);
-        service = new ObligationAttestationService(repo, obligationRepo, obligationService, audit, publisher);
+        service = new ObligationAttestationService(repo, obligationRepo, obligationService, audit, publisher, rollups);
     }
 
     @AfterEach void tearDown() { TenantContext.clear(); }
@@ -130,6 +131,34 @@ class ObligationAttestationServiceTest {
         assertThat(out.attestedAt()).isNotNull();
         // F2-224 — the roll-forward reads the attester off the SAVED ROW, not the request.
         verify(obligationService).rollForwardAfterAttestation(eq(1001L), eq(31L), any());
+    }
+
+    // ─── F2-385 — campaign rollups recompute on every child status change ─────
+
+    @Test void recordAttestation_recomputesCampaignRollups() {
+        when(obligationRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 1001L))
+            .thenReturn(Optional.of(oblig()));
+        when(repo.findByOrganisationIdAndCampaignIdAndIsDeletedFalseOrderByDueDateAsc(ORG_ID, 201L))
+            .thenReturn(List.of(existing("DUE")));
+        when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recordAttestation(recordReq("ATTESTED", null, null));
+
+        // Without this the campaign's stored counts froze at their post-open values, so stats()
+        // reported 0% completion until the campaign was closed. The recompute runs for the campaign
+        // the attestation belongs to (201), in the same transaction as the child save.
+        verify(rollups).recompute(ORG_ID, 201L);
+    }
+
+    @Test void reviewAttestation_recomputesCampaignRollups() {
+        when(repo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
+            .thenReturn(Optional.of(existing("ATTESTED")));
+        when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // REQUEST_CHANGES moves the row back to IN_PROGRESS, changing the campaign's counts.
+        service.reviewAttestation(501L, new AttestationReviewRequest("REQUEST_CHANGES", "redo", "أعد"));
+
+        verify(rollups).recompute(ORG_ID, 201L);
     }
 
     @Test void recordAttestation_withExceptions_preservesExceptionText() {
