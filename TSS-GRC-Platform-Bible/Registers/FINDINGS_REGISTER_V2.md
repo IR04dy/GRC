@@ -15219,6 +15219,27 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-379 — four evidence statuses rendered a raw English token + grey badge on an Arabic-primary UI
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-26 |
+| **Severity** | P3 — a house-rule-7 (Arabic-primary) rendering defect on the compliance assurance core, in a status-label/tone map. `EvidencePage` renders both the evidence-items table and the evidence-requests table via the shared `statusLabel` / `STATUS_TONE` (`lib/labels.ts`). The two declared machines produce `PENDING_REVIEW` / `REJECTED` / `NEEDS_REVISION` (`EvidenceItemService.ITEM_STATUSES`) and `SUBMITTED` / `REJECTED` (the request machine's allowed set) — **none of the four was in `STATUS_KEY`**, so `statusLabel` fell back to the raw token and `STATUS_TONE[status] ?? 'neutral'` fell back to grey. An evidence item in the review queue (PENDING_REVIEW), a rejected item/request, a revision-requested item and a submitted request each printed a raw English token + a grey badge, beside correctly-localised neighbours — which is what makes it read as a data/logic defect rather than a missing translation. `REJECTED` was absent from the shared map entirely. |
+| **Registers** | none — `lib/labels.ts` (four `STATUS_KEY` + four `STATUS_TONE` entries), `translations/en.ts` + `translations/ar.ts` (four bilingual keys each), and a pin leg in `breachStatusToneCompleteness.test.ts`. No backend change, no schema, no migration. |
+| **Standards** | [[F2-357]] / [[F2-359]] (the exact precedent — "fixed the label, left the lookup", and the in-neither-map blind spot: a status absent from `STATUS_KEY` is outside the completeness gate's population, so the gate cannot catch it; F2-359 fixed incident RESOLVED, this fixes the evidence register); [[F2-211]] (the shared-map raw-token fallback on a bilingual UI); [[F2-340]] (`translationKeysDeclared` — the four new keys are declared in both dictionaries, en/ar sets stay identical); house rule 7 (Arabic primary); [[F2-320]] / [[F2-325]] (hermetic — vitest + tsc, no backend); [[F2-188]] (the systematic cross-codebase gate to catch the whole blind-spot class is filed, not forced — it is a substantial instrument). |
+| **Found by** | Cross-referencing the 14 frontend pages that import the shared `statusLabel` / `STATUS_TONE` against the backend registers' declared status machines. `EvidencePage` uses the shared map for both its item and request tables; `EvidenceItemService.ITEM_STATUSES` (read this window for F2-378) and `EvidenceRequestService`'s allowed set are declared, transition-enforcing Sets, so their vocabularies are authoritative (measured from the machines, not guessed — [[F2-359]]'s rule, applicable here because both machines enforce transitions, unlike the CHECK-less breach column). Four of the produced statuses were in neither shared map. Reached after clean reads of the automation/evidence/signature/attachment cores and the openbanking / KbArticle services this window ([[F2-216]]). |
+| **Verification** | hermetic (vitest + `tsc --noEmit`, no backend — [[F2-320]] / [[F2-325]]). `breachStatusToneCompleteness.test.ts` (+1 leg): the four evidence statuses carry their label key and non-neutral tone (`PENDING_REVIEW`→info, `REJECTED`→danger, `NEEDS_REVISION`→warning, `SUBMITTED`→info); the F2-357 completeness leg (`STATUS_KEY ⊆ STATUS_TONE`) stays green; `translationKeysDeclared` green (en/ar identical, keys used). `npx tsc --noEmit` clean; full frontend suite 841 passed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert only `lib/labels.ts` to pre-fix (keeping the pin) → the F2-379 pin leg RED (the four statuses undefined in both maps), the completeness + F2-357/359 pins green. |
+
+### Fix
+
+Added `PENDING_REVIEW`, `REJECTED`, `NEEDS_REVISION`, `SUBMITTED` to `STATUS_KEY` (label keys `statusPendingReview` / `statusRejected` / `statusNeedsRevision` / `statusSubmitted`) and `STATUS_TONE` (info / danger / warning / info, following the platform convention — info = in the review pipeline, warning = awaiting author action, danger = bad outcome), plus the four bilingual keys in `en.ts` + `ar.ts`. Pinned in the completeness gate so a revert to grey/raw fails there.
+
+The reusable rule: **a page rendering a register's status via the SHARED `statusLabel`/`STATUS_TONE` inherits that map's coverage gaps — cross-reference every such page against its backend register's declared status machine, because a status in neither shared map renders raw + grey and the `STATUS_KEY ⊆ STATUS_TONE` completeness gate cannot see it (F2-359's blind spot).**
+
+### Filed (F2-188)
+
+The durable fix for this recurring blind spot is a **cross-codebase gate** (a backend test reading `lib/labels.ts` and every register machine that a shared-map page renders, asserting each produced status is covered) — but it must first enumerate which of the 14 pages use the shared map for which register, and read each register's machine, so it is a substantial instrument (its own slice, [[F2-266]]). The per-register fix here matches the F2-357/359 cadence.
+
 ## F2-378 — replacing an APPROVED evidence item's file left un-reviewed content APPROVED (four-eyes bypass)
 
 | | |
