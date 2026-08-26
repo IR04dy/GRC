@@ -66,7 +66,7 @@ class ComplaintControllerTest {
 
     private static ComplaintResponse stub(Long id, String status) {
         return new ComplaintResponse(
-                id, "CMP-2026-000001", UUID.randomUUID(),
+                id, "CMP-2026-000001",   // F2-383: no submissionToken on the staff DTO
                 "WEB", "FRAUD_UNAUTHORIZED_TXN", null, "HIGH", status,
                 "Khalid Al-Mutairi", "خالد المطيري",
                 "NATIONAL_ID", "4823",

@@ -108,7 +108,10 @@ public final class VendorBcpAttestationDtos {
         Long vendorId,
         String vendorName,
         String vendorNameAr,
-        UUID submissionToken,
+        // F2-383: submissionToken removed — it is the vendor's portal credential (authenticates the
+        // permitAll POST /by-token/{token}/submit), and this DTO is also returned to broad TPRM:READ
+        // staff, so a reader could harvest tokens and submit/forge a vendor's BCP attestation. The
+        // vendor receives the token out-of-band in its invitation URL, not echoed in this response.
         LocalDateTime invitedAt,
         LocalDateTime firstReminderAt,
         LocalDateTime secondReminderAt,

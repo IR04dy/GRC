@@ -60,7 +60,7 @@ class WhistleblowerCaseControllerTest {
 
     private static CaseResponse stubCase(Long id, String status) {
         return new CaseResponse(
-                id, "WB-2026-001", UUID.randomUUID(),
+                id, "WB-2026-001",   // F2-383: no submissionToken on the staff DTO
                 "PUBLIC_PORTAL", "ANONYMOUS",
                 null, null, null, null, true,
                 "FRAUD", "HIGH",

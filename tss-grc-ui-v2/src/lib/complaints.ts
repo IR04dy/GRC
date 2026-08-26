@@ -128,7 +128,8 @@ export interface SubmitComplaintResponse {
 export interface ComplaintResponse {
   id: number;
   complaintNo: string;
-  submissionToken: string;
+  // F2-383: no submissionToken — the server no longer serves the submitter's tracking credential
+  // to staff. It remains on SubmitComplaintResponse (shown once to the submitter on the portal).
   channel: Channel;
   category: Category;
   subcategory?: string;
