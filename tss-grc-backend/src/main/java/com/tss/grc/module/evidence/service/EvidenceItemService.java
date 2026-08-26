@@ -280,6 +280,7 @@ public class EvidenceItemService {
         EvidenceItem item = itemRepository.findById(id)
                 .filter(e -> e.getOrganisationId().equals(orgId))
                 .orElseThrow(() -> new EntityNotFoundException("Evidence not found: " + id));
+        String previousStatus = item.getStatus();
         EvidenceStorageService.StoredFile stored = storage.store(orgId, file);
         item.setFileName(stored.originalName());
         item.setFilePath(stored.relativePath());
@@ -287,11 +288,27 @@ public class EvidenceItemService {
         item.setMimeType(stored.mimeType());
         item.setEvidenceHash(stored.sha256());
         item.setCollectedAt(LocalDateTime.now());
+        // SEC-EVD-002 / F2-378: replacing the bytes of an APPROVED item means the
+        // four-eyes-reviewed content is no longer what is attached — a reviewer signed
+        // off a specific evidenceHash and this call has just changed it. Send the item
+        // back for re-review rather than leaving un-reviewed content in an APPROVED state
+        // (a four-eyes bypass on the assurance core: every framework control resolves to
+        // one or more approved evidence items). APPROVED → PENDING_REVIEW is a declared
+        // ITEM_TRANSITIONS edge, and approve() re-applies the creator≠approver SoD gate on
+        // the replaced content. Working states (DRAFT/NEEDS_REVISION/REJECTED) and an
+        // in-flight PENDING_REVIEW are content-editable, so they keep their status.
+        boolean resetForReview = "APPROVED".equals(previousStatus);
+        if (resetForReview) item.setStatus("PENDING_REVIEW");
         item = itemRepository.save(item);
         audit.log("UPLOAD", "EvidenceItem", item.getId(),
             "File attached: " + nullSafe(stored.originalName())
                 + " (" + stored.size() + " bytes, sha256 " + stored.sha256().substring(0, 12) + "…)");
-        emit("EVIDENCE_FILE_ATTACHED", item, item.getStatus());
+        emit("EVIDENCE_FILE_ATTACHED", item, previousStatus);
+        if (resetForReview) {
+            audit.log("TRANSITION", "EvidenceItem", item.getId(),
+                "Status APPROVED → PENDING_REVIEW: evidence file replaced, re-review required (SEC-EVD-002)");
+            emit("EVIDENCE_SUBMITTED", item, previousStatus);
+        }
         return toResponse(item);
     }
 
