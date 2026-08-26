@@ -61,18 +61,26 @@ public class SocOpsIngestService {
         boolean isNew = (ev.getId() == null);
 
         ev.setOrganisationId(org);
+        // F2-381: the DESCRIPTIVE external fields below land in bounded SecurityEvent columns, so
+        // each is capped to its column width — an oversized value from a machine SIEM feed would
+        // 8152 and, because this method is @Transactional, roll back the whole ingestion (the event
+        // neither recorded nor escalated). Mirrors CrowdStrikeInboundService, which truncates the
+        // identical columns. externalId/sourceSystem are the upstream system's own identity AND the
+        // dedup key — left RAW rather than silently mangled into a colliding key (a malformed >64
+        // id is a far-fetched edge, and ClientSuppliedReferenceRatchetTest recognises these two as
+        // upstream-owned references the platform must not rewrite). The full alert is on raw_payload.
         ev.setExternalId(req.externalId());
         ev.setSourceSystem(req.sourceSystem());
         ev.setEventTime(req.eventTime());
         ev.setIngestedAt(LocalDateTime.now());
-        ev.setSeverity(req.severity());
-        ev.setCategory(req.category());
-        ev.setRuleName(req.ruleName());
-        ev.setSourceHost(req.sourceHost());
-        ev.setSourceIp(req.sourceIp());
-        ev.setDestinationHost(req.destinationHost());
-        ev.setDestinationIp(req.destinationIp());
-        ev.setUsername(req.username());
+        ev.setSeverity(req.severity());   // vocabulary — left raw; feeds computeSlaDue + the CRITICAL fast-lane
+        ev.setCategory(truncate(req.category(), 60));
+        ev.setRuleName(truncate(req.ruleName(), 300));
+        ev.setSourceHost(truncate(req.sourceHost(), 255));
+        ev.setSourceIp(truncate(req.sourceIp(), 45));
+        ev.setDestinationHost(truncate(req.destinationHost(), 255));
+        ev.setDestinationIp(truncate(req.destinationIp(), 45));
+        ev.setUsername(truncate(req.username(), 255));
         ev.setAssetId(req.assetId());
         ev.setRawPayload(req.rawPayload());
 
@@ -127,9 +135,9 @@ public class SocOpsIngestService {
         Long org = TenantContext.getCurrentTenant();
         ScannerRun run = new ScannerRun();
         run.setOrganisationId(org);
-        run.setScanner(req.scanner());
-        run.setScanName(req.scanName());
-        run.setScope(req.scope());
+        run.setScanner(truncate(req.scanner(), 40));    // F2-381: cap to scanner column (40)
+        run.setScanName(truncate(req.scanName(), 300)); // cap to scan_name column (300)
+        run.setScope(req.scope());                       // NVARCHAR(MAX) — no cap
         run.setStartedAt(req.startedAt());
         run.setCompletedAt(req.completedAt());
         run.setStatus(req.status() == null ? "COMPLETED" : req.status());
@@ -169,4 +177,14 @@ public class SocOpsIngestService {
     }
 
     private static int nz(Integer v) { return v == null ? 0 : v; }
+
+    /** Cap an external string to its bounded SecurityEvent/ScannerRun column width (F2-381).
+     *  Plain truncation, no ellipsis — a truncated id/host/IP must stay a valid literal; the same
+     *  helper CrowdStrikeInboundService uses for the identical columns, kept as a private copy per
+     *  ADR-012/018 (no cross-module import of a peer's internals). The full value survives on
+     *  raw_payload, so nothing recoverable is lost. */
+    private static String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
+    }
 }
