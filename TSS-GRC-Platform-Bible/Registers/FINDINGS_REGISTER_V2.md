@@ -15219,6 +15219,27 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-380 — a long SIEM alert title crashed auto-escalation and rolled back the whole ingestion
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-26 |
+| **Severity** | P2 — a severity≥3 SIEM/SOAR alert (exactly the escalation-worthy band) with a title of 479–500 characters was silently lost on ingestion. `BcmAuditCompletionService.ingestSiemEvent` composes a `CrisisEvent` title as `"SIEM auto-escalation: " + row.getTitle()`. Both `SiemInboundEvent.title` and `CrisisEvent.title_en` are `@Column(nullable = false, length = 500)`, so a 479–500 char SIEM title (which stores fine in the SIEM row) plus the 22-char prefix reached up to **522 chars** and overflowed `crisis_events.title_en` → SQL Server 8152 → opaque 500 (SEC-CFG-001 strips the class in prod). `ingestSiemEvent` is `@Transactional`, so the overflow on the crisis insert **rolled back the whole ingestion**: the alert was neither recorded (`siem_inbound_events`) nor escalated. |
+| **Registers** | none — one service (`.../bcm/cycle/service/BcmAuditCompletionService.java`: cap the composed title + a private `cap` helper + `CRISIS_TITLE_MAX`) + a new `BcmAuditCompletionServiceTest` (3 legs). No schema, no migration. |
+| **Standards** | [[F2-338]] (the exact shape — a server-composed string into a narrower column; capped to the column length via the same private `cap` helper `CrisisAarService` uses one file over); [[F2-185b]] (a length budget must account for everything the code prepends, here the 22-char prefix, not just the caller's field); [[F2-283]] (latent in data, live in code — reachable with a 479–500 char sev≥3 SIEM title through ordinary ingestion; not re-measured against a backend, none up); [[F2-320]] / [[F2-325]] (hermetic — a mocked repo has no column, so a unit test cannot reproduce the 8152; assert the cap the service applies before save). |
+| **Found by** | Sweeping `set(Title\|Name\|Code\|...)` setters fed by string concatenation into a bounded column ([[F2-338]]/[[F2-346]]/[[F2-347]]'s family) — most were already `cap()`-protected or built from bounded values (Long ids, 4-digit years, short codes). `BcmAuditCompletionService:148` composed a crisis title from the SIEM alert's own title (variable-length) with no cap; reading the two `@Column(length)` values (both 500) and the 22-char prefix confirmed the composition can reach 522. Reached after clean sweeps of `Enum.valueOf`, `Comparator.comparing` nullable-NPE, `@Async` ThreadLocal reads, and `getTotalElements` ratio mismatch this window ([[F2-216]]). |
+| **Verification** | hermetic (Mockito, no DB — [[F2-320]] / [[F2-325]]). `BcmAuditCompletionServiceTest` (3): ingest a sev=4 alert with a 500-char title → the captured `CrisisEvent`'s `titleEn` ≤ 500 (`CRISIS_TITLE_MAX`); a short title composes untruncated (`"SIEM auto-escalation: Ransomware on core banking"`); `CRISIS_TITLE_MAX` equals `CrisisEvent.title_en`'s `@Column(length)` by reflection (cap and column cannot drift). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): un-cap the composed title (keeping `cap`/`CRISIS_TITLE_MAX` so the class compiles) → only the long-title leg RED (522 > 500), the short-title and mirror legs green. Full backend build 4867 tests, 0/0. |
+
+### Fix
+
+The composed crisis title is capped to `CrisisEvent.title_en`'s column length via a private `cap(s, max)` (the same truncate-with-ellipsis helper `CrisisAarService` uses for the AAR title — F2-338). `CRISIS_TITLE_MAX` mirrors the `@Column(length)` and a test asserts the equality by reflection. The full alert title is preserved on `siem_inbound_events.title`, so truncation loses nothing recoverable. No schema, no migration.
+
+The reusable rule: **when a server composes a string into a bounded column, the length budget must account for the prefix AND the source field's own column width — a source that is itself `@Column(length = 500)` can fill a 500-wide target on its own, so any prefix overflows it.**
+
+### Filed (F2-188)
+
+`BcmAuditCompletionController.ingestSiem` binds `@RequestBody` **without `@Valid`**, so a `@Size(max = 500)` on `SiemInboundPayload.title` would be inert ([[F2-184]]) — adding `@Valid` to enable it (turning a >500-char title's opaque 8152 at the SIEM-row save into a clean 400 naming the field) is a separate boundary-hardening concern with its own reachability question; filed rather than folded into this composed-overflow fix.
+
 ## F2-379 — four evidence statuses rendered a raw English token + grey badge on an Arabic-primary UI
 
 | | |
