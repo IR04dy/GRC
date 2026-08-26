@@ -301,7 +301,10 @@ public class NdiImprovementPlanService {
                 byS.merge("UNKNOWN", 1, Integer::sum);
             }
         }
-        int avg = total == 0 ? 0 : sumProgress / total;
+        // Mean CAPA progress_pct — round half-up, matching NdiGapService#aggregate's
+        // (int) Math.round((double) progSum / n). Plain int/int truncated toward zero
+        // (F2-382), biasing this governance completion figure down by up to ~1pp.
+        int avg = total == 0 ? 0 : (int) Math.round((double) sumProgress / total);
         return new PlanRollup(planId, total, completed, avg, byQ, byP, byS);
     }
 
@@ -322,7 +325,8 @@ public class NdiImprovementPlanService {
         }
         p.setTotalItems(total);
         p.setCompletedItems(completed);
-        p.setProgressPct(total == 0 ? 0 : sum / total);
+        // Round half-up (F2-382) — see rollup() above; NdiGapService#aggregate is the sibling.
+        p.setProgressPct(total == 0 ? 0 : (int) Math.round((double) sum / total));
         // Auto-complete when all CAPAs done and plan is in flight.
         if (total > 0 && completed == total && "IN_FLIGHT".equals(p.getStatus())) {
             p.setStatus("COMPLETED");
