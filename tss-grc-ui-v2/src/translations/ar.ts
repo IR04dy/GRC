@@ -3961,6 +3961,11 @@ export const ar = {
   statusEradicated: 'منزَّلة',
   statusRecovered: 'متعافية',
   statusResolved: 'محلولة',
+  // F2-379 — تسميات حالات نظام الأدلة (عناصر وطلبات). كانت تُعرض بقيمها الخام بالإنجليزية.
+  statusPendingReview: 'بانتظار المراجعة',
+  statusRejected: 'مرفوضة',
+  statusNeedsRevision: 'بحاجة إلى تعديل',
+  statusSubmitted: 'مُقدَّمة',
 
   severityCritical: 'حرجة',
   severityHigh: 'عالية',

@@ -49,6 +49,24 @@ describe('F2-357 — STATUS_TONE is complete for every labellable status', () =>
     expect(STATUS_TONE.RESOLVED).toBe('success');
   });
 
+  it('F2-379 — the evidence item/request statuses carry their label key and non-neutral tone', () => {
+    // EvidencePage renders both the evidence-items table and the evidence-requests table with the
+    // shared statusLabel / STATUS_TONE. The two declared machines produce PENDING_REVIEW / REJECTED
+    // / NEEDS_REVISION (EvidenceItemService.ITEM_STATUSES) and SUBMITTED / REJECTED (the request
+    // machine). None was in STATUS_KEY, so a review-queue item, a rejected item/request, a
+    // revision-requested item and a submitted request all rendered a RAW English token + grey badge
+    // on an Arabic-primary UI — the same in-neither-map blind spot as F2-359 (RESOLVED). A revert
+    // to that state must fail here.
+    expect(STATUS_KEY.PENDING_REVIEW).toBe('statusPendingReview');
+    expect(STATUS_KEY.REJECTED).toBe('statusRejected');
+    expect(STATUS_KEY.NEEDS_REVISION).toBe('statusNeedsRevision');
+    expect(STATUS_KEY.SUBMITTED).toBe('statusSubmitted');
+    expect(STATUS_TONE.PENDING_REVIEW).toBe('info');
+    expect(STATUS_TONE.REJECTED).toBe('danger');
+    expect(STATUS_TONE.NEEDS_REVISION).toBe('warning');
+    expect(STATUS_TONE.SUBMITTED).toBe('info');
+  });
+
   it('the maps are non-trivial (anti-vacuity — a broken import cannot pass this file)', () => {
     // If the import rots to {} both legs above pass vacuously; this floor is the guard.
     expect(Object.keys(STATUS_KEY).length).toBeGreaterThanOrEqual(15);

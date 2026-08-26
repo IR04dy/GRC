@@ -56,6 +56,18 @@ export const STATUS_KEY: Record<string, string> = {
   NOTIFIED: 'statusNotified', INVESTIGATING: 'statusInvestigating',
   INVESTIGATED: 'statusInvestigated', ESCALATED: 'statusEscalated',
   REMEDIATED: 'statusRemediated',
+  // F2-379 — the evidence subsystem's item + request statuses this map did not carry.
+  // EvidencePage renders both the item table and the request table with the shared
+  // `statusLabel`/`STATUS_TONE`, and the two declared machines produce PENDING_REVIEW /
+  // REJECTED / NEEDS_REVISION (EvidenceItemService.ITEM_STATUSES) and SUBMITTED / REJECTED
+  // (EvidenceRequestService's allowed set). None was in STATUS_KEY, so an item in the review
+  // queue, a rejected item/request, a revision-requested item and a submitted request all
+  // printed their RAW English token + a grey badge on an Arabic-primary UI — on the compliance
+  // assurance core (every framework control resolves to approved evidence). Same blind spot the
+  // F2-359 leg below names: absent from STATUS_KEY, they sat outside the F2-357 completeness gate.
+  // Measured from the declared machines (both enforce transitions), not guessed.
+  PENDING_REVIEW: 'statusPendingReview', REJECTED: 'statusRejected',
+  NEEDS_REVISION: 'statusNeedsRevision', SUBMITTED: 'statusSubmitted',
 };
 
 const SEVERITY_KEY: Record<string, string> = {
@@ -99,6 +111,14 @@ export const STATUS_TONE: Record<string, BadgeTone> = {
   INVESTIGATED: 'info',
   ESCALATED: 'danger',
   REMEDIATED: 'success',
+  // F2-379 — evidence item/request statuses (see STATUS_KEY above). Tones follow the same
+  // convention: info = in the review pipeline, warning = awaiting author action, danger = bad
+  // outcome. Without these an evidence item in PENDING_REVIEW / REJECTED / NEEDS_REVISION or a
+  // request in SUBMITTED / REJECTED rendered a grey neutral badge via the '?? neutral' fallback.
+  PENDING_REVIEW: 'info',
+  REJECTED: 'danger',
+  NEEDS_REVISION: 'warning',
+  SUBMITTED: 'info',
 };
 
 /** Map a severity value to a Badge tone on the 6-step --risk-* ramp, so HIGH,

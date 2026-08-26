@@ -4002,6 +4002,13 @@ export const en = {
   statusEradicated: 'Eradicated',
   statusRecovered: 'Recovered',
   statusResolved: 'Resolved',
+  // F2-379 — evidence subsystem item/request statuses (EvidencePage renders both tables via the
+  // shared statusLabel; statusLabel falls back to the raw token, so these printed
+  // PENDING_REVIEW / REJECTED / NEEDS_REVISION / SUBMITTED in an Arabic-primary UI).
+  statusPendingReview: 'Pending Review',
+  statusRejected: 'Rejected',
+  statusNeedsRevision: 'Needs Revision',
+  statusSubmitted: 'Submitted',
 
   severityCritical: 'Critical',
   severityHigh: 'High',
