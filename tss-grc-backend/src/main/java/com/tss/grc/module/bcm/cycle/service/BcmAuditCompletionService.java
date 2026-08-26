@@ -145,7 +145,14 @@ public class BcmAuditCompletionService {
             CrisisEvent ce = new CrisisEvent();
             ce.setOrganisationId(o);
             ce.setEventCode("CRIS-SIEM-" + System.currentTimeMillis());
-            ce.setTitleEn("SIEM auto-escalation: " + row.getTitle());
+            // F2-380 — cap the composed title to CrisisEvent.title_en's column length. The SIEM
+            // alert's own title is @Column(length = 500) on SiemInboundEvent, so a 479-500 char
+            // title (stored fine there) composed with the 22-char "SIEM auto-escalation: " prefix
+            // reached up to 522 chars and overflowed crisis_events.title_en (500) → SQL 8152. As
+            // this method is @Transactional, that rolled back the WHOLE ingestion, so a severity≥3
+            // SIEM/SOAR alert was neither recorded nor escalated. F2-338's shape (a server-composed
+            // string into a narrower column); F2-185b: the budget must account for the prefix.
+            ce.setTitleEn(cap("SIEM auto-escalation: " + row.getTitle(), CRISIS_TITLE_MAX));
             ce.setDescription(row.getSummary());
             ce.setSeverity(sev);
             ce.setTriggerSource("CYBER");
@@ -180,6 +187,15 @@ public class BcmAuditCompletionService {
         audit.log("INGEST", "SiemInboundEvent", saved.getId(),
             row.getSourceSystem() + " sev=" + sev + " → " + saved.getProcessingStatus());
         return saved;
+    }
+
+    /** F2-380 — mirrors CrisisEvent.title_en's {@code @Column(length)}. A test asserts the equality
+     *  by reflection so the cap and the column cannot drift. */
+    static final int CRISIS_TITLE_MAX = 500;
+
+    private static String cap(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
 
     @Transactional(readOnly = true)
