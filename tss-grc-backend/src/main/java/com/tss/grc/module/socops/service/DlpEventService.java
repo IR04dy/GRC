@@ -49,6 +49,15 @@ public class DlpEventService {
                 // SEC-CYB-002 — force id=null so a forged id on the ingest body
                 // can't overwrite an existing (cross-tenant) row via merge.
                 in.setId(null);
+                // F2-386 — the review status is the analyst's act, written only by review().
+                // ingest binds the whole DlpEvent entity, so a caller (a DLP connector, or any
+                // DLP_INGEST/CISO holder) could POST {severity:CRITICAL, reviewed:true} and have
+                // the event born "reviewed", silencing the AR-136 DLP_CRITICAL_UNREVIEWED SOC
+                // escalation below. A freshly-ingested event has not been reviewed — scrub the
+                // review fields on create, the same server-owned-field discipline as the id scrub.
+                in.setReviewed(false);
+                in.setReviewOutcome(null);
+                in.setReviewNotes(null);
                 DlpEvent saved = repo.save(in);
                 audit.log("DLP_INGEST", "DlpEvent", saved.getId(),
                     saved.getSourceSystem() + " · " + saved.getActionTaken()
