@@ -515,7 +515,10 @@ public class IncidentService {
      * clean bill on a statutory clock, and under-scoping a statutory obligation
      * is the finding an examiner writes up (F2-196, F2-197).
      */
-    private java.util.Map<String, Object> template(String code, String titleEn, String titleAr,
+    // F2-390: package-private (was private) so IncidentServiceTest can drive the overdue
+    // boundary deterministically — regulatoryTemplates() computes hoursSinceDiscovery from
+    // LocalDateTime.now(), which a unit test cannot pin to an exact statutory deadline.
+    java.util.Map<String, Object> template(String code, String titleEn, String titleAr,
                                                     int deadlineHours, long hoursSinceDiscovery,
                                                     java.time.LocalDateTime notifiedAt,
                                                     String submissionChannel, String applicabilityHint,
@@ -528,7 +531,14 @@ public class IncidentService {
         m.put("deadlineHours", deadlineHours);
         m.put("hoursSinceDiscovery", hoursSinceDiscovery);
         m.put("hoursRemaining", deadlineHours - hoursSinceDiscovery);
-        m.put("overdue", (deadlineHours - hoursSinceDiscovery) < 0 && notifiedAt == null);
+        // F2-390: a statutory deadline is breached AT the deadline, not an hour after it.
+        // hoursSinceDiscovery is ChronoUnit.HOURS.between(...) floored to whole hours, so a
+        // strict `< 0` (overdue only when floor(hours) > deadlineHours) reads "not overdue"
+        // at the exact deadline AND for up to a full hour past it. Inclusive `<= 0` means
+        // floor(hours) >= deadlineHours, i.e. realHours >= deadlineHours (deadlineHours is a
+        // whole number), so overdue flips at the exact hour boundary — matching the sibling
+        // RegulatorCountdownService (minutesLeft <= 0 -> BREACHED) for the same regulator clock.
+        m.put("overdue", (deadlineHours - hoursSinceDiscovery) <= 0 && notifiedAt == null);
         m.put("notifiedAt", notifiedAt);
         m.put("submissionChannel", submissionChannel);
         m.put("applicabilityHint", applicabilityHint);
