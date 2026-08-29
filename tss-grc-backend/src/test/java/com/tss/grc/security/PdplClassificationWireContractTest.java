@@ -297,9 +297,15 @@ class PdplClassificationWireContractTest {
         assertThat(src)
                 .as("F2-281: every template carries the applicability answer")
                 .containsPattern("m\\.put\\(\"piiClassification\"");
+        // F2-390 corrected the operator to inclusive `<= 0` (a statutory deadline is
+        // breached AT the deadline, and the elapsed count is floor-truncated to whole
+        // hours). This leg's point is unchanged: overdue references only the
+        // deadline-derived quantity and the notified stamp — never piiClassification —
+        // so the classification is carried without gating the statutory clock.
         assertThat(src)
-                .as("F2-281: overdue stays a function of the deadline and the stamp only")
-                .contains("m.put(\"overdue\", (deadlineHours - hoursSinceDiscovery) < 0 "
+                .as("F2-281: overdue stays a function of the deadline and the stamp only "
+                    + "(operator corrected to <= by F2-390)")
+                .contains("m.put(\"overdue\", (deadlineHours - hoursSinceDiscovery) <= 0 "
                         + "&& notifiedAt == null);");
 
         // The five templates are added unconditionally: no `if` may stand between
