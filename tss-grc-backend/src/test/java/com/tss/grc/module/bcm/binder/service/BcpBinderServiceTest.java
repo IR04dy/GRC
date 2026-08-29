@@ -311,6 +311,26 @@ class BcpBinderServiceTest {
         assertThat(b.getLastDownloadedAt()).isNull();
     }
 
+    /** F2-389 — a file_path that escapes the storage root must be refused with a containment error
+     *  BEFORE any file I/O. `Paths.get(base, rel).normalize()` collapses `../` but the result can
+     *  still resolve outside the base, so the fix adds the `startsWith(base)` guard the two hardened
+     *  storage backends already have. Pre-fix (no guard) this reaches Files.isRegularFile on the
+     *  escaped path and throws the IllegalStateException "missing from storage", so this leg is RED. */
+    @Test void download_refusesAFilePathThatEscapesTheStorageRoot() {
+        BcpBinderExport b = new BcpBinderExport();
+        b.setId(90L); b.setOrganisationId(ORG_ID); b.setStatus("READY");
+        b.setExportCode("EXP-2026-0090");
+        // Enough `../` to climb out of any junit @TempDir depth; normalize() cannot keep it under base.
+        b.setFilePath("../../../../../../../../../../etc/passwd");
+        when(binders.findByOrganisationIdAndId(ORG_ID, 90L)).thenReturn(Optional.of(b));
+
+        assertThatThrownBy(() -> service.download(90L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("escapes the storage root");
+        // A refused (escaping) path must not be counted as a download.
+        assertThat(b.getLastDownloadedAt()).isNull();
+    }
+
     @Test void download_notReady_throwsIllegalState() {
         BcpBinderExport b = new BcpBinderExport();
         b.setId(11L); b.setOrganisationId(ORG_ID); b.setStatus("GENERATING");
