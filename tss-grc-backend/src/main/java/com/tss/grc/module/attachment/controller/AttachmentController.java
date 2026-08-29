@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -82,8 +84,16 @@ public class AttachmentController {
     @Operation(summary = "Download an attachment's binary")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
         AttachmentService.DownloadPayload p = service.download(id);
+        // F2-388 — p.fileName() is the uploader's original filename (stored verbatim, path-stripped
+        // but NOT quote/control-char stripped), so a hand-built `filename="<name>"` let a caller who
+        // uploads a file named `x"; filename="pwn.html` break out of the quoted parameter and spoof
+        // the download filename for whoever reads the attachment. Build the header through
+        // ContentDisposition (as CommitteeCatalogController already does): it escapes/encodes the
+        // name, and the UTF-8 charset form also makes non-ASCII (Arabic) filenames RFC 6266-conformant
+        // rather than raw bytes in an ISO-8859-1 header (house rule 7).
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + p.fileName() + "\"")
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                .filename(p.fileName(), StandardCharsets.UTF_8).build().toString())
             .contentType(MediaType.parseMediaType(p.mimeType()))
             .body(p.bytes());
     }
