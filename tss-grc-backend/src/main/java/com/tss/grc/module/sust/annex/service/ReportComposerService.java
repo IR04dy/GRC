@@ -409,8 +409,10 @@ public class ReportComposerService {
         return new AnnexContent(markdown, html, toJson(json));
     }
 
-    /** Minimal Markdown→HTML conversion — enough for headings, tables, lists, bold. */
-    private static String markdownToHtml(String md) {
+    /** Minimal Markdown→HTML conversion — enough for headings, tables, lists, bold.
+     *  F2-391: package-private so ReportComposerServiceTest can drive the table
+     *  renderer directly (the public annex builders need heavy collaborators). */
+    static String markdownToHtml(String md) {
         StringBuilder out = new StringBuilder(md.length() * 2);
         boolean inTable = false;
         boolean firstRowOfTable = false;
@@ -421,7 +423,15 @@ public class ReportComposerService {
             if (t.startsWith("|")) {
                 if (t.matches("\\|\\s*-.*")) continue;  // separator row
                 if (!inTable) { out.append("<table>"); inTable = true; firstRowOfTable = true; }
-                String[] cells = t.split("\\|");
+                // F2-391: split with limit -1 to KEEP the trailing empty cell of a
+                // pipe-terminated row ("| a | b | c |" -> ["", " a ", " b ", " c ", ""]).
+                // The default limit 0 discards trailing empties, so the array was one
+                // shorter than the loop bound below assumes — the bound already subtracts
+                // one for a trailing "|", which only balances if that empty is present.
+                // Without -1 the last data cell of every pipe-terminated row was dropped
+                // (and a single-cell row rendered empty). Matches the md.split("\n", -1)
+                // idiom this method already uses on line 418.
+                String[] cells = t.split("\\|", -1);
                 out.append("<tr>");
                 for (int i = 1; i < cells.length - (t.endsWith("|") ? 1 : 0); i++) {
                     String c = cells[i].trim();
