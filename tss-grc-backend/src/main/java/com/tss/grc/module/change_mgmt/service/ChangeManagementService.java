@@ -1877,6 +1877,19 @@ public class ChangeManagementService {
         if (src.getRequestedDate()        != null) target.setRequestedDate(src.getRequestedDate());
         if (src.getScheduledStart()       != null) target.setScheduledStart(src.getScheduledStart());
         if (src.getScheduledEnd()         != null) target.setScheduledEnd(src.getScheduledEnd());
+        // F2-387 — a change's own schedule window must not be inverted. Both fields are
+        // caller-bound (ChangeManagementController binds the ChangeRequest entity on POST/PUT) and
+        // copied null-safely above, so validate the RESULTING pair on target, not the request: a
+        // partial PUT that sets only one end could otherwise invert the STORED window (F2-292). An
+        // inverted window (start > end) makes the change's effective interval empty, which silently
+        // defeats every joint consumer — enforceFreeze's overlap test reads false, so the change is
+        // SCHEDULED inside an active CH-17 freeze; findScheduleConflicts returns no collisions; the
+        // FSC/calendar drop it. The sibling createFreezeWindow already guards exactly this ordering
+        // (endsAt.isBefore(startsAt) -> throw); mirror it, allowing start == end (a zero-length
+        // window, which that sibling also permits).
+        if (target.getScheduledStart() != null && target.getScheduledEnd() != null
+                && target.getScheduledStart().isAfter(target.getScheduledEnd()))
+            throw new IllegalArgumentException("scheduledEnd must be on or after scheduledStart");
         // CM-C3 (lifecycle integrity): status is DELIBERATELY not copied from the
         // request body. All status changes must go through transition()/guard();
         // create() defaults to DRAFT. This closes the PUT/create bypass where a

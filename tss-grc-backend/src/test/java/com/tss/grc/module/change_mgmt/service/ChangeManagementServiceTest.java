@@ -23,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,6 +105,71 @@ class ChangeManagementServiceTest {
         a.setDecision("APPROVE");
         a.setApproverName("Bob CAB");
         return a;
+    }
+
+    // ─── F2-387: a change's own schedule window may not be inverted ────────────
+    // apply() copies scheduledStart/scheduledEnd null-safely from the bound entity; an inverted
+    // window (start > end) silently defeats enforceFreeze (a change SCHEDULED inside an active CH-17
+    // freeze), findScheduleConflicts and the FSC/calendar. The guard validates the MERGED target
+    // pair, mirroring the sibling createFreezeWindow, and allows a zero-length window.
+
+    @Test
+    void create_rejectsInvertedScheduleWindow() {
+        ChangeRequest req = new ChangeRequest();
+        req.setTitleEn("Patch DB");
+        req.setScheduledStart(LocalDateTime.of(2026, 6, 1, 22, 0));
+        req.setScheduledEnd(LocalDateTime.of(2026, 6, 1, 20, 0));   // ends 2h before it starts
+
+        assertThatThrownBy(() -> service.create(req))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("scheduledEnd must be on or after scheduledStart");
+        verify(changeRepo, never()).save(any(ChangeRequest.class));
+    }
+
+    @Test
+    void create_allowsForwardAndZeroLengthWindow() {
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ChangeRequest forward = new ChangeRequest();
+        forward.setTitleEn("Forward");
+        forward.setScheduledStart(LocalDateTime.of(2026, 6, 1, 20, 0));
+        forward.setScheduledEnd(LocalDateTime.of(2026, 6, 1, 22, 0));
+        assertThat(service.create(forward).getScheduledEnd()).isNotNull();
+
+        ChangeRequest zero = new ChangeRequest();
+        zero.setTitleEn("Instant");
+        LocalDateTime t = LocalDateTime.of(2026, 6, 1, 20, 0);
+        zero.setScheduledStart(t);
+        zero.setScheduledEnd(t);            // zero-length window is allowed (mirrors createFreezeWindow)
+        assertThat(service.create(zero).getScheduledStart()).isEqualTo(t);
+    }
+
+    @Test
+    void create_allowsMissingWindow() {
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        ChangeRequest req = new ChangeRequest();
+        req.setTitleEn("No window");        // both schedule fields null — the guard must not fire
+        assertThat(service.create(req)).isNotNull();
+        verify(changeRepo, atLeastOnce()).save(any(ChangeRequest.class));
+    }
+
+    /** The sharp leg: a partial PUT that sets only scheduledStart — after the STORED scheduledEnd —
+     *  inverts the stored window. The guard validates the MERGED row, not the request (which carries
+     *  no end to compare), so this is refused and nothing is saved (F2-292). */
+    @Test
+    void update_partialBodyCannotInvertStoredWindow() {
+        ChangeRequest stored = change("DRAFT", "NORMAL");
+        stored.setScheduledStart(LocalDateTime.of(2026, 6, 1, 20, 0));
+        stored.setScheduledEnd(LocalDateTime.of(2026, 6, 1, 22, 0));
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(stored));
+
+        ChangeRequest body = new ChangeRequest();
+        body.setScheduledStart(LocalDateTime.of(2026, 6, 2, 3, 0));   // moves start past the stored end
+
+        assertThatThrownBy(() -> service.update(CHANGE_ID, body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("scheduledEnd must be on or after scheduledStart");
+        verify(changeRepo, never()).save(any(ChangeRequest.class));
     }
 
     // ─── Happy path ──────────────────────────────────────────────────
