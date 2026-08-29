@@ -15219,6 +15219,27 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-389 — `BcpBinderService` resolved a storage path with `normalize()` but no `startsWith(root)` containment guard
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-27 |
+| **Severity** | P3 (latent — defence-in-depth) — a path-traversal containment gap on the BCP binder's file I/O. `BcpBinderService` resolves both its generate-write path (`relPath`) and its download-read path (`b.getFilePath()`) as `Paths.get(storageBasePath, rel).toAbsolutePath().normalize()` and then `Files.write` / `Files.readAllBytes` on the result, with **no `startsWith(root)` containment check**. `normalize()` only collapses `../` — the result can still resolve OUTSIDE the base — so this is the textbook incomplete path-traversal guard. It is latent today: `BcpBinderExport.file_path` has exactly one writer (`generate`, server-minted `binders/<org>/<uuid>.pdf`) and the binder controller exposes no entity-binding write path, so `file_path` is not caller-influenced ([[F2-283]]). |
+| **Registers** | none — `BcpBinderService` (one `resolveWithinBase` helper used by both paths); `BcpBinderServiceTest` +1 (existing class). No schema, no migration. |
+| **Standards** | [[F2-215]] (two-of-N — the shared `LocalFileStorageSupport.guardWithinRoot` has the `startsWith(root)` guard and the two backends that extend it, `AttachmentStorageService.load` / `EvidenceStorageService.load`, both apply it on read; `BcpBinderService` rolls its own `Paths.get(storageBasePath, …)` logic and never got it); [[F2-283]] (latent vs live — server-minted `file_path`, so defence-in-depth); [[F2-214]] (the guard never fires for a valid server-minted path, so zero regression risk); [[F2-190]] (add the leg to the existing test class); [[F2-320]] / [[F2-325]] (hermetic — Mockito + `@TempDir`, no DB); [[F2-221]] (re-derived — confirmed `file_path` has one server-minted writer and no caller-binding controller, so latent). |
+| **Found by** | The same file-handling sweep that produced [[F2-388]], which filed this as a follow-up: the two hardened storage read paths (`AttachmentStorageService.load`, `EvidenceStorageService.load`) both carry the `startsWith(root)` guard, and `BcpBinderService` — which does not extend the shared primitive — was the one storage-path consumer that resolved with `normalize()` alone. Re-derived against the code ([[F2-221]]). |
+| **Verification** | hermetic (Mockito + `@TempDir`, no DB — [[F2-320]] / [[F2-325]]). `BcpBinderServiceTest` +1: a READY binder whose `file_path` is a `../`-traversal string is refused by `download` with `IllegalArgumentException("… escapes the storage root")` before any file I/O, and `last_downloaded_at` stays null. 17 run / 0 failed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): surgically remove only the `startsWith` guard from `resolveWithinBase` (the helper still compiles and returns the escaping path, and the test references no new symbol) → the containment leg alone RED — the escaping path reaches `Files.isRegularFile` → false → throws the IllegalStateException "missing from storage" (the F2-78 message), not the containment IllegalArgumentException — while the other 16 legs stay green. Full backend build 4899/0/0. |
+
+### Fix
+
+`BcpBinderService` gains a private `resolveWithinBase(String rel)` helper mirroring `LocalFileStorageSupport.guardWithinRoot`: it computes `base = Paths.get(storageBasePath).toAbsolutePath().normalize()` and `full = Paths.get(storageBasePath, rel).toAbsolutePath().normalize()`, and throws `IllegalArgumentException("Resolved storage path escapes the storage root.")` unless `full.startsWith(base)`. Both the generate-write (formerly line 161) and download-read (formerly line 226) call sites now route through it. The guard never fires for the server-minted `binders/<org>/<uuid>.pdf` paths, so behaviour is unchanged for all real data.
+
+🔑 **`.normalize()` is not a containment guard — it collapses `../` but the result can still leave the base. Whenever `Paths.get(base, <var>).normalize()` feeds a `Files.*` read/write, look for the paired `startsWith(base)` check. And when a service rolls its own storage-path logic instead of using the shared hardened primitive (`LocalFileStorageSupport`), assume it dropped one of the primitive's guards — here the containment check, but the primitive also carries the extension allow-list, the size cap and UUID naming.**
+
+### Filed ([[F2-188]])
+
+`BcpBinderService` should ideally EXTEND `LocalFileStorageSupport` (as the evidence and attachment backends do) rather than duplicate its path logic with a raw `@Value storageBasePath` + hand-rolled `Paths.get`. Doing so would give it the 29-extension allow-list, the per-file size cap, UUID filenames and the containment guard by construction, and remove the drift that produced this finding. That is a refactor touching the generate path's PDF-write flow, worth its own slice.
+
 ## F2-388 — attachment download reflected the uploader's filename into an unescaped `Content-Disposition` header (parameter injection / download-filename spoofing)
 
 | | |

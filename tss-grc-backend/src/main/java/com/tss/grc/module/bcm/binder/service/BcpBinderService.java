@@ -158,7 +158,7 @@ public class BcpBinderService {
             // Persist bytes to disk under base-path/binders/<org>/<uuid>.pdf
             String relPath = String.format(Locale.ROOT, "binders/%d/%s.pdf",
                 org, b.getExternalId().toString());
-            Path full = Paths.get(storageBasePath, relPath).toAbsolutePath().normalize();
+            Path full = resolveWithinBase(relPath);
             Files.createDirectories(full.getParent());
             Files.write(full, result.bytes());
 
@@ -205,6 +205,25 @@ public class BcpBinderService {
         }
     }
 
+    /**
+     * F2-389 — resolve a root-relative storage path and refuse one that escapes the base.
+     * This service rolls its own {@code Paths.get(storageBasePath, rel).normalize()} rather than
+     * extending {@link com.tss.grc.common.storage.LocalFileStorageSupport}, and {@code normalize()}
+     * only collapses {@code ../} — the result can still resolve OUTSIDE the base. The two hardened
+     * storage backends both re-apply a {@code startsWith(root)} containment check ({@code guardWithinRoot});
+     * mirror it here for both the generate-write and download-read paths. Latent today ({@code file_path}
+     * is server-minted {@code binders/<org>/<uuid>.pdf}), so this is defence-in-depth — it makes the
+     * hazard absent rather than reachable-if-a-future-writer-lets-a-caller-influence-file_path.
+     */
+    private Path resolveWithinBase(String relPath) {
+        Path base = Paths.get(storageBasePath).toAbsolutePath().normalize();
+        Path full = Paths.get(storageBasePath, relPath).toAbsolutePath().normalize();
+        if (!full.startsWith(base)) {
+            throw new IllegalArgumentException("Resolved storage path escapes the storage root.");
+        }
+        return full;
+    }
+
     // ─── Download ─────────────────────────────────────────────────────
 
     /** Returns the raw bytes of a READY binder and increments
@@ -223,7 +242,7 @@ public class BcpBinderService {
         if (b.getFilePath() == null || b.getFilePath().isBlank()) {
             throw new IllegalStateException("Binder has no file_path");
         }
-        Path full = Paths.get(storageBasePath, b.getFilePath()).toAbsolutePath().normalize();
+        Path full = resolveWithinBase(b.getFilePath());
 
         // F2-78 — a READY binder whose artefact is absent is a STATE problem, not a generation
         // failure, and the two had been collapsed into one 500.
