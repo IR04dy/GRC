@@ -466,4 +466,54 @@ class IncidentServiceTest {
         verify(repo, org.mockito.Mockito.never()).findRecent(any(), any());
     }
 
+    // ─── F2-390: overdue boundary — a statutory deadline is breached AT the deadline ──
+    //
+    // overdue was `(deadlineHours - hoursSinceDiscovery) < 0`, and hoursSinceDiscovery is
+    // ChronoUnit.HOURS.between(...) floored to whole hours, so a notification read
+    // "not overdue" AT its exact deadline and for up to a full hour past it — on the
+    // PDPL Article 20 72-hour clock (and NCA/CITC 24h, SAMA 48h). Inclusive `<= 0` flips
+    // overdue at the exact hour boundary, matching RegulatorCountdownService
+    // (`minutesLeft <= 0 -> BREACHED`) for the same regulator clock.
+    //
+    // template(...) takes hoursSinceDiscovery as a parameter, so the boundary is driven
+    // directly here — regulatoryTemplates() computes it from LocalDateTime.now(), which a
+    // unit test cannot pin to an exact deadline (F2-178). No stubbing: template() is a
+    // pure function of its arguments.
+
+    /** The discriminating leg: at exactly the deadline, unnotified, overdue must be true. */
+    @Test
+    void overdue_isTrueAtExactlyTheDeadline_whenNotNotified() {
+        Map<String, Object> m = service.template(
+            "DATA_OFFICE", "t", "t", 72, 72L, null, "chan", "hint", "body", "CONFIRMED");
+        // Pre-fix (`0 < 0`) this was false; fixed (`0 <= 0`) it is true.
+        assertThat(m).containsEntry("overdue", true);
+        assertThat(m).containsEntry("hoursRemaining", 0L);
+    }
+
+    /** Guard: the whole hour before the deadline is not overdue (unchanged by the fix). */
+    @Test
+    void overdue_isFalseTheHourBeforeTheDeadline() {
+        Map<String, Object> m = service.template(
+            "DATA_OFFICE", "t", "t", 72, 71L, null, "chan", "hint", "body", "CONFIRMED");
+        assertThat(m).containsEntry("overdue", false);
+    }
+
+    /** Guard: the notifiedAt == null half still gates — a notified breach is never overdue,
+     *  even at the deadline, so the boundary fix did not drop the notified gate. */
+    @Test
+    void overdue_isFalseAtTheDeadline_whenAlreadyNotified() {
+        Map<String, Object> m = service.template(
+            "DATA_OFFICE", "t", "t", 72, 72L,
+            java.time.LocalDateTime.of(2026, 5, 1, 10, 0), "chan", "hint", "body", "CONFIRMED");
+        assertThat(m).containsEntry("overdue", false);
+    }
+
+    /** Guard: well past the deadline, unnotified, is still overdue (unchanged by the fix). */
+    @Test
+    void overdue_isTrueWellPastTheDeadline_whenNotNotified() {
+        Map<String, Object> m = service.template(
+            "DATA_OFFICE", "t", "t", 72, 100L, null, "chan", "hint", "body", "CONFIRMED");
+        assertThat(m).containsEntry("overdue", true);
+    }
+
 }
