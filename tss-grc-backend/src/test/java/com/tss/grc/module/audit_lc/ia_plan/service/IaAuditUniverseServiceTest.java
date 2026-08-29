@@ -253,4 +253,54 @@ class IaAuditUniverseServiceTest {
         assertThat(out).hasSize(1);
         verify(repo).findByOrganisationIdAndIsDeletedFalseOrderByEntryCodeAsc(ORG_ID);
     }
+
+    // ─── F2-392: the service is source-of-truth — a caller-supplied residual is ignored ──
+    //
+    // create()'s own comment says "recompute even if caller passed an explicit value", and
+    // the update()/recomputeResidual() siblings always derive it. Pre-fix, create() trusted
+    // req.residualRiskScore() when non-null, letting a caller store a residual that disagreed
+    // with inherent × (1 - controlEnv). These legs supply a bogus residual and assert the
+    // service derives the formula value instead.
+
+    /** The discriminating leg: create() ignores a caller-supplied residual and derives it. */
+    @Test void create_ignoresCallerSuppliedResidual_andDerivesFromTheFormula() {
+        UniverseCreateRequest req = new UniverseCreateRequest(
+            PLAN_ID, "AU-OVERRIDE-001", "AU-OVERRIDE-001 EN", "AU-OVERRIDE-001 AR",
+            null, null, null, null,
+            new BigDecimal("22.00"),   // inherent
+            new BigDecimal("0.30"),    // controlEnv -> formula = 22 × 0.70 = 15.40
+            new BigDecimal("1.00"),    // BOGUS caller residual, must be ignored
+            null, null, null, null, null, null);
+        when(repo.findByOrganisationIdAndEntryCodeAndPlanIdAndIsDeletedFalse(ORG_ID, "AU-OVERRIDE-001", PLAN_ID))
+            .thenReturn(Optional.empty());
+        when(repo.save(any(IaAuditUniverseEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UniverseResponse out = service.create(req);
+
+        // Pre-fix this stored the caller's 1.00; fixed, it derives 15.40.
+        assertThat(out.residualRiskScore()).isEqualByComparingTo("15.40");
+    }
+
+    /** bulkImport() routes through create(), so it inherits the fix — a bogus residual in a
+     *  bulk entry is ignored and the formula value is persisted. */
+    @Test void bulkImport_alsoIgnoresCallerSuppliedResidual() {
+        UniverseCreateRequest bogus = new UniverseCreateRequest(
+            PLAN_ID, "AU-BULK-OVR-001", "t EN", "t AR",
+            null, null, null, null,
+            new BigDecimal("18.00"),   // inherent
+            new BigDecimal("0.40"),    // controlEnv -> formula = 18 × 0.60 = 10.80
+            new BigDecimal("0.01"),    // BOGUS caller residual
+            null, null, null, null, null, null);
+        UniverseBulkImportRequest req = new UniverseBulkImportRequest(PLAN_ID, List.of(bogus));
+        when(repo.findByOrganisationIdAndEntryCodeAndPlanIdAndIsDeletedFalse(ORG_ID, "AU-BULK-OVR-001", PLAN_ID))
+            .thenReturn(Optional.empty());
+        org.mockito.ArgumentCaptor<IaAuditUniverseEntry> cap =
+            org.mockito.ArgumentCaptor.forClass(IaAuditUniverseEntry.class);
+        when(repo.save(any(IaAuditUniverseEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.bulkImport(req);
+
+        verify(repo).save(cap.capture());
+        assertThat(cap.getValue().getResidualRiskScore()).isEqualByComparingTo("10.80");
+    }
 }
