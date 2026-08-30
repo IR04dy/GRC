@@ -312,8 +312,20 @@ public class PolicyManagementService {
 
     /**
      * Compare dotted version strings NUMERICALLY ("9.0" &lt; "10.0"), not lexically.
-     * Segment-by-segment integer compare; a non-numeric segment falls back to a
-     * lexical compare of that segment; missing trailing segments count as 0. (PM-H2)
+     * A proper TOTAL order, segment by segment: two numeric segments compare by value,
+     * a numeric segment sorts before a non-numeric one, and two non-numeric segments
+     * compare lexically; missing trailing segments count as 0. (PM-H2)
+     *
+     * <p>F2-401: this used to fall back to a lexical compare of the segment ONLY when a
+     * segment was non-numeric, mixing numeric and lexical comparison per-pair — which is
+     * not transitive: "2" &lt; "10" (numeric) and "10" &lt; "1x" (lexical) yet "2" &gt;
+     * "1x" (lexical). A non-transitive comparator makes {@code Stream.max} / the
+     * latest-version {@code merge} return a non-maximal element, so the register's
+     * "latest version" pick (and {@code newVersion}'s metadata source and
+     * {@code supersedePriorPublished}) could be wrong for versions with a non-numeric
+     * segment. Ordering numeric segments consistently before non-numeric ones — the
+     * tuple {@code (isNumeric, value)} — makes it a total order. All-numeric versions
+     * (the common case) are byte-identical to the old behaviour.
      */
     static int compareVersions(String a, String b) {
         if (a == null || b == null) return a == null ? (b == null ? 0 : -1) : 1;
@@ -323,7 +335,11 @@ public class PolicyManagementService {
             String sa = i < pa.length ? pa[i].trim() : "0";
             String sb = i < pb.length ? pb[i].trim() : "0";
             Integer ia = tryParseInt(sa), ib = tryParseInt(sb);
-            int c = (ia != null && ib != null) ? Integer.compare(ia, ib) : sa.compareTo(sb);
+            int c;
+            if (ia != null && ib != null) c = Integer.compare(ia, ib);
+            else if (ia != null)          c = -1;   // numeric segment sorts before non-numeric
+            else if (ib != null)          c = 1;
+            else                          c = sa.compareTo(sb);
             if (c != 0) return c;
         }
         return 0;

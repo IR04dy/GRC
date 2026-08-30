@@ -486,6 +486,48 @@ class PolicyManagementServiceTest {
         assertThat(out.get(0).getVersion()).isEqualTo("10.0");   // not "9.0" (lexical max)
     }
 
+    /**
+     * F2-401 — {@code compareVersions} is a TOTAL order (transitive). The old per-pair mix
+     * of numeric and lexical compare was not: on segments "2" &lt; "10" (numeric) and
+     * "10" &lt; "1x" (lexical), yet it reported "2" &gt; "1x" (lexical) — so a latest-version
+     * {@code merge} / {@code Stream.max} could pick a non-maximal version.
+     */
+    @Test void compareVersions_isTransitive_onMixedNumericAndNonNumericSegments() {
+        assertThat(PolicyManagementService.compareVersions("2", "10")).isNegative();   // numeric (pre & post)
+        assertThat(PolicyManagementService.compareVersions("10", "1x")).isNegative();  // pre & post
+        // Transitivity: 2 < 10 and 10 < 1x ⇒ 2 < 1x. Pre-fix this was POSITIVE (lexical "2" > "1x").
+        assertThat(PolicyManagementService.compareVersions("2", "1x")).isNegative();
+        assertThat(PolicyManagementService.compareVersions("1x", "2")).isPositive();   // antisymmetry
+    }
+
+    /** F2-401 guard (F2-214) — the fix touches only the mixed numeric/non-numeric branch;
+     *  all-numeric comparison is byte-identical to the old Integer.compare-per-segment. */
+    @Test void compareVersions_numericComparison_isUnchangedByTheTotalOrderFix() {
+        assertThat(PolicyManagementService.compareVersions("9.0", "10.0")).isNegative();
+        assertThat(PolicyManagementService.compareVersions("2.10", "2.9")).isPositive();
+        assertThat(PolicyManagementService.compareVersions("1.0", "1")).isZero();       // trailing 0
+        assertThat(PolicyManagementService.compareVersions("3.1.4", "3.1.4")).isZero();
+    }
+
+    /**
+     * F2-401 — the fix flows through to the register's "latest version" pick. Same policy
+     * code, versions {"2","10","1x"}; under the fixed TOTAL order the maximum is "1x"
+     * ("2" &lt; "10" numeric, both &lt; "1x" non-numeric). The DB returns them lexical-desc,
+     * and pre-fix the non-transitive comparator's merge picked "10" — a non-maximal version.
+     */
+    @Test void list_latestOnly_picksTheTotalOrderMaximum_evenWithANonNumericVersion() {
+        PolicyDocument p2  = draft(); p2.setId(2L);  p2.setVersion("2");
+        PolicyDocument p1x = draft(); p1x.setId(3L); p1x.setVersion("1x");
+        PolicyDocument p10 = draft(); p10.setId(4L); p10.setVersion("10");
+        when(docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(ORG_ID))
+            .thenReturn(List.of(p2, p1x, p10));
+
+        List<PolicyDocument> out = service.list(null, null, true);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).getVersion()).isEqualTo("1x");   // pre-fix picked "10" (non-maximal)
+    }
+
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
 
     @Test void publish_emits_POLICY_PUBLISHED_with_previousStatus_and_writes_audit() {
