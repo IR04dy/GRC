@@ -139,15 +139,23 @@ public class BcpPlanService {
     @Transactional(readOnly = true)
     public Page<BcpPlan> list(String planType, int page, int size) {
         Long org = TenantContext.getCurrentTenant();
+        // F2-393: validate page/size up front — exactly as the no-planType branch's
+        // PageRequest already does — so a negative page cannot reach the manual paging
+        // slice below. Without this, `from = Math.min(page*size, all.size())` has no
+        // lower-bound floor, so ?planType=BCP&page=-1 makes `from` negative and
+        // all.subList(-N, 0) throws IndexOutOfBoundsException (an opaque 500), where the
+        // no-planType branch returns a clean 400. PageRequest.of refuses page<0 / size<1
+        // with an IllegalArgumentException the handler maps to 400 — consistent for both.
+        PageRequest pageable = PageRequest.of(page, size);
         if (planType != null) {
             // Filter via the repo + manual paging slice (no pageable for this finder)
             List<BcpPlan> all = plans.findByOrganisationIdAndPlanTypeOrderByIdDesc(org, planType);
             int from = Math.min(page * size, all.size());
             int to   = Math.min(from + size, all.size());
             return new org.springframework.data.domain.PageImpl<>(
-                all.subList(from, to), PageRequest.of(page, size), all.size());
+                all.subList(from, to), pageable, all.size());
         }
-        return plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(page, size));
+        return plans.findByOrganisationIdOrderByIdDesc(org, pageable);
     }
 
     @Transactional(readOnly = true)

@@ -371,4 +371,44 @@ class BcpPlanServiceTest {
         assertThatThrownBy(() -> service.diff(7L, 99, 1))
             .isInstanceOf(EntityNotFoundException.class);
     }
+
+    // ─── F2-393: list paging — a negative page must be refused, not crash ────
+    //
+    // The planType branch does manual paging: from = Math.min(page*size, all.size()) with no
+    // lower-bound floor. A negative page made `from` negative and all.subList(-N, 0) threw
+    // IndexOutOfBoundsException (opaque 500), while the no-planType branch's PageRequest.of
+    // rejects page<0 with an IllegalArgumentException the handler maps to 400. The fix hoists
+    // PageRequest.of to the top so both branches reject a bad page consistently.
+
+    /** The discriminating leg: a negative page in the planType branch is an IllegalArgumentException
+     *  (→ 400), NOT the pre-fix IndexOutOfBoundsException (→ 500). */
+    @Test void list_negativePageWithPlanType_isRefusedCleanly_notIndexOutOfBounds() {
+        when(plans.findByOrganisationIdAndPlanTypeOrderByIdDesc(ORG_ID, "BCP"))
+            .thenReturn(List.of(plan("BCP", "DRAFT"), plan("BCP", "APPROVED")));
+
+        assertThatThrownBy(() -> service.list("BCP", -1, 50))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Guard (non-discriminating): a valid page still returns the correct slice. */
+    @Test void list_validPageWithPlanType_returnsTheSlice() {
+        when(plans.findByOrganisationIdAndPlanTypeOrderByIdDesc(ORG_ID, "BCP"))
+            .thenReturn(List.of(plan("BCP", "DRAFT"), plan("BCP", "APPROVED"), plan("BCP", "PUBLISHED")));
+
+        var out = service.list("BCP", 0, 2);
+
+        assertThat(out.getContent()).hasSize(2);
+        assertThat(out.getTotalElements()).isEqualTo(3);
+    }
+
+    /** Guard (non-discriminating): a valid page beyond the data returns empty, not a crash. */
+    @Test void list_pageBeyondDataWithPlanType_returnsEmptyNotACrash() {
+        when(plans.findByOrganisationIdAndPlanTypeOrderByIdDesc(ORG_ID, "BCP"))
+            .thenReturn(List.of(plan("BCP", "DRAFT")));
+
+        var out = service.list("BCP", 5, 50);
+
+        assertThat(out.getContent()).isEmpty();
+        assertThat(out.getTotalElements()).isEqualTo(1);
+    }
 }
