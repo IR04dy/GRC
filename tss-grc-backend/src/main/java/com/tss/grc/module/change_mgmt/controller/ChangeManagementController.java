@@ -361,8 +361,12 @@ public class ChangeManagementController {
     @PostMapping("/{id}/committee/resolution")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     public CommitteePort.ReferralView linkChangeResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        Long resolutionId = Long.valueOf(body.get("resolutionId").toString());
-        return service.linkChangeResolution(id, resolutionId);
+        // F2-394: resolutionId is required; an absent key must be a clean 400, not
+        // body.get("resolutionId").toString() -> NullPointerException -> opaque 500. Uses the
+        // null-safe strFromBody helper the sibling committeeId extraction (referToCommittee) relies on.
+        String raw = strFromBody(body, "resolutionId");
+        if (raw == null) throw new IllegalArgumentException("resolutionId is required");
+        return service.linkChangeResolution(id, Long.valueOf(raw));
     }
 
     // ── Comments ────────────────────────────────────────────────────────────
