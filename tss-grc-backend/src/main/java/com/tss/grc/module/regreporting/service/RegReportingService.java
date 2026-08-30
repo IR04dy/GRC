@@ -649,9 +649,15 @@ public class RegReportingService {
     static String buildReference(RegReportObligation o, LocalDate periodEnd) {
         return switch (o.getFrequency()) {
             case "DAILY"      -> o.getCode() + "-" + periodEnd;
+            // F2-395: the ISO week number is measured against the week-BASED year, so it must
+            // be paired with weekBasedYear(), not the calendar getYear(). At a year boundary the
+            // two disagree — 2023-01-01 is ISO week 52 of week-based-year 2022 but calendar 2023 —
+            // so getYear() made two distinct weekly periods (52 weeks apart) share one reference
+            // (both "…-W52-2023"). The other frequency arms pair getYear() with a CALENDAR
+            // sub-period (getMonthValue()), so only WEEKLY mixed the two calendars.
             case "WEEKLY"     -> o.getCode() + "-W"
                     + periodEnd.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())
-                    + "-" + periodEnd.getYear();
+                    + "-" + periodEnd.get(java.time.temporal.WeekFields.ISO.weekBasedYear());
             case "MONTHLY"    -> o.getCode() + "-" + periodEnd.getYear() + "-"
                     + String.format("%02d", periodEnd.getMonthValue());
             case "QUARTERLY"  -> o.getCode() + "-" + periodEnd.getYear() + "-Q"
