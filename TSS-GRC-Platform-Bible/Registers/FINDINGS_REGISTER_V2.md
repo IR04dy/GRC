@@ -15219,6 +15219,27 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-393 — BCP plan list crashed with an opaque 500 on a negative page (unfloored manual-paging `subList` index)
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-27 |
+| **Severity** | P3 (robustness — an opaque 500 on malformed input where a 400 is due). `BcpPlanService.list()`'s `planType != null` branch does manual paging: `from = Math.min(page * size, all.size())` — **no lower-bound floor** — so `GET /api/v1/bcm/plans?planType=BCP&page=-1` (the controller binds `@RequestParam(defaultValue = "0") int page` with no `@Min(0)`) makes `from` negative and `all.subList(-N, 0)` throws `IndexOutOfBoundsException` → opaque 500, while the sibling no-`planType` branch's `PageRequest.of(page, size)` rejects `page < 0` with an `IllegalArgumentException` the handler maps to a clean 400. The two branches were inconsistent. Reachable through the API. Live in code, latent-in-data ([[F2-283]]): fires on any request with a negative page and a `planType` filter. |
+| **Registers** | none — `BcpPlanService.list()` (hoist `PageRequest.of` to the top, reuse in both branches); `BcpPlanServiceTest` +3 (existing class). No schema, no migration. |
+| **Standards** | [[F2-215]] (two-of-N — the no-`planType` branch already validates the page via `PageRequest.of` and returns 400; the manual-paging branch crashed with a 500; the fix makes both consistent); [[F2-283]] (live-in-code / latent-in-data); [[F2-214]] (behavior-identical for all valid inputs — proven by two guard legs); [[F2-190]] (add the legs to the existing test class); [[F2-320]] / [[F2-325]] (hermetic — Mockito, no DB); [[F2-221]] (re-derived — the `subList` arithmetic, the controller's unvalidated `page`, and the sibling branch's `PageRequest.of` behavior); [[F2-225]] (one leg discriminates, two guard); [[F2-216]] (the two swept classes this firing — format-string, empty-collection access — both came back clean). |
+| **Found by** | An Explore-agent sweep for format-string specifier/arg mismatches and unguarded empty-collection "first/only" accesses (both **clean sweeps** — [[F2-216]]). This surfaced as a residual the agent set aside as adjacent to the min/max-clamp vein, but it is a distinct defect: a negative-index crash from an unvalidated pagination parameter, not min/max confusion. Re-derived against the code ([[F2-221]]). |
+| **Verification** | hermetic (Mockito, no DB — [[F2-320]] / [[F2-325]]). `BcpPlanServiceTest` +3: `list("BCP", -1, 50)` over a non-empty list throws `IllegalArgumentException` (→ 400) rather than the pre-fix `IndexOutOfBoundsException` (**discriminating**); a valid page returns the correct slice; a page beyond the data returns empty, not a crash (guards). 25 run / 0 failed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): surgically revert only the `PageRequest.of` hoist (restore the inline form so `subList` runs first) → the negative-page leg alone RED (`java.lang.IndexOutOfBoundsException: fromIndex = -50`), the other 24 green. Full backend build 4911/0/0. |
+
+### Fix
+
+`BcpPlanService.list()` hoists `PageRequest pageable = PageRequest.of(page, size)` to the top of the method (before the `planType` branch) and reuses it in both branches. `PageRequest.of` refuses `page < 0` and `size < 1` with an `IllegalArgumentException` the handler maps to 400 — so a bad page is rejected before the manual `subList`, consistently for both the filtered and unfiltered paths. Behavior is unchanged for every valid page/size.
+
+🔑 **Manual paging (`list.subList(from, to)`) computed from a caller-supplied `page`/`size` must floor the lower bound or validate the inputs up front — `Math.min(page*size, size())` caps the TOP but not the BOTTOM, so a negative page produces a negative `fromIndex` and an `IndexOutOfBoundsException` (an opaque 500). When one code path builds a `PageRequest` (which validates page/size) and a sibling hand-rolls the slice, the hand-rolled one usually skips that validation — reuse the `PageRequest`.**
+
+### Filed ([[F2-188]])
+
+An `int` overflow remains theoretically possible: with `page > ~42 million` (× size 50), `page * size` overflows `int` to a negative and `from` goes negative again — but that requires a page value no real client sends, and Spring's own `PageRequest` does not guard it either. Computing `from`/`to` in `long` would close it; a marginal hardening, not the reported defect.
+
 ## F2-392 — IA audit-universe `create` trusted a caller-supplied residual risk score, contradicting its own comment and both siblings
 
 | | |
