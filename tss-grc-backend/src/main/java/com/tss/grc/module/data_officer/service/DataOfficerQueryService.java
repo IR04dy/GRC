@@ -62,8 +62,12 @@ public class DataOfficerQueryService {
             .filter(c -> c.getWithdrawnAt() != null && c.getWithdrawnAt().isAfter(now.minusDays(30)))
             .count();
 
+        // F2-402: APPROVED_WITH_CONDITIONS is a DECIDED state (transitionDpia stamps decidedAt for
+        // it, like APPROVED/REJECTED — see PrivacyAssuranceService), so it must be excluded from
+        // "open". Dropping it counted one AWC record as open here AND as approved in dpiaApprovedYtd
+        // below — a double-count across two mutually-exclusive buckets (in-flight vs decided).
         long dpiaOpen = allDpia.stream()
-            .filter(d -> !Set.of("APPROVED","REJECTED","ARCHIVED").contains(d.getStatus())).count();
+            .filter(d -> !Set.of("APPROVED","APPROVED_WITH_CONDITIONS","REJECTED","ARCHIVED").contains(d.getStatus())).count();
         int year = LocalDate.now().getYear();
         long dpiaApprovedYtd = allDpia.stream()
             .filter(d -> "APPROVED".equals(d.getStatus()) || "APPROVED_WITH_CONDITIONS".equals(d.getStatus()))
@@ -100,8 +104,11 @@ public class DataOfficerQueryService {
             .filter(r -> r.getRunAt() != null && r.getRunAt().isAfter(now.minusDays(30)))
             .count();
 
+        // F2-402: the twin of dpiaOpen — APPROVED_WITH_CONDITIONS is a DECIDED ethics state (the
+        // ethics machine stamps decidedAt for it too), so it is not open. ESCALATED stays open: it
+        // is an in-flight re-review edge (ESCALATED -> COMMITTEE_REVIEW), not a decision.
         long ethicsOpen = ethicsRepo.findByOrganisationIdOrderByCreatedAtDesc(o).stream()
-            .filter(e -> !Set.of("APPROVED","REJECTED").contains(e.getStatus())).count();
+            .filter(e -> !Set.of("APPROVED","APPROVED_WITH_CONDITIONS","REJECTED").contains(e.getStatus())).count();
 
         Map<String, Long> dsrByStatus = allDsr.stream()
             .collect(Collectors.groupingBy(DsrRequest::getStatus, Collectors.counting()));
