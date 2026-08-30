@@ -97,11 +97,13 @@ public class IaAuditUniverseService {
         e.setBusinessUnitAr(req.businessUnitAr());
         e.setInherentRiskScore(req.inherentRiskScore());
         e.setControlEnvironmentScore(req.controlEnvironmentScore());
-        // Residual: recompute even if caller passed an explicit value —
-        // service is source-of-truth for the formula.
-        e.setResidualRiskScore(req.residualRiskScore() != null
-            ? req.residualRiskScore()
-            : computeResidual(req.inherentRiskScore(), req.controlEnvironmentScore()));
+        // Residual: the service is source-of-truth for the formula, so a
+        // caller-supplied residualRiskScore is IGNORED and always recomputed —
+        // the same as the update() and recomputeResidual() siblings.
+        // F2-392: the previous ternary trusted req.residualRiskScore() when
+        // non-null, which contradicted this comment and let a caller store a
+        // residual that disagreed with inherent × (1 - controlEnvironmentScore).
+        e.setResidualRiskScore(computeResidual(req.inherentRiskScore(), req.controlEnvironmentScore()));
         e.setLastAuditedDate(req.lastAuditedDate());
         e.setLastAuditRating(req.lastAuditRating());
         e.setPlannedAuditYear(req.plannedAuditYear());

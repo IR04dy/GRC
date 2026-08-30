@@ -15219,6 +15219,27 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-392 — IA audit-universe `create` trusted a caller-supplied residual risk score, contradicting its own comment and both siblings
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-08-27 |
+| **Severity** | P2 (data integrity on an IIA audit-planning register). `IaAuditUniverseService.create()` set the residual as `req.residualRiskScore() != null ? req.residualRiskScore() : computeResidual(...)` — trusting the caller's value when non-null — while the line's own comment reads *"recompute even if caller passed an explicit value — service is source-of-truth for the formula"*, and both siblings (`update()`'s `scoreTouched` branch, `recomputeResidual()`) always derive `inherent × (1 - controlEnvironmentScore)`. So a caller could `POST /api/v1/ia/universe` (or `/universe/bulk-import`) with a `residualRiskScore` that disagrees with the formula — understating residual risk on a high-inherent-risk auditable entity mis-prioritizes the annual audit plan — and any later `update()` touching a score would silently overwrite it with the formula, so the two write paths visibly disagree. Live in code, latent-in-data ([[F2-283]]): fires whenever a create/bulk-import supplies a non-null residual; whether a stored row currently holds a caller-overridden residual was not measured (no dev backend). |
+| **Registers** | none — `IaAuditUniverseService.create()` (one expression: drop the ternary, always `computeResidual`); `IaAuditUniverseServiceTest` +2 (existing class). No schema, no migration. |
+| **Standards** | [[F2-215]] (two-of-N — `update()` and `recomputeResidual()` always derive; `create()` alone trusted the caller, with the intended behavior stated verbatim on the defective line); [[F2-283]] (live-in-code / latent-in-data); [[F2-214]] (a caller-supplied residual was never the intended contract — the comment says so — so aligning the code breaks no working use case; the existing null-residual + update/recompute tests stay green as regression guards); [[F2-190]] (add the legs to the existing test class); [[F2-320]] / [[F2-325]] (hermetic — Mockito, no DB); [[F2-221]] (re-derived — the comment, the two siblings, the DTO component, and the `POST /universe` + `/bulk-import` reachability); [[F2-225]] (both new legs discriminate); [[F2-216]] (three prior sweep classes this firing — cache-key/thread-safety, min/max clamp, inverted guard — all came back clean). |
+| **Found by** | An Explore-agent sweep for wrong-sibling-field / two-of-N asymmetry defects across the least-covered modules (`audit_lc`, `data_officer`, `rrp`, `regreporting`, `openbanking`, `scm`, `aml`, …). This was the one hit whose own inline comment proves the code does the opposite of what was intended, corroborated by two in-class siblings. Re-derived against the code ([[F2-221]]). |
+| **Verification** | hermetic (Mockito, no DB — [[F2-320]] / [[F2-325]]). `IaAuditUniverseServiceTest` +2: `create()` given a bogus caller residual (1.00) beside inherent 22 / controlEnv 0.30 derives **15.40** (**discriminating** — pre-fix stored 1.00); `bulkImport()` (which routes through `create()`) given a bogus residual (0.01) beside 18 / 0.40 persists **10.80** (**discriminating** — pre-fix stored 0.01). 14 run / 0 failed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): surgically revert only the `create()` expression to the ternary (keep the test) → both new legs RED (`expected 15.40 but was 1.00`; `expected 10.80 but was 0.01`), the other 12 green. Full backend build 4908/0/0. |
+
+### Fix
+
+`IaAuditUniverseService.create()` drops the ternary and always calls `computeResidual(req.inherentRiskScore(), req.controlEnvironmentScore())`, ignoring `req.residualRiskScore()` — making the comment true and matching `update()` and `recomputeResidual()`. A caller can no longer store a residual that disagrees with the IA formula. `bulkImport()` inherits the fix because it routes every entry through `create()`.
+
+🔑 **A comment stating intent is a claim to CHECK against the code beside it, not to trust — here `create()`'s own comment said "recompute even if caller passed an explicit value" and the ternary did the opposite. When a field is DERIVED by a server formula, EVERY write path must derive it; a create/bulk path that trusts a caller value while the update/recompute siblings derive it is the two-of-N signature ([[F2-215]]), and the tell is the paths disagreeing on the same field.**
+
+### Filed ([[F2-188]])
+
+`UniverseCreateRequest.residualRiskScore` is now an inert request field — the server ignores it ([[F2-184]]'s shape, though it carries no validation annotation, so no gate fires). Removing it from the DTO (and the `bulkImport` reconstruction) would be the stronger closure ([[F2-233]] — a field the bound type does not declare can never arrive), but touches the shared DTO and the frontend create form; a bounded follow-up. The response DTO keeps `residualRiskScore` (the computed output — correct).
+
 ## F2-391 — markdown→HTML table renderer dropped the last column of every pipe-terminated row (`split("\\|")` limit 0 vs a loop bound assuming limit -1)
 
 | | |
