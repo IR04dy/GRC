@@ -102,7 +102,12 @@ public class PolicyController {
     @PostMapping("/documents/{id}/committee/resolution")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public CommitteeReferral linkPolicyResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return service.linkPolicyResolution(id, Long.valueOf(body.get("resolutionId").toString()));
+        // F2-394: resolutionId is required; an absent key must be a clean 400, not
+        // body.get("resolutionId").toString() -> NullPointerException -> opaque 500 (the sibling
+        // committeeId extraction in referToCommittee already null-guards).
+        Object raw = body == null ? null : body.get("resolutionId");
+        if (raw == null) throw new IllegalArgumentException("resolutionId is required");
+        return service.linkPolicyResolution(id, Long.valueOf(raw.toString()));
     }
 
     @PostMapping("/documents/{policyCode}/new-version")
