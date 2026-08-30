@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -256,6 +257,33 @@ public class KriDefinitionService {
         if (req.linkedRiskId() != null)    d.setLinkedRiskId(req.linkedRiskId());
         if (req.linkedFrameworkId() != null) d.setLinkedFrameworkId(req.linkedFrameworkId());
         if (req.clauseRef() != null)       d.setClauseRef(req.clauseRef());
+        validateThresholdOrder(d.getValueDirection(), d.getGreenThreshold(), d.getAmberThreshold());
+    }
+
+    /**
+     * F2-397 — a KRI is a green/amber RAG whose GREEN/AMBER thresholds must be strictly ordered
+     * per direction for {@link KriMeasurementService#evaluateStatus} to produce correct statuses:
+     * HIGHER_IS_BETTER needs {@code green > amber}, LOWER_IS_BETTER needs {@code green < amber}
+     * (see the {@link KriDefinition} javadoc). An inverted pair silently mis-bands — a breaching
+     * KRI evaluates GREEN, so {@code evaluateBreaches} opens no {@code KriBreach}, the sustained-RED
+     * auto-CAPA ladder never advances, and the breach never escalates. Validates the MERGED entity
+     * because {@code update} is a partial update — a request that sets only one threshold could
+     * invert against the stored other (F2-292). Mirrors the house pattern
+     * (VulnerabilitySlaPolicyService.validatePctOrder, RrpService.validateThresholdOrder / F2-396).
+     */
+    static void validateThresholdOrder(String direction, BigDecimal green, BigDecimal amber) {
+        if (green == null || amber == null) return;   // evaluateStatus returns NA — nothing to order
+        boolean higherBetter = VALUE_DIRECTION.is(direction, HIGHER_IS_BETTER);
+        if (higherBetter && green.compareTo(amber) <= 0) {
+            throw new IllegalArgumentException(
+                    "greenThreshold (" + green + ") must be greater than amberThreshold (" + amber
+                            + ") for a HIGHER_IS_BETTER KRI");
+        }
+        if (!higherBetter && green.compareTo(amber) >= 0) {
+            throw new IllegalArgumentException(
+                    "greenThreshold (" + green + ") must be less than amberThreshold (" + amber
+                            + ") for a LOWER_IS_BETTER KRI");
+        }
     }
 
     private String generateCode(Long orgId, String category) {
