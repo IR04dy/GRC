@@ -62,8 +62,17 @@ public class RiskAppetiteService {
         RiskAppetiteStatement s = require(id);  // tenant-scoped load
         BigDecimal previousExposure = s.getCurrentExposure();
         apply(s, req);
-        // Auto-evaluate breach on exposure change
-        if (req.currentExposure() != null && !req.currentExposure().equals(previousExposure)) {
+        // Auto-evaluate breach on a genuine exposure CHANGE.
+        // F2-400: BigDecimal.equals() compares SCALE as well as value, so
+        // new BigDecimal("7").equals(new BigDecimal("7.00")) is FALSE. A scale-only
+        // resubmission (the register recompute stores BigDecimal.valueOf(int) at
+        // scale 0, then a client PUT resends "7.00") read as a change and spuriously
+        // re-fired the APPETITE_BREACHED F8 escalation on an edit that changed
+        // nothing. Value equality is compareTo() == 0. Null-guarded: a first-time
+        // set (previous null) is a change, and compareTo(null) would NPE.
+        if (req.currentExposure() != null
+                && (previousExposure == null
+                    || req.currentExposure().compareTo(previousExposure) != 0)) {
             evaluateExposure(s);
         }
         return repo.save(s);
