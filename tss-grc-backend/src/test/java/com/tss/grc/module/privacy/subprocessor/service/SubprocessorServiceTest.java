@@ -450,6 +450,93 @@ class SubprocessorServiceTest {
         verify(audit, never()).log(eq("CROSS_BORDER_CHANGE"), eq("Subprocessor"), anyLong(), anyString());
     }
 
+    // ─── F2-403: cross-border safeguard change on an APPROVED row forces re-review ──
+
+    @Test
+    void update_safeguardChangeOnApprovedRow_forcesBackToUnderDpoReview() {
+        // F2-403 (discriminating): swapping the cross-border legal mechanism on a DPO-APPROVED
+        // row is a material change — materialChange() forces re-review on exactly this — so
+        // update() must send it back to UNDER_DPO_REVIEW. Otherwise the APPROVED-only public
+        // register keeps listing it as DPO-approved with a mechanism the DPO never reviewed.
+        Subprocessor s = sub("APPROVED", "US");   // SCC_PLUS_TIA
+        when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SUB_EX))
+                .thenReturn(Optional.of(s));
+        when(repo.save(any(Subprocessor.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(eventRepo.save(any(SubprocessorEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubprocessorRequest r = new SubprocessorRequest(
+                null, null,
+                s.getSubProcessorLegalName(), s.getSubProcessorLegalNameAr(),
+                null, "US", "Texas",
+                null, null,
+                s.getProcessingPurposeEn(), s.getProcessingPurposeAr(),
+                s.getLawfulBasis(),
+                s.getAuthorisationType(), null,
+                "ADEQUACY_DECISION", null, null, null,   // SCC_PLUS_TIA → ADEQUACY_DECISION
+                "SDAIA-AD-2024-007",
+                s.getDataVolumeBand(),
+                s.getHasDpaInPlace(), s.getDpaSignedDate(), null);
+
+        SubprocessorResponse out = service.update(SUB_EX, r);
+
+        assertThat(out.lifecycleStage()).isEqualTo("UNDER_DPO_REVIEW");   // pre-fix: "APPROVED"
+    }
+
+    @Test
+    void update_noSafeguardChangeOnApprovedRow_leavesStageApproved() {
+        // F2-403 guard (F2-214): a benign edit that does NOT change the cross-border safeguard
+        // must not force re-review — the APPROVED sign-off stands.
+        Subprocessor s = sub("APPROVED", "US");   // SCC_PLUS_TIA
+        when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SUB_EX))
+                .thenReturn(Optional.of(s));
+        when(repo.save(any(Subprocessor.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubprocessorRequest r = new SubprocessorRequest(
+                null, null,
+                s.getSubProcessorLegalName(), s.getSubProcessorLegalNameAr(),
+                null, "US", "California",   // region change only
+                null, null,
+                s.getProcessingPurposeEn(), s.getProcessingPurposeAr(),
+                s.getLawfulBasis(),
+                s.getAuthorisationType(), null,
+                s.getCrossBorderSafeguardType(), null, null, null, null,   // unchanged safeguard
+                s.getDataVolumeBand(),
+                s.getHasDpaInPlace(), s.getDpaSignedDate(), null);
+
+        SubprocessorResponse out = service.update(SUB_EX, r);
+
+        assertThat(out.lifecycleStage()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void update_safeguardChangeOnProposedRow_leavesStageProposed() {
+        // F2-403 guard: the reset is scoped to APPROVED (the only stage a re-review invalidates).
+        // A PROPOSED row is still before its first DPO review — a safeguard edit must not silently
+        // advance its lifecycle.
+        Subprocessor s = sub("PROPOSED", "US");   // SCC_PLUS_TIA
+        when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SUB_EX))
+                .thenReturn(Optional.of(s));
+        when(repo.save(any(Subprocessor.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(eventRepo.save(any(SubprocessorEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubprocessorRequest r = new SubprocessorRequest(
+                null, null,
+                s.getSubProcessorLegalName(), s.getSubProcessorLegalNameAr(),
+                null, "US", "Texas",
+                null, null,
+                s.getProcessingPurposeEn(), s.getProcessingPurposeAr(),
+                s.getLawfulBasis(),
+                s.getAuthorisationType(), null,
+                "ADEQUACY_DECISION", null, null, null,
+                "SDAIA-AD-2024-007",
+                s.getDataVolumeBand(),
+                s.getHasDpaInPlace(), s.getDpaSignedDate(), null);
+
+        SubprocessorResponse out = service.update(SUB_EX, r);
+
+        assertThat(out.lifecycleStage()).isEqualTo("PROPOSED");
+    }
+
     // ─── Tenant isolation ────────────────────────────────────────
 
     @Test

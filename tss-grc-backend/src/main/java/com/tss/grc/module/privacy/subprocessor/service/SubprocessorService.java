@@ -151,18 +151,32 @@ public class SubprocessorService {
         Subprocessor s = mustGet(externalId);
         String previousSafeguard = s.getCrossBorderSafeguardType();
         applyFields(s, req);
+
+        // F2-403: a cross-border safeguard change is material (PDPL Article 30). materialChange()
+        // forces re-review on exactly this kind of change, and update() already classifies it as
+        // material (it emits SUBPROCESSOR_CROSS_BORDER_CHANGED below). So if the row was
+        // DPO-approved, send it back to DPO review here too — mirroring materialChange() — so the
+        // new legal mechanism is signed off. Otherwise the APPROVED-only public register
+        // (SubprocessorPublicListService, PDPL Article 12) keeps listing it as DPO-approved with the
+        // stale dpoApprovedBy/At attribution, defeating the material-change re-review control.
+        String newSafeguard = s.getCrossBorderSafeguardType();
+        boolean crossBorderChanged = !java.util.Objects.equals(previousSafeguard, newSafeguard);
+        boolean forcedReview = crossBorderChanged && "APPROVED".equals(s.getLifecycleStage());
+        if (forcedReview) {
+            s.setLifecycleStage("UNDER_DPO_REVIEW");
+        }
         s = repo.save(s);
 
         audit.log("UPDATE", "Subprocessor", s.getId(),
                 "Sub-processor updated: " + s.getSubprocessorCode());
 
         // If cross-border safeguard changed, emit the dedicated event.
-        String newSafeguard = s.getCrossBorderSafeguardType();
-        if (!java.util.Objects.equals(previousSafeguard, newSafeguard)) {
+        if (crossBorderChanged) {
             audit.log("CROSS_BORDER_CHANGE", "Subprocessor", s.getId(),
                     "Cross-border safeguard changed: "
                             + (previousSafeguard == null ? "<none>" : previousSafeguard)
-                            + " → " + (newSafeguard == null ? "<none>" : newSafeguard));
+                            + " → " + (newSafeguard == null ? "<none>" : newSafeguard)
+                            + (forcedReview ? " — forced re-review (APPROVED → UNDER_DPO_REVIEW)" : ""));
             Map<String, Object> p = payload(s, null);
             p.put("previousSafeguard", previousSafeguard == null ? "" : previousSafeguard);
             eventPublisher.publishEvent(new DomainEvent(
