@@ -346,6 +346,7 @@ public class RrpService {
 
     @Transactional
     public IndicatorResponse addIndicator(Long cycleId, CreateIndicatorRequest req) {
+        validateThresholdOrder(req.getDirection(), req.getGreenThreshold(), req.getAmberThreshold());
         RrpCycle c = loadCycle(cycleId);
         RrpIndicator i = new RrpIndicator();
         i.setOrganisationId(org());
@@ -564,6 +565,32 @@ public class RrpService {
         c.setIndicatorsRed((int) red);
         c.setTotalRecoveryCapacitySarM(capacity);
         cycleRepo.save(c);
+    }
+
+    /**
+     * F2-396 — an RRP indicator is a 3-band RAG (GREEN/AMBER/RED), and {@link #computeBand}
+     * only produces correct bands when the green and amber thresholds are strictly ordered
+     * per direction: HIGHER_IS_BETTER needs {@code green > amber}, LOWER_IS_BETTER needs
+     * {@code green < amber} (see the {@code RrpIndicator} worked examples — CET1 green 13 >
+     * amber 11; NPL green 3 < amber 5). An inverted pair silently mis-bands: a breaching SAMA
+     * recovery indicator reads GREEN, {@code recountCycle} under-reports, and the
+     * {@code RRP_INDICATOR_THRESHOLD_BREACHED} F8 escalation to the CRO/CFO never fires — so the
+     * Recovery Committee is never convened. Mirrors the house pattern
+     * (VulnerabilitySlaPolicyService.validatePctOrder, BcmSettingsService.validate).
+     */
+    static void validateThresholdOrder(String direction, BigDecimal green, BigDecimal amber) {
+        if (green == null || amber == null) return;   // computeBand returns GREEN — nothing to order
+        boolean higherBetter = !"LOWER_IS_BETTER".equals(direction);
+        if (higherBetter && green.compareTo(amber) <= 0) {
+            throw new IllegalArgumentException(
+                    "greenThreshold (" + green + ") must be greater than amberThreshold (" + amber
+                            + ") for a HIGHER_IS_BETTER indicator");
+        }
+        if (!higherBetter && green.compareTo(amber) >= 0) {
+            throw new IllegalArgumentException(
+                    "greenThreshold (" + green + ") must be less than amberThreshold (" + amber
+                            + ") for a LOWER_IS_BETTER indicator");
+        }
     }
 
     static String computeBand(String direction, BigDecimal green,
