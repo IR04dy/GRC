@@ -141,6 +141,7 @@ public class QuestionnaireService {
             "POST /api/v1/tprm/questionnaire-templates/{id}/transition"));
         body.setActivatedAt(null);
         body.setArchivedAt(null);
+        validateThresholdOrder(body.getThresholdLowMax(), body.getThresholdMediumMax(), body.getThresholdHighMax());
         return templates.save(body);
     }
 
@@ -166,7 +167,31 @@ public class QuestionnaireService {
         if (body.getThresholdMediumMax() != null) t.setThresholdMediumMax(body.getThresholdMediumMax());
         if (body.getThresholdHighMax() != null)   t.setThresholdHighMax(body.getThresholdHighMax());
         if (body.getNotes() != null)              t.setNotes(body.getNotes());
+        validateThresholdOrder(t.getThresholdLowMax(), t.getThresholdMediumMax(), t.getThresholdHighMax());
         return templates.save(t);
+    }
+
+    /**
+     * F2-398 — a template's LOW/MEDIUM/HIGH thresholds must be non-decreasing for {@link #bandFor}
+     * to produce correct risk bands: it tests {@code pct <= low ? LOW : pct <= medium ? MEDIUM :
+     * pct <= high ? HIGH : CRITICAL}, so an inverted set (e.g. low 80 &gt; medium 60 &gt; high 30)
+     * bands a genuinely CRITICAL vendor LOW (a pct of 70 → {@code 70 <= 80} → LOW). Neither
+     * {@code createTemplate} nor {@code updateTemplate} checked it. Validates the MERGED thresholds
+     * so a DRAFT partial update touching only one cannot invert against the stored others (F2-292).
+     *
+     * <p>Non-strict ({@code <=}, not the strict {@code <} of the 2-band RRP/KRI twins F2-396/F2-397):
+     * a 3-band template's correctness needs only non-decreasing thresholds, and a metadata-only
+     * update of a DRAFT template with a degenerate-but-coherent equal pair (an empty band) must not
+     * be rejected (F2-214). Null-guarded — the entity defaults null thresholds to 30/60/80 at persist.
+     * Mirrors the house pattern (VulnerabilitySlaPolicyService.validatePctOrder, F2-396/F2-397).
+     */
+    static void validateThresholdOrder(Integer low, Integer medium, Integer high) {
+        if (low == null || medium == null || high == null) return;   // entity defaults 30/60/80 apply
+        if (low > medium || medium > high) {
+            throw new IllegalArgumentException(
+                    "thresholds must be non-decreasing (thresholdLowMax <= thresholdMediumMax <= "
+                            + "thresholdHighMax), got " + low + " / " + medium + " / " + high);
+        }
     }
 
     /**

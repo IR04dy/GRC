@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -129,6 +130,43 @@ class QuestionnaireServiceTest {
         assertThatThrownBy(() -> service.transitionTemplate(TPL_ID, "ACTIVE"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("no questions");
+    }
+
+    // ─── F2-398: template threshold-ordering guard ────────────────
+
+    /** Discriminating: createTemplate with inverted thresholds (low 80 > medium 60 > high 30) is
+     *  rejected. Pre-fix (guard call removed) the inverted set reaches templates.save. */
+    @Test void createTemplate_rejectsInvertedThresholds() {
+        QuestionnaireTemplate t = template("DRAFT");
+        t.setThresholdLowMax(80);
+        t.setThresholdMediumMax(60);
+        t.setThresholdHighMax(30);
+        assertThatThrownBy(() -> service.createTemplate(t))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("non-decreasing");
+    }
+
+    /** Discriminating (F2-292 — validate the MERGED row): a DRAFT partial update that sets ONLY low
+     *  (90) inverts it against the stored medium (60) and is rejected — proving the guard reads the
+     *  merged entity, not the request (whose medium/high are null). */
+    @Test void updateTemplate_rejectsPartialUpdateThatInvertsAgainstStoredThreshold() {
+        when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(template("DRAFT")));
+        QuestionnaireTemplate body = new QuestionnaireTemplate();
+        body.setThresholdLowMax(90);   // stored is 30/60/80 → merged 90/60/80 inverts
+        assertThatThrownBy(() -> service.updateTemplate(TPL_ID, body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("non-decreasing");
+    }
+
+    /** Guard (non-discriminating): non-decreasing thresholds pass — including a degenerate-but-coherent
+     *  equal pair (30/30/80, an empty MEDIUM band) that the non-strict rule accepts (F2-214), and a
+     *  null threshold (the entity defaults it at persist). */
+    @Test void validateThresholdOrder_acceptsNonDecreasingAndNullThresholds() {
+        assertThatCode(() -> {
+            QuestionnaireService.validateThresholdOrder(30, 60, 80);
+            QuestionnaireService.validateThresholdOrder(30, 30, 80);
+            QuestionnaireService.validateThresholdOrder(null, 60, 80);
+        }).doesNotThrowAnyException();
     }
 
     @Test void activate_stampsActivatedAt() {
