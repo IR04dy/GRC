@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -15,6 +16,16 @@ public interface RegInspectionRepository extends JpaRepository<RegInspection, Lo
 
     Page<RegInspection> findByOrganisationIdOrderByCreatedAtDesc(
             Long organisationId, Pageable pageable);
+
+    /**
+     * F2-406 — uncapped overload (respects {@code @Where(is_deleted = 0)}, live rows only) for the
+     * dashboard's tenant-wide open/overdue document-request KPI sum. The paged overload above is
+     * for {@code listInspections} and the dashboard's {@code recentInspections}; summing the DR
+     * counters over only that 10-row window under-reported the moment a tenant had more than 10
+     * inspections and an older one still carried open/overdue DRs. Ordered the same, so
+     * {@code all.stream().limit(10)} is byte-identical to the paged top-10.
+     */
+    List<RegInspection> findByOrganisationIdOrderByCreatedAtDesc(Long organisationId);
 
     Optional<RegInspection> findByIdAndOrganisationId(Long id, Long organisationId);
 

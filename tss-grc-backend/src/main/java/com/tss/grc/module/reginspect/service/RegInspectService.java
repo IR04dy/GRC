@@ -292,13 +292,20 @@ public class RegInspectService {
         long closedCount = inspectionRepo.countByOrganisationIdAndStatus(
                 org(), "CLOSED");
 
-        Page<RegInspection> recent = inspectionRepo
-                .findByOrganisationIdOrderByCreatedAtDesc(
-                        org(), PageRequest.of(0, 10));
+        // F2-406 — sum the denormalised open/overdue DR counters over ALL of the tenant's
+        // inspections, not just the 10-most-recent-by-createdAt window. The counters are maintained
+        // absolutely per inspection by recountInspectionCounters, so summing the whole (@Where-scoped,
+        // soft-delete-excluded) population is the correct tenant-wide KPI — matching the all-time
+        // activeCount/closedCount beside it — where the old windowed loop under-reported the moment a
+        // tenant had more than 10 inspections and an older one still carried open/overdue document
+        // requests (the ordering is by recency, orthogonal to open-ness). NOT a SQL SUM: the null-skip
+        // stays in Java and hermetically testable (F2-345 / F2-352 / F2-365). recentInspections is
+        // the same top-10 window as before (the finder is ordered createdAt DESC).
+        List<RegInspection> all = inspectionRepo.findByOrganisationIdOrderByCreatedAtDesc(org());
 
         long openDr = 0;
         long overdueDr = 0;
-        for (RegInspection i : recent.getContent()) {
+        for (RegInspection i : all) {
             openDr   += i.getOpenDrCount() == null ? 0 : i.getOpenDrCount();
             overdueDr += i.getOverdueDrCount() == null ? 0 : i.getOverdueDrCount();
         }
@@ -308,7 +315,7 @@ public class RegInspectService {
                 .closedCount(closedCount)
                 .openDrCount(openDr)
                 .overdueDrCount(overdueDr)
-                .recentInspections(recent.stream()
+                .recentInspections(all.stream().limit(10)
                         .map(this::toInspection).toList())
                 .build();
     }
