@@ -3,6 +3,7 @@ package com.tss.grc.module.reginspect.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateDocumentRequestRequest;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateInspectionRequest;
+import com.tss.grc.module.reginspect.dto.RegInspectDtos.DashboardResponse;
 import com.tss.grc.module.reginspect.entity.RegDocumentRequest;
 import com.tss.grc.module.reginspect.entity.RegInspection;
 import com.tss.grc.module.reginspect.repository.RegDocumentRequestRepository;
@@ -18,16 +19,21 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -203,5 +209,47 @@ class RegInspectServiceTest {
                 eq(10L), eq(ORG), argThat(s -> s != null && s.endsWith("-DR-007")))).thenReturn(false);
 
         assertThat(mintedDrReference(insp)).isEqualTo("SAMA-OSI-2026-Q1-001-DR-007");
+    }
+
+    // ── F2-406: dashboard DR-counter sum covers ALL inspections, not the recent-10 window ──────
+
+    private static RegInspection dashInsp(long id, int openDr, int overdueDr) {
+        RegInspection i = new RegInspection();
+        i.setId(id);
+        i.setOpenDrCount(openDr);
+        i.setOverdueDrCount(overdueDr);
+        return i;
+    }
+
+    @Test
+    void dashboardSumsDrCountersOverAllInspectionsNotJustTheRecentWindow() {
+        // 12 live inspections, ordered createdAt DESC. The 10 most-recent carry ONE open DR between
+        // them; the 2 older (outside a top-10 window) still hold the bulk — 10 open + 4 overdue. A
+        // dashboard that sums only the recent-10 window under-reports the tenant-wide DR KPIs.
+        List<RegInspection> all = new ArrayList<>();
+        all.add(dashInsp(1L, 1, 0));                              // most-recent, 1 open DR
+        for (long id = 2; id <= 10; id++) all.add(dashInsp(id, 0, 0)); // 9 more recent, 0 DRs
+        all.add(dashInsp(11L, 5, 2));                             // older, outside the window
+        all.add(dashInsp(12L, 5, 2));                             // older, outside the window
+
+        when(inspectionRepo.countByOrganisationIdAndStatusIn(eq(ORG), anyCollection())).thenReturn(3L);
+        when(inspectionRepo.countByOrganisationIdAndStatus(ORG, "CLOSED")).thenReturn(9L);
+        // The fix reads the uncapped finder; the pre-fix body read the capped Page. Both stubbed
+        // lenient so the pre-fix control fails on the VALUE, not on an UnnecessaryStubbingException.
+        lenient().when(inspectionRepo.findByOrganisationIdOrderByCreatedAtDesc(ORG)).thenReturn(all);
+        lenient().when(inspectionRepo
+                        .findByOrganisationIdOrderByCreatedAtDesc(eq(ORG), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(all.subList(0, 10)));
+
+        DashboardResponse r = service.dashboard();
+
+        // Discriminating: the open/overdue DR KPIs cover ALL 12 inspections (1 + 5 + 5 = 11 open,
+        // 0 + 2 + 2 = 4 overdue), where the old windowed sum saw only the recent-10 (1 open / 0 overdue).
+        assertThat(r.getOpenDrCount()).isEqualTo(11L);
+        assertThat(r.getOverdueDrCount()).isEqualTo(4L);
+        // Guards (F2-214): the all-time counts are unchanged and recentInspections is still the top-10.
+        assertThat(r.getActiveCount()).isEqualTo(3L);
+        assertThat(r.getClosedCount()).isEqualTo(9L);
+        assertThat(r.getRecentInspections()).hasSize(10);
     }
 }
