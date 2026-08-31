@@ -50,7 +50,13 @@ public class DashboardService {
         long medium   = riskRepository.countByOrganisationIdAndRiskLevel(organisationId, "MEDIUM");
         long low      = riskRepository.countByOrganisationIdAndRiskLevel(organisationId, "LOW");
         long total    = critical + high + medium + low;
-        long open     = riskRepository.countByOrganisationIdAndStatus(organisationId, "OPEN");
+        // F2-407: "open" = the register's live population (not CLOSED), matching the
+        // openCritical/openHigh level tiles below and completing the open/closed
+        // partition. countByStatus(org, "OPEN") counted only the literal initial
+        // state, dropping every live non-OPEN risk (UNDER_REVIEW / MITIGATING /
+        // ACCEPTED / TRANSFERRED) — so a CRITICAL risk being mitigated raised
+        // openCriticalRisks but not openRisks (openCriticalRisks could exceed openRisks).
+        long open     = riskRepository.countByOrganisationIdAndStatusNot(organisationId, "CLOSED");
         long closed   = riskRepository.countByOrganisationIdAndStatus(organisationId, "CLOSED");
         long activeUsers = userRepository.countByOrganisationIdAndIsActiveTrue(organisationId);
         long totalUsers  = userRepository.findByOrganisationId(organisationId, PageRequest.of(0, 1)).getTotalElements();
