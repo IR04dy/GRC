@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -312,17 +313,57 @@ class ObligationCampaignServiceTest {
         // this test stubbed the repository and counted saves, i.e. it asserted the campaign's own copy
         // of the loop as correct — and that copy emitted no row-level event at all.
         when(attestationService.markOverdueForCampaign(eq(201L), any())).thenReturn(stale.size());
+        // F2-405 — the rollup now comes from recompute (the absolute OVERDUE count), not the delta.
+        // No prior sweep here, so the absolute equals the 2 rows flipped this pass. lenient() because
+        // the pre-fix code stored the delta directly and never ran recompute, leaving this unused.
+        lenient().when(attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
+                eq(ORG_ID), eq(201L), eq("OVERDUE"))).thenReturn(2L);
         when(campaignRepo.save(any(ObligationAttestationCampaign.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CampaignResponse out = service.escalateOverdue(201L);
 
         assertThat(out.status()).isEqualTo("ESCALATED");
         assertThat(out.totalOverdue())
-            .as("the roll-up must come from what the owning service actually flipped, not from the "
-                + "size of a candidate list the campaign selected for itself")
+            .as("the roll-up is the campaign's absolute OVERDUE count from recompute (F2-405); with no "
+                + "prior sweep it equals the 2 rows flipped this pass")
             .isEqualTo(2);
         verify(attestationService).markOverdueForCampaign(eq(201L), any());
         verify(attestationRepo, never()).save(any(ObligationAttestation.class));
+    }
+
+    @Test void escalateOverdue_reportsAbsoluteOverdueNotThisPassDelta() {
+        // The daily ComplianceDeadlineScheduler sweep already flipped this campaign's past-due rows to
+        // OVERDUE before the officer escalated, so markOverdueForCampaign has nothing left to flip
+        // (delta 0) — yet the campaign has 3 OVERDUE obligations that must be escalated. The rollup,
+        // audit line and F8 overdueCount must report the absolute count (recompute), not this pass's
+        // delta (F2-405 / F2-282). recompute also corrects total_in_progress, which the delta write
+        // never touched.
+        ObligationAttestationCampaign c = existing("IN_PROGRESS", 4);
+        when(campaignRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 201L)).thenReturn(Optional.of(c));
+        when(attestationService.markOverdueForCampaign(eq(201L), any())).thenReturn(0);  // the sweep already took them
+        lenient().when(attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
+                eq(ORG_ID), eq(201L), eq("OVERDUE"))).thenReturn(3L);
+        lenient().when(attestationRepo.countByOrganisationIdAndCampaignIdAndAttestationStatusAndIsDeletedFalse(
+                eq(ORG_ID), eq(201L), eq("IN_PROGRESS"))).thenReturn(1L);
+        when(campaignRepo.save(any(ObligationAttestationCampaign.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CampaignResponse out = service.escalateOverdue(201L);
+
+        assertThat(out.status()).isEqualTo("ESCALATED");
+        assertThat(out.totalOverdue())
+            .as("escalation must report the campaign's absolute OVERDUE count, not the rows flipped "
+                + "this pass — the sweep already flipped them, so the delta is 0")
+            .isEqualTo(3);                                   // pre-fix: 0 (the delta)
+        assertThat(out.totalInProgress())
+            .as("recompute also corrects total_in_progress, which the delta write never touched")
+            .isEqualTo(1);                                   // pre-fix: 0 (fixture value, never recomputed)
+
+        // The F8 event count is the absolute overdue too, not the delta (the audit line reads the
+        // same value, so proving the event proves both).
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().payload())
+            .containsEntry("overdueCount", "3");             // pre-fix: "0"
     }
 
     @Test void escalateOverdue_emitsAuditCommitteeTrigger() {

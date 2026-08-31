@@ -245,10 +245,19 @@ public class ObligationCampaignService {
         // nothing for campaign-driven escalation. Routing through the attestation service gives each
         // row its guard, its event and the correct previous status.
         LocalDateTime now = LocalDateTime.now();
-        int overdue = attestationService.markOverdueForCampaign(c.getId(), LocalDate.now());
+        // F2-405 — markOverdueForCampaign returns only the rows flipped THIS pass, but the daily
+        // ComplianceDeadlineScheduler sweep (sweepOverdueForOrg) also flips this campaign's rows to
+        // OVERDUE without touching the rollup, so by escalation time the delta can be 0 while the
+        // true OVERDUE population is N. Recompute total_overdue — and the other rollups, including
+        // total_in_progress, which the inline write never touched — from the live child rows, the
+        // single source of truth, exactly as closeCampaign does (F2-385 / F2-282). Storing the delta
+        // left stats() / CampaignResponse, the audit line and the F8 overdueCount all reporting 0
+        // overdue on a campaign the sweep had already made N-overdue.
+        attestationService.markOverdueForCampaign(c.getId(), LocalDate.now());
+        rollups.recompute(c);
+        int overdue = c.getTotalOverdue();
 
         c.setStatus("ESCALATED");
-        c.setTotalOverdue(overdue);
         c.setUpdatedAt(now);
         ObligationAttestationCampaign saved = campaignRepo.save(c);
 
