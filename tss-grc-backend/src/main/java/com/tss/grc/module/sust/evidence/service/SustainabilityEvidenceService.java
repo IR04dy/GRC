@@ -96,6 +96,7 @@ public class SustainabilityEvidenceService {
         if ("SUPERSEDED".equals(cur.getApprovalStatus()) || "EXPIRED".equals(cur.getApprovalStatus()))
             throw new IllegalStateException(
                 "Evidence is " + cur.getApprovalStatus() + " and cannot be modified. Upload a new version instead.");
+        String previousFileUrl = cur.getFileUrl();
         if (req.getTitleEn() != null)              cur.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null)              cur.setTitleAr(req.getTitleAr());
         if (req.getDescriptionEn() != null)        cur.setDescriptionEn(req.getDescriptionEn());
@@ -118,8 +119,26 @@ public class SustainabilityEvidenceService {
         if (req.getOwnerEmail() != null)           cur.setOwnerEmail(req.getOwnerEmail());
         if (req.getNotes() != null)                cur.setNotes(req.getNotes());
         validate(cur);
+        // F2-404: the evidence FILE is the certified content. approve() applies a four-eyes / SoD
+        // sign-off (approver != owner, SEC-ESG-002) on THIS document, and supersede() is the dedicated
+        // route for replacing it (a fresh PENDING_REVIEW row that must be re-approved). Replacing the
+        // file in place on an APPROVED row through update() left it APPROVED with the stale approver, so
+        // the ESG / CMA / TCFD / ISAE 3410 assurance register kept surfacing an approved document the
+        // reviewer never saw (F2-378 shape). Reset to PENDING_REVIEW and clear the stale approval so it
+        // re-enters review — keyed on a real file change (Objects.equals) and scoped to APPROVED (a
+        // benign metadata edit, or a file change on a not-yet-approved row, is untouched — F2-214).
+        boolean forcedReview =
+            !Objects.equals(previousFileUrl, cur.getFileUrl())
+            && "APPROVED".equals(cur.getApprovalStatus());
+        if (forcedReview) {
+            cur.setApprovalStatus("PENDING_REVIEW");
+            cur.setApprovedBy(null);
+            cur.setApprovedAt(null);
+        }
         SustainabilityEvidence saved = repo.save(cur);
-        audit.log("UPDATE", "SustainabilityEvidence", saved.getId(), "Sustainability evidence updated");
+        audit.log("UPDATE", "SustainabilityEvidence", saved.getId(),
+            "Sustainability evidence updated"
+                + (forcedReview ? " — file replaced, re-review required (APPROVED -> PENDING_REVIEW)" : ""));
         return saved;
     }
 
