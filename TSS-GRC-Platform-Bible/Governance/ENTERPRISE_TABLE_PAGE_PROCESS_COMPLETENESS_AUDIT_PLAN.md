@@ -1,51 +1,113 @@
 # Enterprise Table, Page, Process and Workflow Completeness Audit Plan
 
-**Document type:** Enterprise product-operability, UX, data and process audit plan  
-**Status:** `DISPOSITIONED (reduced to four keepers)` — see §0. Not executed as written.  
-**Baseline date:** 2026-07-31  
+**Document type:** Enterprise product-operability, UX, data and process audit standard
+**Status:** `ACTIVE AUDIT STANDARD — execution is governed by UNIFIED_IMPLEMENTATION_PLAN.md`
+**Version:** 2.0 (repository revalidation)
+**Baseline date:** 2026-08-31 (`cafcdf2d`)
 **Scope:** Every SQL Server object, managed business object, backend command/API, workflow, frontend page and module in the TSS GRC Platform  
 **Companion:** [Platform Capability Reachability and Orphan Discovery Plan](PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md)  
 
 ---
 
-## §0 Disposition — 2026-08-01
+## §0 Revalidation and governing disposition — 2026-08-31
 
-**This document is not scheduled as written, and the reason is the finding.** It appeared in the tree
-on 2026-07-31, 1,173 lines, scoped to *"every SQL Server object, managed business object, backend
-command/API, workflow, frontend page and module"* — while its own companion, the
-[Reachability and Orphan Discovery Plan](PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md),
-was already **rescoped and half-executed** as F2-68 in the governing backlog. Two documents proposing
-overlapping census machinery, days apart, is the duplication F2-68 exists to prevent — **occurring
-while F2-68 was being written.** So this gets the treatment
-[`UNIFIED_IMPLEMENTATION_PLAN.md`](../../UNIFIED_IMPLEMENTATION_PLAN.md) prescribes for a plan that
-arrives beside an active programme: a disposition at the top, its keepers filed as `F2-*` ids in the
-governing backlog, and **no numbering scheme of its own**.
+The 2026-08-01 decision remains correct: this document must not become a second implementation
+backlog. The repository now contains much of the discovery machinery the first edition proposed.
+Version 2.0 therefore turns the document into the **single audit method for table/page/process
+completeness**, while scheduling, finding IDs, owners and delivery status remain exclusively in
+[`UNIFIED_IMPLEMENTATION_PLAN.md`](../../UNIFIED_IMPLEMENTATION_PLAN.md) and
+[`FINDINGS_REGISTER_V2.md`](../Registers/FINDINGS_REGISTER_V2.md).
 
-**Reviewed in full against the instruments that already exist** (`table_xref.py`, `schema_drift.py`,
-`grant_tightness.py`, `deployment_identity.py`, `SchemaContractRatchetTest`,
-`RoleGuardConversionRatchetTest`, `routeReachability.test.ts`). Verdict: **one genuinely new idea plus
-three small pairwise joins — roughly 3–4 engineer-weeks — inside ~1,100 lines that re-derive
-instruments already running.** The bulk is not wrong; it is *already built*, and re-inflates the
-8-role pod, four councils, master graph and ten hand-maintained registers that the companion's adopted
-rescope deliberately cut. One measured example of the cost of not checking: its §6.1 proposes a
-stored-procedure and view universe for a database the companion measured at **1 view, 0 procedures,
-1 trigger**.
+This resolves the user's concern in professional terms:
 
-### The four keepers
+> For every table-backed business capability and every customer-visible page, determine whether a
+> legitimate persona or system can start, maintain, progress and complete the intended outcome.
+> Where a surface is absent, decide from the object's business semantics whether to add a guided
+> entry point, embed it under a parent workspace, automate it, expose an operational console, keep it
+> read-only, or retire it. Never infer that generic CRUD is the answer.
 
-| # | Keep | Where it is here | Why it survives | Size |
-|---|---|---|---|---|
-| **K-1** | **Interaction-archetype / expected-surface classification** | §5, TPC-001 | The only novel *idea* in the document. `table_xref.py` classifies **liveness** — operating, seed-only, orphaned. Nothing classifies what surface a table *ought* to have, so "this table has no page" cannot currently be distinguished from "this table must never have one". Two columns on the existing register + exceptions pattern, adjudicated **only for tables already under disposition** | days |
-| **K-2** | **Status-transition reachability scan** | §9.2 | States with no incoming or no outgoing command; backend states absent from the FE; two state machines over one record. No instrument does this, and F2-22b and F2-29 already supply the known positives to anchor it against vacuity. Workflow-adopting modules first | 1–2 wk |
-| **K-3** | **Multi-write-path (dual-lineage) detector** | §7.3 | A detector for this platform's historically worst shape — CH-6/CH-9's two policy backends, DF-3 — currently found only by hand, and only after it has shipped. Sits on top of `table_xref.py`'s existing reference collection | days |
-| **K-4** | **Workflow definition-vs-actor reachability** | §10.1–10.2 | Template with no publisher; task role with no users in the tenant. Folds into **F2-66**'s clean-tenant probe rather than standing alone — F2-66 already has to exercise the engine end to end | 1–2 d |
+### 0.1 Current measured baseline
 
-⚠ **K-1 through K-4 are filed as backlog candidates, not as a plan.** They enter the queue through
-`UNIFIED_IMPLEMENTATION_PLAN.md` §8 like anything else, behind the schema spine — because a
-classification of what surface a table *should* have is worth little while 67 mapped tables and 11 of
-their schemas cannot be created by a migration at all (RC-A / F2-70).
+The source-tree census was rerun on 2026-08-31 at `cafcdf2d`.
 
-**Everything below this section is retained as reference, not as scope.**
+| Surface | Current measurement | Audit consequence |
+|---|---:|---|
+| Module packages | 59 | All 59 enter the module coverage matrix, including empty/technical packages |
+| Entity files / entity declarations | 419 / 432 | Table work must reconcile inheritance and files containing multiple entity classes |
+| HTTP endpoints / write endpoints | 2,216 / 1,238 | Page coverage cannot be inferred from controller existence |
+| Frontend pages / routes / navigation entries | 353 / 330 / 190 | Pages, routes and discoverability are separate evidence planes |
+| Frontend grouped API clients | 91 clients / 1,070 methods | Method-level reachability is required; a used client object can hide unused methods |
+| API-client methods with no production caller | 188 in the current ratchet | Each is a candidate, not automatically a defect; classify `HOLE`, whole-capability dark, duplicate or intentional system use |
+| Backend endpoints with no frontend client | 407 | Includes legitimate integration/system producers; every guarded write still needs a producer decision |
+| Clientless guarded write endpoints | 198 | Highest-value reconciliation population after high-consequence lifecycle commands |
+| Current generated table snapshot | 471 register rows: 399 operating, 30 wired-unproven, 16 seed-only, 10 legacy, 10 confirmed orphan, 5 dormant, 1 intentional technical | **Stale evidence dated 2026-08-06**; useful as seed/known positives only, never as the August 31 database truth |
+| Zero-test module packages | 4 (`audit_eng`, `controlmap`, `dashboard`, `datagov`) | Published baseline still says 7; repair the baseline pairing before using it as an audit gate |
+
+The database cross-reference could not be regenerated in the bundled audit runtime because `pyodbc`
+is absent. Gate 0 must run `table_xref.py` using an approved read-only SQL Server runtime with the
+required ODBC dependency. Until then, no current database population count may be described as
+complete.
+
+### 0.2 Existing controls to reuse, not rebuild
+
+| Evidence question | Existing authority | Residual question this plan adds |
+|---|---|---|
+| Does a database table exist, carry rows and have mappings/references? | `table_xref.py`, `schema_drift.py`, `SchemaContractRatchetTest` | What interaction surface **should** its managed object have? |
+| Can a user navigate to a page/detail target? | `routeReachability.test.ts`, `routeDetailReachability.test.ts` | Does the page expose the right start/next/terminal action for the intended persona? |
+| Does a production page use real server data? | `pageDataProvenance.test.ts`, demo-fallback and lifecycle-store contracts | Does real data complete a business outcome rather than merely render rows? |
+| Is a frontend API client or method called? | `apiClientReachability.test.ts`, `apiClientMethodReachability.test.ts` | Is absence intentional, and is a workflow step missing inside an otherwise live family? |
+| Does every frontend-called endpoint exist? | `FrontendEndpointContractTest` | Are clientless endpoints intentional system/integration surfaces or sellable capability gaps? |
+| Is a service method reachable from production code? | `DarkServiceMethodTest` | Is the reachable method exposed through the correct business command and actor? |
+| Are guards, permissions and licences structurally present? | role-guard, permission, module-registry and licence coverage ratchets | Can an actual non-platform-admin holder in a clean tenant perform the action? |
+| Is a page backed by the canonical lifecycle store? | lifecycle-store, state-column and module lifecycle tests | Are all legal states reachable forward and backward through UI/API/actor edges? |
+| Can an empty tenant activate a capability? | `clean_tenant_probe.py` and full-chain probes | Do workflow definitions resolve to populated actor groups and produce evidence? |
+
+### 0.3 Residual audit work — the four governed keepers
+
+| Keeper | Required result | Size | Gate |
+|---|---|---:|---|
+| **K-1 Expected interaction surface** | Add `object_archetype`, `expected_surface`, `producer_type`, `owner_module`, `decision_basis` and `confidence` to a generated, exception-backed join—not to a hand-maintained table list | 3–5 days | 100% of in-scope objects classified or explicitly `DECISION_REQUIRED` |
+| **K-2 State-transition reachability** | Join persisted states, backend transition maps/commands, frontend actions, guards, actor availability and terminal outcomes | 1–2 weeks | Every state has a legal incoming edge and either a legal outgoing edge or explicit terminal semantics |
+| **K-3 Dual-lineage/multi-writer detection** | Detect two aggregates, schemas, services or pages authoring the same business fact | 3–5 days | Every duplicate lineage has a canonical owner ADR, migration/retention decision and write prohibition |
+| **K-4 Workflow definition-to-actor proof** | Prove definition → publisher → instance → eligible populated actor → task → decision/callback → evidence in a clean tenant | 1–2 days plus probes | No workflow is declared operable from templates or seeded tasks alone |
+
+### 0.4 Expected-surface decision vocabulary
+
+Every managed object receives exactly one primary decision. This is the control that separates an
+orphan from a deliberate no-UI design.
+
+| Code | Meaning | Expected entry point |
+|---|---|---|
+| `BUSINESS_CREATE` | A persona originates a governed business record | Workspace/register “Create”, guided wizard, or contextual add |
+| `PARENT_MANAGED` | Child or relationship has no independent business life | Add/edit/link inside the parent record |
+| `INTAKE_OR_EVENT_PRODUCED` | Intake, integration, detector or domain event is the authoritative producer | Intake/event configuration plus traceable promotion; no duplicate create page |
+| `WORKFLOW_PRODUCED` | Engine creates task/approval/notification records | My Work/queue for action; definition/admin surface for setup |
+| `IMPORT_RECONCILED` | Bulk/connector data requires validation before acceptance | Import/reconciliation/quarantine console |
+| `CONFIG_MANAGED` | Versioned tenant/reference configuration | Restricted administration or content-pack installation |
+| `READ_ONLY_EVIDENCE` | Immutable decision, signature, ledger or derived fact | Viewer/history/drill-through; correction by supersession only |
+| `TECHNICAL_DIAGNOSTIC` | Outbox, scheduler, delivery, idempotency or health object | Operations console with bounded retry/replay where safe |
+| `LEGACY_READ_ONLY` | Historic record retained for continuity/retention | Search/export only; no new writes |
+| `RETIRE` | Duplicate, unused or invalid structure | Block writes, migrate/retain evidence, then remove through approved migration |
+| `DECISION_REQUIRED` | Evidence is insufficient or owners disagree | No implementation until owner/ADR resolves it |
+
+### 0.5 Classification safeguards grounded in current platform evidence
+
+- `POST /api/capa/tasks` is deliberately clientless when CAPA is created from intake, findings or
+  automation. Adding a parallel “Create CAPA” button without a product decision would create a second
+  lineage, not fix reachability.
+- An API family with list/approve/close but no create/update/transition is a **workflow hole** until its
+  upstream producer is proven. Examples already visible in the current method-reachability register
+  include DPIA create/update, internal-audit plan transition, risk attestation, KRI breach closure and
+  change-condition access.
+- `privacy` versus `privacy_lc`, or any other dual register, requires canonical-ownership and migration
+  evidence. Seeding the empty side makes the duplication harder to see.
+- Audit logs, committee votes, signed decisions, evidence hashes, derived scores and notification
+  outboxes fail the audit if generic edit/delete is exposed.
+- A page that loads real rows can still fail operability if it has no discoverable start, no actionable
+  next state, no eligible actor, no completion evidence, or depends on an unlicensed sibling module.
+
+**Sections 1–21 below define the detailed audit method. Sections 22–28 define the revalidated
+execution plan.**
 
 ---
 
@@ -1057,15 +1119,27 @@ Generic statements such as “add CRUD”, “improve UX”, “add workflow” 
 
 ## 22. Execution waves
 
-### Wave 0 — platform kernel and audit tooling
+The audit runs as vertical reconciliation, not as “inspect all tables, then inspect all pages.” Every
+selected object is followed through table → aggregate → producer → API → page/task → transition →
+outcome → evidence, and then traced backward. Findings enter the existing `F2-*` register only after
+the first broken edge is reproduced.
 
-`auth`, `iam`, permissions/licensing, workflow, approvals, evidence, signatures, audit ledger, automation, notifications, attachments, exports, admin/committees.
+### Wave 0 — measurement integrity and pilot
+
+- repair the measured-baseline drift;
+- regenerate the live database disposition with a read-only SQL runtime;
+- add expected-surface fields and validate exceptions in both directions;
+- execute known-positive pilots covering orphan, seed-only, system-produced, immutable and live
+  business objects;
+- mutation-test each new detector before trusting a clean result.
+
+### Wave 1 — platform kernel and high-consequence authority
+
+`auth`, `iam`, permissions/licensing, workflow, approvals, evidence, signatures, audit ledger,
+automation, notifications, attachments, exports, admin/committees, Change/CAB, policy approval, risk
+acceptance and audit findings.
 
 Reason: a shared-kernel break can make every product module look incomplete.
-
-### Wave 1 — high-consequence authority processes
-
-Change/CAB, policy approval, risk acceptance, committee resolutions, access governance, evidence approval, audit findings.
 
 ### Wave 2 — core GRC products
 
@@ -1085,19 +1159,23 @@ Within each wave audit vertical outcomes, not all tables first and all pages lat
 
 ## 23. Delivery schedule and governance
 
-For the current platform scale, allow **10–12 weeks for the audit and target specifications** with a dedicated cross-functional pod. Remediation follows a separately approved roadmap.
+The residual design/audit effort is **3–4 engineer-weeks** because the repository already has the
+route, client, endpoint, provenance, dark-method, schema and role/licence instruments. This estimate
+does not include remediation of findings or owner-delayed canonical-data decisions.
 
-| Phase | Weeks | Outcome | Gate |
+| Work package | Target duration | Outcome | Exit gate |
 |---|---:|---|---|
-| 0. Standards and pilot selection | 1 | Archetypes, IDs, scorecards, owners, evidence protocol | Audit charter approved |
-| 1. Automated inventory/graph | 1–3 | Complete database/backend/frontend/workflow candidate graph | Anti-vacuity and sample reconciliation pass |
-| 2. Kernel and Wave 1 audit | 3–5 | Authority/process integrity findings and target designs | P0 decisions approved |
-| 3. Core GRC module audit | 5–8 | Per-table/page/process assessments and specs | Module owners sign classifications |
-| 4. Specialist/Saudi audit | 7–10 | Specialist packs and Saudi-market improvements | GRC/regulatory review complete |
-| 5. Cross-platform UX and consolidation | 9–11 | Workspace/page consolidation and shared-object decisions | UX/Architecture council sign-off |
-| 6. Portfolio and CI prevention | 11–12 | Final heatmaps, backlog, release waves and ratchets | Acceptance committee approves audit |
+| 0. Measurement integrity | 2–3 days | Fresh source/database/route/client baseline and known-positive set | No stale input is presented as current; detectors fail on seeded mutations |
+| 1. Expected-surface join | 3–5 days | Every in-scope object classified by §0.4 with evidence/confidence | No unclassified object except explicit `DECISION_REQUIRED` |
+| 2. Lifecycle and actor reachability | 7–10 days | State/command/page/guard/actor/terminal graph for lifecycle modules | No unexplained dead-end state; clean-tenant actor proof passes |
+| 3. Dual-lineage and page/process review | 5–7 days | Canonical-owner candidates, workflow holes and target UX decisions | Every candidate has owner decision or documented blocker |
+| 4. Acceptance and prevention | 3–5 days | Module heatmap, PDS deltas, findings, acceptance probes and CI ratchets | Acceptance Committee signs evidence, not prose |
 
-### 23.1 Core audit team
+Sampling is allowed only to validate the method. Coverage claims require population reconciliation:
+every current table/register row and every active production page must appear exactly once in the
+joined audit output.
+
+### 23.1 Accountable review roles
 
 - Chief Product/Enterprise GRC reviewer;
 - Enterprise/Solution Architect;
@@ -1108,7 +1186,10 @@ For the current platform scale, allow **10–12 weeks for the audit and target s
 - Saudi Regulatory SME;
 - rotating module business owners.
 
-### 23.2 Governance forums
+These are review roles, not a requirement to create an eight-person permanent pod. One person may
+hold several roles, but the author of a high-consequence finding may not be its sole verifier.
+
+### 23.2 Governance cadence
 
 - weekly Evidence Review: candidate → corroborated → verified;
 - weekly Product Process Council: interaction/lifecycle decisions;
@@ -1118,30 +1199,23 @@ For the current platform scale, allow **10–12 weeks for the audit and target s
 
 ---
 
-## 24. Initial product backlog
+## 24. Governing work queue
 
-| ID | Priority | Deliverable | Acceptance |
-|---|---|---|---|
-| TPC-001 | P0 | Ratify MBO archetypes and interaction rules | Every table class has page/no-page rule |
-| TPC-002 | P0 | Build full database object/migration lineage collector | 100% SQL objects inventoried |
-| TPC-003 | P0 | Build Java producer/consumer/command graph | Known JPA/native/dynamic cases detected |
-| TPC-004 | P0 | Build TypeScript page/action/API graph | Every active route/action inventoried |
-| TPC-005 | P0 | Build workflow trigger/actor/callback graph | Definitions and publishers reconciled |
-| TPC-006 | P0 | Join permission/role/user/entitlement reachability | Intended non-admin persona identified |
-| TPC-007 | P0 | Pilot on workflow/evidence/approvals/committee/change/privacy | Known positives and defects validate method |
-| TPC-008 | P0 | Audit high-consequence decision tables/pages | No caller-editable decision fact remains unassessed |
-| TPC-009 | P1 | Execute every-table Loop A by module wave | 100% table records classified |
-| TPC-010 | P1 | Execute every-page Loop B | 100% active page records classified |
-| TPC-011 | P1 | Build MBO two-way reconciliation | No unowned table/page remains without decision |
-| TPC-012 | P1 | Complete lifecycle/state-machine matrix | Every state has command/path/terminal evidence |
-| TPC-013 | P1 | Complete workflow matrix | Every workflow has trigger/actor/callback/outcome |
-| TPC-014 | P1 | Perform empty-tenant and intended-persona probes | Representative MBOs proven end to end |
-| TPC-015 | P1 | Produce per-module improvement PDS | Target interaction/process design approved |
-| TPC-016 | P1 | Produce canonical/legacy migration decisions | ADR and retention plan for duplicates |
-| TPC-017 | P1 | Produce page consolidation/workspace blueprint | Register/detail/task/admin surfaces rationalised |
-| TPC-018 | P1 | Produce remediation implementation roadmap | P0/P1/P2 slices, effort, ROI and dependencies |
-| TPC-019 | P1 | Add capability/table/page/workflow CI ratchets | Mutation-proven failures name broken edge |
-| TPC-020 | P2 | Build ongoing completeness health dashboard | New/unclassified/stuck/drift items visible |
+Do not create `TPC-*` backlog IDs. The earlier list was a competing backlog and is withdrawn. Work
+enters the governing plan through the existing finding process with the full finding schema in §21.
+
+| Order | Work item | Priority | Done when |
+|---:|---|---|---|
+| 1 | Refresh source and database evidence; repair the baseline drift | P0 | Reproduction commands and commit/database identities are attached |
+| 2 | Extend the generated table disposition with §0.4 expected-surface decisions | P0 | All rows classified or owner-blocked; stale exceptions fail |
+| 3 | Join active pages to routes, personas, API methods, commands and owned objects | P0 | Every page has provenance, discoverability, outcome and disposition |
+| 4 | Triage 198 clientless guarded writes and 188 uncalled client methods by business meaning | P0 | Each is intentional, duplicate, system/integration-only, or a verified workflow hole |
+| 5 | Run lifecycle transition reachability on high-consequence modules | P0 | State dead ends, invisible transitions and dual machines are verified/closed/filed |
+| 6 | Run definition-to-actor clean-tenant workflow probes | P0 | Intended roles exist, have holders and can complete the task without platform-admin |
+| 7 | Detect multi-writer/dual-lineage business facts | P0 | Canonical owner, migration, retention and write-block decision recorded |
+| 8 | Complete module/page UX and Saudi acceptance review | P1 | Arabic/RTL, accessibility, evidence, regulatory clocks and persona journeys pass |
+| 9 | Produce per-module PDS deltas and remediation slices | P1 | Each finding has target design, effort, dependency, ROI and executable acceptance |
+| 10 | Add mutation-proven prevention gates | P1 | A new unclassified object, dead state, unreachable command or actorless workflow fails CI |
 
 ---
 
@@ -1164,6 +1238,12 @@ The audit is complete only when:
 13. Arabic/English, RTL and accessibility have explicit page-level results.
 14. Every finding has a concrete target design and acceptance test.
 15. Product, Data, Architecture, Security, UX, QA and Saudi GRC owners sign the final matrices.
+16. The table-object and page-object joins reconcile exactly to the regenerated populations; no row
+    disappears through filtering, naming mismatch or stale exception.
+17. No immutable, derived, technical or system-produced object receives generic CRUD merely to make
+    a reachability count improve.
+18. Every intentional no-UI/no-create decision names its actual producer, consumer, operational
+    recovery path and accountable owner.
 
 ---
 
@@ -1179,6 +1259,9 @@ The audit is complete only when:
 8. Canonical/legacy decisions already made but not documented.
 9. Whether empty production tenants should show no records or an explicitly isolated demo mode.
 10. Permission to create/clean `[REVIEW-TEST]` records in development.
+11. An approved Python/ODBC runtime capable of executing the read-only database census.
+12. Which modules and workflows are contractually sold today, so clean-tenant SKU tests use real
+    packaging promises rather than repository package names.
 
 Unknown answers remain visible audit blockers; they are not replaced by silent assumptions.
 
@@ -1199,7 +1282,8 @@ Unknown answers remain visible audit blockers; they are not replaced by silent a
 
 ## 28. Immediate next action
 
-Start with **TPC-001 through TPC-007** as a read-only pilot. The first pilot must deliberately include different archetypes:
+Execute Work Queue items 1–3 as a read-only pilot; do not file remediation findings until the
+measurement gates pass. The first pilot must deliberately include different archetypes:
 
 ```text
 change request (aggregate root)
@@ -1211,4 +1295,12 @@ automation/outbox (system technical)
 dashboard/export source (derived consumer)
 ```
 
-The pilot succeeds only when the audit correctly recommends a page for some tables, a nested interaction for others, and **no editable UI** for immutable/technical/legacy tables. That proves the method is assessing product process maturity rather than mechanically generating CRUD screens.
+For each pilot object, complete both Loop A and Loop B, then reconcile it in Loop C/D. The pilot
+succeeds only when it correctly recommends a page for some objects, a nested interaction for others,
+an event/intake producer for others, and **no editable UI** for immutable/technical/legacy objects.
+That proves the method is assessing product-process maturity rather than mechanically generating CRUD
+screens.
+
+After the pilot, process modules in §22 order and publish one module coverage ledger per review batch.
+Each ledger must show population total, classified total, verified total, blocked decisions, findings
+filed and acceptance probes passed. A percentage without those denominators is not an audit result.
