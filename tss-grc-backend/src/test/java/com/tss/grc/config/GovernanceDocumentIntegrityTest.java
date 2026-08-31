@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -152,22 +155,47 @@ class GovernanceDocumentIntegrityTest {
 
     /** Every tracked-ish {@code .md} in the repo, excluding build output and agent worktrees. */
     private static List<Path> allRepoMarkdown() {
-        try (Stream<Path> s = Files.walk(ROOT)) {
-            return s.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(".md"))
-                    .filter(p -> {
-                        String r = rel(p);
-                        // `.claude/worktrees/` holds full clones from concurrent agent sessions
-                        // (F2-134 measured 1,061 duplicate .md files there). They are not this
-                        // repo's documents and must not be judged as such.
-                        return !r.startsWith(".claude/") && !r.startsWith("node_modules/")
-                                && !r.contains("/node_modules/") && !r.contains("/target/");
-                    })
-                    .sorted()
-                    .toList();
+        // F2-408: PRUNE the traversal at .claude / node_modules / target rather than only
+        // filtering them out of the RESULT. Files.walk descends into every subtree first and
+        // throws NoSuchFileException the moment it meets a dangling symlink inside a concurrent
+        // agent worktree's node_modules (`.claude/worktrees/` holds full clones from concurrent
+        // sessions — F2-134 measured 1,061 duplicate .md there; F2-206: scope filesystem sweeps
+        // to the working tree). That crashed the whole build on garbage that is not this repo's
+        // document. walkFileTree lets us SKIP_SUBTREE before descending, and visitFileFailed
+        // tolerates a file removed mid-walk (e.g. a concurrent pnpm install).
+        List<Path> out = new ArrayList<>();
+        try {
+            Files.walkFileTree(ROOT, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    Path name = dir.getFileName();
+                    if (name != null) {
+                        String n = name.toString();
+                        if (n.equals(".claude") || n.equals("node_modules") || n.equals("target")) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (attrs.isRegularFile() && file.getFileName().toString().endsWith(".md")) {
+                        out.add(file);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new UncheckedIOException("could not walk " + ROOT.toAbsolutePath(), e);
         }
+        out.sort(null);
+        return out;
     }
 
     // ---------------------------------------------------------------------------------------
