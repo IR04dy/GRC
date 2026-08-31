@@ -21,6 +21,12 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     // QUAL-BCMP-005: "open <level> risks" = that level AND not in a terminal
     // (CLOSED) status — distinct from the unfiltered countByRiskLevel total.
     long countByOrganisationIdAndRiskLevelAndStatusNot(Long organisationId, String riskLevel, String status);
+    // F2-407: the dashboard's aggregate "open risks" = not in a terminal (CLOSED)
+    // status — the same single-terminal "open" the QUAL-BCMP-005 level tiles above
+    // use. The old countByStatus(org, "OPEN") dropped every live non-OPEN state
+    // (UNDER_REVIEW / MITIGATING / ACCEPTED / TRANSFERRED), so openCriticalRisks
+    // could exceed openRisks and open + closed did not partition the register.
+    long countByOrganisationIdAndStatusNot(Long organisationId, String status);
 
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId ORDER BY r.createdAt DESC")
     List<Risk> findTop5ByOrganisationIdOrderByCreatedAtDesc(@Param("orgId") Long orgId, Pageable pageable);
