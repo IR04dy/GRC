@@ -15219,6 +15219,75 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-423 — an unordered PICK has no key either, and it chose which SAMA limit an approval overwrote
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — the destructive half (a COUNTERPARTY upsert capturing a GROUP row) is reachable in two API calls and latent in data at 0 such rows; the determinism half is **exercised today**, since 33 counterparty keys and 4 group references already hold two rows each in dev AND prod ([[F2-283]]: say which you have) |
+| **Source** | asking [[F2-422]]'s question of a single-row PICK rather than a window — the population [[F2-415]] swept for EMPTINESS and never asked *which row* about |
+| **Size** | S — three repository finders, two branches of one method, five gate legs, no schema and no migration |
+
+⚠⚠ **A WINDOW WITH NO KEY IS A FUNCTION OF THE QUERY PLAN; SO IS A PICK WITH NO KEY.** [[F2-422]] closed the window half — `Pageable.ofSize(N)`, an unsorted cap, feeding three Audit Committee sections. The same mechanism one notch down is `list.get(0)` / `.findFirst()` over a finder that declares no order. 🔑 **[[F2-415]] swept exactly this population — `.get(0)`, `.getFirst()`, `.findFirst()`, `Optional.get()` — and recorded a clean sweep: *"every empty-first access is guarded or provably non-empty"*. That is true, and it is a different question. An instrument keyed on EMPTINESS is blind to ORDER, and both readings of `get(0)` look identical in the source.**
+
+⚠⚠ **THE MEMBER: `CptyService.upsertLimit` IDENTIFIED THE SAMA LARGE-EXPOSURE ROW IT WAS ABOUT TO OVERWRITE WITH `hits.get(0)` OF AN UNORDERED, UNSCOPED FINDER — AND THE BRANCH FOUR LINES BELOW IT FILTERED THE SCOPE.** The method opens with the comment *"Identify existing row for (scope, key) pair"*, and both halves of that sentence were false on the first branch:
+
+```java
+if ("COUNTERPARTY".equals(req.getScope()) && req.getCounterpartyId() != null) {
+    List<LargeExposureLimit> hits = limitRepo
+            .findByCounterpartyIdAndOrganisationId(req.getCounterpartyId(), org());   // no order, no scope
+    existing = hits.isEmpty() ? null : hits.get(0);
+} else if ("GROUP".equals(req.getScope()) && req.getGroupReference() != null) {
+    existing = limitRepo.findByOrganisationIdOrderByUtilisationPctDesc(org())
+            .stream().filter(l -> "GROUP".equals(l.getScope())                       // scope filtered HERE
+                    && req.getGroupReference().equals(l.getGroupReference()))
+            .findFirst().orElse(null);
+}
+```
+
+🔑 **Two sibling branches of one method, one applying the scope half of the key and one not** — [[F2-215]]'s two-of-N at the tightest range this register has recorded it, four lines.
+
+⚠⚠ **THE DESTRUCTIVE CONSEQUENCE, AND IT NEEDS NO CONCURRENCY.** The body then does `l.setScope(req.getScope())` and `l.setGroupReference(req.getGroupReference())` on whatever row was picked. So a COUNTERPARTY upsert that captures a GROUP row **rewrites a consolidated group limit as a single counterparty's limit and nulls its group reference**. It is two API calls away and nothing refuses either: `UpsertLimitRequest` declares `scope`, `counterpartyId` and `groupReference` as three independent optional fields with **no cross-field validation**, and `setCounterpartyId` is unconditional — so a GROUP upsert carrying a `counterpartyId` writes a GROUP row that the COUNTERPARTY branch can then find. Whether it *is* found is decided by the plan, which is the whole point. Measured: **0 GROUP rows carry a `counterparty_id` today** in either database, so that half is a latent-hazard closure ([[F2-283]]).
+
+⚠⚠ **THE DETERMINISM CONSEQUENCE IS EXERCISED TODAY, ON REAL ROWS.** Measured 2026-09-01, dev and prod **byte-identical**: `cpty.large_exposure_limit` holds **74 rows, 66 COUNTERPARTY over 33 keys and 8 GROUP over 4 references — exactly two rows per key**, with **zero CHECK constraints and zero unique indexes** on the table. So `hits.get(0)` picks between two real rows on every single key. 🔑 **The pairs differ only in `approved_at` (24th vs 25th February) and `id` — the fingerprint of the seed having run twice, not of the API creating them** — which is why the arbitrary pick has no *observable* consequence today: the two candidates are identical, so whichever is updated produces the same figures. What was at stake was stability, and that is now stated rather than incidental.
+
+⚠ **`OrderByIdAsc` was chosen by MEASUREMENT, not by taste.** The current plan returns **id ASC on every sampled key in both databases** (`ix_limit_cpty` is `(organisation_id, counterparty_id)` and the PK is clustered on `id`, so a seek yields the clustering key in order — but that is a claim about a plan, and a plan is precisely the thing this finding says you may not reason about, so it was run). Stating the order the plan already yields means **the fix cannot change the outcome of any request that works today**, which is [[F2-183]]'s direction.
+
+⚠ **And the GROUP branch's order was ORTHOGONAL, then a TIE.** `findByOrganisationIdOrderByUtilisationPctDesc` orders by utilisation, which is unrelated to *which row is the one for this group reference* — [[F2-420]]'s case. Worse: measured, all four duplicated group references hold rows with **identical `utilisation_pct`**, so the sort is a tie and the pick was unordered after all. 🔑 **An ordered finder whose key ties across the candidate set is an unordered finder.**
+
+⚠⚠ **THE TELL WAS AT THE REPOSITORY AND IT IS [[F2-205]] / [[F2-282]]'S: `findByCounterpartyIdAndOrganisationId` WAS THE ONLY ONE OF FOUR SIBLINGS IN `module/cpty` WITH NO ORDER.** `CptyEventRepository`, `CreditRatingRepository` and `RatingActionRepository` each declare `findByCounterpartyIdAndOrganisationIdOrderBy…`. 🔑 **And it had a SECOND consumer nobody had asked about: `listLimitsForCounterparty` rendered the per-counterparty limit list in plan order too**, so replacing the finder outright with `…OrderByIdAsc` fixed a surface the finding was not looking for.
+
+⚙ **Fix shape.** Two `findFirstByOrganisationIdAndScope…OrderByIdAsc` finders returning `Optional`, so **the query picks the row and there is no list for a caller to pick out of** — the defect becomes unrepresentable rather than merely corrected ([[F2-213]]'s direction). `SCOPE_COUNTERPARTY` / `SCOPE_GROUP` are declared once, because F2-423 made each token **two** facts (the branch test and the query argument) and a second literal is how the GROUP branch came to filter a scope the COUNTERPARTY branch did not ([[F2-217]]). ⚠ Matching the scope in the QUERY rather than with a Java `equals` also compares under the column's own **case-insensitive** collation instead of exactly — strictly wider than the filter it replaces, which is the safe direction here ([[F2-179]]).
+
+⚠⚠ **THE CENSUS IS THE PUREST FORM OF THE SHAPE, AND IT IS NOT A HARD ZERO — THE REASON WHY IS THE DISCRIMINATOR FOR THE WHOLE FAMILY.** A `findFirstBy…` / `findTopBy…` derived finder with no `OrderBy` is `SELECT TOP 1` with no key. Measured: **6 such finders against 27 that declare an order.** All six were read:
+
+| finder | verdict |
+|---|---|
+| `findFirstByIntegrationAndExternalNumber` | **DARK** — zero callers in main or test, and the only one of the six that is not tenant-scoped ([[F2-187]]'s question, not this one) |
+| `findFirstByOrganisationIdAndFactorCodeAndIsActiveTrue` | **GENUINE PICK, LATENT — FILED** (see below) |
+| `findFirstByOrganisationIdAndFalconHostId` | **EXISTENCE CHECK** — its only caller is `.isEmpty()` |
+| `findFirstByOrganisationIdAndIntegrationAndExternalNumber` | **GENUINE PICK, UNMEASURED — FILED** |
+| `findFirstByOrganisationIdAndTenablePluginId` | **EXISTENCE CHECK** — its only caller is `.isPresent()` |
+| `findFirstByOrganisationIdAndUserIdAndPageKeyAndIsDefaultTrue` | **CORRECT BY INDEX** — V160's `UNIQUE INDEX UX_saved_views_default_per_user_page` makes the result size ≤ 1 |
+
+🔑 **A `findFirstBy` with no order is correct exactly when something guarantees the result cannot hold two rows — a unique index, or a caller that only asks whether one exists at all.** A hard zero would fail on three of the six, which is the one failure a gate must never have ([[F2-214]]).
+
+⚠⚠ **AND A CORPUS-WIDE HARD ZERO OVER `get(0)` WOULD BE FAR WORSE: 11 OF THE 12 SHORTLISTED PICKS ARE CORRECT.** The sweep found **61 raw pick sites**; resolved, **17** come from a finder that declares an order, **12** are not repository results at all (a `TreeSet`, a declared ladder, a CSV header, an upstream JSON array), **20** were unresolvable by my window-based resolver, and **12** shortlisted as unordered. Reading them: `StrategyRoiService` checks the invariant over **every** row so the pick is a representative; `BiaPromotionAdapter` and `BreakGlassService` filter to a unique key first; `AuditChainService` and `CommitteeResolutionService` order in an `@Query` my `@Query` detector's lookback window missed; `RiskAssessmentService` and `SocOpsDashboardService` were mis-attributed by my resolver taking the nearest repository call in an 8-line window. 🔑 **My resolver over-reports, which is the loud direction — but a gate built on it would fail on correct code, so the invariant is scoped to the ONE method and the census to the one finder shape that has no correct unordered form.**
+
+⚙ **The gate extends [[F2-422]]'s class rather than adding one** ([[F2-190]]): *"may a FIGURE come off an unsorted window"* and *"may a PICK come off an unordered finder"* are one question with two carriers. Five legs — the two finders by reflection (so a rename cannot fool it, and the unordered one must not come back), a source scan scoped to `upsertLimit`, the exactly-asserted census, an anti-vacuity floor over the 27 ordered finders, and a self-test that the detector splits on the ORDER rather than on the verb.
+
+⚠ **My own substantiality floor refused my own verdict on the gate's first run** — the Tenable entry read *"EXISTENCE CHECK — its only caller is `.isPresent()`"* at 45 characters against a 60-character floor. [[F2-188]]'s rule firing on the slice that wrote it, for the third time in this register. 🔑 **The fix was not to lower the floor and not to pad the sentence — padding is the fluency-reads-as-verification trap the floor exists to catch — but to say what actually settles it: the row is never dereferenced, so the pick cannot reach a caller.**
+
+⚠ **And an escape landmine, self-inflicted and loud.** A heredoc patch put `\n` where the closing quote of a Java string literal belonged, so the literal ran off the end of its line. `mvn -o test` then printed `BUILD FAILURE` with **no `Tests run:` line** — [[F2-414]] / [[F2-255]]'s tell that nothing ran rather than that everything passed. Repaired with the editing tools, which is what this file's own rule says to use for content carrying escapes.
+
+⚙ **Verification.** Hermetic ([[F2-320]] / [[F2-325]] — Mockito, no DB, no Spring context); the read-only measurements above are reachability evidence, which is what [[F2-283]] demands rather than fix verification. `CptyServiceTest` 6 → **9**, `UnsortedWindowContractTest` 4 → **9**. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert `CptyService` to master and restore the unordered finder **alongside** the three new ones so both trees compile → **5 of 5 discriminating legs RED, 13 guards green**, and 🔑 **the census leg correctly did NOT move when a plain `findBy` was restored, which is what proves it is keyed on `findFirstBy` rather than on any finder.**
+
+⚙ **Filed, deliberately not forced** ([[F2-188]]): the **33 + 4 duplicated rows** — cleaning live rows in two customer databases is an owner decision, and a unique index would fail Flyway over them, which is [[F2-183]]'s rule exactly; `large_exposure_limit.scope` carrying **no CHECK**, so an unrecognised scope matches neither branch and inserts a fresh row (both stored values are canonical today — 66 COUNTERPARTY / 8 GROUP / 0 others — and the branch test is a case-**sensitive** Java `equals` against a case-insensitive column, [[F2-179]]); **`EmissionFactorService.resolveActive`**, whose repository javadoc asserts *"there is at most one"* active factor per code with **0 CHECKs and 0 unique indexes** enforcing it, where two concurrent `create()` calls both deactivate the same prior row and both insert `isActive = true`, and the chosen `factor_value` multiplies activity data into tCO2e for the ISAE 3410 lineage — latent at **6 rows, 0 LIVE** in both databases, so `resolveActive` currently throws for every code; `platform.integration_external_link` having no unique index while the ServiceNow webhook dereferences the match to attach an inbound update to a GRC record (**unmeasured** — saying so is the point); and the **20 unresolvable pick sites**, since *unresolved reads identically to clean* ([[F2-206]]).
+
+⚙ **Sweep recorded so nobody re-runs it** ([[F2-216]]): 61 raw pick sites → 17 ordered / 12 not-a-repository / 20 unresolved / 12 shortlisted → **1 genuine member, 11 refuted by reading**, plus 6 unordered `findFirstBy` finders → **2 filed, 4 correct**.
+
+🔑 **When you find a single-row pick, ask what the finder was ordered by — and if the answer is "nothing", the row you get is a function of the query plan. The tell is a sibling finder on the same repository that declares one.**
+
 ## F2-422 — three Audit Committee sections, and two more governance figures, came off an UNSORTED page
 
 | | |
