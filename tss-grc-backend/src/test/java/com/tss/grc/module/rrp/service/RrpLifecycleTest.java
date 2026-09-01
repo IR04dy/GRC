@@ -188,9 +188,15 @@ class RrpLifecycleTest {
         RrpCycle closedLate = cycle("CLOSED", LocalDate.now().minusDays(493));
         RrpCycle noDueDate = cycle("IN_PREPARATION", null);
 
-        Page<RrpCycle> page = new PageImpl<>(
+        // F2-421: repointed at the UNCAPPED overload, because dashboard() no longer windows its
+        // own population. Worth recording WHY this test could not have caught that defect: it
+        // stubbed the PAGED finder with `any()` for the Pageable, and a mocked repository has no
+        // page size — it returns whatever it is handed. So the leg asserted F2-132's PREDICATE
+        // (which statuses count, that a null due date is not overdue) perfectly and was
+        // structurally blind to the POPULATION, exactly as F2-132's comment reasoned about the
+        // predicate and never about the cap two lines above it.
+        when(cycleRepo.findByOrganisationIdOrderByFiscalYearDesc(ORG)).thenReturn(
             List.of(latePrep, lateDraft, onTime, lodgedLate, closedLate, noDueDate));
-        when(cycleRepo.findByOrganisationIdOrderByFiscalYearDesc(eq(ORG), any())).thenReturn(page);
         when(cycleRepo.countByOrganisationIdAndStatus(eq(ORG), any())).thenReturn(0L);
         when(indRepo.findByCycleIdAndOrganisationIdOrderByIndicatorCodeAsc(any(), any()))
             .thenReturn(List.of());
