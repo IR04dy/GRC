@@ -13,7 +13,6 @@ import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -65,10 +64,20 @@ public class AnnexGeneratorService {
         var ghgAgg   = ghgService.aggregate(year);
         var ghgYoy   = ghgService.yoy(year);
         var ghgRows  = ghgRepo.findByOrganisationIdAndReportingYear(org, year);
-        var climates = climateRepo.findByOrganisationIdOrderByRiskScoreDescIdDesc(org,
-            PageRequest.of(0, 50)).getContent();
+        // F2-415 — UNCAPPED, and that is the whole fix. These two read
+        // PageRequest.of(0, 50) and PageRequest.of(0, 100); buildJson then published
+        // climates.size() / sgi.size() as climateRiskCount / sgiCommitmentCount, so the
+        // machine-readable half of a CMA Articles 91-94 annex reported 50 for a register
+        // holding more (F2-197: a capped list is fine to RENDER and wrong to COUNT), and
+        // the markdown/HTML sections truncated with nothing on the page saying so.
+        // The tell was in this very block: ghgRows, cma and tcfd below are already
+        // uncapped, so three of the five registers one method fetches were whole and two
+        // were windowed (F2-205 / F2-282's lone-outlier shape, inside one statement list).
+        // One list now feeds both the rendering and the count, so a numerator drawn from a
+        // different population than its denominator is unrepresentable here.
+        var climates = climateRepo.findByOrganisationIdOrderByRiskScoreDescIdDesc(org);
         // S-I — live SGI / CMA / TCFD registers (replace the hardcoded arrays).
-        var sgi  = sgiRepo.findByOrganisationIdOrderByTargetYearAscCommitmentCodeAsc(org, PageRequest.of(0, 100)).getContent();
+        var sgi  = sgiRepo.findByOrganisationIdOrderByTargetYearAscCommitmentCodeAsc(org);
         var cma  = cmaRepo.findByOrganisationIdAndReportingYear(org, year);
         var tcfd = tcfdRepo.findByOrganisationIdAndReportingYear(org, year);
 
