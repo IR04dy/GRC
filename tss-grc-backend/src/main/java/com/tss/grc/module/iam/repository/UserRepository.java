@@ -23,8 +23,43 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findWithRolesById(Long id);
     Optional<User> findByUsernameAndOrganisationId(String username, Long orgId);
     Page<User> findByOrganisationId(Long organisationId, Pageable pageable);
-    boolean existsByUsernameAndOrganisationId(String username, Long orgId);
-    boolean existsByEmailAndOrganisationId(String email, Long orgId);
+    /**
+     * Whether a username is already taken <b>anywhere on the platform, including soft-deleted
+     * rows</b> — F2-418.
+     *
+     * <p>This mirrors {@code ix_users_username} exactly, and <b>both</b> narrowings the finders it
+     * replaced carried are the point. V227 creates that index GLOBAL (key is {@code username}
+     * alone, no {@code organisation_id}) and UNFILTERED (no {@code WHERE is_deleted = 0}), and its
+     * own comment states both as deliberate: <em>"login authenticates by username with no tenant
+     * context, so the uniqueness here is GLOBAL (username/email unique across the platform), NOT
+     * per-organisation"</em> and <em>"keeps username/email globally unique even across soft-deleted
+     * rows"</em>. The guard that stood here asked
+     * {@code existsByUsernameAndOrganisationId(username, orgId)} — narrower on <b>both</b> axes, so
+     * it answered "available" for exactly the rows the index was about to reject.
+     *
+     * <p>⚠ NATIVE on purpose, and that is not a style choice. A derived finder runs against the
+     * entity, so it inherits {@link com.tss.grc.module.iam.entity.User}'s
+     * {@code @Where(clause = "is_deleted = 0")} and cannot see the row the index counts —
+     * F2-374's shape. {@code @Where} applies to entity queries only; native SQL bypasses it.
+     *
+     * <p>No {@code COLLATE}: the predicate is on the column, so it compares under the column's own
+     * collation — which is the collation the unique index compares under. The guard and the index
+     * therefore agree about case by construction rather than by coincidence (F2-179).
+     */
+    @Query(value = "SELECT COUNT(*) FROM iam.users WHERE username = :username", nativeQuery = true)
+    long countByUsernameIncludingDeleted(@Param("username") String username);
+
+    /** Email counterpart of {@link #countByUsernameIncludingDeleted} — mirrors {@code ix_users_email}. */
+    @Query(value = "SELECT COUNT(*) FROM iam.users WHERE email = :email", nativeQuery = true)
+    long countByEmailIncludingDeleted(@Param("email") String email);
+
+    /**
+     * As {@link #countByEmailIncludingDeleted}, excluding one row by id — for the update path,
+     * where a user keeping their own email must not collide with themselves.
+     */
+    @Query(value = "SELECT COUNT(*) FROM iam.users WHERE email = :email AND id <> :id",
+           nativeQuery = true)
+    long countByEmailIncludingDeletedExcludingId(@Param("email") String email, @Param("id") Long id);
     long countByOrganisationIdAndIsActiveTrue(Long organisationId);
 
     @Query("""
