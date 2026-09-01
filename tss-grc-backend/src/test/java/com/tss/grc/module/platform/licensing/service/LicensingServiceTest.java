@@ -4,9 +4,9 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.licensing.entity.OrganisationLicense;
 import com.tss.grc.module.platform.licensing.repository.OrganisationLicenseRepository;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -39,7 +39,19 @@ class LicensingServiceTest {
     @Mock private OrganisationLicenseRepository repo;
     @Mock private OrganisationRepository organisations;
     @Mock private AuditLogService audit;
-    @InjectMocks private LicensingService service;
+
+    /**
+     * F2-412 — a <b>REAL</b> {@link LicensedModuleReader} over the mocked repository, never a
+     * {@code @Mock}. The entitlement-filtering legs below assert enabled/valid-from/valid-to
+     * behaviour; with a mocked reader they would assert the mock and pass over any filtering defect
+     * (F2-237). Constructed by hand rather than by {@code @InjectMocks} for the same reason.
+     */
+    private LicensingService service;
+
+    @BeforeEach
+    void wire() {
+        service = new LicensingService(repo, organisations, audit, new LicensedModuleReader(repo));
+    }
 
     private static OrganisationLicense lic(String code, boolean enabled,
                                             LocalDate from, LocalDate to) {

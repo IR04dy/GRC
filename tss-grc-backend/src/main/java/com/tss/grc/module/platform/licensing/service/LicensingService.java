@@ -8,7 +8,6 @@ import com.tss.grc.module.platform.repository.OrganisationRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +45,12 @@ public class LicensingService {
     private final OrganisationLicenseRepository repo;
     private final OrganisationRepository organisations;
     private final AuditLogService audit;
+    /**
+     * F2-412 — the cached read lives on its own bean so it is reached through a proxy. A self-call
+     * to a {@code @Cacheable} method bypasses the caching advice entirely, which is what made this
+     * service query the database on every guarded request.
+     */
+    private final LicensedModuleReader modules;
 
     /**
      * <b>The 15 product SKUs ratified by ADR-018 — what the platform may sell.</b> Every one of
@@ -103,24 +108,24 @@ public class LicensingService {
             SELLABLE_MODULES.stream(), RETIRED_DESTINATION.keySet().stream())
         .collect(Collectors.toUnmodifiableSet());
 
-    @Cacheable(value = "licenses", key = "#organisationId")
+    /**
+     * The organisation's entitled module codes. Delegates to {@link LicensedModuleReader}, which
+     * owns the {@code licenses} cache — see F2-412 on why the cached read may not live here.
+     */
     @Transactional(readOnly = true)
     public Set<String> enabledModulesFor(Long organisationId) {
-        LocalDate today = LocalDate.now();
-        Set<String> out = new TreeSet<>();
-        for (OrganisationLicense l : repo.findByOrganisationIdOrderByModuleCodeAsc(organisationId)) {
-            if (Boolean.FALSE.equals(l.getEnabled())) continue;
-            if (l.getValidFrom() != null && l.getValidFrom().isAfter(today)) continue;
-            if (l.getValidTo()   != null && l.getValidTo().isBefore(today))  continue;
-            out.add(l.getModuleCode());
-        }
-        return out;
+        return modules.enabledModulesFor(organisationId);
     }
 
+    /**
+     * F2-412 — this reads through {@code modules}, NOT through {@link #enabledModulesFor}. A
+     * self-call would bypass the caching advice on the proxy, and this is the method
+     * {@code LicenseGuardAspect} calls on every guarded request.
+     */
     @Transactional(readOnly = true)
     public boolean isModuleEnabled(Long organisationId, String moduleCode) {
         if (moduleCode == null) return false;
-        return enabledModulesFor(organisationId).contains(moduleCode);
+        return modules.enabledModulesFor(organisationId).contains(moduleCode);
     }
 
     @Transactional(readOnly = true)
