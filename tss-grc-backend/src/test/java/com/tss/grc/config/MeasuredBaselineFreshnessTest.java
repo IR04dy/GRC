@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,6 +80,8 @@ class MeasuredBaselineFreshnessTest {
         Path.of("..", "TSS-GRC-Platform-Bible", "Appendix", "scripts", "baseline_census.py");
     private static final Path MODULES = Path.of("src", "main", "java", "com", "tss", "grc", "module");
     private static final Path MAIN_JAVA = Path.of("src", "main", "java");
+    /** F2-409 — the census's own {@code TESTJ}: the root every backend test is attributed from. */
+    private static final Path TEST_JAVA_ROOT = Path.of("src", "test", "java", "com", "tss", "grc");
     private static final Path MIGRATIONS =
         Path.of("src", "main", "resources", "db", "migration", "sqlserver");
     private static final Path FE_PAGES = Path.of("..", "tss-grc-ui-v2", "src", "pages");
@@ -96,6 +99,12 @@ class MeasuredBaselineFreshnessTest {
     private static final Pattern HAS_PERMISSION_BARE = Pattern.compile("hasPermission\\(");
     private static final Pattern MIGRATION_VERSION = Pattern.compile("^V(\\d+)__.+\\.sql$");
     private static final Pattern ROUTE = Pattern.compile("<Route[^>]*path=");
+    /** F2-409 — mirrors {@code baseline_census.py}'s {@code TESTM}: what the census counts as a test. */
+    private static final Pattern TEST_METHOD =
+        Pattern.compile("@(?:Test|ParameterizedTest|RepeatedTest)\\b");
+    /** F2-409 — mirrors the census's import fallback, narrowed to the module segment it reads. */
+    private static final Pattern MODULE_IMPORT = Pattern.compile(
+        "^import\\s+(?:static\\s+)?com\\.tss\\.grc\\.module\\.([A-Za-z0-9_]+)\\.", Pattern.MULTILINE);
 
     /**
      * Remove comments, keep literals — a string may legitimately contain {@code @Entity}.
@@ -415,6 +424,86 @@ class MeasuredBaselineFreshnessTest {
             .isEqualTo(docNumber("Module packages with **zero**"));
     }
 
+    /**
+     * F2-409 — {@code zero_test_packages} was <b>the one GATED census figure with no gate</b>. Eleven
+     * of the thirteen are re-derived from the tree by the legs in this class and compared
+     * doc↔{@code PUBLISHED} by {@link #theCensusScriptAgreesWithTheDocument()};
+     * {@code db_schemas_dev} legitimately cannot be derived hermetically, because it counts SQL Server
+     * schemas. This one is derivable and had <b>neither</b> leg, so three artefacts drifted to three
+     * different numbers while every build stayed green: the document said <b>8</b>, the script's
+     * {@code PUBLISHED} dict said <b>7</b>, and the tree said <b>3</b>.
+     *
+     * <p>🔑 F2-215's shape at its plainest — the mechanism is visibly present for eleven siblings, so
+     * the twelfth reads as covered. And the drift is not slow: F2-407 added {@code dashboard}'s first
+     * test hours after the baseline that published the figure, so a hand-typed count can rot on the
+     * same afternoon it is written (F2-265: a count in prose is a copy of a measurement).
+     *
+     * <p>The attribution deliberately MIRRORS {@code baseline_census.py} rather than inventing a
+     * second, differently-shaped count — which would just be a fourth number (F2-213: write the sweep
+     * as the gate, over the same tree, in the same language). A test under {@code module/<name>/}
+     * belongs to that module; anything cross-cutting ({@code security/}, {@code config/} …) is
+     * attributed to the module it imports most often, which is how a package with no test directory of
+     * its own can still be credited — the reason a bare directory listing is not a substitute.
+     */
+    @Test
+    void zeroTestPackagesMatch() {
+        List<String> modules;
+        try (Stream<Path> s = Files.list(MODULES)) {
+            modules = s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).sorted().toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        assertThat(modules).as("anti-vacuity: no module packages found under %s", MODULES)
+            .hasSizeGreaterThan(50);
+
+        Map<String, Integer> tests = new LinkedHashMap<>();
+        for (String m : modules) tests.put(m, 0);
+
+        int suite = 0;
+        for (Path p : javaFiles(TEST_JAVA_ROOT)) {
+            String code = stripComments(read(p));
+            int n = count(TEST_METHOD, code);
+            suite += n;
+
+            String rel = TEST_JAVA_ROOT.relativize(p).toString().replace('\\', '/');
+            String owner = rel.startsWith("module/") ? rel.split("/")[1] : null;
+
+            if (owner == null || !tests.containsKey(owner)) {
+                // Most-imported module wins; first seen breaks a tie, which is what
+                // Counter.most_common(1) yields in the census because it iterates in insertion order.
+                Map<String, Integer> hits = new LinkedHashMap<>();
+                Matcher im = MODULE_IMPORT.matcher(code);
+                while (im.find()) {
+                    if (tests.containsKey(im.group(1))) hits.merge(im.group(1), 1, Integer::sum);
+                }
+                owner = null;
+                int best = 0;
+                for (Map.Entry<String, Integer> e : hits.entrySet()) {
+                    if (e.getValue() > best) {
+                        best = e.getValue();
+                        owner = e.getKey();
+                    }
+                }
+            }
+            if (owner != null) tests.merge(owner, n, Integer::sum);
+        }
+        assertThat(suite).as("anti-vacuity: no @Test declarations found under %s", TEST_JAVA_ROOT)
+            .isGreaterThan(1_000);
+
+        List<String> zero = tests.entrySet().stream()
+            .filter(e -> e.getValue() == 0)
+            .map(Map.Entry::getKey)
+            .toList();
+
+        assertThat(zero.size())
+            .as("MEASURED_BASELINE.md §0 'Module packages with **zero tests**'. A package with no test "
+              + "at all is where an unreviewed regulatory surface hides — F2-03 floored seven Tier-1 "
+              + "packages for exactly that reason — so this is a coverage FLOOR, not decoration. "
+              + "Re-run baseline_census.py and update §0 AND the script's PUBLISHED dict in the same "
+              + "commit. Packages: %s", zero)
+            .isEqualTo(docNumber("Module packages with **zero tests**"));
+    }
+
     @Test
     void frontendPageAndRouteCountsMatch() {
         Assumptions.assumeTrue(Files.isDirectory(FE_PAGES) && Files.isRegularFile(FE_APP),
@@ -490,6 +579,8 @@ class MeasuredBaselineFreshnessTest {
         fromDoc.put("flyway_baseline", docBaselineVersion());
         fromDoc.put("perm_modules", docNumber("Distinct permission modules used by guards"));
         fromDoc.put("packages_no_haspermission", docNumber("Module packages with **zero**"));
+        // F2-409: this pairing did not exist, which is half of why the figure drifted three ways.
+        fromDoc.put("zero_test_packages", docNumber("Module packages with **zero tests**"));
         fromDoc.put("fe_pages", docNumber("Frontend pages"));
         fromDoc.put("fe_routes", docNumber("Routes registered in"));
 
