@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -71,7 +72,7 @@ public class AccessRequestService {
         Long org = org();
         return status == null || status.isBlank()
             ? requests.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(org)
-            : requests.findByOrganisationIdAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(org, status.toUpperCase());
+            : requests.findByOrganisationIdAndStatusAndIsDeletedFalseOrderByCreatedAtDesc(org, status.toUpperCase(Locale.ROOT));
     }
 
     @Transactional

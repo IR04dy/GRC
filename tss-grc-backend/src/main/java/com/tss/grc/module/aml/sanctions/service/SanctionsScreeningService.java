@@ -282,7 +282,7 @@ public class SanctionsScreeningService {
             .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
             // Arabic harakat (vowels + tatweel) too
             .replaceAll("[ً-ٰٟـ]", "");
-        String cleaned = NON_WORD.matcher(stripped).replaceAll(" ").trim().toLowerCase();
+        String cleaned = NON_WORD.matcher(stripped).replaceAll(" ").trim().toLowerCase(Locale.ROOT);
         return WS.matcher(cleaned).replaceAll(" ");
     }
 
@@ -326,7 +326,7 @@ public class SanctionsScreeningService {
         if (subjectDoc == null || idDocsJson == null) return false;
         String needle = subjectDoc.trim();
         if (needle.length() < 4) return false; // avoid noisy 1-char matches
-        return idDocsJson.toLowerCase().contains(needle.toLowerCase());
+        return idDocsJson.toLowerCase(Locale.ROOT).contains(needle.toLowerCase(Locale.ROOT));
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ public class SanctionsScreeningService {
                 return candidate;
             }
         }
-        return "SCR-" + year + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        return "SCR-" + year + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
     }
 
     CheckResponse toResponse(ScreeningCheck c) {

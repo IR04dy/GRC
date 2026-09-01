@@ -397,7 +397,7 @@ public class TcfdScenarioService {
                 return candidate;
             }
         }
-        return "TCFD-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "TCFD-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private static Map<String, Object> payload(TcfdClimateScenario s, String previousStage) {

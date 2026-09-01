@@ -401,7 +401,7 @@ public class FinancedEmissionsService {
                 return candidate;
             }
         }
-        return "FE-TARGET-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "FE-TARGET-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private static String recordCode(FinancedEmissionsRecord r) {

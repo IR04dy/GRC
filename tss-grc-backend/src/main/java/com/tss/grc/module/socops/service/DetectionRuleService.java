@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -95,22 +96,22 @@ public class DetectionRuleService {
             throw new IllegalArgumentException("ruleCode is required");
         if (in.getTitleEn() == null || in.getTitleEn().isBlank())
             throw new IllegalArgumentException("titleEn is required");
-        if (in.getDetectionType() == null || !DETECTION_TYPES.contains(in.getDetectionType().toUpperCase()))
+        if (in.getDetectionType() == null || !DETECTION_TYPES.contains(in.getDetectionType().toUpperCase(Locale.ROOT)))
             throw new IllegalArgumentException("detectionType must be one of " + DETECTION_TYPES);
         // The whole point of the library — a detection with no ATT&CK technique is rejected.
         if (in.getMitreTechniques() == null || in.getMitreTechniques().isBlank())
             throw new IllegalArgumentException("mitreTechniques is required (ATT&CK technique id, e.g. T1566)");
         if (in.getStatus() != null && !in.getStatus().isBlank()
-                && !STATUSES.contains(in.getStatus().toUpperCase()))
+                && !STATUSES.contains(in.getStatus().toUpperCase(Locale.ROOT)))
             throw new IllegalArgumentException("status must be one of " + STATUSES);
     }
 
     /** Canonicalise enum-ish fields + default the status so the DB CHECK never trips. */
     private void normalise(DetectionRule d) {
-        d.setDetectionType(d.getDetectionType().toUpperCase());
+        d.setDetectionType(d.getDetectionType().toUpperCase(Locale.ROOT));
         d.setMitreTechniques(d.getMitreTechniques().trim());
         if (d.getStatus() == null || d.getStatus().isBlank()) d.setStatus("DRAFT");
-        else d.setStatus(d.getStatus().toUpperCase());
+        else d.setStatus(d.getStatus().toUpperCase(Locale.ROOT));
         if (d.getEnabled() == null) d.setEnabled(true);
     }
 

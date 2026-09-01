@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -182,7 +183,7 @@ public class PrivacyService {
                                             java.time.LocalDateTime submittedAt,
                                             String targetStatus) {
         DataBreach breach = getBreach(id);
-        String resolvedStatus = targetStatus == null ? "SUBMITTED" : targetStatus.toUpperCase();
+        String resolvedStatus = targetStatus == null ? "SUBMITTED" : targetStatus.toUpperCase(Locale.ROOT);
         if (!SDAIA_STATES.contains(resolvedStatus)) {
             throw new IllegalArgumentException(
                 "Invalid SDAIA status: " + targetStatus +

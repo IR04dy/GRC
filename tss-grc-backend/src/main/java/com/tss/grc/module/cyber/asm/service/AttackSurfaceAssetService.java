@@ -265,7 +265,7 @@ public class AttackSurfaceAssetService {
                 return candidate;
             }
         }
-        return prefix + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return prefix + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private String pickHighestOpenSeverity(Long orgId, Long assetId) {

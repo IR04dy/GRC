@@ -212,7 +212,7 @@ public class BcmComplianceMappingService {
         for (String fw : FRAMEWORKS) {
             Map<String, Long> row = new LinkedHashMap<>();
             for (String s : STATUSES) {
-                row.put(s.toLowerCase(),
+                row.put(s.toLowerCase(Locale.ROOT),
                     repo.countByOrganisationIdAndSourceFrameworkAndComplianceStatus(org, fw, s));
             }
             // Skip empty frameworks to keep the dashboard tidy
@@ -227,7 +227,7 @@ public class BcmComplianceMappingService {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new LinkedHashMap<>();
         for (String s : STATUSES) {
-            out.put(s.toLowerCase(), repo.countByOrganisationIdAndComplianceStatus(org, s));
+            out.put(s.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndComplianceStatus(org, s));
         }
         return out;
     }

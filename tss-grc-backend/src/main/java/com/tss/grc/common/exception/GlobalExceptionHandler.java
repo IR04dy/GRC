@@ -27,6 +27,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.Locale;
 import java.net.URI;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -858,7 +859,7 @@ public class GlobalExceptionHandler {
         while (cur != null) {
             String msg = cur.getMessage();
             if (msg != null) {
-                String low = msg.toLowerCase();
+                String low = msg.toLowerCase(Locale.ROOT);
                 if (low.contains("invalid object name")  // SQL Server
                     || low.contains("does not exist")    // Postgres
                     || low.contains("not found")         // H2 / generic

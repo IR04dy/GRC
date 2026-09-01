@@ -609,7 +609,7 @@ public class AuditCommitteeDashboardService {
             // append a short uniqueness suffix rather than throw — the caller
             // is operating against live data and "two snapshots in a day" is
             // a legitimate workflow (morning + post-meeting refinement).
-            code = code + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            code = code + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
         }
 
         DashboardSnapshot s = new DashboardSnapshot();

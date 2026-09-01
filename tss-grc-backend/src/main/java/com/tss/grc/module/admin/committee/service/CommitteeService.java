@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -81,7 +82,7 @@ public class CommitteeService {
         while (cur != null) {
             String msg = cur.getMessage();
             if (msg != null) {
-                String low = msg.toLowerCase();
+                String low = msg.toLowerCase(Locale.ROOT);
                 if (low.contains("invalid object name")
                     || low.contains("does not exist")
                     || low.contains("not found")) return true;
@@ -741,11 +742,11 @@ public class CommitteeService {
     }
 
     private String generateMeetingCode(String committeeCode) {
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase();
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase(Locale.ROOT);
         String code = "MTG-" + Year.now().getValue() + "-" + committeeCode + "-" + suffix;
         Long org = TenantContext.getCurrentTenant();
         if (meetingRepo.findByOrganisationIdAndMeetingCode(org, code).isPresent()) {
-            suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase();
+            suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase(Locale.ROOT);
             code = "MTG-" + Year.now().getValue() + "-" + committeeCode + "-" + suffix;
         }
         return code;

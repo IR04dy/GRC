@@ -251,7 +251,7 @@ public class ReportSchedulerService {
         String type = s.getReportType();
         String fmt  = s.getFormat() == null ? "PDF" : s.getFormat().toUpperCase(Locale.ROOT);
         String lang = s.getLanguage() == null ? "en" : s.getLanguage();
-        String stem = type.toLowerCase().replace('_', '-') + "-" + LocalDate.now();
+        String stem = type.toLowerCase(Locale.ROOT).replace('_', '-') + "-" + LocalDate.now();
         return switch (type) {
             case "RISK_REGISTER"  -> "XLSX".equals(fmt)
                 ? xlsx(exportService.riskRegisterXlsx(), stem)
@@ -311,7 +311,7 @@ public class ReportSchedulerService {
             if (cc.length > 0) helper.setCc(cc);
         }
         helper.setSubject("[TSS GRC] " + s.getName());
-        helper.setText("Automated " + s.getReportType().replace('_', ' ').toLowerCase() +
+        helper.setText("Automated " + s.getReportType().replace('_', ' ').toLowerCase(Locale.ROOT) +
             " report attached. Cadence: " + s.getCadence() + ". Language: " + s.getLanguage(), false);
         helper.addAttachment(filename, new ByteArrayResource(body), mime);
         mailSender.send(mm);
@@ -424,7 +424,7 @@ public class ReportSchedulerService {
 
     private DayOfWeek parseDayOfWeek(String name, DayOfWeek fallback) {
         if (name == null) return fallback;
-        try { return DayOfWeek.valueOf(name.toUpperCase()); }
+        try { return DayOfWeek.valueOf(name.toUpperCase(Locale.ROOT)); }
         catch (Exception e) { return fallback; }
     }
 

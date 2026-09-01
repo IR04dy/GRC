@@ -31,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -220,7 +221,7 @@ public class CommitteeResolutionService {
         if (actor == null || (actor.userId() == null && norm(actor.username()).isEmpty()))
             throw new DomainAccessDeniedException(
                 "A committee vote must be recorded by an identified user.");
-        String vote = norm(voteRaw).toUpperCase();
+        String vote = norm(voteRaw).toUpperCase(Locale.ROOT);
         if (!VOTE_VALUES.contains(vote))
             throw new IllegalArgumentException("vote must be one of " + VOTE_VALUES);
 

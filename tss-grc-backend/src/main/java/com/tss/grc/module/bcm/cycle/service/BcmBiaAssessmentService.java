@@ -369,8 +369,8 @@ public class BcmBiaAssessmentService {
     public Map<String, Long> stats() {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new HashMap<>();
-        for (String s : STATUSES)     out.put("status_" + s.toLowerCase(),       repo.countByOrganisationIdAndApprovalStatus(org, s));
-        for (String c : CRITICALITIES) out.put("crit_" + c.toLowerCase(),        repo.countByOrganisationIdAndOverallCriticality(org, c));
+        for (String s : STATUSES)     out.put("status_" + s.toLowerCase(Locale.ROOT),       repo.countByOrganisationIdAndApprovalStatus(org, s));
+        for (String c : CRITICALITIES) out.put("crit_" + c.toLowerCase(Locale.ROOT),        repo.countByOrganisationIdAndOverallCriticality(org, c));
         return out;
     }
 

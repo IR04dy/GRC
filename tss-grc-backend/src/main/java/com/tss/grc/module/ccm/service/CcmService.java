@@ -408,7 +408,7 @@ public class CcmService {
                 return candidate;
             }
         }
-        return prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     /**

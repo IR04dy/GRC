@@ -88,11 +88,11 @@ public class AiSuggestionService {
             "Regulatory finding from the relevant authority (SAMA / NCA / SDAIA)",
             "Reputational damage covered by local + regional media",
             "Internal investigation, remediation cost, and management attention"));
-        if (in.categoryCode() != null && in.categoryCode().toUpperCase().contains("CYBER")) {
+        if (in.categoryCode() != null && in.categoryCode().toUpperCase(Locale.ROOT).contains("CYBER")) {
             causes.add("Threat-actor exploitation of a known vulnerability");
             consequences.add("Data exfiltration triggering PDPL Article 20 (72-hour notification)");
         }
-        if (in.categoryCode() != null && in.categoryCode().toUpperCase().contains("PRIVACY")) {
+        if (in.categoryCode() != null && in.categoryCode().toUpperCase(Locale.ROOT).contains("PRIVACY")) {
             causes.add("Personal data processed without explicit consent or legal basis");
             consequences.add("Data-subject complaint to SDAIA and PDPL administrative fine");
         }

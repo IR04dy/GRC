@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.ghg.service;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashMap;
@@ -54,7 +55,7 @@ public final class GhgUnitRegistry {
 
     /** e.g. "kgCO2e/L" → "kgco2e/l" → mass token "kg". */
     private static String normalise(String u) {
-        return u.trim().toLowerCase();
+        return u.trim().toLowerCase(Locale.ROOT);
     }
 
     private static BigDecimal matchMultiplier(String u) {

@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -161,7 +162,7 @@ public class AuditEngagementService {
         Map<String, Object> out = new HashMap<>();
         out.put("total",         repo.countByOrganisationId(org));
         for (String s : STATUS_ORDER) {
-            out.put(s.toLowerCase(), repo.countByOrganisationIdAndStatus(org, s));
+            out.put(s.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndStatus(org, s));
         }
         return out;
     }

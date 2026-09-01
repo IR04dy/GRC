@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -61,7 +62,7 @@ public class RiskMethodologyService {
         RiskMethodologyConfig c = getOrSeed();
         if (dto.impactDimensions() != null && !dto.impactDimensions().isEmpty()) {
             String csv = dto.impactDimensions().stream()
-                .map(s -> s == null ? "" : s.trim().toUpperCase())
+                .map(s -> s == null ? "" : s.trim().toUpperCase(Locale.ROOT))
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .collect(Collectors.joining(","));
@@ -80,7 +81,7 @@ public class RiskMethodologyService {
     /** Declared impact dimensions for the current org (upper-cased, de-duped). */
     public Set<String> dimensions(RiskMethodologyConfig c) {
         return Arrays.stream(c.getImpactDimensionsCsv().split(","))
-            .map(s -> s.trim().toUpperCase()).filter(s -> !s.isEmpty())
+            .map(s -> s.trim().toUpperCase(Locale.ROOT)).filter(s -> !s.isEmpty())
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
@@ -115,7 +116,7 @@ public class RiskMethodologyService {
 
         // validate
         for (ImpactDimensionDto d : ratings) {
-            String dim = d.dimension() == null ? "" : d.dimension().trim().toUpperCase();
+            String dim = d.dimension() == null ? "" : d.dimension().trim().toUpperCase(Locale.ROOT);
             if (!allowed.contains(dim))
                 throw new IllegalArgumentException("Unknown impact dimension '" + d.dimension()
                     + "' — expected one of " + allowed);
@@ -133,7 +134,7 @@ public class RiskMethodologyService {
             RiskImpactRating r = new RiskImpactRating();
             r.setOrganisationId(o);
             r.setRiskId(riskId);
-            r.setDimension(d.dimension().trim().toUpperCase());
+            r.setDimension(d.dimension().trim().toUpperCase(Locale.ROOT));
             r.setScore(d.score());
             impactRepo.save(r);
             worst = (worst == null) ? d.score() : Math.max(worst, d.score());

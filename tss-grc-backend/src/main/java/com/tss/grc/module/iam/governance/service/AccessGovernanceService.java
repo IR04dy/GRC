@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -254,7 +255,7 @@ public class AccessGovernanceService {
         // Resolve requested pairs against the catalogue (unknown pairs are rejected).
         Set<Permission> next = new HashSet<>();
         for (GrantPair g : req.grants()) {
-            Permission p = permissions.findByModuleAndAction(g.module().toUpperCase(), g.action().toUpperCase())
+            Permission p = permissions.findByModuleAndAction(g.module().toUpperCase(Locale.ROOT), g.action().toUpperCase(Locale.ROOT))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Unknown permission: " + g.module() + "/" + g.action()));
             next.add(p);

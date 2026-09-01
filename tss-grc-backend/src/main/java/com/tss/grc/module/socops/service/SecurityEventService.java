@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -41,7 +42,7 @@ public class SecurityEventService {
     private static final java.util.Set<String> LEGAL_SEVERITY =
         java.util.Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static String legalSeverity(String s) {
-        String v = s == null ? "MEDIUM" : s.trim().toUpperCase();
+        String v = s == null ? "MEDIUM" : s.trim().toUpperCase(Locale.ROOT);
         if (LEGAL_SEVERITY.contains(v)) return v;
         return "INFO".equals(v) ? "LOW" : "MEDIUM";
     }

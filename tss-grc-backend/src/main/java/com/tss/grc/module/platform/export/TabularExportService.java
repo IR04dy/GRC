@@ -16,6 +16,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -175,7 +176,7 @@ public class TabularExportService {
         if (base.length() > 31) base = base.substring(0, 31);
         String name = base.isEmpty() ? "Sheet" : base;
         int n = 2;
-        while (!used.add(name.toLowerCase())) {
+        while (!used.add(name.toLowerCase(Locale.ROOT))) {
             String suffix = " (" + n++ + ")";
             String trimmed = base.length() + suffix.length() > 31 ? base.substring(0, 31 - suffix.length()) : base;
             name = trimmed + suffix;

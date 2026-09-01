@@ -28,6 +28,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -122,7 +123,7 @@ public class AiRegistryExportService {
     private boolean matchesGap(MlModel m, String gap, Set<Long> aia) {
         boolean elevated = ELEVATED.contains(m.getRiskTier());
         boolean prodish = PROD_OR_APPROVED.contains(m.getLifecycleStage());
-        return switch (gap.toUpperCase()) {
+        return switch (gap.toUpperCase(Locale.ROOT)) {
             case "OVERSIGHT" -> elevated && prodish && (m.getHumanOversight() == null
                     || m.getHumanOversight().isBlank() || "NONE".equals(m.getHumanOversight()));
             case "CROSS_BORDER" -> m.getDataResidency() != null && CROSS_BORDER.contains(m.getDataResidency())

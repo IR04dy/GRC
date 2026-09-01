@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.List;
 
 /**
@@ -50,7 +51,7 @@ public class CyberIncidentService {
      */
     private static String workflowToStatus(String wf) {
         if (wf == null) return "OPEN";
-        return switch (wf.trim().toUpperCase()) {
+        return switch (wf.trim().toUpperCase(Locale.ROOT)) {
             case "CLOSURE", "RESOLVED"            -> "RESOLVED";
             case "LESSONS_LEARNED", "CLOSED", "DONE" -> "CLOSED";
             case "CONTAINMENT", "INVESTIGATION", "INVESTIGATING", "ANALYSIS",

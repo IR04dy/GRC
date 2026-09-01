@@ -431,4 +431,116 @@ class LocaleSensitiveFormatContractTest {
         }
         return new Scan(files, withLocale, lsLiterals, defaults, unresolved);
     }
+
+    // ── F2-417: the same question asked of CASE FOLDING ──────────────
+
+    /**
+     * <b>No backend case conversion may use the ambient deployment locale.</b>
+     *
+     * <p>A hard zero with <b>no exemption map</b>, and the argument is that there is no site
+     * where "whatever locale the server happens to be configured with" is the answer. A backend
+     * case conversion means one of exactly two things:
+     * <ul>
+     *   <li>Unicode-default folding for a token, a comparison or a key → {@code Locale.ROOT};</li>
+     *   <li>folding for a human in a <em>named</em> language → that language, passed explicitly.</li>
+     * </ul>
+     * The ambient locale is neither, so there is no correct code for this to fail on (F2-214) and
+     * therefore nothing to exempt.
+     *
+     * <p>Under {@code tr-TR}, {@code "i".toUpperCase()} is {@code İ} (U+0130) and
+     * {@code "I".toLowerCase()} is {@code ı} (U+0131) — and nearly every token in this platform's
+     * closed vocabularies contains an {@code i}: {@code IN_PROGRESS}, {@code CRITICAL},
+     * {@code HIGH}, {@code MITIGATING}, {@code ACTIVE}, {@code IDENTIFIED},
+     * {@code INVESTIGATING}, {@code PRIVACY}, {@code EFFECTIVE}. So a bare conversion on a
+     * vocabulary path yields a value the column's CHECK refuses and a case-sensitive
+     * {@code .equals} cannot match (F2-179's whole family, reached by a locale).
+     */
+    @Test
+    void noBackendCaseConversionUsesTheAmbientLocale() throws IOException {
+        List<String> bare = new ArrayList<>();
+        int withLocale = 0;
+        int files = 0;
+
+        try (Stream<Path> walk = Files.walk(MAIN)) {
+            for (Path p : walk.filter(x -> x.toString().endsWith(".java")).sorted().toList()) {
+                files++;
+                String code = strip(Files.readString(p).replace("\r\n", "\n"));
+                String rel = MAIN.relativize(p).toString().replace('\\', '/');
+                // ONE detector, shared with the self-test below, so the corpus assertion and
+                // the synthetic assertion cannot disagree about what a bare conversion is.
+                for (String kind : bareCaseConversionsIn(code)) {
+                    bare.add(rel + "  ::  ." + kind + "()");
+                }
+                for (String kind : new String[] {"toUpperCase", "toLowerCase"}) {
+                    int at = -1;
+                    while ((at = code.indexOf("." + kind + "(", at + 1)) >= 0) {
+                        int j = at + kind.length() + 2;
+                        while (j < code.length() && Character.isWhitespace(code.charAt(j))) j++;
+                        if (j < code.length() && code.charAt(j) != ')') withLocale++;
+                    }
+                }
+            }
+        }
+
+        // The walk must have reached the tree at all: with no files, nothing below means
+        // anything (F2-235). This is the ONE floor that legitimately precedes the claim.
+        assertThat(files)
+            .as("the walk must reach the whole main tree — a root that stops resolving reports a "
+                + "clean tree")
+            .isGreaterThan(1_000);
+
+        // ⚠ The primary claim comes BEFORE the remaining floors, and that ordering is the
+        // finding rather than a style choice. The first draft asserted `withLocale > 200`
+        // first; on the pre-fix tree it short-circuited at "116 is not greater than 200",
+        // so a reader saw *the detector changed* instead of *182 bare sites*. It was also
+        // F2-414's own lesson unapplied: `withLocale > 200` can only hold BECAUSE of the
+        // sweep, so it re-asserted the fix rather than asserting the detector. The detector
+        // is asserted by the synthetic self-test below instead.
+        assertThat(bare)
+            .as("String#toUpperCase()/toLowerCase() with no argument folds against "
+                + "Locale.getDefault(). Under tr-TR an 'i' becomes 'İ', so a vocabulary token, a "
+                + "switch label, a map key or a column value silently stops matching. Pass "
+                + "Locale.ROOT for a token, or a named language for human text — never the "
+                + "ambient deployment locale.")
+            .isEmpty();
+
+        assertThat(withLocale)
+            .as("with the tree clean there must still be locale-bearing conversions to have "
+                + "counted — zero here would mean the detector reaches nothing")
+            .isPositive();
+    }
+
+    /**
+     * The case detector distinguishes the two forms. A corpus assertion passes both when the
+     * tree is clean and when the scan has rotted, so this drives the same walk logic over
+     * synthetic input in both directions (F2-195) — and it asserts the DETECTOR rather than
+     * re-asserting the fix, which is what the removed {@code withLocale > 200} floor did
+     * (F2-414).
+     */
+    @Test
+    void theCaseDetectorFiresOnTheBareFormAndNotOnTheLocaleBearingOne() {
+        assertThat(bareCaseConversionsIn("String x = s.toUpperCase();")).containsExactly("toUpperCase");
+        assertThat(bareCaseConversionsIn("String x = s.toLowerCase(  );")).containsExactly("toLowerCase");
+        assertThat(bareCaseConversionsIn("String x = s.toUpperCase(Locale.ROOT);")).isEmpty();
+        assertThat(bareCaseConversionsIn("String x = s.toLowerCase(Locale.ENGLISH);")).isEmpty();
+        assertThat(bareCaseConversionsIn("String x = s.toUpperCase(java.util.Locale.ROOT);")).isEmpty();
+        // A commented-out example must not count — the stripper is what makes that true, and
+        // this class's own javadoc quotes `toUpperCase()` while explaining the rule (F2-193).
+        assertThat(bareCaseConversionsIn(strip("// s.toUpperCase();\nString x = y;"))).isEmpty();
+    }
+
+    /** The bare-conversion detector, extracted so the self-test above can drive it. */
+    private static List<String> bareCaseConversionsIn(String code) {
+        List<String> out = new ArrayList<>();
+        for (String kind : new String[] {"toUpperCase", "toLowerCase"}) {
+            int at = -1;
+            while ((at = code.indexOf("." + kind + "(", at + 1)) >= 0) {
+                int j = at + kind.length() + 2;
+                while (j < code.length() && Character.isWhitespace(code.charAt(j))) j++;
+                if (j < code.length() && code.charAt(j) == ')') out.add(kind);
+            }
+        }
+        return out;
+    }
+
 }

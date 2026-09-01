@@ -27,6 +27,7 @@ import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -124,7 +125,7 @@ public class ApprovalChainInstanceService {
         Long orgId = org();
         Set<String> rolesUpper = new HashSet<>();
         if (userRoles != null) {
-            for (String r : userRoles) if (r != null) rolesUpper.add(r.toUpperCase());
+            for (String r : userRoles) if (r != null) rolesUpper.add(r.toUpperCase(Locale.ROOT));
         }
 
         List<PendingDecisionResponse> out = new ArrayList<>();
@@ -536,7 +537,7 @@ public class ApprovalChainInstanceService {
         if (s.getRequiredUserId() != null && Objects.equals(s.getRequiredUserId(), actorUserId)) {
             return true;
         }
-        if (s.getRequiredRole() != null && rolesUpper.contains(s.getRequiredRole().toUpperCase())) {
+        if (s.getRequiredRole() != null && rolesUpper.contains(s.getRequiredRole().toUpperCase(Locale.ROOT))) {
             return true;
         }
         return false;

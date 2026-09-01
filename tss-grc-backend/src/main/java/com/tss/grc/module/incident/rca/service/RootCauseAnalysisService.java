@@ -81,7 +81,7 @@ public class RootCauseAnalysisService {
         Long orgId = TenantContext.getCurrentTenant();
         RootCauseAnalysis r = new RootCauseAnalysis();
         r.setOrganisationId(orgId);
-        r.setExternalId("RCA-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        r.setExternalId("RCA-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
         r.setRelatedEntityType(body.relatedEntityType());
         r.setRelatedEntityId(body.relatedEntityId());
         r.setRelatedEntityLabel(body.relatedEntityLabel());
@@ -230,7 +230,7 @@ public class RootCauseAnalysisService {
         for (String item : items) {
             String externalId = String.format(Locale.ROOT, "CAPA-%d-%s-%02d",
                     LocalDate.now().getYear(),
-                    Long.toHexString(base + seq).toUpperCase(),
+                    Long.toHexString(base + seq).toUpperCase(Locale.ROOT),
                     seq);
             seq++;
             CapaTaskDto dto = CapaTaskDto.builder()

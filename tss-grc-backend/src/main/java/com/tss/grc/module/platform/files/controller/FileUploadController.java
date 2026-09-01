@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Locale;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -230,7 +231,7 @@ public class FileUploadController {
         if (probe.contains(eicar)) {
             return new ScanResult("INFECTED", "EICAR test signature detected");
         }
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         if (name.matches(".*\\.(exe|scr|bat|cmd|com|pif|js|vbs|ps1|jar)$")) {
             return new ScanResult("SUSPICIOUS", "Executable extension — review before opening");
         }

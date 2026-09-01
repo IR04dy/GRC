@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -120,7 +121,7 @@ public class SocOpsIngestService {
      *  SLA-burn list rather than silently dropping. */
     private LocalDateTime computeSlaDue(LocalDateTime eventTime, String severity) {
         if (eventTime == null || severity == null) return null;
-        return switch (severity.toUpperCase()) {
+        return switch (severity.toUpperCase(Locale.ROOT)) {
             case "CRITICAL" -> eventTime.plusHours(1);
             case "HIGH"     -> eventTime.plusHours(4);
             case "MEDIUM"   -> eventTime.plusHours(24);

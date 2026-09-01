@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
@@ -273,7 +274,7 @@ public class RiskScenarioService {
     private String generateExternalId() { return "SCN_" + UUID.randomUUID().toString().substring(0, 12); }
 
     private String shortHex() {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private void broadcast(String event, RiskScenario s) {

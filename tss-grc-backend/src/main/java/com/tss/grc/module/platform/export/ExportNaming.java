@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.export;
 
+import java.util.Locale;
 import java.time.LocalDate;
 
 /**
@@ -17,7 +18,7 @@ public final class ExportNaming {
     /** Build a filename with an explicit version. */
     public static String build(String module, String exportType, String lang, int version, String ext) {
         String date = LocalDate.now().toString().replace("-", "");
-        String langCode = (lang != null && lang.trim().toLowerCase().startsWith("ar")) ? "AR" : "EN";
+        String langCode = (lang != null && lang.trim().toLowerCase(Locale.ROOT).startsWith("ar")) ? "AR" : "EN";
         return sanitize(module) + "_" + sanitize(exportType) + "_" + langCode
              + "_" + date + "_v" + Math.max(1, version) + "." + safeExt(ext);
     }
@@ -36,6 +37,6 @@ public final class ExportNaming {
 
     private static String safeExt(String ext) {
         if (ext == null || ext.isBlank()) return "bin";
-        return ext.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+        return ext.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 }

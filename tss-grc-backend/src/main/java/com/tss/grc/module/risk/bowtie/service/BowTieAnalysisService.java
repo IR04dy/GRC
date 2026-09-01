@@ -522,7 +522,7 @@ public class BowTieAnalysisService {
             }
         }
         // Fall back to UUID suffix if random retries exhausted.
-        return "BOWTIE-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "BOWTIE-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private static Map<String, Object> payloadFor(BowTieAnalysis b, String previousStatus) {

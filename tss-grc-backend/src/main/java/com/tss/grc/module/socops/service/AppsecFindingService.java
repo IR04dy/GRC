@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -95,7 +96,7 @@ public class AppsecFindingService {
      *  / Medium 90d / Low 180d — mirrors the existing vulnerability lifecycle. */
     private LocalDateTime computeSla(LocalDateTime discovered, String severity) {
         if (discovered == null || severity == null) return null;
-        return switch (severity.toUpperCase()) {
+        return switch (severity.toUpperCase(Locale.ROOT)) {
             case "CRITICAL" -> discovered.plusDays(30);
             case "HIGH"     -> discovered.plusDays(60);
             case "MEDIUM"   -> discovered.plusDays(90);

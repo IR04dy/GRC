@@ -71,7 +71,7 @@ public class PlanDistributionService {
             .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + planId));
         if (recipients == null || recipients.isEmpty())
             throw new IllegalArgumentException("recipients required");
-        String ch = (channel == null || channel.isBlank()) ? "EMAIL" : channel.toUpperCase();
+        String ch = (channel == null || channel.isBlank()) ? "EMAIL" : channel.toUpperCase(Locale.ROOT);
         if (!CHANNELS.contains(ch))
             throw new IllegalArgumentException("Invalid distribution channel: " + ch);
 
@@ -160,7 +160,7 @@ public class PlanDistributionService {
             // interpolate row.getRecipientName(), safe only while handleAccessDenied discarded it.
             // The caller learns the rule and the remedy without learning who the recipient is.
             throw new DomainAccessDeniedException(
-                "Only the designated recipient may " + to.toLowerCase()
+                "Only the designated recipient may " + to.toLowerCase(Locale.ROOT)
                     + " this plan distribution. Someone holding BCM write access can record the "
                     + "action on their behalf.");
         boolean onBehalf = !isDesignatedRecipient(row, actorUserId, byName);
@@ -177,7 +177,7 @@ public class PlanDistributionService {
         row.setUpdatedAt(LocalDateTime.now());
         BcpPlanAcknowledgement saved = acks.save(row);
         audit.log(to, "BcpPlanAcknowledgement", saved.getId(),
-            "Plan v" + saved.getPlanVersion() + " " + to.toLowerCase()
+            "Plan v" + saved.getPlanVersion() + " " + to.toLowerCase(Locale.ROOT)
                 + " by " + (byName == null ? saved.getRecipientName() : byName)
                 + (onBehalf ? " ON BEHALF OF " + saved.getRecipientName() : ""));
         return saved;

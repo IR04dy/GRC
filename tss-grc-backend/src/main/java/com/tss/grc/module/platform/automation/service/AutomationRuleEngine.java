@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
@@ -309,7 +310,7 @@ public class AutomationRuleEngine {
     private static Boolean toBool(Object v) {
         if (v == null) return null;
         if (v instanceof Boolean b) return b;
-        String s = String.valueOf(v).trim().toLowerCase();
+        String s = String.valueOf(v).trim().toLowerCase(Locale.ROOT);
         if ("true".equals(s) || "1".equals(s) || "yes".equals(s)) return Boolean.TRUE;
         if ("false".equals(s) || "0".equals(s) || "no".equals(s)) return Boolean.FALSE;
         return null;

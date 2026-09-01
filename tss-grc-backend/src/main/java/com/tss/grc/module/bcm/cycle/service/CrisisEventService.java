@@ -631,7 +631,7 @@ public class CrisisEventService {
     public Map<String, Long> stats() {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new HashMap<>();
-        for (String s : STATUSES) out.put(s.toLowerCase(), events.countByOrganisationIdAndStatus(org, s));
+        for (String s : STATUSES) out.put(s.toLowerCase(Locale.ROOT), events.countByOrganisationIdAndStatus(org, s));
         out.put("active",        out.getOrDefault("detected", 0L)
                                + out.getOrDefault("assessing", 0L)
                                + out.getOrDefault("activated", 0L)

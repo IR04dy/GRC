@@ -76,7 +76,7 @@ public class RiskReviewService {
         refreshComputed(r);  // pull DB-computed residual_score / risk_level after a re-score
 
         String decision = (dto != null && dto.decision() != null && !dto.decision().isBlank())
-                ? dto.decision().trim().toUpperCase()
+                ? dto.decision().trim().toUpperCase(Locale.ROOT)
                 : (rescored ? "RESCORED" : "CONFIRMED");
 
         RiskReview rv = new RiskReview();

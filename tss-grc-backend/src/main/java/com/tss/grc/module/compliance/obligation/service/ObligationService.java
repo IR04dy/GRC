@@ -20,6 +20,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
@@ -284,7 +285,7 @@ public class ObligationService {
 
     private static String nextObligationCode(String regulator) {
         int year = LocalDate.now().getYear();
-        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
         return "OBL-" + regulator + "-" + year + "-" + suffix;
     }
 

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
 import java.io.IOException;
 import java.util.List;
 
@@ -119,13 +120,13 @@ public class NdiReportController {
         byte[] body;
         MediaType ct;
         String ext;
-        switch (format.toUpperCase()) {
+        switch (format.toUpperCase(Locale.ROOT)) {
             case "PDF"  -> { body = exporter.toPdf(r, lang);  ct = MediaType.APPLICATION_PDF; ext = "pdf"; }
             case "CSV"  -> { body = exporter.toCsv(r);  ct = MediaType.parseMediaType("text/csv;charset=utf-8"); ext = "csv"; }
             case "XLSX" -> { body = exporter.toXlsx(r); ct = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); ext = "xlsx"; }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         }
-        String filename = "ndi-" + r.reportType().toLowerCase().replace('_', '-')
+        String filename = "ndi-" + r.reportType().toLowerCase(Locale.ROOT).replace('_', '-')
             + (r.cycleId() == null ? "" : "-cycle" + r.cycleId()) + "." + ext;
         return ResponseEntity.ok()
             .contentType(ct)

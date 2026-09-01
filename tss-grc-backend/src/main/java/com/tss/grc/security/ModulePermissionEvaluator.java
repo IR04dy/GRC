@@ -7,6 +7,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.io.Serializable;
 
 /**
@@ -45,8 +46,8 @@ public class ModulePermissionEvaluator implements PermissionEvaluator {
                                  Object permission) {
         if (authentication == null || targetDomainObject == null) return false;
 
-        String module = targetDomainObject.toString().toUpperCase();
-        String action = permission.toString().toUpperCase();
+        String module = targetDomainObject.toString().toUpperCase(Locale.ROOT);
+        String action = permission.toString().toUpperCase(Locale.ROOT);
 
         return hasPlatformAdminRole(authentication)
             || hasAuthority(authentication, module + "_" + action);
@@ -107,8 +108,8 @@ public class ModulePermissionEvaluator implements PermissionEvaluator {
             return false;
         }
 
-        String relation = permission.toString().toUpperCase();
-        String type = targetType.toUpperCase();
+        String relation = permission.toString().toUpperCase(Locale.ROOT);
+        String type = targetType.toUpperCase(Locale.ROOT);
 
         if (CommitteeSeatDirectory.TARGET_TYPE.equals(type)) {
             if (!CommitteeSeatDirectory.SEAT_RELATION.equals(relation)) {

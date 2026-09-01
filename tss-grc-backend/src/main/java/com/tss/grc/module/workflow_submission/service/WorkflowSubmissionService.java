@@ -13,6 +13,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -132,7 +133,7 @@ public class WorkflowSubmissionService {
                 "Segregation of duties: a submission cannot be reviewed by its own submitter");
         }
 
-        String decision = body.decision() == null ? "" : body.decision().toUpperCase();
+        String decision = body.decision() == null ? "" : body.decision().toUpperCase(Locale.ROOT);
         String previousStatus = s.getStatus();
         switch (decision) {
             case "APPROVE", "APPROVED" -> s.setStatus("APPROVED");

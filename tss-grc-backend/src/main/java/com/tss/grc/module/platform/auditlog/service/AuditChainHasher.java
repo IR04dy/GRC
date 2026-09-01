@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -77,8 +78,8 @@ public class AuditChainHasher {
         String k = configuredKey == null ? "" : configuredKey.trim();
         // A short or placeholder key is worse than no key: it reads as "keyed" in the audit report
         // while being trivially guessable. Refuse to call it keyed.
-        boolean usable = k.length() >= 32 && !k.toLowerCase().contains("change-this")
-                         && !k.toLowerCase().contains("placeholder");
+        boolean usable = k.length() >= 32 && !k.toLowerCase(Locale.ROOT).contains("change-this")
+                         && !k.toLowerCase(Locale.ROOT).contains("placeholder");
         if (!usable && !k.isEmpty())
             log.warn("[F2-31] grc.audit.integrity-key is set but unusable (needs >=32 chars, no "
                    + "placeholder text) — falling back to UNKEYED SHA-256. A database-only "

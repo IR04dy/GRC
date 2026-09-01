@@ -213,9 +213,9 @@ public class ObService {
                     c.setStatus("REVOKED");
                     c.setRevokedAt(LocalDateTime.now());
                     c.setRevokedBy("BANK");
-                    c.setRevocationReasonEn("TPP " + to.toLowerCase() + " by bank — "
+                    c.setRevocationReasonEn("TPP " + to.toLowerCase(Locale.ROOT) + " by bank — "
                             + (req.getReasonEn() == null ? "regulatory action" : req.getReasonEn()));
-                    c.setRevocationReasonAr("سحب موافقة لأنّ المزوّد " + to.toLowerCase());
+                    c.setRevocationReasonAr("سحب موافقة لأنّ المزوّد " + to.toLowerCase(Locale.ROOT));
                     consentRepo.save(c);
                 }
             }

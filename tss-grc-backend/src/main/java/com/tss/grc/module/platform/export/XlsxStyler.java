@@ -16,6 +16,7 @@ import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.util.Locale;
 import java.awt.Color;
 
 /**
@@ -84,7 +85,7 @@ public final class XlsxStyler {
     /** True when a column header looks like a status/severity/RAG column worth colour-coding. */
     public static boolean isStatusHeader(String header) {
         if (header == null) return false;
-        String h = header.toLowerCase();
+        String h = header.toLowerCase(Locale.ROOT);
         return h.contains("status") || h.contains("severity") || h.contains("level")
             || h.contains("band") || h.contains("rag") || h.contains("priority")
             || h.contains("الحالة") || h.contains("الأهمية") || h.contains("المستوى");

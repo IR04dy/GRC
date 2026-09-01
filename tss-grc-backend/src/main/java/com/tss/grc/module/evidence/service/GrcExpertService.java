@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -142,7 +143,7 @@ public class GrcExpertService {
      *  ESG and ERM are checked before the NCA issuer-fallback so ERM/RISK catalogs
      *  (whose issuer may mention NCA) classify as ERM, not NCA. */
     static String classifyFamily(String code, String issuer) {
-        String c = code == null ? "" : code.toUpperCase();
+        String c = code == null ? "" : code.toUpperCase(Locale.ROOT);
         if (c.startsWith("PDPL")) return "PDPL";
         if (c.startsWith("NDMO") || c.startsWith("NDI")) return "NDI";
         if (c.startsWith("BCM")) return "BCM";
@@ -153,7 +154,7 @@ public class GrcExpertService {
                 || c.startsWith("ISO31000")) return "ERM";
         if (c.startsWith("ECC") || c.startsWith("CCC") || c.startsWith("DCC")
                 || c.startsWith("CSCC") || c.startsWith("OTCC") || c.startsWith("TCC")
-                || (issuer != null && issuer.toUpperCase().contains("NCA"))) return "NCA";
+                || (issuer != null && issuer.toUpperCase(Locale.ROOT).contains("NCA"))) return "NCA";
         return "OTHER";
     }
 }

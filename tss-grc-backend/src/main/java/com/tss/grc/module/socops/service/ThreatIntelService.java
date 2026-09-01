@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -157,14 +158,14 @@ public class ThreatIntelService {
         ThreatIntel ti = get(id);                       // validates existence + tenant scope
 
         String type = (actionType == null || actionType.isBlank())
-            ? "REVIEWED" : actionType.trim().toUpperCase();
+            ? "REVIEWED" : actionType.trim().toUpperCase(Locale.ROOT);
         if (!ACTION_TYPES.contains(type))
             throw new IllegalArgumentException("actionType must be one of " + ACTION_TYPES);
 
         String tType = null;
         String tLabel = null;
         if (targetType != null && !targetType.isBlank() && !"NONE".equalsIgnoreCase(targetType)) {
-            tType = targetType.trim().toUpperCase();
+            tType = targetType.trim().toUpperCase(Locale.ROOT);
             if (!TARGET_TYPES.contains(tType))
                 throw new IllegalArgumentException("targetType must be one of " + TARGET_TYPES + " or NONE");
             if (targetId == null)

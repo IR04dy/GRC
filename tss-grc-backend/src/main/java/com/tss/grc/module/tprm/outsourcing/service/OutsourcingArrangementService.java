@@ -22,6 +22,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -429,7 +430,7 @@ public class OutsourcingArrangementService {
 
     private static String nextArrangementCode() {
         int year = LocalDate.now().getYear();
-        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
         return "OUT-" + year + "-" + suffix;
     }
 

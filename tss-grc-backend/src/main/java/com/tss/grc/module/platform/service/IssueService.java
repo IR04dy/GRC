@@ -234,8 +234,8 @@ public class IssueService {
     public Map<String, Long> stats() {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new HashMap<>();
-        for (String s : STATUSES)   out.put("status_" + s.toLowerCase(),   repo.countByOrganisationIdAndStatus(org, s));
-        for (String s : SEVERITIES) out.put("severity_" + s.toLowerCase(), repo.countByOrganisationIdAndSeverity(org, s));
+        for (String s : STATUSES)   out.put("status_" + s.toLowerCase(Locale.ROOT),   repo.countByOrganisationIdAndStatus(org, s));
+        for (String s : SEVERITIES) out.put("severity_" + s.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndSeverity(org, s));
         return out;
     }
 

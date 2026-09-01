@@ -475,9 +475,9 @@ public class BcpPlanService {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new LinkedHashMap<>();
         for (String s : STATUSES) {
-            out.put("status_" + s.toLowerCase(),     plans.countByOrganisationIdAndStatus(org, s));
-            out.put("bcp_"    + s.toLowerCase(),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "BCP", s));
-            out.put("drp_"    + s.toLowerCase(),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "DRP", s));
+            out.put("status_" + s.toLowerCase(Locale.ROOT),     plans.countByOrganisationIdAndStatus(org, s));
+            out.put("bcp_"    + s.toLowerCase(Locale.ROOT),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "BCP", s));
+            out.put("drp_"    + s.toLowerCase(Locale.ROOT),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "DRP", s));
         }
         return out;
     }

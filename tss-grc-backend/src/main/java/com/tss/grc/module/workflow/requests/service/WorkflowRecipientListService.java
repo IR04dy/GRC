@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.List;
 
 /**
@@ -102,12 +103,12 @@ public class WorkflowRecipientListService {
             WorkflowRecipientListMember m = new WorkflowRecipientListMember();
             m.setOrganisationId(org);
             m.setListId(listId);
-            m.setRecipientType(in.recipientType().trim().toUpperCase());
+            m.setRecipientType(in.recipientType().trim().toUpperCase(Locale.ROOT));
             m.setRecipientId(in.recipientId());
             m.setRecipientKey(in.recipientKey());
             m.setRecipientLabel(in.recipientLabel());
             m.setActorRole(in.actorRole() == null || in.actorRole().isBlank()
-                ? "ASSIGNEE" : in.actorRole().trim().toUpperCase());
+                ? "ASSIGNEE" : in.actorRole().trim().toUpperCase(Locale.ROOT));
             m.setStepNo(in.stepNo() == null ? 1 : in.stepNo());
             memberRepo.save(m);
         }
