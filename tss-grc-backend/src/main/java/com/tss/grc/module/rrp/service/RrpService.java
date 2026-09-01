@@ -475,9 +475,26 @@ public class RrpService {
                 + cycleRepo.countByOrganisationIdAndStatus(org(), "ACKNOWLEDGED");
         long closed = cycleRepo.countByOrganisationIdAndStatus(org(), "CLOSED");
 
-        // Sum indicators across all cycles for this org.
-        Page<RrpCycle> all = cycleRepo.findByOrganisationIdOrderByFiscalYearDesc(
-                org(), PageRequest.of(0, 50));
+        // ── F2-421: one UNCAPPED list feeds every derivation below ─────────────────────────────
+        //
+        // This was `PageRequest.of(0, 50)` -- the 50 most-recent fiscal years -- and four figures
+        // came off it while `activeCount`, `submitted`, `closed` and `byStatus` above and below are
+        // all-time countBy sums. A windowed figure beside an all-time countBy in one method is this
+        // family's signature (F2-406 / F2-415 / F2-420).
+        //
+        // ⚠ The cap's order is ADVERSE, not merely orthogonal: `fiscal_year DESC` keeps the NEWEST,
+        // and an overdue cycle is one whose due date has PASSED, so the rows the window drops are
+        // the ones most likely to be overdue. It under-reported -- the flattering direction.
+        //
+        // ⚠ Reachable without 50 years of history: `rrp_cycle` has no unique constraint on
+        // fiscal_year (only ux_rrp_cycle_reference on (organisation_id, reference)) and
+        // `nextOrdinal` mints a per-fiscal-year ordinal, so several cycles per year is designed.
+        //
+        // ⚠ Two derivations below are CORRECT and must keep working, which is why the fix is one
+        // uncapped list rather than a ban on capping: `capCurrent` reads element 0 (the newest
+        // fiscal year) and `recentCycles` takes `.limit(10)` of the same ordering -- for both of
+        // those the cap order IS the question they ask (F2-420's `awarenessRate` shape).
+        List<RrpCycle> all = cycleRepo.findByOrganisationIdOrderByFiscalYearDesc(org());
 
         // ── F2-132: a cycle still awaiting submission, past its own due date ────────────────────
         //
@@ -495,7 +512,7 @@ public class RrpService {
         // lateness is a fact about a date, and a stored LATE word could disagree with the date
         // (S7e's reasoning). This counts; the operator decides.
         LocalDate today = LocalDate.now();
-        long overdue = all.getContent().stream()
+        long overdue = all.stream()
                 .filter(c -> ACTIVE_STATUSES.contains(c.getStatus()))
                 .filter(c -> c.getSubmissionDueDate() != null
                         && c.getSubmissionDueDate().isBefore(today))
@@ -503,8 +520,8 @@ public class RrpService {
 
         long red = 0, amber = 0;
         long capCurrent = 0;
-        for (int i = 0; i < all.getContent().size(); i++) {
-            RrpCycle c = all.getContent().get(i);
+        for (int i = 0; i < all.size(); i++) {
+            RrpCycle c = all.get(i);
             red += c.getIndicatorsRed() == null ? 0 : c.getIndicatorsRed();
             amber += c.getIndicatorsAmber() == null ? 0 : c.getIndicatorsAmber();
             if (i == 0) {
