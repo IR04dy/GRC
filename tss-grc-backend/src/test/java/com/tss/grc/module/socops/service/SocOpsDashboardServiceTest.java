@@ -1,10 +1,16 @@
 package com.tss.grc.module.socops.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.socops.dto.SocOpsDashboardResponse;
+import com.tss.grc.module.socops.entity.RegulatorExamination;
 import com.tss.grc.module.socops.entity.SecurityEvent;
 import com.tss.grc.module.socops.repository.AwarenessCampaignRepository;
 import com.tss.grc.module.socops.repository.CryptoAssetRepository;
@@ -19,18 +25,27 @@ import com.tss.grc.module.socops.repository.ThreatIntelRepository;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -141,6 +156,159 @@ class SocOpsDashboardServiceTest {
             .doesNotContain("\"IN_ANALYSIS\"")
             .doesNotContain("\"CONTAINED\"")
             .doesNotContain("findByOrganisationIdAndStatusOrderByEventTimeDesc(org, \"NEW\")");
+    }
+
+    // ── F2-420: the regulator-examination figures must not come off a notified_at window ──
+
+    /** The service source, resolved once — the two structural legs both read it. */
+    private static final String SERVICE_SRC =
+        "src/main/java/com/tss/grc/module/socops/service/SocOpsDashboardService.java";
+
+    /**
+     * F2-420 — every {@code PageRequest.of(0, N)} left in {@code get()}, with the reason it is
+     * allowed to stay. Asserted EXACTLY rather than as a ceiling: a new capped fetch must fail
+     * here and be read, because whether a cap is a defect depends on whether its order is
+     * aligned with the question the figure asks — which no regex can decide.
+     */
+    private static final Map<String, String> REMAINING_CAPS = Map.of(
+        "100",  "scanRunsLast24h — capped under started_at DESC, which is ALIGNED with the "
+              + "last-24h question it asks, so the window can only bite above 100 scanner runs "
+              + "in a single day. The benign variant of this shape.",
+        "1000", "scanCritsOpen — F2-367 FILED this as an owner decision: summing "
+              + "findings_critical over historical runs double-counts a finding present in "
+              + "consecutive scans, so the metric question has to be settled before the cap is "
+              + "the interesting part.");
+
+    /**
+     * The discriminating leg. Notified-at order puts the LATER-due examination first, which is
+     * exactly the row a notified_at-ordered window keeps while dropping the one due soonest — so
+     * a service still reading the capped overload reports the wrong examination as next up.
+     */
+    @Test
+    @DisplayName("F2-420: upcomingExams orders EVERY live examination by response_due_at, not the notified_at window")
+    void theUpcomingListIsOrderedOverEveryExamNotTheNotifiedAtWindow() {
+        stubPagedFetchesEmpty();
+        LocalDateTime now = LocalDateTime.now();
+        RegulatorExamination notifiedRecentlyDueLater = exam(1L, "EX-LATER", "SAMA", now.plusDays(40));
+        RegulatorExamination notifiedLongAgoDueSoon   = exam(2L, "EX-SOON",  "NCA",  now.plusDays(3));
+
+        when(regulatorExams.findByOrganisationIdOrderByNotifiedAtDesc(ORG))
+            .thenReturn(List.of(notifiedRecentlyDueLater, notifiedLongAgoDueSoon));
+        // Had the service kept the capped overload it would see only the recently-notified row.
+        when(regulatorExams.findByOrganisationIdOrderByNotifiedAtDesc(anyLong(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(notifiedRecentlyDueLater)));
+
+        SocOpsDashboardResponse snap = svc.get();
+
+        assertThat(snap.upcomingExams())
+            .as("the soonest-due examination must lead the list even though it was notified longest ago")
+            .extracting(SocOpsDashboardResponse.RegulatorExamBucket::examinationCode)
+            .containsExactly("EX-SOON", "EX-LATER");
+        assertThat(snap.regulatorExamsByRegulator())
+            .as("the per-regulator breakdown must count every live examination, not a window")
+            .containsEntry("SAMA", 1L)
+            .containsEntry("NCA", 1L);
+        verify(regulatorExams, never())
+            .findByOrganisationIdOrderByNotifiedAtDesc(anyLong(), any(Pageable.class));
+    }
+
+    /**
+     * F2-420 — the fortnight KPI and {@code SocOpsScheduledSweep.sweepRegulatorResponseDue} were
+     * two implementations of one predicate over the same band, and only the KPI was capped. They
+     * read one query now, so the scheduler can no longer page someone about an examination the
+     * dashboard does not count.
+     */
+    @Test
+    @DisplayName("F2-420: the due-soon KPI reads the same query the scheduler escalates from, over the same 14-day band")
+    void dueSoonReadsTheSameQueryTheSchedulerEscalatesFrom() {
+        stubPagedFetchesEmpty();
+        when(regulatorExams.findByOrganisationIdOrderByNotifiedAtDesc(ORG)).thenReturn(List.of());
+        when(regulatorExams.findResponseDueBetween(anyLong(), any(), any()))
+            .thenReturn(List.of(exam(1L, "A", "SAMA", null),
+                                exam(2L, "B", "NCA", null),
+                                exam(3L, "C", "CMA", null)));
+
+        SocOpsDashboardResponse snap = svc.get();
+
+        assertThat(snap.regulatorExamsResponseDueSoon())
+            .as("the KPI is the size of the authoritative query's result, not a Java re-filter")
+            .isEqualTo(3L);
+
+        ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> to   = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(regulatorExams).findResponseDueBetween(eq(ORG), from.capture(), to.capture());
+        assertThat(Duration.between(from.getValue(), to.getValue()).toDays())
+            .as("the band must be the 14 days SocOpsScheduledSweep escalates on")
+            .isEqualTo(14L);
+    }
+
+    /** Structural: the window mechanism is gone and the uncapped reads are wired in. */
+    @Test
+    @DisplayName("F2-420: the notified_at window is gone from the source")
+    void theRegulatorExamWindowIsGoneFromTheSource() throws Exception {
+        String src = stripComments(Files.readString(Path.of(SERVICE_SRC)));
+        assertThat(src)
+            .as("the 200-row notified_at window must be gone")
+            .doesNotContain("PageRequest.of(0, 200)")
+            .doesNotContain("examPage");
+        assertThat(src)
+            .as("all three exam figures must read the uncapped finder / the authoritative query")
+            .contains("findByOrganisationIdOrderByNotifiedAtDesc(org)")
+            .contains("findResponseDueBetween(org, now, now.plusDays(14))");
+    }
+
+    /**
+     * Census. A blanket ban on capped fetches would fail on correct code (F2-214): {@code
+     * PageRequest.of(0, 1)} is a point lookup — {@code tiTotal} reads {@code getTotalElements()},
+     * whose value does not depend on the page size at all, and {@code awarenessRate} takes {@code
+     * findFirst()} of a started_at DESC page, where the cap order IS the question. So the residual
+     * is counted and named instead, which keeps it visible (F2-205) without forcing a filed
+     * owner decision.
+     */
+    @Test
+    @DisplayName("F2-420: every capped fetch still feeding a dashboard figure is named")
+    void everyRemainingCappedAggregateIsNamed() throws Exception {
+        String src = stripComments(Files.readString(Path.of(SERVICE_SRC)));
+        Matcher m = Pattern.compile("PageRequest\\.of\\(0,\\s*(\\d+)\\)").matcher(src);
+        List<String> caps = new ArrayList<>();
+        while (m.find()) {
+            caps.add(m.group(1));
+        }
+        assertThat(caps)
+            .as("a new capped fetch must be read and named here, not absorbed into a ceiling")
+            .containsExactlyInAnyOrder("1", "1", "100", "1000");
+        assertThat(REMAINING_CAPS.keySet())
+            .as("every cap above 1 owes a reason; a point lookup (N=1) does not")
+            .containsExactlyInAnyOrderElementsOf(
+                caps.stream().filter(c -> !"1".equals(c)).collect(Collectors.toSet()));
+        assertThat(REMAINING_CAPS.values())
+            .allSatisfy(reason -> assertThat(reason.length())
+                .as("a bare label is not a reason (F2-188)")
+                .isGreaterThan(60));
+    }
+
+    /**
+     * {@code get()} reads four other paged finders; Mockito returns null for a {@code Page}, so
+     * they are stubbed empty to keep these legs about the examination figures alone.
+     */
+    private void stubPagedFetchesEmpty() {
+        when(threatIntel.findByOrganisationIdOrderByPublishedAtDesc(anyLong(), any(Pageable.class)))
+            .thenReturn(Page.empty());
+        when(scannerRuns.findByOrganisationIdOrderByStartedAtDesc(anyLong(), any(Pageable.class)))
+            .thenReturn(Page.empty());
+        when(awareness.findByOrganisationIdOrderByStartedAtDesc(anyLong(), any(Pageable.class)))
+            .thenReturn(Page.empty());
+    }
+
+    private static RegulatorExamination exam(Long id, String code, String regulator, LocalDateTime dueAt) {
+        RegulatorExamination e = new RegulatorExamination();
+        e.setId(id);
+        e.setOrganisationId(ORG);
+        e.setExaminationCode(code);
+        e.setRegulator(regulator);
+        e.setTitleEn("Thematic review");
+        e.setResponseDueAt(dueAt);
+        return e;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

@@ -15219,6 +15219,37 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-420 — three published SOC figures came off a notified_at window
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code on the SOC leadership dashboard; latent in data, since the window only bites above 200 examinations for one tenant ([[F2-283]]) |
+| **Source** | a fresh vein — *which capped fetch is re-sorted or FILTERED in Java under a different key?* — the half [[F2-415]]'s counted-over-a-cap census could not see |
+| **Size** | S — one repository overload, three call sites, no schema and no migration |
+
+⚠⚠ **A CAP IS A DEFECT WHEN ITS ORDER IS ORTHOGONAL TO THE QUESTION THE FIGURE ASKS, AND ONE METHOD HELD FOUR CAPS OF WHICH EXACTLY ONE WAS.** `SocOpsDashboardService.get()` fetched the 200 most-recently-**notified** regulator examinations (`PageRequest.of(0, 200)`, ordered `notified_at DESC`) and derived three published figures from that window: `regulatorExamsResponseDueSoon` (a count of written responses falling due in the next fortnight), `regulatorExamsByRegulator` (a per-regulator breakdown), and `upcomingExams` (**re-sorted by `response_due_at ASC`**, limit 5). So a SAMA or NCA examination notified long ago with an imminent response deadline fell outside the window and vanished from the fortnight KPI **and** from the "due soonest" list — flattering ([[F2-193]] / [[F2-195]] / [[F2-210]]).
+
+🔑 **THE DISCRIMINATOR IS ORTHOGONALITY, AND IT IS WHY A BLANKET BAN WOULD FAIL ON CORRECT CODE** ([[F2-214]]). The same method's other three caps are all fine, each for a different reason: `PageRequest.of(0, 1)` feeding `tiTotal` reads `.getTotalElements()`, whose value does not depend on the page size at all; `PageRequest.of(0, 1)` feeding `awarenessRate` takes `.findFirst()` of a `started_at DESC` page, where **the cap order IS the question**; and `PageRequest.of(0, 100)` feeding `scanRunsLast24h` caps under `started_at DESC` filtered to the last 24 hours, again **aligned**. Only the examination window ordered by *notification recency* while being asked *which deadline is nearest*. **Sort a method's caps by whether the cap order answers the figure's question — not by how large N is.**
+
+⚠ **The tell was two lines above the defect**: `examsOpen` is an all-time `countByOrganisationIdAndStatus` sum. **A windowed figure sitting beside an all-time `countBy` in one method** is this family's signature ([[F2-406]] / [[F2-415]]). And the response record states the claim the cap made false, in a trailing comment on the field itself: `List<RegulatorExamBucket> upcomingExams      // next 5 by responseDueAt`.
+
+⚠⚠ **THE SHARPER HALF: THE KPI AND THE ESCALATION THAT PAGES SOMEONE WERE TWO IMPLEMENTATIONS OF ONE PREDICATE, AND ONLY ONE WAS CAPPED.** `examsDueSoon` hand-rolled `responseDueAt != null && responseSubmittedAt == null && isAfter(now) && isBefore(now.plusDays(14))` as a Java filter over the window — while `RegulatorExaminationRepository.findResponseDueBetween` already expresses exactly that, uncapped, and is the query `SocOpsScheduledSweep.sweepRegulatorResponseDue` fires **`REGULATOR_EXAM_RESPONSE_DUE`** from, over the **identical** `now .. now.plusDays(14)` band (read, not assumed). 🔑 **So the scheduler could page someone about an examination the dashboard did not count** — [[F2-177]] / [[F2-282]]'s two-readers-of-one-concept, with the reader that *acts* being the correct one and the reader an operator *looks at* being the capped one. The dashboard reads the authoritative query now, so the two cannot drift; a side effect worth stating is that `BETWEEN` is inclusive where the Java filter was exclusive at both ends, which aligns the KPI with the authority.
+
+⚙ **Fix = [[F2-352]] / [[F2-406]]'s shape**: an uncapped `findByOrganisationIdOrderByNotifiedAtDesc(Long)` overload, so **one list feeds every derivation** and the mismatch is unrepresentable. NOT a SQL `COUNT`/`GROUP BY` beside the paged fetch — that leaves two populations and re-creates [[F2-365]]'s defect. The paged overload **stays**, because `RegulatorExaminationService.list` is a genuine paged register read; both respect the entity's `@Where(is_deleted = 0)`, so the two agree on soft-delete scoping (checked, not assumed).
+
+⚠ **`countByOrganisationIdAndRegulator` exists on that repository with ZERO callers** and was deliberately not used for the breakdown: it would have made the grouping a second population from the list beside it, which is the defect rather than the fix.
+
+⚙ **The residual is a NAMED CENSUS, asserted exactly, rather than a ceiling.** Whether a cap is a defect depends on an alignment judgement no regex can make, so the two surviving caps above 1 each owe a reason: `100` (`scanRunsLast24h`, aligned, bites only above 100 scanner runs in one day) and `1000` (`scanCritsOpen`, **[[F2-367]]'s filed owner decision** — summing `findings_critical` over historical runs double-counts a finding present in consecutive scans, so the metric question has to be settled before the cap is the interesting part). A new capped fetch fails the leg and must be read ([[F2-188]]: no manufactured verdicts).
+
+⚠ **One error of mine, and it is the recurring one:** I guessed the test class's `@InjectMocks` field name (`service`) where it is `svc`, and paid a compile round-trip. **Resolve an identifier from the file, never from the shape of the name** — the guessed-identifier family since [[F2-198]].
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — Mockito over the existing mocks, no DB and no Spring; the cap's row selection is SQL, so only the *sourcing* is observable): `SocOpsDashboardServiceTest` **4 → 8**, extending the existing class rather than adding a second ([[F2-190]]). Two behavioural legs — the soonest-due examination leads `upcomingExams` **even though it was notified longest ago**, with the paged overload stubbed to return only the recently-notified row *and* `verify(never())` on it, so the leg discriminates on value **and** on routing ([[F2-406]]'s pattern); and the KPI equals the authoritative query's size, with the band captured and asserted at 14 days. Two structural — the window mechanism is gone (`PageRequest.of(0, 200)` and `examPage` both absent), and the residual caps are asserted exactly. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert **only** the service and keep the repository overload, unreferenced, so the test still compiles → **4 of 8 RED (all four new legs)** while the four pre-existing [[F2-367]] legs stay GREEN, which is what proves the revert was surgical.
+
+🔑 **When a dashboard re-sorts or filters a fetched list in Java, ask what the FETCH was ordered by. If the two keys are orthogonal, the cap silently decides which rows the figure can ever see — and the tell is an all-time `countBy` sitting in the same method.**
+
+---
+
 ## F2-419 — the intake adapter picked the newest policy version lexically
 
 | | |
