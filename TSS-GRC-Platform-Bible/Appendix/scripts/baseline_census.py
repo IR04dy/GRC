@@ -108,7 +108,7 @@ PUBLISHED = {
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.
-    "zero_test_packages": 7,
+    "zero_test_packages": 3,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
     "migration_files": 384,          # +V396 (F2-309, nine tenant-scoped unique indexes over the
