@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -182,7 +183,7 @@ public class ConsentRecordService {
     public java.util.Map<String, Long> stats() {
         Long org = TenantContext.getCurrentTenant();
         java.util.Map<String, Long> out = new java.util.HashMap<>();
-        for (String s : STATUSES) out.put(s.toLowerCase(), repo.countByOrganisationIdAndStatus(org, s));
+        for (String s : STATUSES) out.put(s.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndStatus(org, s));
         return out;
     }
 }

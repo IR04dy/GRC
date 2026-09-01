@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 
 /**
@@ -156,7 +157,7 @@ public class CyberAssessmentService {
     /** Normalise the assessment risk level onto the CAPA priority scale. */
     private static String normalisePriority(String riskLevel) {
         if (riskLevel == null) return "MEDIUM";
-        String r = riskLevel.trim().toUpperCase().replace(' ', '_');
+        String r = riskLevel.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
         return switch (r) {
             case "CRITICAL", "VERY_HIGH" -> "CRITICAL";
             case "HIGH"                  -> "HIGH";

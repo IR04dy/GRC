@@ -96,7 +96,7 @@ public class PlanReviewService {
         Long o = org();
         BcpPlan p = plans.findByIdAndOrganisationId(planId, o)
             .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + planId));
-        String out = (outcome == null || outcome.isBlank()) ? "STILL_CURRENT" : outcome.toUpperCase();
+        String out = (outcome == null || outcome.isBlank()) ? "STILL_CURRENT" : outcome.toUpperCase(Locale.ROOT);
         if (!OUTCOMES.contains(out))
             throw new IllegalArgumentException("Invalid outcome: " + out);
 

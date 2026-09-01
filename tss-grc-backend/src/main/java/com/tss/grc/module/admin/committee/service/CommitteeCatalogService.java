@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -56,7 +57,7 @@ public class CommitteeCatalogService {
         while (cur != null) {
             String msg = cur.getMessage();
             if (msg != null) {
-                String low = msg.toLowerCase();
+                String low = msg.toLowerCase(Locale.ROOT);
                 // SQL Server: "Invalid object name 'admin.committee_templates'"
                 // Postgres/H2 variants kept here for forward-compat
                 if (low.contains("invalid object name")

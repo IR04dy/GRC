@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -249,7 +250,7 @@ public class ChangeDecisionRegisterService {
         if (votes == null || votes.isEmpty()) return "";
         Map<String, Integer> counts = new TreeMap<>();
         for (ChangeApproval v : votes) {
-            String d = v.getDecision() == null ? "UNKNOWN" : v.getDecision().toUpperCase();
+            String d = v.getDecision() == null ? "UNKNOWN" : v.getDecision().toUpperCase(Locale.ROOT);
             counts.merge(d, 1, Integer::sum);
         }
         StringBuilder sb = new StringBuilder();

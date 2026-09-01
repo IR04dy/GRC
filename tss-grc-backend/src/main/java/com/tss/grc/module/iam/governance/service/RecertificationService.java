@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -74,7 +75,7 @@ public class RecertificationService {
         c.setTitleEn(r.titleEn());
         c.setTitleAr(r.titleAr());
         c.setScope(r.scope());
-        c.setScopeModule("MODULE".equals(r.scope()) ? r.scopeModule().toUpperCase() : null);
+        c.setScopeModule("MODULE".equals(r.scope()) ? r.scopeModule().toUpperCase(Locale.ROOT) : null);
         c.setWindowStart(r.windowStart());
         c.setWindowEnd(r.windowEnd());
         c.setWindowHijri(PdfTheme.formatHijri(r.windowStart()) + " – " + PdfTheme.formatHijri(r.windowEnd()));

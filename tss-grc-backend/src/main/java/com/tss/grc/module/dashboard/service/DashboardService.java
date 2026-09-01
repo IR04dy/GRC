@@ -178,7 +178,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public List<TrendPoint> getKpiTrend(Long orgId, String metric, int weeks) {
         int n = Math.max(2, Math.min(52, weeks));
-        MetricSource src = METRICS.getOrDefault(metric == null ? "risks" : metric.toLowerCase(),
+        MetricSource src = METRICS.getOrDefault(metric == null ? "risks" : metric.toLowerCase(Locale.ROOT),
                 METRICS.get("risks"));
         LocalDate windowStart = LocalDate.now()
                 .minusWeeks(n - 1L)

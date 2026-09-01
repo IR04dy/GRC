@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,8 +102,8 @@ public class CloudServiceService {
     public Map<String, Long> stats() {
         Long org = TenantContext.getCurrentTenant();
         Map<String, Long> out = new HashMap<>();
-        for (String s : STATUSES)      out.put("status_" + s.toLowerCase(), repo.countByOrganisationIdAndStatus(org, s));
-        for (String c : CRITICALITIES) out.put("crit_"   + c.toLowerCase(), repo.countByOrganisationIdAndCriticality(org, c));
+        for (String s : STATUSES)      out.put("status_" + s.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndStatus(org, s));
+        for (String c : CRITICALITIES) out.put("crit_"   + c.toLowerCase(Locale.ROOT), repo.countByOrganisationIdAndCriticality(org, c));
         out.put("ksa_resident", repo.countByOrganisationIdAndKingdomDataResident(org, true));
         out.put("off_kingdom",  repo.countByOrganisationIdAndKingdomDataResident(org, false));
         return out;

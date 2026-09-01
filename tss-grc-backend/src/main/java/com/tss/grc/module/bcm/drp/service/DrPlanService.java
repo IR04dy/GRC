@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -204,6 +205,6 @@ public class DrPlanService {
     }
 
     private String shortHex() {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
     }
 }

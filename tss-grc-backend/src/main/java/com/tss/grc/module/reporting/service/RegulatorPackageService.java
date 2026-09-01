@@ -33,6 +33,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
@@ -326,7 +327,7 @@ public class RegulatorPackageService {
     private static String uniqueName(String base, Set<String> used) {
         String name = base;
         int n = 2;
-        while (!used.add(name.toLowerCase())) {
+        while (!used.add(name.toLowerCase(Locale.ROOT))) {
             int dot = base.lastIndexOf('.');
             int slash = base.lastIndexOf('/');
             name = (dot > slash) ? base.substring(0, dot) + "_" + n + base.substring(dot) : base + "_" + n;

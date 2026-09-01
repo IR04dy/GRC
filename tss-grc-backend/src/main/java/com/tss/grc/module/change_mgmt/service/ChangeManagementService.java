@@ -631,7 +631,7 @@ public class ChangeManagementService {
             throw new IllegalArgumentException("CAB votes can only be recorded while the change is in IMPACT_ASSESSED or CAB_PENDING");
         if (req == null || req.decision() == null || req.decision().isBlank())
             throw new IllegalArgumentException("decision is required");
-        String decision = req.decision().trim().toUpperCase();
+        String decision = req.decision().trim().toUpperCase(Locale.ROOT);
         if (!CAB_DECISIONS.contains(decision))
             throw new IllegalArgumentException("decision must be one of " + CAB_DECISIONS);
 
@@ -1592,7 +1592,7 @@ public class ChangeManagementService {
         if (decision == null || decision.isBlank())
             throw new IllegalArgumentException(
                 "decision is required — one of " + RatificationStates.DECISIONS);
-        String d = decision.trim().toUpperCase();
+        String d = decision.trim().toUpperCase(Locale.ROOT);
         if (!RatificationStates.DECISIONS.contains(d))
             throw new IllegalArgumentException(
                 "Invalid ratification decision '" + decision + "' — allowed: " + RatificationStates.DECISIONS);
@@ -1610,7 +1610,7 @@ public class ChangeManagementService {
               + "must be closed — it is not ratified silently, because no clock ever ran for it.");
         if (RatificationStates.RATIFIED.equals(state) || RatificationStates.REJECTED.equals(state))
             throw new IllegalStateException(
-                "Change " + nullSafeMsg(c.getChangeCode()) + " was already " + state.toLowerCase()
+                "Change " + nullSafeMsg(c.getChangeCode()) + " was already " + state.toLowerCase(Locale.ROOT)
               + " on " + c.getRatifiedAt() + " by " + nullSafeStr(c.getRatifiedByName())
               + ". A ratification decision is recorded once.");
         if (RatificationStates.AWAITING_IMPLEMENTATION.equals(state))
@@ -1637,7 +1637,7 @@ public class ChangeManagementService {
         ChangeRequest saved = changeRepo.save(c);
 
         audit.log("RATIFICATION_" + d, "ChangeRequest", saved.getId(),
-            "Emergency change " + nullSafeMsg(saved.getChangeCode()) + " " + saved.getRatificationState().toLowerCase()
+            "Emergency change " + nullSafeMsg(saved.getChangeCode()) + " " + saved.getRatificationState().toLowerCase(Locale.ROOT)
                 + " by " + ratifier + (late ? " — AFTER the SLA deadline of " + c.getRatificationDueAt() : "")
                 + (saved.getRatificationEscalatedAt() != null
                     ? " (breach was escalated on " + saved.getRatificationEscalatedAt() + ")" : ""));
@@ -2019,7 +2019,7 @@ public class ChangeManagementService {
         if (governanceHealth == null) return;   // directly-constructed unit tests
         ChangeAuthorisationMatrix m = resolveMatrix(c);
         if (m == null || m.getGate() == null) return;
-        String gate = m.getGate().trim().toUpperCase();
+        String gate = m.getGate().trim().toUpperCase(Locale.ROOT);
         if (!"CAB".equals(gate) && !"ECAB".equals(gate)) return;   // AUTO — no committee demanded
         if (committeePort != null && committeePort.activeReferral("CHANGE", c.getId()).isPresent())
             return;

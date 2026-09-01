@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Locale;
+
 /**
  * CY-F — cyber register exports (Excel + Arabic-RTL PDF).
  *
@@ -53,7 +55,7 @@ public class CyberExportController {
                                          @RequestParam(required = false) String lang) {
         byte[] body = exportService.export(register, format, lang);   // validates register/format → 400
         boolean pdf = "PDF".equalsIgnoreCase(format);
-        String slug = register.toLowerCase().replaceAll("[^a-z0-9-]", "");
+        String slug = register.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9-]", "");
         String filename = "cyber-" + (slug.isEmpty() ? "register" : slug) + (pdf ? ".pdf" : ".xlsx");
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : XLSX)

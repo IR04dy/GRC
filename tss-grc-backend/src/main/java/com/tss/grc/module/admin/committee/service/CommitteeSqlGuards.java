@@ -1,5 +1,7 @@
 package com.tss.grc.module.admin.committee.service;
 
+import java.util.Locale;
+
 /**
  * Shared helpers for the committees module's defensive-degradation
  * pattern: when the dev DB doesn't have the V154..V159 schema
@@ -26,7 +28,7 @@ final class CommitteeSqlGuards {
         while (cur != null) {
             String msg = cur.getMessage();
             if (msg != null) {
-                String low = msg.toLowerCase();
+                String low = msg.toLowerCase(Locale.ROOT);
                 if (low.contains("invalid object name")  // SQL Server
                     || low.contains("does not exist")    // Postgres
                     || low.contains("not found")         // H2 / generic

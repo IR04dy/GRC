@@ -12,6 +12,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.Locale;
+
 /**
  * Export remediation P2 — central export audit trail. Any successful response that streams a file
  * (Content-Disposition: attachment) is recorded as an {@code EXPORT} event in the existing platform
@@ -40,7 +42,7 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
             // as data, with no attachment header, and the Content-Disposition test alone would have
             // let the platform's most sensitive aggregate leave with no audit row.
             String cd = res.getHeader(HttpHeaders.CONTENT_DISPOSITION);
-            boolean streamed = cd != null && cd.toLowerCase().contains("attachment");
+            boolean streamed = cd != null && cd.toLowerCase(Locale.ROOT).contains("attachment");
             String declaredFormat = ExportAuditContext.declaredFormat();
             if (!streamed && declaredFormat == null) return;
 
@@ -112,7 +114,7 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
 
     /** Pull the filename from a Content-Disposition header (quoted or bare). */
     static String parseFilename(String cd) {
-        int i = cd.toLowerCase().indexOf("filename=");
+        int i = cd.toLowerCase(Locale.ROOT).indexOf("filename=");
         if (i < 0) return "";
         String v = cd.substring(i + "filename=".length()).trim();
         if (v.startsWith("\"")) {
@@ -128,12 +130,12 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
         if (fileName == null) return "file";
         int dot = fileName.lastIndexOf('.');
         if (dot < 0 || dot == fileName.length() - 1) return "file";
-        return fileName.substring(dot + 1).toLowerCase().replaceAll("[^a-z0-9]", "");
+        return fileName.substring(dot + 1).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     /** Best-effort module from the request path (first segment after /api[/v1]). */
     static String moduleFromPath(String path) {
-        String p = path == null ? "" : path.toLowerCase();
+        String p = path == null ? "" : path.toLowerCase(Locale.ROOT);
         String seg = firstSegmentAfterApi(p);
         return switch (seg) {
             case "reporting"      -> "REPORTING";
@@ -156,7 +158,7 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
             // only ever produced registry modules (PRIVACY, TPRM — the URL segment happens to be
             // the package name), and narrowing it to a known set would DROP those real
             // attributions. Filed: the path→module mapping is a mapping job, not a scan.
-            default               -> seg.isEmpty() ? null : seg.toUpperCase();
+            default               -> seg.isEmpty() ? null : seg.toUpperCase(Locale.ROOT);
         };
     }
 

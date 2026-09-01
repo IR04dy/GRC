@@ -104,7 +104,7 @@ public class CommitteeCalendarService {
         for (int i = 0; i < dates.size(); i++) {
             LocalDate date = dates.get(i);
             String code = String.format(Locale.ROOT, "MTG-%d-%s-%03d",
-                year, committee.getCode().replace("COM-", "").toUpperCase(), i + 1);
+                year, committee.getCode().replace("COM-", "").toUpperCase(Locale.ROOT), i + 1);
 
             if (meetings.findByOrganisationIdAndMeetingCode(org, code).isPresent()) {
                 continue;   // idempotent — skip if already exists

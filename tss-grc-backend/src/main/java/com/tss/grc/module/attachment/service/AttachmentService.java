@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -30,7 +31,7 @@ public class AttachmentService {
     /** Normalize + validate a classification; null/blank stays null (unclassified). */
     private static String normClassification(String c) {
         if (c == null || c.isBlank()) return null;
-        String up = c.toUpperCase();
+        String up = c.toUpperCase(Locale.ROOT);
         if (!CLASSIFICATIONS.contains(up)) {
             throw new IllegalArgumentException("Unknown classification '" + c + "'. Valid: " + CLASSIFICATIONS);
         }
@@ -72,7 +73,7 @@ public class AttachmentService {
                                      String titleEn, LocalDate validTo, String classification,
                                      MultipartFile file, Long userId) {
         Long orgId = TenantContext.getCurrentTenant();
-        String type = (docType == null || docType.isBlank()) ? "OTHER" : docType.toUpperCase();
+        String type = (docType == null || docType.isBlank()) ? "OTHER" : docType.toUpperCase(Locale.ROOT);
         if (!DOC_TYPES.contains(type)) {
             throw new IllegalArgumentException("Unknown docType '" + docType + "'. Valid: " + DOC_TYPES);
         }
@@ -112,7 +113,7 @@ public class AttachmentService {
         Attachment old = mustGet(oldId);
         requireParentVisible(old, "new version");
         Long orgId = old.getOrganisationId();
-        String type = (docType == null || docType.isBlank()) ? old.getDocType() : docType.toUpperCase();
+        String type = (docType == null || docType.isBlank()) ? old.getDocType() : docType.toUpperCase(Locale.ROOT);
         if (!DOC_TYPES.contains(type)) {
             throw new IllegalArgumentException("Unknown docType '" + docType + "'. Valid: " + DOC_TYPES);
         }
@@ -163,7 +164,7 @@ public class AttachmentService {
         Attachment a = mustGet(id);
         requireParentVisible(a, "metadata edit");
         if (docType != null && !docType.isBlank()) {
-            String type = docType.toUpperCase();
+            String type = docType.toUpperCase(Locale.ROOT);
             if (!DOC_TYPES.contains(type)) {
                 throw new IllegalArgumentException("Unknown docType '" + docType + "'. Valid: " + DOC_TYPES);
             }

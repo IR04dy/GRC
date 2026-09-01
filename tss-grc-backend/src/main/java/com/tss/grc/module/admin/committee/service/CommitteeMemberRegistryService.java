@@ -24,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -330,7 +331,7 @@ public class CommitteeMemberRegistryService {
     @Transactional(readOnly = true)
     public List<LinkableUser> linkableUsers(Long committeeId, String query) {
         Long org = TenantContext.getCurrentTenant();
-        String q = query == null ? "" : query.trim().toLowerCase();
+        String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         return users.findByOrganisationId(org, Pageable.unpaged()).getContent().stream()
             .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
             .filter(u -> q.isEmpty()
@@ -624,6 +625,6 @@ public class CommitteeMemberRegistryService {
     }
 
     private static boolean contains(String haystack, String needleLower) {
-        return haystack != null && haystack.toLowerCase().contains(needleLower);
+        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needleLower);
     }
 }

@@ -200,10 +200,10 @@ public class WorkflowRequestService {
 
         WorkflowRequest r = new WorkflowRequest();
         r.setOrganisationId(org);
-        r.setSourceModule(dto.sourceModule().trim().toUpperCase());
+        r.setSourceModule(dto.sourceModule().trim().toUpperCase(Locale.ROOT));
         r.setSourceRecordType(dto.sourceRecordType());
         r.setSourceRecordId(dto.sourceRecordId());
-        r.setRequestType(dto.requestType().trim().toUpperCase());
+        r.setRequestType(dto.requestType().trim().toUpperCase(Locale.ROOT));
         r.setTitleEn(dto.titleEn());
         r.setTitleAr(dto.titleAr());
         r.setDescription(dto.description());
@@ -256,7 +256,7 @@ public class WorkflowRequestService {
             WorkflowRequestRecipient rec = new WorkflowRequestRecipient();
             rec.setOrganisationId(org);
             rec.setRequestId(r.getId());
-            rec.setRecipientType(in.recipientType().trim().toUpperCase());
+            rec.setRecipientType(in.recipientType().trim().toUpperCase(Locale.ROOT));
             rec.setRecipientId(in.recipientId());
             rec.setRecipientKey(in.recipientKey());
             rec.setRecipientLabel(resolveLabel(org, in));
@@ -277,10 +277,10 @@ public class WorkflowRequestService {
         requireInitiatorOrAdmin(r, "edit");
         Long org = r.getOrganisationId();
 
-        r.setSourceModule(dto.sourceModule().trim().toUpperCase());
+        r.setSourceModule(dto.sourceModule().trim().toUpperCase(Locale.ROOT));
         r.setSourceRecordType(dto.sourceRecordType());
         r.setSourceRecordId(dto.sourceRecordId());
-        r.setRequestType(dto.requestType().trim().toUpperCase());
+        r.setRequestType(dto.requestType().trim().toUpperCase(Locale.ROOT));
         r.setTitleEn(dto.titleEn());
         r.setTitleAr(dto.titleAr());
         r.setDescription(dto.description());
@@ -338,7 +338,7 @@ public class WorkflowRequestService {
         boolean hasEscalationRecipient = false;
         TreeSet<Integer> steps = new TreeSet<>();
         for (RecipientDto in : recipients) {
-            String type = in.recipientType() == null ? "" : in.recipientType().trim().toUpperCase();
+            String type = in.recipientType() == null ? "" : in.recipientType().trim().toUpperCase(Locale.ROOT);
             if (!RECIPIENT_TYPES.contains(type))
                 throw new IllegalArgumentException("recipientType must be one of " + RECIPIENT_TYPES);
             String role = upperOr(in.actorRole(), "ASSIGNEE");
@@ -550,7 +550,7 @@ public class WorkflowRequestService {
         mine.setRespondedAt(LocalDateTime.now());
         mine.setRespondedBy(respondedBy);
         mine.setResponse(note);
-        mine.setResponseOutcome(outcome == null || outcome.isBlank() ? null : outcome.trim().toUpperCase());
+        mine.setResponseOutcome(outcome == null || outcome.isBlank() ? null : outcome.trim().toUpperCase(Locale.ROOT));
         recipientRepo.save(mine);
 
         BranchRuleDto branch = matchBranchRule(r, mine.getStepNo(), mine.getResponseOutcome());
@@ -754,7 +754,7 @@ public class WorkflowRequestService {
         int level = 1;
         for (EscalationTierDto t : tiers) {
             out.add(new EscalationTierDto(level++,
-                t.role() == null || t.role().isBlank() ? null : t.role().trim().toUpperCase(),
+                t.role() == null || t.role().isBlank() ? null : t.role().trim().toUpperCase(Locale.ROOT),
                 t.userId(),
                 t.afterDays() == null ? 0 : t.afterDays()));
         }
@@ -847,8 +847,8 @@ public class WorkflowRequestService {
                 .map(this::toResponseShallow);
         }
         boolean hasStatus = status != null && !status.isBlank();
-        String st = hasStatus ? status.toUpperCase() : null;
-        String mod = (sourceModule != null && !sourceModule.isBlank()) ? sourceModule.trim().toUpperCase() : null;
+        String st = hasStatus ? status.toUpperCase(Locale.ROOT) : null;
+        String mod = (sourceModule != null && !sourceModule.isBlank()) ? sourceModule.trim().toUpperCase(Locale.ROOT) : null;
         Page<WorkflowRequest> page;
         if (mod != null && hasStatus)
             page = requestRepo.findByOrganisationIdAndSourceModuleAndStatusOrderByCreatedAtDesc(org, mod, st, pageable);
@@ -1010,7 +1010,7 @@ public class WorkflowRequestService {
     public RecipientReach reachOf(String recipientType, Long recipientId, String recipientKey) {
         Long org = TenantContext.getCurrentTenant();
         if (recipientType == null || recipientType.isBlank()) return RecipientReach.no("UNKNOWN_TYPE");
-        return switch (recipientType.trim().toUpperCase()) {
+        return switch (recipientType.trim().toUpperCase(Locale.ROOT)) {
             // Each branch resolves exactly what notifyStep's matching branch resolves.
             case "USER" -> recipientId == null ? RecipientReach.no("USER_NOT_FOUND")
                 : userRepo.findById(recipientId)
@@ -1145,7 +1145,7 @@ public class WorkflowRequestService {
                 out.add(new RecipientSuggestion("DEPARTMENT", deptId, null, label, "ASSIGNEE", "Your department"));
             }
         }
-        String mod = sourceModule == null ? "" : sourceModule.trim().toUpperCase();
+        String mod = sourceModule == null ? "" : sourceModule.trim().toUpperCase(Locale.ROOT);
         for (String role : MODULE_OWNER_ROLES.getOrDefault(mod, List.of()))
             out.add(new RecipientSuggestion("ROLE", null, role, role, "ASSIGNEE", mod + " owner role"));
         out.add(new RecipientSuggestion("ROLE", null, "COMPLIANCE_OFFICER", "COMPLIANCE_OFFICER", "REVIEWER", "Compliance reviewer"));
@@ -1300,8 +1300,8 @@ public class WorkflowRequestService {
         if (rules == null || rules.isEmpty()) return List.of();
         return rules.stream().map(b -> new BranchRuleDto(
             b.stepNo(),
-            b.onOutcome() == null ? null : b.onOutcome().trim().toUpperCase(),
-            b.action() == null ? null : b.action().trim().toUpperCase(),
+            b.onOutcome() == null ? null : b.onOutcome().trim().toUpperCase(Locale.ROOT),
+            b.action() == null ? null : b.action().trim().toUpperCase(Locale.ROOT),
             b.targetStep())).toList();
     }
 
@@ -1598,7 +1598,7 @@ public class WorkflowRequestService {
 
     private String resolveLabel(Long org, RecipientDto in) {
         if (in.recipientLabel() != null && !in.recipientLabel().isBlank()) return in.recipientLabel();
-        return switch (in.recipientType().trim().toUpperCase()) {
+        return switch (in.recipientType().trim().toUpperCase(Locale.ROOT)) {
             case "USER" -> userRepo.findById(in.recipientId()).map(User::getFullNameEn).orElse("user#" + in.recipientId());
             case "DEPARTMENT" -> departmentRepo.findByIdAndOrganisationId(in.recipientId(), org)
                 .map(d -> d.getNameEn()).orElse("dept#" + in.recipientId());
@@ -1637,7 +1637,7 @@ public class WorkflowRequestService {
 
     private static String categoryOf(List<RecipientDto> recipients) {
         Set<String> types = new LinkedHashSet<>();
-        recipients.forEach(x -> types.add(x.recipientType().trim().toUpperCase()));
+        recipients.forEach(x -> types.add(x.recipientType().trim().toUpperCase(Locale.ROOT)));
         return types.size() == 1 ? types.iterator().next() : "MIXED";
     }
 
@@ -1648,7 +1648,7 @@ public class WorkflowRequestService {
     }
 
     private static String upperOr(String v, String dflt) {
-        return v == null || v.isBlank() ? dflt : v.trim().toUpperCase();
+        return v == null || v.isBlank() ? dflt : v.trim().toUpperCase(Locale.ROOT);
     }
 
     private static String noteSuffix(String note) {

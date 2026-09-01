@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -97,10 +98,10 @@ public class CrossBorderTransferService {
     public CrossBorderTransfer create(CrossBorderCreate body, Long createdBy) {
         CrossBorderTransfer t = new CrossBorderTransfer();
         t.setOrganisationId(TenantContext.getCurrentTenant());
-        t.setExternalId("CBT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        t.setExternalId("CBT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
         t.setRopaCode(body.ropaCode());
         t.setRopaTitleEn(body.ropaTitleEn());
-        t.setDestinationCountry(body.destinationCountry().toUpperCase());
+        t.setDestinationCountry(body.destinationCountry().toUpperCase(Locale.ROOT));
         t.setDestinationOrgName(body.destinationOrgName());
         t.setDestinationOrgRole(body.destinationOrgRole());
         t.setDataCategories(body.dataCategories());

@@ -4,6 +4,7 @@ import com.lowagie.text.Font;
 import com.lowagie.text.pdf.BaseFont;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Locale;
 import java.awt.Color;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -130,7 +131,7 @@ public final class PdfFonts {
             try {
                 if (Files.exists(Path.of(path))) {
                     BaseFont bf = BaseFont.createFont(path, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-                    boolean weak = path.toLowerCase().contains("dejavu");
+                    boolean weak = path.toLowerCase(Locale.ROOT).contains("dejavu");
                     log.warn("PDF Arabic font: using OS font {} ({}). For portable Arabic rendering, "
                         + "set -D{} or bundle an OFL font in resources/fonts/.",
                         path, weak ? "PARTIAL Arabic coverage" : "full Arabic coverage", FONT_PROP);

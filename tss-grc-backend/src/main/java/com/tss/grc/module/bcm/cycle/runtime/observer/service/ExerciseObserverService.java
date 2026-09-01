@@ -462,7 +462,7 @@ public class ExerciseObserverService {
     /** Exercise observation severity → BCM gap severity. */
     private static String mapSeverity(String obs) {
         if (obs == null) return "MEDIUM";
-        return switch (obs.toUpperCase()) {
+        return switch (obs.toUpperCase(Locale.ROOT)) {
             case "CRITICAL"        -> "CRITICAL";
             case "MAJOR"           -> "HIGH";
             case "MODERATE"        -> "MEDIUM";

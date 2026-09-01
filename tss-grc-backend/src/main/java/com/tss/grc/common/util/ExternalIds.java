@@ -50,7 +50,7 @@ public final class ExternalIds {
         return String.format(Locale.ROOT, "%s-%d-%s%04X",
             prefix,
             LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase(),
+            Long.toHexString(System.currentTimeMillis()).toUpperCase(Locale.ROOT),
             ThreadLocalRandom.current().nextInt(0x10000));
     }
 }

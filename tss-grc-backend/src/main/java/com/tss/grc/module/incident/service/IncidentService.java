@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
@@ -172,9 +173,9 @@ public class IncidentService {
         var existing = incidentRepo.findByOrganisationIdAndSourceWorkspaceIncidentId(orgId, workspaceIncidentId);
         if (existing.isPresent()) return existing.get().getId();
 
-        String sev = severity == null ? "MEDIUM" : severity.trim().toUpperCase();
+        String sev = severity == null ? "MEDIUM" : severity.trim().toUpperCase(Locale.ROOT);
         if (!LEGAL_SEVERITY.contains(sev)) sev = "MEDIUM";
-        String cat = category == null ? "CYBER" : category.trim().toUpperCase();
+        String cat = category == null ? "CYBER" : category.trim().toUpperCase(Locale.ROOT);
         if (!LEGAL_CATEGORY.contains(cat)) cat = "CYBER";   // CK_incidents_category is strict
 
         Incident i = new Incident();
@@ -234,7 +235,7 @@ public class IncidentService {
     }
 
     private static String legalStatus(String s) {
-        String v = s == null ? "OPEN" : s.trim().toUpperCase();
+        String v = s == null ? "OPEN" : s.trim().toUpperCase(Locale.ROOT);
         return switch (v) {
             case "OPEN", "INVESTIGATING", "RESOLVED", "CLOSED" -> v;
             default -> "OPEN";   // CK_incidents_status is strict
@@ -400,7 +401,7 @@ public class IncidentService {
         Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        String reg = regulator == null ? "" : regulator.toUpperCase();
+        String reg = regulator == null ? "" : regulator.toUpperCase(Locale.ROOT);
         switch (reg) {
             case "NCA_HEY"     -> i.setNcaHeyNotifiedAt(now);
             case "DATA_OFFICE" -> i.setDataOfficeNotifiedAt(now);

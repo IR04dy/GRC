@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -36,7 +37,7 @@ public class SignatureService {
     @Transactional
     public SignatureResponse sign(String entityType, Long entityId, String intent, String statementEn, Long userId) {
         Long orgId = TenantContext.getCurrentTenant();
-        String normIntent = intent == null ? "ATTEST" : intent.trim().toUpperCase();
+        String normIntent = intent == null ? "ATTEST" : intent.trim().toUpperCase(Locale.ROOT);
         if (!INTENTS.contains(normIntent)) {
             throw new IllegalArgumentException("Unknown intent '" + intent + "'. Valid: " + INTENTS);
         }

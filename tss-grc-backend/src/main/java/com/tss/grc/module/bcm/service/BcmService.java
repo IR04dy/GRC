@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
@@ -543,7 +544,7 @@ public class BcmService {
 
     private static boolean typeHas(String planType, String... needles) {
         if (planType == null) return false;
-        String t = planType.toUpperCase();
+        String t = planType.toUpperCase(Locale.ROOT);
         for (String n : needles) if (t.contains(n)) return true;
         return false;
     }

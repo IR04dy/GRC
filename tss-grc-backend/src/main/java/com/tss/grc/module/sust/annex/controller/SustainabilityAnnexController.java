@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
 import java.util.List;
 
 /**
@@ -137,7 +138,7 @@ public class SustainabilityAnnexController {
     public ResponseEntity<String> export(@PathVariable Long id, @PathVariable String format) {
         SustainabilityReport r = service.getReport(id);
         String body; MediaType mt; String ext;
-        switch (format.toLowerCase()) {
+        switch (format.toLowerCase(Locale.ROOT)) {
             case "md", "markdown" -> { body = r.getContentMarkdown(); mt = MediaType.TEXT_PLAIN;   ext = "md";   }
             // html/json derive from the report when the frozen snapshot is null (reports from the
             // generic generator store only markdown) — so these never export the literal "(empty)".

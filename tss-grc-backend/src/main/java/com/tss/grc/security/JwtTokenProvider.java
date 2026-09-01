@@ -12,6 +12,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Locale;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -129,7 +130,7 @@ public class JwtTokenProvider {
                 "JWT_SECRET must be at least 32 characters (256 bits). Current length: " + secret.length());
         }
         // Reject the historical placeholder strings that previously lived in application*.yml
-        String lower = secret.toLowerCase();
+        String lower = secret.toLowerCase(Locale.ROOT);
         if (lower.contains("change-this") || lower.contains("change_me") ||
             lower.contains("placeholder") || lower.contains("provide_jwt_secret")) {
             throw new IllegalStateException(

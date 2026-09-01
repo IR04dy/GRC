@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -261,7 +262,7 @@ public class HelpTopicService {
         if (qm >= 0) r = r.substring(0, qm);
         if (!r.startsWith("/")) r = "/" + r;
         if (r.length() > 1 && r.endsWith("/")) r = r.substring(0, r.length() - 1);
-        return r.toLowerCase();
+        return r.toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -272,7 +273,7 @@ public class HelpTopicService {
      */
     static boolean matches(String pattern, String route) {
         if (pattern == null) return false;
-        String p = pattern.toLowerCase().trim();
+        String p = pattern.toLowerCase(Locale.ROOT).trim();
         if (p.equals(route)) return true;
         if (!p.contains("*")) return false;
         // Translate to regex: escape regex metachars then replace `*`.

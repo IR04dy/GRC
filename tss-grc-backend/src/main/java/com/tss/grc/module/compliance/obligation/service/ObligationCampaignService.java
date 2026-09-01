@@ -22,6 +22,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -394,7 +395,7 @@ public class ObligationCampaignService {
         int year = cycleYear != null ? cycleYear : LocalDate.now().getYear();
         String qPart = (quarter == null || quarter.isBlank()) ? "ANNUAL" : quarter;
         String regPart = (regulator == null || regulator.isBlank()) ? "ALL" : regulator;
-        String suffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        String suffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
         return "OBLCAM-" + year + "-" + qPart + "-" + regPart + "-" + suffix;
     }
 

@@ -341,7 +341,7 @@ public class MlModelService {
                 return candidate;
             }
         }
-        return "MODEL-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "MODEL-" + year + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private static Map<String, Object> payload(MlModel m, String previousStage) {

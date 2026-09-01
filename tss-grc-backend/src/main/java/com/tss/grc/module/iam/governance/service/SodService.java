@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -61,7 +62,7 @@ public class SodService {
         Long org = org();
         return status == null || status.isBlank()
             ? violations.findByOrganisationIdAndIsDeletedFalseOrderByDetectedAtDesc(org)
-            : violations.findByOrganisationIdAndStatusAndIsDeletedFalseOrderByDetectedAtDesc(org, status.toUpperCase());
+            : violations.findByOrganisationIdAndStatusAndIsDeletedFalseOrderByDetectedAtDesc(org, status.toUpperCase(Locale.ROOT));
     }
 
     // ── detective scan ───────────────────────────────────────────────────

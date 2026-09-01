@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -69,7 +70,7 @@ public class RiskLinkService {
             .filter(r -> Objects.equals(r.getOrganisationId(), o))
             .orElseThrow(() -> new EntityNotFoundException("Risk " + riskId + " not found for tenant " + o));
 
-        String type = dto.linkType() == null ? "" : dto.linkType().trim().toUpperCase();
+        String type = dto.linkType() == null ? "" : dto.linkType().trim().toUpperCase(Locale.ROOT);
         if (!TYPES.contains(type))
             throw new IllegalArgumentException("Unknown link type '" + dto.linkType()
                 + "' — expected one of " + TYPES);

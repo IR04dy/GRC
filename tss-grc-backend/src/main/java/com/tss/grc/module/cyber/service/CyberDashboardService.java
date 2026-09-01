@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -125,13 +126,13 @@ public class CyberDashboardService {
         long total = controls.stream()
                 .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
                           || (c.getFrameworkName() != null
-                              && c.getFrameworkName().toUpperCase().contains(fwCode.toUpperCase())))
+                              && c.getFrameworkName().toUpperCase(Locale.ROOT).contains(fwCode.toUpperCase(Locale.ROOT))))
                 .count();
         if (total == 0) return 0;
         long compliant = controls.stream()
                 .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
                           || (c.getFrameworkName() != null
-                              && c.getFrameworkName().toUpperCase().contains(fwCode.toUpperCase())))
+                              && c.getFrameworkName().toUpperCase(Locale.ROOT).contains(fwCode.toUpperCase(Locale.ROOT))))
                 .filter(c -> "IMPLEMENTED".equalsIgnoreCase(c.getImplementationStatus()))
                 .count();
         return Math.round(100f * compliant / total);

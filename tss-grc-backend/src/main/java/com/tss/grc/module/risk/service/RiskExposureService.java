@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.List;
 import java.util.Objects;
 
@@ -158,9 +159,21 @@ public class RiskExposureService {
         return Math.min(MAX_MITIGATION, Math.max(0.0, sum));
     }
 
-    private static double effectivenessFactor(String eff) {
+    /**
+     * Control effectiveness → the mitigation credit it earns.
+     *
+     * <p>Package-private so F2-417's behavioural leg can drive it under a hostile locale (the
+     * F2-390 idiom, where {@code IncidentService#template} was opened for the same reason). It
+     * is the sharpest member of that slice's population: all three non-default tokens contain
+     * an {@code i}, so under {@code tr-TR} a bare {@code toUpperCase()} yields
+     * {@code EFFECTİVE} / {@code İNEFFECTİVE} / {@code NEEDS_İMPROVEMENT}, none of which match,
+     * and every assessed control falls to the {@code default} — <b>zero mitigation credit, so
+     * residual risk equals inherent risk</b>. That errs pessimistically rather than
+     * flatteringly, which is worth saying: it over-states risk instead of hiding it.
+     */
+    static double effectivenessFactor(String eff) {
         if (eff == null) return 0.0;
-        return switch (eff.trim().toUpperCase()) {
+        return switch (eff.trim().toUpperCase(Locale.ROOT)) {
             case "EFFECTIVE"         -> 1.0;
             case "NEEDS_IMPROVEMENT" -> 0.5;
             case "INEFFECTIVE"       -> 0.1;

@@ -169,9 +169,9 @@ public class NdiGovernanceDomainService {
 
         // Track every upstream domain string we've seen so we can flag unmatched ones.
         Set<String> allUpstream = new HashSet<>();
-        for (var m : mat)    if (m.getDomain()   != null) allUpstream.add(m.getDomain().trim().toLowerCase());
-        for (var c : cmp)    if (c.getDomain()   != null) allUpstream.add(c.getDomain().trim().toLowerCase());
-        for (var k : ops)    if (k.getCategory() != null) allUpstream.add(k.getCategory().trim().toLowerCase());
+        for (var m : mat)    if (m.getDomain()   != null) allUpstream.add(m.getDomain().trim().toLowerCase(Locale.ROOT));
+        for (var c : cmp)    if (c.getDomain()   != null) allUpstream.add(c.getDomain().trim().toLowerCase(Locale.ROOT));
+        for (var k : ops)    if (k.getCategory() != null) allUpstream.add(k.getCategory().trim().toLowerCase(Locale.ROOT));
         Set<String> matchedUpstream = new HashSet<>();
 
         List<DomainRollup> result = new ArrayList<>();
@@ -281,7 +281,7 @@ public class NdiGovernanceDomainService {
     }
 
     private String norm(String s) {
-        return s == null ? "" : s.trim().toLowerCase();
+        return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
     }
 
     /** Direction-aware progress fraction [0..1] mirroring lib/ndiOpex.ts. */

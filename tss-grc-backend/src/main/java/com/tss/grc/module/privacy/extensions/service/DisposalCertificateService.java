@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -50,7 +51,7 @@ public class DisposalCertificateService {
     public DisposalCertificate create(DisposalCreate body, Long createdBy) {
         DisposalCertificate d = new DisposalCertificate();
         d.setOrganisationId(TenantContext.getCurrentTenant());
-        d.setExternalId("DC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        d.setExternalId("DC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
         d.setRelatedEntityType(body.relatedEntityType());
         d.setRelatedEntityId(body.relatedEntityId());
         d.setRelatedEntityLabel(body.relatedEntityLabel());

@@ -18,6 +18,7 @@ import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -321,7 +322,7 @@ public class ApprovalRequestService {
         switch (req.getStatus()) {
             case "APPROVED", "REJECTED" -> {
                 trigger = "APPROVAL_DECIDED";
-                message = "Approval " + req.getStatus().toLowerCase()
+                message = "Approval " + req.getStatus().toLowerCase(Locale.ROOT)
                     + (r.getDecidedBy() != null ? " by " + r.getDecidedBy() : "");
             }
             case "DELEGATED" -> {

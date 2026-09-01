@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +42,7 @@ public class ControlMapService {
 
     private static String normalizeSatisfaction(String s) {
         if (s == null) return "FULL";
-        String up = s.trim().toUpperCase();
+        String up = s.trim().toUpperCase(Locale.ROOT);
         return SATISFACTIONS.contains(up) ? up : "FULL";
     }
 

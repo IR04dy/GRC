@@ -2,6 +2,7 @@ package com.tss.grc.module.platform.calendar.service;
 
 import com.tss.grc.module.platform.calendar.dto.CalendarEventDto;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -199,7 +200,7 @@ public final class IcsBuilder {
 
     /** Maps our severity label to RFC-5545 PRIORITY (1=highest, 9=lowest). */
     private static int priorityFor(String sev) {
-        return switch (sev == null ? "" : sev.toUpperCase()) {
+        return switch (sev == null ? "" : sev.toUpperCase(Locale.ROOT)) {
             case "CRITICAL", "SEV-1", "SEV1" -> 1;
             case "HIGH",     "SEV-2", "SEV2" -> 3;
             case "MEDIUM",   "SEV-3", "SEV3" -> 5;

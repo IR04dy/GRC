@@ -69,7 +69,7 @@ public class BcmAuditCompletionService {
         body.setOrganisationId(org());
         if (body.getReviewCode() == null || body.getReviewCode().isBlank()) {
             body.setReviewCode("MR-" + Year.now().getValue() + "-"
-                + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+                + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT));
         }
         if (body.getStatus() == null) body.setStatus("DRAFT");
         if (!MR_STATUSES.contains(body.getStatus()))
@@ -201,7 +201,7 @@ public class BcmAuditCompletionService {
     @Transactional(readOnly = true)
     public List<SiemInboundEvent> listSiemEvents(String status) {
         if (status != null && !status.isBlank())
-            return siemEvents.findByOrganisationIdAndProcessingStatusOrderByReceivedAtDesc(org(), status.toUpperCase());
+            return siemEvents.findByOrganisationIdAndProcessingStatusOrderByReceivedAtDesc(org(), status.toUpperCase(Locale.ROOT));
         return siemEvents.findByOrganisationIdOrderByReceivedAtDesc(org());
     }
 

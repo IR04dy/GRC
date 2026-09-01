@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,7 +149,7 @@ public class CustomSqlRunner implements ControlTestRunner {
         // Defence-in-depth: even when the statement starts with SELECT,
         // refuse if any of the DML/DDL tokens appear as standalone words.
         // Crude but reliable for the bounded auditor surface we care about.
-        String upper = " " + stripped.toUpperCase() + " ";
+        String upper = " " + stripped.toUpperCase(Locale.ROOT) + " ";
         for (String token : FORBIDDEN_TOKENS) {
             if (upper.contains(" " + token + " ") || upper.contains(";" + token + " ")) {
                 return "Forbidden token '" + token + "' detected in CCM CUSTOM_SQL test";
@@ -161,7 +162,7 @@ public class CustomSqlRunner implements ControlTestRunner {
         // SEC-INT-001: enforce tenant scoping — the query MUST reference
         // organisation_id so a CCM test cannot read across tenants in the
         // shared schema. (Defence-in-depth on top of the default kill-switch.)
-        if (!stripped.toLowerCase().contains("organisation_id")) {
+        if (!stripped.toLowerCase(Locale.ROOT).contains("organisation_id")) {
             return "CCM CUSTOM_SQL must filter by organisation_id (tenant scoping required)";
         }
         return null;

@@ -23,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -427,7 +428,7 @@ public class VendorBcpCampaignService {
 
     private static String nextCampaignCode(Integer cycleYear) {
         int year = cycleYear != null ? cycleYear : LocalDateTime.now().getYear();
-        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
         return "VBCP-" + year + "-" + suffix;
     }
 

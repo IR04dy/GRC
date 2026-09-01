@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -96,7 +97,7 @@ public class CommitteeGateMapService {
     @Transactional
     public Map<String, Object> upsert(String gate, Long committeeId) {
         Long org = TenantContext.getCurrentTenant();
-        String g = gate == null ? "" : gate.trim().toUpperCase();
+        String g = gate == null ? "" : gate.trim().toUpperCase(Locale.ROOT);
         if (!GATES.contains(g))
             throw new IllegalArgumentException("gate must be one of " + GATES + " (AUTO needs no committee)");
         if (committeeId == null)
@@ -134,7 +135,7 @@ public class CommitteeGateMapService {
     @Transactional
     public void clear(String gate) {
         Long org = TenantContext.getCurrentTenant();
-        String g = gate == null ? "" : gate.trim().toUpperCase();
+        String g = gate == null ? "" : gate.trim().toUpperCase(Locale.ROOT);
         if (!GATES.contains(g))
             throw new IllegalArgumentException("gate must be one of " + GATES);
         CommitteeGateMap row = gateMapRepo.findByOrganisationIdAndGate(org, g)

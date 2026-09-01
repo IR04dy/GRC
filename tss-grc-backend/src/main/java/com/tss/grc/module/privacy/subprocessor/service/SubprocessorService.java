@@ -100,7 +100,7 @@ public class SubprocessorService {
     @Transactional(readOnly = true)
     public List<SubprocessorResponse> findByCountry(String country) {
         Long orgId = TenantContext.getCurrentTenant();
-        return repo.findByOrganisationIdAndCountryOfProcessingAndIsDeletedFalse(orgId, country.toUpperCase())
+        return repo.findByOrganisationIdAndCountryOfProcessingAndIsDeletedFalse(orgId, country.toUpperCase(Locale.ROOT))
                 .stream().map(SubprocessorResponse::from).toList();
     }
 
@@ -356,7 +356,7 @@ public class SubprocessorService {
         if (r.subProcessorLegalName()  != null) s.setSubProcessorLegalName(r.subProcessorLegalName());
         if (r.subProcessorLegalNameAr()!= null) s.setSubProcessorLegalNameAr(r.subProcessorLegalNameAr());
         if (r.vendorId()               != null) s.setVendorId(r.vendorId());
-        if (r.countryOfProcessing()    != null) s.setCountryOfProcessing(r.countryOfProcessing().toUpperCase());
+        if (r.countryOfProcessing()    != null) s.setCountryOfProcessing(r.countryOfProcessing().toUpperCase(Locale.ROOT));
         if (r.regionOfProcessing()     != null) s.setRegionOfProcessing(r.regionOfProcessing());
         if (r.dataCategoriesJson()     != null) s.setDataCategoriesJson(r.dataCategoriesJson());
         if (r.dataSubjectCategoriesJson()!= null) s.setDataSubjectCategoriesJson(r.dataSubjectCategoriesJson());
@@ -386,7 +386,7 @@ public class SubprocessorService {
                 return candidate;
             }
         }
-        return prefix + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return prefix + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     private static String mapTransitionToEventType(String targetStage) {

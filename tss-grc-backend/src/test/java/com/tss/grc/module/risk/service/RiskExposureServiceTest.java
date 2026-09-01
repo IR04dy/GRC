@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -138,5 +139,46 @@ class RiskExposureServiceTest {
         when(risks.findUncontrolled(ORG)).thenReturn(List.of(risk("OPEN", 5, 5, 25)));
         assertThat(service.listUncontrolledRisks()).hasSize(1);
         verify(risks).findUncontrolled(eq(ORG));
+    }
+
+    /**
+     * F2-417 — the control-effectiveness ladder must still match under a hostile locale.
+     *
+     * <p>{@link RiskExposureService#effectivenessFactor} maps a control's assessed effectiveness
+     * to the mitigation credit it earns. <b>All three non-default tokens contain an {@code i}</b>,
+     * so a bare {@code toUpperCase()} under {@code tr-TR} yields {@code EFFECTİVE},
+     * {@code İNEFFECTİVE} and {@code NEEDS_İMPROVEMENT} — none of which match — and every
+     * assessed control falls to {@code default -> 0.0}, <i>"no credit until proven"</i>. Residual
+     * risk would then equal inherent risk for the whole register. That errs pessimistically
+     * rather than flatteringly, which is worth recording: it over-states risk instead of hiding
+     * it.
+     *
+     * <p>⚠ The negative control is load-bearing. Without it, a JDK on which {@code tr-TR} folded
+     * {@code i} to ASCII {@code I} would make every assertion below pass while proving nothing —
+     * a green indistinguishable from a working guard (F2-235).
+     */
+    @Test
+    void theEffectivenessLadderStillMatchesUnderAHostileLocale() {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+
+            assertThat("effective".toUpperCase())
+                .as("NEGATIVE CONTROL — if tr-TR folds 'i' to ASCII 'I' on this JDK then the "
+                    + "assertions below are vacuous")
+                .isNotEqualTo("EFFECTIVE");
+
+            assertThat(RiskExposureService.effectivenessFactor("effective"))
+                .as("an EFFECTIVE control must still earn full mitigation credit under tr-TR")
+                .isEqualTo(1.0);
+            assertThat(RiskExposureService.effectivenessFactor("needs_improvement")).isEqualTo(0.5);
+            assertThat(RiskExposureService.effectivenessFactor("ineffective")).isEqualTo(0.1);
+            assertThat(RiskExposureService.effectivenessFactor("NOT_TESTED"))
+                .as("an unrecognised token must still earn nothing — the fix stops the locale "
+                    + "breaking the ladder, it does not widen it")
+                .isEqualTo(0.0);
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 }

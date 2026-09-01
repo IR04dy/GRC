@@ -16,6 +16,7 @@ import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -84,7 +85,7 @@ public class DigitalSignatureService {
         Long orgId = TenantContext.getCurrentTenant();
         DigitalSignatureTransaction d = new DigitalSignatureTransaction();
         d.setOrganisationId(orgId);
-        d.setExternalId("DSIG-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        d.setExternalId("DSIG-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
         d.setRelatedEntityType(body.relatedEntityType());
         d.setRelatedEntityId(body.relatedEntityId());
         d.setRelatedEntityLabel(body.relatedEntityLabel());

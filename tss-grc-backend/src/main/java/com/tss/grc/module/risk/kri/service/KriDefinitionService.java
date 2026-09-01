@@ -297,7 +297,7 @@ public class KriDefinitionService {
                 return candidate;
             }
         }
-        return prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
     }
 
     /** Visible for testing — payload assembled for every KRI_* domain event. */
