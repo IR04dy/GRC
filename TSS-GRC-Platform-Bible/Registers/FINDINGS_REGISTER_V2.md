@@ -15219,6 +15219,137 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-413 — a nested member that does not cascade skips its element's constraints, and both existing legs are blind to it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live, not latent ([[F2-283]]): `POST /universe/bulk-import` and `POST /bowtie` accepted blank mandatory titles, over-long values and a malformed quarter, on routes whose own body IS `@Valid`. The failure is a truncation 8152 or a NOT NULL violation naming nothing, rather than a 400 naming the field |
+| **Source** | executing [[F2-392]]'s filing, then asking the cascade question one level below `@RequestBody` |
+| **Size** | S — one gate leg, three `@Valid`s, three inert components removed |
+
+⚠⚠ **BEAN VALIDATION CASCADES ONLY WHERE IT IS TOLD TO, AND `@NotNull` ON A COLLECTION IS NOT TOLD.**
+
+```java
+public record UniverseBulkImportRequest(
+    Long planId,
+    @NotNull List<UniverseCreateRequest> entries      // ← @NotNull, no @Valid
+) {}
+```
+
+The outer body is `@Valid @RequestBody`, so `@NotNull` runs — and the cascade **stops at this
+record**. So on `POST /universe/bulk-import` none of `UniverseCreateRequest`'s constraints ran:
+`@NotBlank entryCode`, `@NotBlank titleEn`, `@NotBlank titleAr` (house rule 7), six `@Size` caps and
+the `@Pattern` on `plannedQuarter`. `POST /universe` binds **the very same type** with `@Valid`, so
+**the same type was validated at one site and skipped at the other.**
+
+⚠⚠ **THE TWO EXISTING LEGS ARE BLIND FOR COMPLEMENTARY REASONS, WHICH IS WHY IT SURVIVED.**
+`everyValidationConstraintSitsOnATypeSomeEndpointActuallyValidates` is per-TYPE: it asks whether a
+constrained type is validated *somewhere*, and it is — at the single-add route.
+`aConstrainedRequestTypeIsValidatedAtEverySiteThatBindsIt` is per-SITE, and **its population is
+`@RequestBody` parameters**. A constrained type reached at one site through the cascade and at
+another through a non-cascading **nested field** is in neither population.
+🔑 **[[F2-185b]]'s own headline one level deeper** — *a per-type gate over a per-site defect reports
+the population it can see* — where "site" has moved from a parameter to a field.
+
+⚠⚠ **MY GREP FOUND 3 SITES AND THE GATE FOUND 5, AND THE DIFFERENCE IS THE LESSON.** The
+reconnaissance pattern required `@NotNull` **and** `List<…Request>`, because that is the shape
+[[F2-185]]'s sanctions finding had — so it returned `SanctionsDtos.entries` (already `@Valid`),
+`ApprovalChainDtos.steps` (already `@Valid`) and `IaDtos.entries`, reading as *"a lone outlier out of
+three"*. The four `BowTieAnalysisRequest` lists carry **no `@NotNull`** and were invisible to it.
+🔑 **A pattern scoped to the shape you have already seen returns a SMALLER population, and a smaller
+population reads exactly like "the rest are fine."** The gate, deriving from the type system rather
+than from a spelling, refuted my census on its first run — 4 of 5 members missed.
+
+⚙ **The population, measured, and each member's treatment:**
+
+| site | element declares | treatment |
+|---|---|---|
+| `UniverseBulkImportRequest#entries` | 10 constraints | **`@NotNull @Valid`** |
+| `BowTieAnalysisRequest#threats` | `@NotBlank/@Size titleEn`, `@Size titleAr` | **`List<@Valid …>`** |
+| `BowTieAnalysisRequest#consequences` | same | **`List<@Valid …>`** |
+| `BowTieAnalysisRequest#preventiveControls` | same | **REMOVED** — never read |
+| `BowTieAnalysisRequest#mitigatingControls` | same | **REMOVED** — never read |
+
+⚠ **Enabling a cascade is only safe because every cap mirrors its column, and that was checked
+rather than assumed** ([[F2-184]]'s *cap == column → enable*): `entryCode` 64 ↔ `length = 64`, the
+titles and names 255 ↔ 255, `lastAuditRating` 20 ↔ 20, `linkedControlIds` 500 ↔ 500, the BowTie
+element titles 300 ↔ 300, and both `@NotBlank` titles mirror `nullable = false`. So the cascade
+converts a truncation **8152** — or *"A required field was not supplied"* naming nothing — into a
+**400 naming the field**, and **cannot break a request that works today**.
+
+⚠⚠ **TWO OF THE FIVE ARE REMOVED RATHER THAN CASCADED, AND GIVING THEM `@Valid` WOULD HAVE BEEN THE
+WRONG FIX.** `preventiveControls` and `mitigatingControls` are read by **no code in the module** —
+neither `create()` nor `update()` — and the frontend's own `BowTieAnalysisRequest` declares neither,
+so nothing sent them and nothing consumed them: a caller who supplied controls got **201 and silent
+discard**. Cascading into a list nothing reads is decoration on a dead field ([[F2-184]]); a field
+the bound type does not declare can never arrive ([[F2-233]]), which is the stronger closure. Safe by
+construction: Spring Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`, so removing a component that was
+already being discarded is **byte-identical observable behaviour**.
+
+🔑 **The comment beside them was worse than the fields.** It read *"Preventive + mitigating controls
+require parent UUIDs to be present — when the cascade is used these must be supplied in the same
+request body (frontend pre-mints UUIDs locally)"* — describing a capability the code does not have,
+and explaining a **mechanism** (client-pre-minted UUIDs) that nothing consumes. [[F2-184]]'s decoy
+shape in prose: it answers the question a reader was about to ask. Corrected in place, not deleted.
+
+⚙ **[[F2-392]]'s filing executed:** `UniverseCreateRequest.residualRiskScore` is inert — `create()`
+always derives `inherent × (1 - controlEnvironmentScore)`, as `update()` and `recomputeResidual()` do
+— so the component is removed. ⚠⚠ **That RETIRES F2-392's own two discriminating legs, and the
+reason is worth keeping:** *"the server ignores a caller-supplied residual"* is **no longer
+expressible**, because the bound type has no component for one to arrive in. 🔑 **Removing an inert
+field retires the test that proved the server ignored it.** Both legs are repurposed to assert the
+claim that still has content — the residual is derived, on `create` and on `bulkImport` — and the
+absence itself is now enforced by the gate rather than by a fixture.
+
+⚠⚠ **NO BEHAVIOUR TEST IN THE TREE CAN SEE THIS, AND THE PRE-FIX CONTROL PROVED IT.** With the two
+cascades reverted, `IaAuditUniverseServiceTest` (14) and `BowTieAnalysisServiceTest` (20) stayed
+**green** — a unit test calls the service directly and bean validation runs at the **controller**
+boundary — while exactly the one gate leg went red. Same shape as [[F2-412]] one slice earlier, where
+a mocked repository could not see a bypassed `@Cacheable`. 🔑 **When the defect is "the framework was
+never asked", only a structural gate can see it.**
+
+⚙ **The leg is a hard zero with no exemption map**, and that is safe rather than strict: if the
+element type carries constraints they are either meant to run at this site — add `@Valid` — or they
+are inert, which the per-type leg above already refuses. There is no third state, so there is no
+correct code for it to fail on ([[F2-214]]). Two anti-vacuity floors, both sitting above the largest
+**wrong** answer of zero ([[F2-215]]): the closure must resolve > 100 types, and the walk must
+examine > 200 non-cascading members.
+
+⚠ **The record/field duality is load-bearing in the member walk.** A record component's annotations
+are propagated to its backing field for `FIELD`-targeted annotations but `@Valid` written as
+`List<@Valid Foo>` is a `TYPE_USE` annotation on the component's annotated type, so the field view
+and the component view disagree. `nestedMembersOf` walks both and lets the component **remove** a
+name the field view reported as non-cascading — the same asymmetry [[F2-185b]] recorded for
+`@Size` having no `RECORD_COMPONENT` target.
+
+⚠ **No frontend change, and that is a corroboration rather than an omission.** Both client request
+types were **already narrower than the server's**: `iaPlan.ts`'s `UniverseEntryCreate` is documented
+as *"subset of UniverseCreateRequest"* and omits the residual, and `api.ts`'s `BowTieAnalysisRequest`
+declares only `threats` and `consequences`. 🔑 **The clients had already decided not to send what the
+server declared** — [[F2-212]]'s payload-builder gap inverted, with the client in the right.
+
+⚠ **Two of my own errors, both caught before any write.** A patch-script assert demanded `Valid`
+already be imported *before* the block that adds it — inverted, and it fired on correct input. And
+the heredoc ate `\\n` for the **fourth** time this session, in a patch-of-a-patch. Both times the
+script's fail-before-write ordering meant the target files were untouched, which is the whole
+argument for encode-check → temp → round-trip → `os.replace` ([[F2-247]]).
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — reflection over the classpath, no DB, no Spring
+context): `InertValidationConstraintTest` 3 legs, `IaAuditUniverseServiceTest` 14,
+`BowTieAnalysisServiceTest` 20, plus `WireContractTest` 8 and `RequestSizeCapMirrorTest` 4 unchanged.
+Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert **only** the two
+`@Valid` cascades, keeping the removals so the tests still compile — a control that cannot compile
+reads exactly like a gate that passed — → the one leg RED naming all five sites, everything else
+green ([[F2-225]]).
+
+🔑 **`@Valid` on a nested member is not style. Whenever a request type holds a collection or a nested
+object whose element declares constraints, ask whether the cascade is told to go there — and check
+the caps against their columns before you enable it, because the cap is a decision and the column is
+a fact.**
+
+---
+
 ## F2-412 — a self-call bypasses the proxy, so the licences `@Cacheable` was never consulted on the hot path it exists for
 
 | | |
