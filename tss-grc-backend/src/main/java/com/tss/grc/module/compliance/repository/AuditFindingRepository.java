@@ -14,6 +14,20 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long
 
     Page<AuditFinding> findByOrganisationId(Long organisationId, Pageable pageable);
 
+    /**
+     * The same population, UNCAPPED -- F2-422.
+     *
+     * <p>AuditCommitteeDashboardService#findingSection took this register through
+     * {@code Pageable.ofSize(2000)} and derived the open count, the four severity counts,
+     * the three ageing buckets and the closure RATE from the window.
+     *
+     * <p>Derived, so it inherits {@code AuditFinding}'s {@code @Where(is_deleted = 0)} and agrees
+     * with the paged overload on soft-delete scoping (checked, not assumed). Deliberately NOT
+     * a SQL {@code COUNT} beside the paged fetch: that leaves two populations and re-creates
+     * F2-365's defect. The paged overload stays -- the list endpoints are genuine paged reads.
+     */
+    List<AuditFinding> findByOrganisationId(Long organisationId);
+
     /** C-12/item-20 — dedup auto-created gaps by their source marker (clause_ref). */
     List<AuditFinding> findByOrganisationIdAndClauseRef(Long organisationId, String clauseRef);
 

@@ -58,7 +58,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
@@ -141,17 +140,22 @@ class AuditCommitteeDashboardServiceTest {
         TenantContext.clear();
     }
 
+    // F2-422: these stubbed `findByOrganisationId(eq(ORG), any(Pageable.class))`. A mocked
+    // repository has no page size -- it returns whatever it is handed -- so the
+    // `Pageable.ofSize(N)` window every figure below was derived from sat outside this
+    // class's reach BY CONSTRUCTION. Repointed at the uncapped overload; the assertions
+    // are unchanged, because the predicates were never what was wrong.
     /** Stub every repo so safeXxxSection() falls back gracefully. */
     private void stubAllZeros() {
-        when(riskRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(riskRepo.findByOrganisationId(ORG_ID))
+                .thenReturn(List.of());
         when(controlRepo.countByOrganisationId(ORG_ID)).thenReturn(0L);
         when(controlRepo.countByOrganisationIdAndStatus(eq(ORG_ID), anyString())).thenReturn(0L);
-        when(findingRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(findingRepo.findByOrganisationId(ORG_ID))
+                .thenReturn(List.of());
         when(capaRepo.findByOrganisationIdOrderByCreatedAtDesc(ORG_ID)).thenReturn(List.of());
-        when(incidentRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(incidentRepo.findByOrganisationId(ORG_ID))
+                .thenReturn(List.of());
         when(mlModelRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(ORG_ID))
                 .thenReturn(List.of());
         when(mlModelRepo.findHighRiskModelsWithoutFairnessAudit(ORG_ID)).thenReturn(List.of());
@@ -196,14 +200,14 @@ class AuditCommitteeDashboardServiceTest {
 
     @Test
     void computeLiveDashboard_riskSection_bucketsByLevel() {
-        when(riskRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(
+        when(riskRepo.findByOrganisationId(ORG_ID))
+                .thenReturn(List.of(
                         risk("R1", "CRITICAL", 20, "OPEN"),
                         risk("R2", "HIGH", 16, "OPEN"),
                         risk("R3", "MEDIUM", 9, "OPEN"),
                         risk("R4", "LOW", 4, "OPEN"),
                         risk("R5", "CLOSED-RISK", null, "CLOSED")  // filtered out
-                )));
+                ));
         LiveDashboardResponse out = service.computeLiveDashboard(ORG_ID);
         assertThat(out.risk().totalRisks()).isEqualTo(4);
         assertThat(out.risk().criticalCount()).isEqualTo(1);
@@ -254,7 +258,7 @@ class AuditCommitteeDashboardServiceTest {
         // Make one repo blow up — service must keep going and still
         // return a complete LiveDashboardResponse with that section
         // zero-filled.
-        when(riskRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class)))
+        when(riskRepo.findByOrganisationId(ORG_ID))
                 .thenThrow(new RuntimeException("table risks does not exist"));
         LiveDashboardResponse out = service.computeLiveDashboard(ORG_ID);
         assertThat(out.risk().totalRisks()).isEqualTo(0);
@@ -480,14 +484,14 @@ class AuditCommitteeDashboardServiceTest {
         // We didn't stub anything for org 2, so the various repos
         // return null/empty defaults — but the safe wrappers catch
         // that and the dashboard still comes back with zeros.
-        when(riskRepo.findByOrganisationId(eq(2L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(riskRepo.findByOrganisationId(2L))
+                .thenReturn(List.of());
         when(controlRepo.countByOrganisationId(2L)).thenReturn(0L);
-        when(findingRepo.findByOrganisationId(eq(2L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(findingRepo.findByOrganisationId(2L))
+                .thenReturn(List.of());
         when(capaRepo.findByOrganisationIdOrderByCreatedAtDesc(2L)).thenReturn(List.of());
-        when(incidentRepo.findByOrganisationId(eq(2L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(incidentRepo.findByOrganisationId(2L))
+                .thenReturn(List.of());
         when(mlModelRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(2L))
                 .thenReturn(List.of());
         when(mlModelRepo.findHighRiskModelsWithoutFairnessAudit(2L)).thenReturn(List.of());
@@ -509,7 +513,34 @@ class AuditCommitteeDashboardServiceTest {
         assertThat(out.risk().totalRisks()).isEqualTo(0);
 
         // Verify the org=2 finders were used, not org=1.
-        verify(riskRepo).findByOrganisationId(eq(2L), any(Pageable.class));
+        verify(riskRepo).findByOrganisationId(2L);
+    }
+
+    /**
+     * F2-422 — the three sections read the whole register, never a window.
+     *
+     * <p>All three used {@code Pageable.ofSize(N)}, an UNSORTED cap: it keeps N rows and
+     * does not say which N, so every figure below was a function of the query plan — and
+     * {@code generateSnapshot} serialises them into the {@code kpis_json} an Audit
+     * Committee member then signs. The assertion is the NEGATIVE because that is what
+     * discriminates: a value assertion also fails pre-fix, but it fails looking like an
+     * arithmetic bug rather than like a window.
+     */
+    @Test
+    void theThreeSectionsReadTheWholeRegisterNotAWindow() {
+        stubAllZeros();
+        service.computeLiveDashboard(ORG_ID);
+
+        verify(riskRepo).findByOrganisationId(ORG_ID);
+        verify(findingRepo).findByOrganisationId(ORG_ID);
+        verify(incidentRepo).findByOrganisationId(ORG_ID);
+
+        verify(riskRepo, never())
+                .findByOrganisationId(anyLong(), any(org.springframework.data.domain.Pageable.class));
+        verify(findingRepo, never())
+                .findByOrganisationId(anyLong(), any(org.springframework.data.domain.Pageable.class));
+        verify(incidentRepo, never())
+                .findByOrganisationId(anyLong(), any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test

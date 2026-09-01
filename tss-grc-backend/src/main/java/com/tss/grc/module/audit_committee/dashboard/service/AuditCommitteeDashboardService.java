@@ -63,7 +63,6 @@ import com.tss.grc.module.tprm.bcp_attestation.repository.VendorBcpCampaignRepos
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -235,8 +234,12 @@ public class AuditCommitteeDashboardService {
     }
 
     private RiskSection riskSection(Long orgId) {
-        var page = riskRepo.findByOrganisationId(orgId, Pageable.ofSize(1000));
-        List<Risk> all = page.getContent().stream()
+        // F2-422: this was `findByOrganisationId(orgId, Pageable.ofSize(1000))`. An unsorted
+        // cap does not say WHICH rows it keeps -- the window is whatever the query plan
+        // yields -- and every figure below is derived from it, then serialised into the
+        // snapshot an Audit Committee member signs. A governance figure that is a function
+        // of a query plan is not reproducible, so it may not be attested.
+        List<Risk> all = riskRepo.findByOrganisationId(orgId).stream()
                 .filter(r -> !RISK_CLOSED_STATUSES.contains(r.getStatus()))
                 .toList();
         long critical = all.stream().filter(r -> "CRITICAL".equals(r.getRiskLevel())).count();
@@ -302,8 +305,12 @@ public class AuditCommitteeDashboardService {
     }
 
     private FindingSection findingSection(Long orgId) {
-        var page = findingRepo.findByOrganisationId(orgId, Pageable.ofSize(2000));
-        List<AuditFinding> all = page.getContent();
+        // F2-422: this was `findByOrganisationId(orgId, Pageable.ofSize(2000))`. An unsorted
+        // cap does not say WHICH rows it keeps -- the window is whatever the query plan
+        // yields -- and every figure below is derived from it, then serialised into the
+        // snapshot an Audit Committee member signs. A governance figure that is a function
+        // of a query plan is not reproducible, so it may not be attested.
+        List<AuditFinding> all = findingRepo.findByOrganisationId(orgId);
         List<AuditFinding> open = all.stream()
                 .filter(f -> !FINDING_CLOSED_STATUSES.contains(safe(f.getStatus())))
                 .toList();
@@ -482,9 +489,13 @@ public class AuditCommitteeDashboardService {
     }
 
     private IncidentSection incidentSection(Long orgId) {
-        var page = incidentRepo.findByOrganisationId(orgId, Pageable.ofSize(2000));
+        // F2-422: this was `findByOrganisationId(orgId, Pageable.ofSize(2000))`. An unsorted
+        // cap does not say WHICH rows it keeps -- the window is whatever the query plan
+        // yields -- and every figure below is derived from it, then serialised into the
+        // snapshot an Audit Committee member signs. A governance figure that is a function
+        // of a query plan is not reproducible, so it may not be attested.
         LocalDateTime quarterStart = LocalDateTime.now().minusMonths(3);
-        List<Incident> lastQuarter = page.getContent().stream()
+        List<Incident> lastQuarter = incidentRepo.findByOrganisationId(orgId).stream()
                 .filter(i -> i.getCreatedAt() != null && i.getCreatedAt().isAfter(quarterStart))
                 .toList();
         long critical = lastQuarter.stream().filter(i -> "CRITICAL".equalsIgnoreCase(i.getSeverity())).count();

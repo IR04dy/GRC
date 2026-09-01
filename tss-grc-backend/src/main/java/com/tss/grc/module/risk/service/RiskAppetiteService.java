@@ -148,7 +148,10 @@ public class RiskAppetiteService {
     @Transactional(readOnly = true)
     public Map<String, Object> dashboard() {
         Long org = TenantContext.getCurrentTenant();
-        List<RiskAppetiteStatement> all = repo.findByOrganisationIdOrderByCreatedAtDesc(org, Pageable.ofSize(200)).getContent();
+        // F2-422: this was `Pageable.ofSize(200)`, so "total" was the size of a window and the
+        // four severity buckets were counted over it. Creation order is orthogonal to how many
+        // statements exist, which is F2-420's case; `list(Pageable)` above remains the paged read.
+        List<RiskAppetiteStatement> all = repo.findByOrganisationIdOrderByCreatedAtDesc(org);
         int within = 0, exceeded = 0, critical = 0, noExposure = 0;
         for (RiskAppetiteStatement s : all) {
             String severity = computeSeverity(s);

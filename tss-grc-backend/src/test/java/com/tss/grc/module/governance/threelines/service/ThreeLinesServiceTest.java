@@ -42,6 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -83,8 +85,10 @@ class ThreeLinesServiceTest {
         ));
 
         // Open risks (2 OPEN, 1 CLOSED → filtered out).
-        when(riskRepo.findByOrganisationId(eq(ORG), any(Pageable.class)))
-            .thenReturn(pageOf(risk("OPEN"), risk("OPEN"), risk("CLOSED")));
+        // F2-422: was `any(Pageable.class)` over a `Pageable.ofSize(1000)` window. A mocked
+        // repository has no page size, so the cap was outside this test's reach.
+        when(riskRepo.findByOrganisationId(ORG))
+            .thenReturn(List.of(risk("OPEN"), risk("OPEN"), risk("CLOSED")));
 
         // Findings: 3 raised; 1 CLOSED filtered out; 1 CRITICAL escalates to BOARD.
         when(findingRepo.findByOrganisationIdOrderByRaisedAtDesc(ORG)).thenReturn(List.of(
@@ -140,10 +144,34 @@ class ThreeLinesServiceTest {
         assertThat(out.totalCapaOpen()).isEqualTo(2);
     }
 
+    /**
+     * F2-422 — openRisksFor reads the whole register, never a window.
+     *
+     * <p>It was {@code Pageable.ofSize(1000)} under a comment claiming it paged "with a
+     * generous size so the dashboard sees the whole open set" and that "the alternative is
+     * a native query". The second half was false: {@code openFindingsFor} and
+     * {@code openCapasFor}, directly below it, both use an uncapped derived finder — so it
+     * was the lone outlier of three sibling accessors.
+     */
+    @Test
+    void openRisksForReadsTheWholeRegisterNotAWindow() {
+        when(riskRepo.findByOrganisationId(ORG)).thenReturn(List.of(risk("OPEN")));
+        when(findingRepo.findByOrganisationIdOrderByRaisedAtDesc(ORG)).thenReturn(List.of());
+        when(capaRepo.findByOrganisationIdOrderByCreatedAtDesc(ORG)).thenReturn(List.of());
+        when(policyRepo.findByOrganisationIdAndStatusOrderByPolicyCodeAscVersionDesc(ORG, "REVIEW"))
+            .thenReturn(List.of());
+
+        service.overview();
+
+        verify(riskRepo).findByOrganisationId(ORG);
+        verify(riskRepo, never())
+            .findByOrganisationId(anyLong(), any(org.springframework.data.domain.Pageable.class));
+    }
+
     @Test
     void overview_returns_zero_counts_when_register_is_empty() {
         when(mappingRepo.findEffectiveForOrg(ORG)).thenReturn(List.of());
-        when(riskRepo.findByOrganisationId(eq(ORG), any(Pageable.class))).thenReturn(pageOf());
+        when(riskRepo.findByOrganisationId(ORG)).thenReturn(List.of());
         when(findingRepo.findByOrganisationIdOrderByRaisedAtDesc(ORG)).thenReturn(List.of());
         when(capaRepo.findByOrganisationIdOrderByCreatedAtDesc(ORG)).thenReturn(List.of());
         when(policyRepo.findByOrganisationIdAndStatusOrderByPolicyCodeAscVersionDesc(ORG, "REVIEW"))
@@ -363,9 +391,6 @@ class ThreeLinesServiceTest {
         return out;
     }
 
-    private static Page<Risk> pageOf(Risk... risks) {
-        return new PageImpl<>(Arrays.asList(risks));
-    }
 
     private static Map<String, ThreeLinesOverviewDto.BandCounts> byBand(
             List<ThreeLinesOverviewDto.BandCounts> bands) {

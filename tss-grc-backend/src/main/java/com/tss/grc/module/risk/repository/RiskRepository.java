@@ -12,6 +12,21 @@ import java.util.List;
 public interface RiskRepository extends JpaRepository<Risk, Long> {
     Page<Risk> findByOrganisationId(Long organisationId, Pageable pageable);
 
+    /**
+     * The same population, UNCAPPED -- F2-422.
+     *
+     * <p>AuditCommitteeDashboardService#riskSection and ThreeLinesService#openRisksFor both took
+     * this register through {@code Pageable.ofSize(1000)} and then derived every published
+     * figure from the window -- the open-risk count, the four risk-level counts, the
+     * above-appetite total and the CMA Art. 54 "top 5 above appetite" ranking.
+     *
+     * <p>Derived, so it inherits {@code Risk}'s {@code @Where(is_deleted = 0)} and agrees
+     * with the paged overload on soft-delete scoping (checked, not assumed). Deliberately NOT
+     * a SQL {@code COUNT} beside the paged fetch: that leaves two populations and re-creates
+     * F2-365's defect. The paged overload stays -- the list endpoints are genuine paged reads.
+     */
+    List<Risk> findByOrganisationId(Long organisationId);
+
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId AND (:status IS NULL OR r.status = :status)")
     Page<Risk> findByOrgAndStatus(@Param("orgId") Long orgId, @Param("status") String status, Pageable pageable);
 
