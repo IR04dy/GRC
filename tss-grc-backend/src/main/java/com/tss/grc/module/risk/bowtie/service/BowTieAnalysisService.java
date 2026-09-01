@@ -154,9 +154,13 @@ public class BowTieAnalysisService {
         // Cascade children if the request carries them.
         if (req.threats() != null) for (BowTieThreatDto t : req.threats()) saveNewThreat(b, t);
         if (req.consequences() != null) for (BowTieConsequenceDto c : req.consequences()) saveNewConsequence(b, c);
-        // Preventive + mitigating controls require parent UUIDs to be
-        // present — when the cascade is used these must be supplied in
-        // the same request body (frontend pre-mints UUIDs locally).
+        // F2-413: this comment used to read "Preventive + mitigating controls require parent
+        // UUIDs to be present — when the cascade is used these must be supplied in the same
+        // request body (frontend pre-mints UUIDs locally)", which described a capability the code
+        // does not have: neither list was ever read, here or in update(). Worse than an inert
+        // field, because it explained a mechanism (pre-minted UUIDs) that nothing consumes
+        // (F2-184). The two request components are gone; controls are created through their own
+        // routes, which resolve the parent from the path rather than from a client-minted UUID.
 
         audit.log("CREATE", "BowTieAnalysis", b.getId(),
                 "Bow-tie " + b.getBowtieCode() + " created · " + safe(b.getTopEventTitleEn()));

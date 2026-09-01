@@ -81,7 +81,8 @@ class IaAuditUniverseServiceTest {
             null, null, null, null,
             inherent != null ? new BigDecimal(inherent) : null,
             controlEnv != null ? new BigDecimal(controlEnv) : null,
-            null, null, null, null, null, null, null
+            // F2-413 removed residualRiskScore from this record — the server always derives it.
+            null, null, null, null, null, null
         );
     }
 
@@ -254,22 +255,29 @@ class IaAuditUniverseServiceTest {
         verify(repo).findByOrganisationIdAndIsDeletedFalseOrderByEntryCodeAsc(ORG_ID);
     }
 
-    // ─── F2-392: the service is source-of-truth — a caller-supplied residual is ignored ──
+    // ─── F2-392 / F2-413: the service is source-of-truth for the residual ─────────────────
     //
-    // create()'s own comment says "recompute even if caller passed an explicit value", and
-    // the update()/recomputeResidual() siblings always derive it. Pre-fix, create() trusted
+    // create()'s own comment says "recompute even if caller passed an explicit value", and the
+    // update()/recomputeResidual() siblings always derive it. Pre-F2-392, create() trusted
     // req.residualRiskScore() when non-null, letting a caller store a residual that disagreed
-    // with inherent × (1 - controlEnv). These legs supply a bogus residual and assert the
-    // service derives the formula value instead.
+    // with inherent × (1 - controlEnv), and these two legs supplied a bogus residual to prove it
+    // was dropped.
+    //
+    // ⚠ F2-413 then REMOVED residualRiskScore from UniverseCreateRequest, and that retired the
+    // claim these legs were written to make: "the server ignores a caller-supplied residual" is no
+    // longer EXPRESSIBLE, because the bound type has no component for one to arrive in. The
+    // absence is the enforcement (F2-233), and it is asserted by
+    // InertValidationConstraintTest rather than here. 🔑 Removing an inert field retires the test
+    // that proved the server ignored it — so what survives is the claim that still has content:
+    // the residual is DERIVED from the formula, on both write paths.
 
-    /** The discriminating leg: create() ignores a caller-supplied residual and derives it. */
-    @Test void create_ignoresCallerSuppliedResidual_andDerivesFromTheFormula() {
+    /** create() derives the residual from inherent × (1 - controlEnv). */
+    @Test void create_derivesResidualFromTheFormula() {
         UniverseCreateRequest req = new UniverseCreateRequest(
             PLAN_ID, "AU-OVERRIDE-001", "AU-OVERRIDE-001 EN", "AU-OVERRIDE-001 AR",
             null, null, null, null,
             new BigDecimal("22.00"),   // inherent
             new BigDecimal("0.30"),    // controlEnv -> formula = 22 × 0.70 = 15.40
-            new BigDecimal("1.00"),    // BOGUS caller residual, must be ignored
             null, null, null, null, null, null);
         when(repo.findByOrganisationIdAndEntryCodeAndPlanIdAndIsDeletedFalse(ORG_ID, "AU-OVERRIDE-001", PLAN_ID))
             .thenReturn(Optional.empty());
@@ -281,17 +289,15 @@ class IaAuditUniverseServiceTest {
         assertThat(out.residualRiskScore()).isEqualByComparingTo("15.40");
     }
 
-    /** bulkImport() routes through create(), so it inherits the fix — a bogus residual in a
-     *  bulk entry is ignored and the formula value is persisted. */
-    @Test void bulkImport_alsoIgnoresCallerSuppliedResidual() {
-        UniverseCreateRequest bogus = new UniverseCreateRequest(
+    /** bulkImport() routes through create(), so the derivation holds on that path too. */
+    @Test void bulkImport_alsoDerivesResidualFromTheFormula() {
+        UniverseCreateRequest entry = new UniverseCreateRequest(
             PLAN_ID, "AU-BULK-OVR-001", "t EN", "t AR",
             null, null, null, null,
             new BigDecimal("18.00"),   // inherent
             new BigDecimal("0.40"),    // controlEnv -> formula = 18 × 0.60 = 10.80
-            new BigDecimal("0.01"),    // BOGUS caller residual
             null, null, null, null, null, null);
-        UniverseBulkImportRequest req = new UniverseBulkImportRequest(PLAN_ID, List.of(bogus));
+        UniverseBulkImportRequest req = new UniverseBulkImportRequest(PLAN_ID, List.of(entry));
         when(repo.findByOrganisationIdAndEntryCodeAndPlanIdAndIsDeletedFalse(ORG_ID, "AU-BULK-OVR-001", PLAN_ID))
             .thenReturn(Optional.empty());
         org.mockito.ArgumentCaptor<IaAuditUniverseEntry> cap =

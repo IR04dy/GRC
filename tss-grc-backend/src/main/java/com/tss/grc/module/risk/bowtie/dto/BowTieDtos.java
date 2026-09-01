@@ -6,6 +6,7 @@ import com.tss.grc.module.risk.bowtie.entity.BowTieConsequence;
 import com.tss.grc.module.risk.bowtie.entity.BowTieMitigatingControl;
 import com.tss.grc.module.risk.bowtie.entity.BowTiePreventiveControl;
 import com.tss.grc.module.risk.bowtie.entity.BowTieThreat;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -40,11 +41,25 @@ public final class BowTieDtos {
             @Size(max = 255) String assessedByName,
             @Size(max = 60) String methodology,
             LocalDate nextReviewAt,
-            // Optional cascade — frontend can POST a fully-shaped bow-tie in one call.
-            List<BowTieThreatDto> threats,
-            List<BowTieConsequenceDto> consequences,
-            List<BowTiePreventiveControlDto> preventiveControls,
-            List<BowTieMitigatingControlDto> mitigatingControls
+            // Optional cascade — the frontend can POST a bow-tie's threats and consequences in
+            // the same call. F2-413: `List<@Valid ...>` is load-bearing, not decoration. Without it
+            // the enclosing @Valid stops at this record, so none of the element constraints ran on
+            // this route — @NotBlank titleEn, @NotBlank/@Size titleAr (house rule 7) and the @Size
+            // caps — although each element type IS @Valid on its own single-add route. The same
+            // type validated at one site and not the other, which is F2-185b's shape one level down
+            // from a @RequestBody parameter and therefore invisible to the gate that watches those.
+            List<@Valid BowTieThreatDto> threats,
+            List<@Valid BowTieConsequenceDto> consequences
+            // F2-413: `preventiveControls` and `mitigatingControls` USED TO BE DECLARED HERE, with
+            // a comment claiming they "must be supplied in the same request body (frontend
+            // pre-mints UUIDs locally)". Measured: no code in this module read either list — not
+            // create(), not update() — and the frontend's own BowTieAnalysisRequest declares
+            // neither, so nothing sent them and nothing consumed them. A caller who supplied
+            // controls got 201 and silent discard. Removed rather than given @Valid, because
+            // cascading into a list nothing reads is decoration on a dead field (F2-184), and a
+            // field the bound type does not declare can never arrive (F2-233). Controls are
+            // created through POST /bowtie/{id}/threats/{threatId}/preventive-controls and its
+            // mitigating twin; making the cascade cover them is a FEATURE, and is filed as one.
     ) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
