@@ -15219,6 +15219,157 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-415 — a capped window counted as the total, in a document that leaves the platform
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code, latent-in-data ([[F2-283]]): the CMA Articles 91-94 / TCFD annual-report annex published `climateRiskCount: 50` and `sgiCommitmentCount: 100` as totals for any tenant holding more, and truncated the rendered sections with nothing on the page saying so. Whether a tenant is over the caps was not measured (hermetic slice, no DB) |
+| **Source** | six veins measured this firing; five came back clean sweeps, and the one defect was found by reading a capped fetch inside an **export** service — the junction of [[F2-197]] (fine to render, wrong to count) and [[F2-199]] (the harm ladder) that neither had swept |
+| **Size** | S — two uncapped repository overloads, two call sites, two test legs |
+
+⚠⚠ **A CAPPED LIST IS FINE TO RENDER AND WRONG TO COUNT — AND THE COUNT WAS IN A DIFFERENT METHOD FROM THE CAP, WHICH IS WHY NO SINGLE-METHOD SCAN COULD SEE IT.**
+
+```java
+// AnnexGeneratorService.generate — BEFORE
+var ghgRows  = ghgRepo.findByOrganisationIdAndReportingYear(org, year);          // uncapped
+var climates = climateRepo.findByOrganisationIdOrderByRiskScoreDescIdDesc(org,
+    PageRequest.of(0, 50)).getContent();                                        // ← capped
+var sgi  = sgiRepo.findByOrganisationIdOrderByTargetYearAscCommitmentCodeAsc(org,
+    PageRequest.of(0, 100)).getContent();                                       // ← capped
+var cma  = cmaRepo.findByOrganisationIdAndReportingYear(org, year);             // uncapped
+var tcfd = tcfdRepo.findByOrganisationIdAndReportingYear(org, year);            // uncapped
+
+// AnnexGeneratorService.buildJson — the count, two methods away
+b.append("  \"climateRiskCount\": ").append(climates.size()).append(",\n");
+b.append("  \"sgiCommitmentCount\": ").append(sgi.size()).append("\n");
+```
+
+The artefact is the **Sustainability Annex** — `G / SUSTAINABILITY ANNEX — ANNUAL REPORT`,
+CMA Corporate Governance Regulations Articles 91-94 plus TCFD, produced as markdown, HTML
+and JSON, the last of which the code's own comment describes as *"machine-readable export
+for downstream systems … consumers that just want to ingest the figures."* So a figure
+derived from the first 50 rows left the platform under an all-time label.
+
+🔑 **THE TELL WAS INSIDE THE SAME STATEMENT LIST.** Three of the five registers `generate`
+fetches — GHG, CMA, TCFD — are already uncapped, and two were windowed. A lone outlier
+among siblings is the [[F2-205]] / [[F2-282]] shape, and here the siblings are five
+consecutive lines of one method, which is the tightest range this register has recorded it
+at. That also settles the fix without a product argument: uncapping the two is
+**consistency with the method's own three neighbours**, not a new decision about how much
+a document may contain.
+
+⚠ **The two caps are not equally bad, and the ordering is why.** Climate risks come back
+`riskScore DESC`, so a truncated list at least keeps the most severe rows — the defensible
+half. SGI commitments come back `targetYear ASC, commitmentCode ASC`, **orthogonal to
+importance**, so the rows dropped are simply the latest-target ones: a 2060 net-zero
+commitment falls off the end of a Saudi Green Initiative section. The **count** was wrong
+either way, which is the part that needs no judgement.
+
+⚙ **The remedy is [[F2-352]] / [[F2-406]]'s**: a new uncapped ordered overload per
+repository, so **one list feeds both the rendering and the count** and a numerator drawn
+from a different population than its denominator is unrepresentable at these sites. Not a
+SQL `COUNT` beside the paged fetch — that would leave two populations and re-create
+[[F2-365]]'s exact defect. Both entities carry `@Where(clause = "is_deleted = 0")`, so the
+uncapped overloads agree with the paged ones on soft-delete scoping (checked, not assumed
+— [[F2-406]]).
+
+⚠⚠ **MY OWN CENSUS OF THE SHAPE UNDER-REPORTED BY TWO THIRDS, AND THE DIRECTION IS THE
+QUIET ONE.** Written per **line**, "a local bound to a capped fetch, then counted in the
+same method" reported **16 capped locals / 6 counted**. The house style wraps a paged
+fetch, so `var climates =` and `PageRequest.of(0, 50)` sit on different lines and the
+declaration match could not see them. Per **statement** the answer is **47 capped locals /
+10 counted**. 🔑 **A smaller population reads exactly like "the rest are fine"** — and the
+detector that missed them was written *after* I had already found the annex by reading, so
+it could be checked against a known answer. Without that it would have shipped as the
+measurement.
+
+⚠⚠ **AND THE CORRECTED CENSUS STILL CANNOT SEE THIS DEFECT, WHICH IS THE STRUCTURAL POINT.**
+The cap is in `generate()` and the count is in `buildJson()`, with the list crossing as a
+**parameter** — so a per-method scan is blind to it by construction. [[F2-195]]'s shape
+(a gate keyed on the `<Kpi>` tag could not see numbers arriving as props from two files
+away) and [[F2-197]]'s (a catalogue two files away), at a method boundary. A cross-method
+dataflow answer is not something a regex can give ([[F2-182]]), so the invariant is scoped
+to the class instead — see below.
+
+⚙ **THE STRUCTURAL LEG COVERS ALL FIVE REGISTERS, NOT THE TWO THIS SLICE UNCAPPED, AND
+THAT IS DELIBERATE.** `buildJson` publishes a size for every one of them — `recordCount`,
+`climateRiskCount`, `cmaArticleCount`, `tcfdItemCount`, `sgiCommitmentCount` — so capping
+**any** of the five reintroduces the defect. The behaviour leg can only see the two it
+stubs; `theAnnexGeneratorFetchesNoCappedPopulation` bans `PageRequest`, `findTop` and
+`.limit(` from the generator outright, which is the only assertion that covers the three
+whose counts no test had ever named. 🔑 **[[F2-215]]'s two-of-N, pre-empted: a reader who
+finds the two former offenders asserted has no reason to ask about the three that were
+always clean — and they are one edit away from not being.**
+
+⚠ **That leg strips comments in ONE left-to-right alternation ([[F2-198]] / [[F2-211]]),
+because the fix's own comment quotes `PageRequest.of(0, 50)` to record what it replaced.**
+A raw scan reads the epitaph as the corpse ([[F2-193]]) and fails on a **correct** tree,
+which is the one failure a gate must never have ([[F2-214]]). Two positive controls ride
+with it: the literal pre-fix expression must still be detected, and the same text inside a
+`//` comment must not be.
+
+⚠ **The behaviour leg stubs BOTH overloads, the paged one `lenient()` and SHORTER**
+([[F2-406]]'s pattern) — 60 climate risks with a 50-row window, 120 SGI commitments with a
+100-row window — so a regression fails on the **value** (50 rather than 60) instead of
+surfacing as an `UnnecessaryStubbingException` that reads like an unrelated harness fault.
+It also asserts the rendered markdown carries `CLIMATE-060` and `SGI-120`, the rows the
+window would have dropped, so the leg covers the truncation as well as the count.
+
+⚠⚠ **MY FIRST PRE-FIX CONTROL FAILED TO COMPILE, AND ONLY THE "DID ANYTHING RUN?" CHECK
+SEPARATED THAT FROM THE CONTROL FIRING.** The revert wrote
+`org.springframework.data.domain.PageRequest.of(...)` — and the local variable in
+`generate()` is called **`org`** (a `Long`), so the fully-qualified name resolves to that
+local and shadows the package. The run printed `BUILD FAILURE`, which is what a firing
+control also prints. 🔑 **`Tests run:` absent means nothing ran, and a control that
+declines to run is not a control** ([[F2-414]]'s lesson from the other direction, where a
+missed anchor reported 4/4 green). Restoring the `import` instead, it fires properly.
+
+⚠ **And a guard in my own patch script fired on correct input**: `if "PageImpl" in s` was
+meant to prove the re-point had landed, and it matched the **import line** — plus the new
+leg legitimately needs `PageImpl` for the lenient windows. Scope such a check to a
+**usage**, never a bare token ([[F2-193]]'s shape in a patch guard, third instance in three
+slices).
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — Mockito over six mocked
+repositories, no DB, no Spring context): `AnnexGeneratorServiceTest` 2 → **4**,
+`ReportComposerServiceTest` 3 unchanged. Pre-fix control ([[F2-274]] / [[F2-287]], fix
+committed first — [[F2-297]]): revert **only** the two call sites, keeping the repository
+overloads so the test still compiles — a control that cannot compile reads exactly like a
+gate that passed ([[F2-287]]) → 4 run, **2 failures + 2 errors**. The two discriminating
+legs fail on their own claims (the count leg on the value; the structural leg naming its
+message); the two pre-existing legs error with `PotentialStubbingProblem`, because their
+stubs are now coupled to the uncapped contract — collateral, not discrimination, and said
+out loud ([[F2-225]]).
+
+⚙ **Five veins swept clean this firing, recorded so nobody re-runs them** ([[F2-216]]):
+`new BigDecimal(<double>)` fed by a division — **0 of 21**, every site zero-guarded, so the
+`NumberFormatException` on `Infinity`/`NaN` is unrepresentable (the residual is a 0.1pp
+rounding-tie difference against `BigDecimal.valueOf`, a display artefact);
+`@Modifying` without `clearAutomatically`/`flushAutomatically` — **24 sites, 0 with
+either, and none followed by a same-transaction read of the affected entity type**, so the
+stale-persistence-context shape is unreachable; `Files.walk`/`list`/`lines` outside
+try-with-resources — **0 in main sources**; `@RequestParam(required = false)` on a
+primitive (an `IllegalStateException` → 500 when absent) — **0**, and `@PathVariable` the
+same; `@TransactionalEventListener` with no `REQUIRES_NEW` — **0 sites of the annotation at
+all**. And `Collectors.groupingBy` with a null-capable classifier — **27 distinct
+classifiers, 0 that can produce a null key**: every one is `nullable = false` in JPA, NOT
+NULL with a DEFAULT in the migration, filtered one line above, or safe by an `IN`-predicate
+query. ⚠ That last sweep is worth its own note — `groupingBy` is **stricter** than the
+`Comparator.comparing` family [[F2-412]] swept (`Objects.requireNonNull(…, "element cannot
+be mapped to a null key")`, with no `nullsLast` equivalent), so a clean answer there is not
+implied by a clean answer here; and two of the 27 classifiers carry a comment recording
+that [[F2-238]] / [[F2-240]] **removed the entity's field initialiser** and moved the
+default to the create path, which relocated the guarantee from the entity to the service —
+both survive only because the DB column is NOT NULL.
+
+🔑 **Whenever a document generator fetches a register, ask whether anything downstream
+counts what it fetched — and ask it across the method boundary, because the cap and the
+count are usually in different methods and the sibling fetches in the same block are the
+tell.**
+
+---
+
 ## F2-414 — a constraint on a method parameter is inert unless the class carries `@Validated`
 
 | | |
