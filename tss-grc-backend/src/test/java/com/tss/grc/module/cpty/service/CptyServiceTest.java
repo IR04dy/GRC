@@ -3,7 +3,9 @@ package com.tss.grc.module.cpty.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.cpty.dto.CptyDtos.CreateCounterpartyRequest;
 import com.tss.grc.module.cpty.dto.CptyDtos.DashboardResponse;
+import com.tss.grc.module.cpty.dto.CptyDtos.UpsertLimitRequest;
 import com.tss.grc.module.cpty.entity.Counterparty;
+import com.tss.grc.module.cpty.entity.LargeExposureLimit;
 import com.tss.grc.module.cpty.repository.CounterpartyRepository;
 import com.tss.grc.module.cpty.repository.CptyEventRepository;
 import com.tss.grc.module.cpty.repository.CreditRatingRepository;
@@ -23,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -188,5 +191,94 @@ class CptyServiceTest {
     void callerSuppliedReferenceBypassesGeneration() {
         assertThat(mintedReference(req("CUSTOM-9"))).isEqualTo("CUSTOM-9");
         verify(cptyRepo, never()).findMaxReferenceSeq(anyLong());
+    }
+
+    // ── F2-423: the limit upsert addresses its row by the WHOLE key, in a stated order ──
+
+    private static UpsertLimitRequest limitReq(String scope, Long cptyId, String groupRef) {
+        return UpsertLimitRequest.builder()
+                .scope(scope).counterpartyId(cptyId).groupReference(groupRef)
+                .displayNameEn("Acme").displayNameAr("أكمي")
+                .limitSarM(new BigDecimal("1000.00")).utilisedSarM(new BigDecimal("100.00"))
+                .build();
+    }
+
+    private static LargeExposureLimit limitRow(long id, String scope) {
+        LargeExposureLimit l = new LargeExposureLimit();
+        l.setId(id);
+        l.setOrganisationId(ORG);
+        l.setScope(scope);
+        l.setBand("GREEN");
+        return l;
+    }
+
+    /**
+     * A COUNTERPARTY upsert asks for the (org, COUNTERPARTY, counterpartyId) row — scope included.
+     *
+     * <p>It used to read {@code findByCounterpartyIdAndOrganisationId}, which filters no scope,
+     * while the GROUP branch four lines below filtered {@code "GROUP".equals(getScope())}. Since
+     * the body then rewrites {@code setScope} / {@code setGroupReference} on whatever row it
+     * picked, capturing a GROUP row that carried a {@code counterparty_id} turned a consolidated
+     * group limit into one counterparty's limit and nulled its group reference. Nothing refuses
+     * such a request — {@code UpsertLimitRequest} has no cross-field validation.
+     */
+    @Test
+    void counterpartyLimitUpsertAddressesTheWholeKeyIncludingScope() {
+        when(limitRepo.findFirstByOrganisationIdAndScopeAndCounterpartyIdOrderByIdAsc(
+                ORG, "COUNTERPARTY", 42L)).thenReturn(Optional.empty());
+        when(limitRepo.save(any(LargeExposureLimit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.upsertLimit(limitReq("COUNTERPARTY", 42L, null));
+
+        verify(limitRepo).findFirstByOrganisationIdAndScopeAndCounterpartyIdOrderByIdAsc(
+                ORG, "COUNTERPARTY", 42L);
+        // The scope-blind finder is not consulted — that is the capture path.
+        verify(limitRepo, never())
+                .findByCounterpartyIdAndOrganisationIdOrderByIdAsc(anyLong(), anyLong());
+    }
+
+    /**
+     * Where a key already holds two rows the oldest wins, and it wins because the QUERY says so.
+     *
+     * <p>Measured 2026-09-01: 33 counterparty keys hold two rows each in dev AND prod, so this is
+     * not hypothetical — {@code get(0)} of an unordered finder decided which SAMA large-exposure
+     * row an approval overwrote and which was left standing with the old figure.
+     */
+    @Test
+    void counterpartyLimitUpsertUpdatesTheRowTheQueryNames() {
+        LargeExposureLimit oldest = limitRow(5L, "COUNTERPARTY");
+        when(limitRepo.findFirstByOrganisationIdAndScopeAndCounterpartyIdOrderByIdAsc(
+                ORG, "COUNTERPARTY", 42L)).thenReturn(Optional.of(oldest));
+        when(limitRepo.save(any(LargeExposureLimit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.upsertLimit(limitReq("COUNTERPARTY", 42L, null));
+
+        ArgumentCaptor<LargeExposureLimit> cap = ArgumentCaptor.forClass(LargeExposureLimit.class);
+        verify(limitRepo).save(cap.capture());
+        // An UPDATE of the named row, not an INSERT of a second one.
+        assertThat(cap.getValue().getId()).isEqualTo(5L);
+    }
+
+    /**
+     * A GROUP upsert resolves by (org, GROUP, groupReference) — not by utilisation order.
+     *
+     * <p>It used to fetch every limit in the tenant ordered by {@code utilisation_pct DESC} and
+     * filter in Java. That key is orthogonal to identity (F2-420) and, on all four duplicated
+     * group references in dev and prod, a TIE — so the pick was unordered after all.
+     */
+    @Test
+    void groupLimitUpsertResolvesByReferenceNotByUtilisationOrder() {
+        when(limitRepo.findFirstByOrganisationIdAndScopeAndGroupReferenceOrderByIdAsc(
+                ORG, "GROUP", "ARAMCO_GROUP")).thenReturn(Optional.empty());
+        when(limitRepo.save(any(LargeExposureLimit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.upsertLimit(limitReq("GROUP", null, "ARAMCO_GROUP"));
+
+        verify(limitRepo).findFirstByOrganisationIdAndScopeAndGroupReferenceOrderByIdAsc(
+                ORG, "GROUP", "ARAMCO_GROUP");
+        verify(limitRepo, never()).findByOrganisationIdOrderByUtilisationPctDesc(anyLong());
     }
 }

@@ -271,19 +271,53 @@ public class CptyService {
 
     // ─── Large-exposure limit ──────────────────────────────────────
 
+    /**
+     * The two limit scopes, declared once because F2-423 made each of them TWO facts: the
+     * branch test and the scope the query filters on. A second literal is how the GROUP
+     * branch came to filter a scope the COUNTERPARTY branch did not.
+     *
+     * <p>{@code large_exposure_limit.scope} carries no CHECK constraint, so an unrecognised
+     * scope still matches neither branch and inserts a fresh row; both stored values are
+     * canonical in dev and prod today (66 COUNTERPARTY / 8 GROUP, 0 others), so that is
+     * filed rather than fixed here.
+     */
+    private static final String SCOPE_COUNTERPARTY = "COUNTERPARTY";
+    private static final String SCOPE_GROUP = "GROUP";
+
     @Transactional
     public LimitResponse upsertLimit(UpsertLimitRequest req) {
-        // Identify existing row for (scope, key) pair.
+        // Identify the existing row for the (scope, key) pair — F2-423.
+        //
+        // Both halves of that sentence are load-bearing and neither used to hold.
+        //
+        // SCOPE: the COUNTERPARTY branch read findByCounterpartyIdAndOrganisationId, which
+        // filters no scope, while the GROUP branch below it filtered "GROUP".equals(getScope())
+        // — one method, two sibling branches, one applying the scope half of the key and one
+        // not. Since the body then rewrites setScope/setGroupReference on whatever row was
+        // picked, a COUNTERPARTY upsert that captured a GROUP row carrying a counterparty_id
+        // turned a consolidated group limit into one counterparty's limit and nulled its group
+        // reference. Nothing refuses such a request: UpsertLimitRequest has no cross-field
+        // validation, and setCounterpartyId is unconditional.
+        //
+        // ORDER: `hits.get(0)` over an unordered finder picks by query plan, and the GROUP
+        // branch's findByOrganisationIdOrderByUtilisationPctDesc ordered by a key ORTHOGONAL
+        // to identity (F2-420) — a tie, in fact, on all four duplicated group references.
+        // Measured 2026-09-01: 33 counterparty keys and 4 group references already hold two
+        // rows each in dev AND prod, so this pick decides which SAMA large-exposure row an
+        // approval overwrites and which is left standing with the old figure. Oldest-first,
+        // stated in the query, is the order the plan already yields (measured on every sampled
+        // key), so no request that works today changes outcome.
         LargeExposureLimit existing = null;
-        if ("COUNTERPARTY".equals(req.getScope()) && req.getCounterpartyId() != null) {
-            List<LargeExposureLimit> hits = limitRepo
-                    .findByCounterpartyIdAndOrganisationId(req.getCounterpartyId(), org());
-            existing = hits.isEmpty() ? null : hits.get(0);
-        } else if ("GROUP".equals(req.getScope()) && req.getGroupReference() != null) {
-            existing = limitRepo.findByOrganisationIdOrderByUtilisationPctDesc(org())
-                    .stream().filter(l -> "GROUP".equals(l.getScope())
-                            && req.getGroupReference().equals(l.getGroupReference()))
-                    .findFirst().orElse(null);
+        if (SCOPE_COUNTERPARTY.equals(req.getScope()) && req.getCounterpartyId() != null) {
+            existing = limitRepo
+                    .findFirstByOrganisationIdAndScopeAndCounterpartyIdOrderByIdAsc(
+                            org(), SCOPE_COUNTERPARTY, req.getCounterpartyId())
+                    .orElse(null);
+        } else if (SCOPE_GROUP.equals(req.getScope()) && req.getGroupReference() != null) {
+            existing = limitRepo
+                    .findFirstByOrganisationIdAndScopeAndGroupReferenceOrderByIdAsc(
+                            org(), SCOPE_GROUP, req.getGroupReference())
+                    .orElse(null);
         }
 
         LargeExposureLimit l = existing == null ? new LargeExposureLimit() : existing;
@@ -423,7 +457,7 @@ public class CptyService {
     @Transactional(readOnly = true)
     public List<LimitResponse> listLimitsForCounterparty(Long counterpartyId) {
         load(counterpartyId);
-        return limitRepo.findByCounterpartyIdAndOrganisationId(counterpartyId, org())
+        return limitRepo.findByCounterpartyIdAndOrganisationIdOrderByIdAsc(counterpartyId, org())
                 .stream().map(CptyService::toLimit).toList();
     }
 
