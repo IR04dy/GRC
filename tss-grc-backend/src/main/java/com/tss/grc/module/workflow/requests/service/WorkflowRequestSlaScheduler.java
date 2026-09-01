@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -318,7 +319,7 @@ public class WorkflowRequestSlaScheduler {
         }
     }
 
-    private static String code(WorkflowRequest r) { return "WR-" + String.format("%05d", r.getId()); }
+    private static String code(WorkflowRequest r) { return "WR-" + String.format(Locale.ROOT, "%05d", r.getId()); }
 
     public record SweepResult(int reminders, int escalations) {}
 }

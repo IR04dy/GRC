@@ -29,6 +29,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -515,7 +516,7 @@ public class BowTieAnalysisService {
         int year = Year.now().getValue();
         for (int attempt = 0; attempt < 5; attempt++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("BOWTIE-%d-%03d", year, seq);
+            String candidate = String.format(Locale.ROOT, "BOWTIE-%d-%03d", year, seq);
             if (bowtieRepo.countByOrganisationIdAndBowtieCode(orgId, candidate) == 0) {
                 return candidate;
             }

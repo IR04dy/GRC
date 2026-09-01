@@ -15,6 +15,7 @@ import com.tss.grc.common.util.ExternalIds;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -112,7 +113,7 @@ public class FindingService {
         f.setExternalId(generateExternalId());
         f.setOrganisationId(orgId);
         f.setEngagementCode(req.getEngagementCode());
-        f.setRefNumber(String.format("FIN-%03d", count + 1));
+        f.setRefNumber(String.format(Locale.ROOT, "FIN-%03d", count + 1));
         f.setTitleEn(req.getTitleEn()); f.setTitleAr(req.getTitleAr());
         f.setSeverity(req.getSeverity()); f.setStatus("OPEN");
         f.setControlCrosswalk(req.getControlCrosswalk());

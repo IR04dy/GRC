@@ -21,6 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
@@ -395,7 +396,7 @@ public class FinancedEmissionsService {
     private String generateTargetCode(Long orgId, Integer year) {
         for (int attempt = 0; attempt < 10; attempt++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("FE-TARGET-%d-%03d", year == null ? 0 : year, seq);
+            String candidate = String.format(Locale.ROOT, "FE-TARGET-%d-%03d", year == null ? 0 : year, seq);
             if (targetRepo.countByOrganisationIdAndTargetCode(orgId, candidate) == 0) {
                 return candidate;
             }

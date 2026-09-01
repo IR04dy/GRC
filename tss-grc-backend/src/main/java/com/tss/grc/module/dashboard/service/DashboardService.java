@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
@@ -125,7 +126,7 @@ public class DashboardService {
         List<Risk> risks = riskRepository.findTop5ByOrganisationIdOrderByCreatedAtDesc(organisationId, PageRequest.of(0, 5));
         return risks.stream().map(r -> new RiskResponse(
             r.getId(), r.getExternalId(),
-            "RISK-" + String.format("%04d", r.getId()),
+            "RISK-" + String.format(Locale.ROOT, "%04d", r.getId()),
             r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(), r.getDescriptionAr(),
             r.getCategoryId(), null, null, null,
             r.getOwnerId(), null, null, null,

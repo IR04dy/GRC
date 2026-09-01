@@ -15219,6 +15219,57 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-416 — an identifier built with `String.format("%d", …)` is not ASCII on every JVM
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code, **deployment-latent** ([[F2-283]]): the defect fires on any JVM whose default locale rewrites digits, which for this platform's market is the single most likely regional setting. The build box is `user.language=en`, so nothing is broken today and nothing was measured against a deployed server |
+| **Source** | asked of the locale-sensitivity of number formatting after five clean sweeps; the population turned out to be almost entirely identifiers and protocol strings rather than display text |
+| **Size** | S — one mechanical change at 78 sites, one gate. No schema, no migration |
+
+⚠⚠ **JAVA'S `Formatter` APPLIES THE NUMBER LOCALIZATION ALGORITHM TO `%d`, `%f`, `%e`, `%E`, `%g` AND `%G` USING `Locale.getDefault()` WHEN NO LOCALE IS PASSED.**
+
+Measured on this JDK rather than reasoned about:
+
+| locale | `%05d` | `%02x` | `%.2f` | `%,d` | `"title".toUpperCase()` |
+|---|---|---|---|---|---|
+| `en-US` | `00042` | `ab` | `1.50` | `1,234,567` | `TITLE` |
+| `ar-SA` | `٠٠٠٤٢` | `ab` | `١٫٥٠` | `١٬٢٣٤٬٥٦٧` | `TITLE` |
+| `tr-TR` | `00042` | `ab` | `1,50` | `1.234.567` | `TİTLE` |
+| `de-DE` | `00042` | `ab` | `1,50` | `1.234.567` | `TITLE` |
+
+🔑 **`%x` / `%X` are NOT localised**, which is the refutation that mattered: `NdiSubmissionPackageService`'s `String.format("%02x", b)` hex digest — the SHA-256 chain — was never at risk and is deliberately outside the population. Getting that wrong in the other direction would have meant "fixing" the one site whose output is provably locale-independent.
+
+⚠⚠ **WHY THIS IS A CORRECTNESS QUESTION AND NOT HARDENING: THE POPULATION IS 78 IDENTIFIERS AND PROTOCOL STRINGS AND 7 PROSE LITERALS.** The shapes say what they are — `CP-%05d`, `ISS-%d-%06d`, `SCR-%d-%06d`, `CRIS-%d-%06d`, `BIA-%d-%06d`, `CMP-%d-%06d`, `INC%07d`, `MODEL-%d-%03d`, `ENG-%d-%03d`, `BOWTIE-%d-%03d`, `WB-%d-%03d`, `TP-%d-%03d`, `MTG-%d-%s-%03d`, `TCFD-%d-%s-%03d`, `NCA-%d-001`, `FR-%04d-%02d-%04d`, `RISK-%04d`, `WR-%05d`, `REQ-%05d`, `EV-%05d`, `R-%05d`. Four of them are worse than a mangled code:
+
+- ⚠⚠ **The refresh-token `Set-Cookie` header.** `AuthController` builds `grc_refresh=%s; HttpOnly; Secure; Path=…; SameSite=Strict; Max-Age=%d`. `Max-Age=٦٠٤٨٠٠` is not a valid cookie attribute, so a browser discards the attribute — the cookie degrades to a session cookie or is dropped, and **the refresh flow breaks for every user**. On an Arabic-locale server that is an authentication-wide failure with no error anywhere.
+- ⚠⚠ **The three STOMP destinations in `RealtimeBroadcaster`.** The server would publish to `/topic/org.١.changed.vulnerability` while the frontend subscribes to `/topic/org.1.changed.vulnerability`, so **no realtime frame ever arrives and nothing reports an error** — [[F2-205]]'s shape (a live server wire terminating nowhere) reached by a locale rather than by a handler, and CLAUDE.md's own instruction is to check a topic string against this class's format.
+- ⚠⚠ **The JSON *number* fields of the CMA Articles 91-94 annex.** `AnnexGeneratorService.buildJson` emits `"reportingYear": %d` and `"recordCount": %d`, so an Arabic-locale JVM produces `"reportingYear": ٢٠٢٦` — **invalid JSON** for exactly the *"downstream consumers that just want to ingest the figures"* that file's own comment names. 🔑 **This is [[F2-415]]'s artefact, one method over, broken by a different mechanism — and my reconnaissance grep MISSED BOTH SITES** (it printed only the first match per line, which was the markdown header). The sweep found them.
+- ⚠⚠ **Every `MAX`-seed reference minter.** Five repositories recover the ordinal in SQL with `TRY_CAST(SUBSTRING(reference, …) AS INT)` ([[F2-337]], [[F2-353]], [[F2-354]], [[F2-355]], [[F2-395]]). `TRY_CAST` of an Arabic-Indic numeral is **NULL**, so `ISNULL(MAX(…), 0)` resets the seed to **0** and the minter re-issues ordinal 1 — the collision defect those five slices each fixed, resurrected by a locale. Where a skip-loop exists it degrades to an O(n) walk from 1; where none exists it is a unique-index violation on every create after the first.
+
+⚙ **The fix is `Locale.ROOT` at 78 sites, and its safety argument is measurable rather than rhetorical: on the tested locale the output is byte-identical, so the full suite is a complete regression check and the change can only differ on the locale that is currently broken.**
+
+⚠ **Human prose is deliberately left on the default locale** — 7 literals across 9 sites, each named in the gate with a reason. On an Arabic-primary platform Arabic-Indic digits inside Arabic prose may well be what a reader wants, so forcing `Locale.ROOT` there is a product decision, not a fix ([[F2-188]]). 🔑 **`DbSizeMonitorJob`'s ops-alert sentence was REVERTED after the sweep touched it**, because it is the same kind of thing as the other six and exempting six of seven prose sites while converting the seventh would have made the classification incidental rather than principled.
+
+⚙ **`String#formatted` has no locale overload at all**, so it is *always* default-locale and a machine-readable string may never be built with it. The two sites that use it with `%d` are exception messages; the gate covers the shape and records that verdict rather than leaving `.formatted` outside the population.
+
+⚠⚠ **MY DIAGNOSIS OF MY OWN GATE'S FIRST FAILURE WAS WRONG, AND THE SYMPTOM IS WHY.** It threw `StackOverflowError` on three of five legs — the three that walk the tree — and I attributed it to the recorded [[F2-198]] trap (`/\*[\s\S]*?\*/` recursing per iteration, which is why `MeasuredBaselineFreshnessTest` keeps a character scanner). Replacing the stripper with a scanner **changed nothing**: the real cause was the *literal* pattern `"((?:[^"\\]|\\.)*)"` applied over a **whole file**, where an alternation inside `*` recurses once per character consumed. 🔑 **Two different regexes in one class produce the identical symptom, and the recorded landmine is the one you reach for first.** Both are now character scans — the stripper *and* a single-pass literal index — which also buys something the regex could not have: a comment delimiter **inside a string literal** is not a comment, and the population being measured *is* string literals, one of which is a cookie header full of `/` characters.
+
+⚙ **The behavioural leg carries its own negative control, and that is load-bearing.** Whether `ar-SA` uses Arabic-Indic digits is a CLDR datum that has changed between JDK releases, so `assertThat(id).isAscii()` alone would silently become a tautology on a JDK where it does not ([[F2-235]]). The leg first asserts that `String.format("%05d", 42)` under `ar-SA` is **not** ASCII, then that `ExternalIds.generate("CAPA")` is — `ExternalIds` being the single primitive [[F2-48]] introduced to replace nine copy-pasted generators, so nine registers' identifiers pass through that one assertion.
+
+⚙ **`0` unresolved, asserted as a hard zero.** All 133 `String.format` calls in main sources have a **literal** format string, so nothing is unclassifiable — and that count is asserted rather than skipped, because "unresolved" reads identically to "clean" ([[F2-206]]). A future `String.format(someVariable, …)` fails the gate until somebody reads it.
+
+⚠⚠ **AND THE SWEEP BLINDED A SECURITY RATCHET, WHICH ONLY ITS REVERSE LEG SAW.** [[F2-356]]'s `CountBasedReferenceMinterRatchetTest` detects a count-seed reference minter by matching `String.format\s*\(\s*"` — the paren followed **immediately** by a quote. Inserting `Locale.ROOT, ` broke it completely: it found **zero** minters where it knows two exist, so its forward leg (*“every count-seed minter is a known mitigated survivor”*) passed **vacuously over an empty list**, and only `everyKnownSurvivorIsStillDetected` — the direction nobody writes first ([[F2-199]]) — turned red. 🔑 **A detector keyed on the spelling of a call is broken by anything that adds an argument to that call, and it fails in the quiet direction.** Repaired with an optional `Locale.X,` group, and its synthetic self-test now carries **both** shapes so the detector cannot silently depend on either; the reverse leg is what proves the repair still answers the same on the tree the original passed on ([[F2-254]]). ⚙ Measured before assuming a population: it is the **only** detector in the test tree keyed on `String.format`'s shape — every other hit is test code, which the sweep never walked.
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — a source walk plus one `Locale.setDefault` in a try/finally; no DB, no Spring context): `LocaleSensitiveFormatContractTest` **5** legs, full backend suite green. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): `git checkout master -- src/main/java`, keeping the gate — the test references no new main symbol, so it still compiles → **3 of 5 legs RED**: the invariant naming all 78 sites, the anti-vacuity floor (explicit-Locale count collapsing from 83 to 5), and **the behavioural leg, which is the one that demonstrates the defect rather than its shape**. The detector self-test and the reverse exemption leg correctly stay green, since neither depends on the fix ([[F2-225]]).
+
+⚠ **Filed:** the `toUpperCase()` / `toLowerCase()` half of the same family — **87 bare sites against 99 that pass a `Locale`**, where `tr-TR` turns `"title".toUpperCase()` into `TİTLE` and `"TITLE".toLowerCase()` into `tıtle`. That is measured above and is a **separate slice**, because unlike the numeric conversions it interacts with `ClosedVocabulary`'s normalisation contract and with every CHECK-constrained column ([[F2-179]]'s whole family), so it needs the vocabulary mirrors read rather than a mechanical sweep. Also filed: consolidating this class's character scanner with `MeasuredBaselineFreshnessTest`'s into `support/`, which `GuardExpressions.stripComments` cannot do today because its regex form is the one twenty importers use.
+
+🔑 **A number that will be compared, parsed, indexed or sent over a wire is not display text. `String.format` defaults to the ambient locale, so every identifier, protocol string and filename built with `%d` needs `Locale.ROOT` — and `%x` does not, which is exactly the distinction a sweep must get right in both directions.**
+
+---
+
 ## F2-415 — a capped window counted as the total, in a document that leaves the platform
 
 | | |

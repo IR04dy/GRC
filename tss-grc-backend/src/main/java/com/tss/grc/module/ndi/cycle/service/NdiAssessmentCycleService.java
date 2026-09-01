@@ -203,7 +203,7 @@ public class NdiAssessmentCycleService {
             : src.getCycleNameEn().replaceAll("\\d{4}$", String.valueOf(newYear)));
         copy.setCycleNameAr(src.getCycleNameAr() == null ? null
             : src.getCycleNameAr().replaceAll("\\d{4}$", String.valueOf(newYear)));
-        copy.setCycleCode(String.format("NDI-%d-Q1", newYear));
+        copy.setCycleCode(String.format(Locale.ROOT, "NDI-%d-Q1", newYear));
         copy.setReportingYear(newYear);
         copy.setScope(src.getScope());
         copy.setEntityNameEn(src.getEntityNameEn());

@@ -217,7 +217,7 @@ public class AnnexGeneratorService {
         b.append("{\n");
         b.append(String.format("  \"reportingEntityEn\": %s,%n", j(orgEn)));
         b.append(String.format("  \"reportingEntityAr\": %s,%n", j(orgAr == null ? orgEn : orgAr)));
-        b.append(String.format("  \"reportingYear\": %d,%n", year));
+        b.append(String.format(Locale.ROOT, "  \"reportingYear\": %d,%n", year));
         b.append(String.format("  \"generatedAt\": %s,%n", j(LocalDate.now().toString() + "T00:00:00Z")));
         b.append("  \"ghg\": {\n");
         b.append(String.format("    \"scope1\": %s,%n", fmt(bd(ghgAgg.get("scope1Total")))));
@@ -226,7 +226,7 @@ public class AnnexGeneratorService {
         b.append(String.format("    \"total\": %s,%n",  fmt(bd(ghgAgg.get("grandTotal")))));
         b.append(String.format("    \"scope3Coverage\": %s,%n", bd(ghgAgg.get("scope3Coverage"))));
         b.append(String.format("    \"scope3PartialFlag\": %s,%n", ghgAgg.get("scope3PartialFlag")));
-        b.append(String.format("    \"recordCount\": %d,%n", ghgRows.size()));
+        b.append(String.format(Locale.ROOT, "    \"recordCount\": %d,%n", ghgRows.size()));
         b.append(String.format("    \"yoy\": { \"scope1\": %s, \"scope2\": %s, \"scope3\": %s, \"total\": %s }%n",
             bd(ghgYoy.get("scope1YoY")), bd(ghgYoy.get("scope2YoY")),
             bd(ghgYoy.get("scope3YoY")), bd(ghgYoy.get("totalYoY"))));

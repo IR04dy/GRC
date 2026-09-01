@@ -33,6 +33,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -659,7 +660,7 @@ public class RegReportingService {
                     + periodEnd.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())
                     + "-" + periodEnd.get(java.time.temporal.WeekFields.ISO.weekBasedYear());
             case "MONTHLY"    -> o.getCode() + "-" + periodEnd.getYear() + "-"
-                    + String.format("%02d", periodEnd.getMonthValue());
+                    + String.format(Locale.ROOT, "%02d", periodEnd.getMonthValue());
             case "QUARTERLY"  -> o.getCode() + "-" + periodEnd.getYear() + "-Q"
                     + (((periodEnd.getMonthValue() - 1) / 3) + 1);
             case "SEMIANNUAL" -> o.getCode() + "-" + periodEnd.getYear() + "-H"

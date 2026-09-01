@@ -17,6 +17,7 @@ import com.lowagie.text.DocumentException;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
+import java.util.Locale;
 import java.awt.Color;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.EntityNotFoundException;
@@ -182,7 +183,7 @@ public class BcmEvidencePackageService {
         }
 
         byte[] zipBytes = out.toByteArray();
-        String filename = String.format("bcm-evidence-%s-cycle-%d-%s.zip",
+        String filename = String.format(Locale.ROOT, "bcm-evidence-%s-cycle-%d-%s.zip",
             cycle.getReportingYear(), cycleId, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
 
         audit.log("REPORT", "BcmAssessmentCycle", cycleId,

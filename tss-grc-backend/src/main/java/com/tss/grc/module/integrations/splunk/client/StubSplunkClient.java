@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -52,7 +53,7 @@ public class StubSplunkClient implements SplunkClient {
         Long orgId = TenantContext.getCurrentTenant();
         long orgKey = orgId == null ? 0L : orgId;
         long seq = sequencesByOrg.computeIfAbsent(orgKey, k -> new AtomicLong(0L)).incrementAndGet();
-        String eventId = String.format("SPLK-EVT-%d-%d", orgKey, seq);
+        String eventId = String.format(Locale.ROOT, "SPLK-EVT-%d-%d", orgKey, seq);
         String idx = req.index() != null ? req.index() : props.getDefaultIndex();
 
         SplunkHecEventResponse resp = new SplunkHecEventResponse(

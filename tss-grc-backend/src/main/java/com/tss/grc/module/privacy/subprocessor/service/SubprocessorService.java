@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -380,7 +381,7 @@ public class SubprocessorService {
         String prefix = "SUBP-" + year + "-";
         for (int i = 0; i < 50; i++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("%s%03d", prefix, seq);
+            String candidate = String.format(Locale.ROOT, "%s%03d", prefix, seq);
             if (repo.countByOrganisationIdAndSubprocessorCode(orgId, candidate) == 0) {
                 return candidate;
             }

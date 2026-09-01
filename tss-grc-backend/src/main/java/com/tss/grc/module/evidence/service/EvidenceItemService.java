@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -509,7 +510,7 @@ public class EvidenceItemService {
         String ownerName = e.getOwnerId() == null ? null : ownerNameById.get(e.getOwnerId());
 
         boolean isExpired = e.getValidTo() != null && e.getValidTo().isBefore(LocalDate.now());
-        String evidenceCode = "EV-" + String.format("%05d", e.getId());
+        String evidenceCode = "EV-" + String.format(Locale.ROOT, "%05d", e.getId());
 
         return new EvidenceItemResponse(
                 e.getId(), e.getExternalId(), evidenceCode, e.getOrganisationId(),

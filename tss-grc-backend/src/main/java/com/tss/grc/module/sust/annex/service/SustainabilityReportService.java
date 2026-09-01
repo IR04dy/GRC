@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -171,7 +172,7 @@ public class SustainabilityReportService {
             : reportTitleAr(reportType, ry.getYear(), ry.getReportingEntityAr()));
         r.setVersion(version);
         r.setStatus("DRAFT");
-        r.setReportCode(String.format("%s-%d-%s", reportCodePrefix(reportType), ry.getYear(), version));
+        r.setReportCode(String.format(Locale.ROOT, "%s-%d-%s", reportCodePrefix(reportType), ry.getYear(), version));
         r.setContentMarkdown(content.markdown());
         r.setContentHtml(content.html());
         r.setContentJson(content.json());

@@ -41,6 +41,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -647,14 +648,14 @@ public class MtpdInheritanceService {
         long ordinal = assessRepo.countByOrganisationIdAndCycleYearAndIsDeletedFalse(orgId, year) + 1L;
         String q = (quarter == null || quarter.isBlank()) ? "ANN" : quarter;
         // MTPD-INH-<year>-<quarter>-<seq>
-        String candidate = String.format("MTPD-INH-%d-%s-%02d", year, q, ordinal);
+        String candidate = String.format(Locale.ROOT, "MTPD-INH-%d-%s-%02d", year, q, ordinal);
         // Defensive guard against rare unique-index collisions on rapid double-fire.
         int attempt = 0;
         while (assessRepo.findByOrganisationIdAndAssessmentCodeAndIsDeletedFalse(orgId, candidate).isPresent()
                 && attempt < 5) {
             attempt++;
             ordinal++;
-            candidate = String.format("MTPD-INH-%d-%s-%02d", year, q, ordinal);
+            candidate = String.format(Locale.ROOT, "MTPD-INH-%d-%s-%02d", year, q, ordinal);
         }
         return candidate;
     }

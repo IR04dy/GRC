@@ -28,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -130,7 +131,7 @@ public class EvidenceRequestService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("anchorType", req.getEntityType());
             payload.put("anchorId", req.getEntityId());
-            payload.put("requestCode", "REQ-" + String.format("%05d", req.getId()));
+            payload.put("requestCode", "REQ-" + String.format(Locale.ROOT, "%05d", req.getId()));
             payload.put("title", req.getTitleEn());
             events.publishEvent(new DomainEvent(
                 req.getOrganisationId(), "EVIDENCE_REQUEST_REJECTED",
@@ -143,7 +144,7 @@ public class EvidenceRequestService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("anchorType", req.getEntityType());
             payload.put("anchorId", req.getEntityId());
-            payload.put("requestCode", "REQ-" + String.format("%05d", req.getId()));
+            payload.put("requestCode", "REQ-" + String.format(Locale.ROOT, "%05d", req.getId()));
             payload.put("title", req.getTitleEn());
             events.publishEvent(new DomainEvent(
                 req.getOrganisationId(), "EVIDENCE_REQUEST_APPROVED",
@@ -215,7 +216,7 @@ public class EvidenceRequestService {
 
         return new EvidenceRequestResponse(
                 r.getId(), r.getExternalId(),
-                "REQ-" + String.format("%05d", r.getId()),
+                "REQ-" + String.format(Locale.ROOT, "%05d", r.getId()),
                 r.getSubControlId(), subControlCode, subControlNameEn, frameworkCode,
                 r.getEntityType(), r.getEntityId(),
                 r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(),

@@ -721,7 +721,7 @@ public class ExerciseRuntimeService {
      * soft-deleted code is free to be re-used — the {@code @Where}-scoped finders agree with it.
      */
     private String generateRunCode(Long orgId, Long exerciseId) {
-        String prefix = String.format("RUN-%d-EX%d-", orgId, exerciseId);
+        String prefix = String.format(Locale.ROOT, "RUN-%d-EX%d-", orgId, exerciseId);
         int next = 1;
         Optional<ExerciseRun> top =
             runRepo.findTopByOrganisationIdAndExerciseIdOrderByRunCodeDesc(orgId, exerciseId);
@@ -734,12 +734,12 @@ public class ExerciseRuntimeService {
             }
         }
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = String.format("%s%03d", prefix, seq);
+            String candidate = String.format(Locale.ROOT, "%s%03d", prefix, seq);
             if (!runRepo.existsByOrganisationIdAndRunCode(orgId, candidate)) {
                 return candidate;
             }
         }
-        return prefix + String.format("%03d", next) + "-"
+        return prefix + String.format(Locale.ROOT, "%03d", next) + "-"
             + UUID.randomUUID().toString().substring(0, 6);
     }
 

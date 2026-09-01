@@ -22,6 +22,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -350,7 +351,7 @@ public class SanctionsScreeningService {
         int year = Year.now().getValue();
         long total = checkRepo.countByOrganisationIdAndIsDeletedFalse(orgId);
         for (long seq = total + 1; seq < total + 1000; seq++) {
-            String candidate = String.format("SCR-%d-%06d", year, seq);
+            String candidate = String.format(Locale.ROOT, "SCR-%d-%06d", year, seq);
             if (!checkRepo.existsByOrganisationIdAndCheckCodeAndIsDeletedFalse(orgId, candidate)) {
                 return candidate;
             }

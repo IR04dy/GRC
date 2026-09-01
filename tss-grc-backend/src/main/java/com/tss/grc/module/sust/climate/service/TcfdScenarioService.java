@@ -21,6 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -391,7 +392,7 @@ public class TcfdScenarioService {
                 : scenarioType.replace("_", "");
         for (int attempt = 0; attempt < 10; attempt++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("TCFD-%d-%s-%03d", year, typeFragment, seq);
+            String candidate = String.format(Locale.ROOT, "TCFD-%d-%s-%03d", year, typeFragment, seq);
             if (scenarioRepo.countByOrganisationIdAndScenarioCode(orgId, candidate) == 0) {
                 return candidate;
             }

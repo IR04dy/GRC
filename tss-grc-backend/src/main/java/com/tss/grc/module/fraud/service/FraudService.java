@@ -29,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -391,7 +392,7 @@ public class FraudService {
         LocalDateTime monthStart = ym.atDay(1).atStartOfDay();
         LocalDateTime monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay();
         long inMonth = caseRepo.countCasesInMonth(orgId, monthStart, monthEnd);
-        return String.format("FR-%04d-%02d-%04d", ym.getYear(), ym.getMonthValue(), inMonth + 1);
+        return String.format(Locale.ROOT, "FR-%04d-%02d-%04d", ym.getYear(), ym.getMonthValue(), inMonth + 1);
     }
 
     private static Long org() { return TenantContext.requireOrganisationId(); }

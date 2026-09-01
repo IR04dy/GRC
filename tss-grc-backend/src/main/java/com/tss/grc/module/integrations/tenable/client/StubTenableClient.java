@@ -99,7 +99,7 @@ public class StubTenableClient implements TenableClient {
             long s = seq.incrementAndGet();
             int idx = (int) ((s - 1) % FAKE_SEVERITIES.length);
             String assetUuid = FAKE_ASSETS[(int) ((s - 1) % FAKE_ASSETS.length)];
-            String pluginId = String.format("TEN-FND-%d", s);
+            String pluginId = String.format(Locale.ROOT, "TEN-FND-%d", s);
             String key = assetUuid + "|" + pluginId;
             if (emitted.contains(key)) {
                 continue; // stub-side dedupe — never re-emit

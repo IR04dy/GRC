@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -227,7 +228,7 @@ public class RootCauseAnalysisService {
         int seq = 0;
         long base = System.currentTimeMillis();
         for (String item : items) {
-            String externalId = String.format("CAPA-%d-%s-%02d",
+            String externalId = String.format(Locale.ROOT, "CAPA-%d-%s-%02d",
                     LocalDate.now().getYear(),
                     Long.toHexString(base + seq).toUpperCase(),
                     seq);

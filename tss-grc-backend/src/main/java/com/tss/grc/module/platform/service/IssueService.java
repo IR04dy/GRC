@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.HashMap;
@@ -269,6 +270,6 @@ public class IssueService {
         Long org = TenantContext.getCurrentTenant();
         int year = Year.now().getValue();
         long count = repo.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
-        return String.format("ISS-%d-%06d", year, count + 1);
+        return String.format(Locale.ROOT, "ISS-%d-%06d", year, count + 1);
     }
 }

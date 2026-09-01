@@ -64,9 +64,22 @@ class CountBasedReferenceMinterRatchetTest {
     private static final Pattern COUNT_SEED = Pattern.compile(
         "(?:\\bcount\\w*\\s*\\([^;{}]*\\)|\\.\\s*size\\s*\\(\\s*\\)|\\.\\s*count\\s*\\(\\s*\\))\\s*\\+\\s*1L?");
 
-    /** A reference build: a zero-padded {@code String.format} ordinal, or a reference/code setter. */
+    /**
+     * A reference build: a zero-padded {@code String.format} ordinal, or a
+     * reference/code setter.
+     *
+     * <p>⚠ F2-416 — the optional {@code Locale.X,} group is load-bearing. That slice put
+     * {@code Locale.ROOT} on every identifier-building {@code String.format} (an ar-SA JVM
+     * otherwise mints Arabic-Indic digits, and {@code TRY_CAST} of one is NULL, which resets
+     * every MAX seed to 0). Inserting an argument between the paren and the literal blinded
+     * this detector completely: it found ZERO minters where it knows two exist, so the
+     * forward leg passed <b>vacuously over an empty list</b> and only
+     * {@link #everyKnownSurvivorIsStillDetected} caught it. 🔑 A detector keyed on the
+     * spelling of a call is broken by anything that adds an argument to that call, and it
+     * fails in the quiet direction — which is the whole argument for the reverse leg.
+     */
     private static final Pattern REFERENCE_BUILD = Pattern.compile(
-        "String\\.format\\s*\\(\\s*\"[^\"]*%0\\d*d|\\.\\s*set\\w*(?:Reference|Code)\\s*\\(");
+        "String\\.format\\s*\\(\\s*(?:(?:java\\.util\\.)?Locale\\.\\w+\\s*,\\s*)?\"[^\"]*%0\\d*d|\\.\\s*set\\w*(?:Reference|Code)\\s*\\(");
 
     private static final Pattern METHOD_HEADER = Pattern.compile(
         "(?:public|protected|private)\\s+(?:static\\s+)?[\\w<>,\\[\\].?\\s]+?\\s+(\\w+)\\s*\\([^;{]*\\)\\s*\\{");
@@ -164,8 +177,22 @@ class CountBasedReferenceMinterRatchetTest {
                 return repo.countByOrganisationId(org) + 1;
               }
             }""";
+        // F2-416 — the same minter with an explicit Locale. The sweep that added
+        // Locale.ROOT platform-wide blinded this detector, and it failed in the quiet
+        // direction (zero found, forward leg vacuous). Both shapes are asserted now, so
+        // the detector cannot silently depend on either one.
+        String countSeedMinterWithLocale = """
+            class X {
+              private String nextCode(long org) {
+                long n = repo.countByOrganisationId(org) + 1;
+                return String.format(java.util.Locale.ROOT, "AC-%05d", n);
+              }
+            }""";
 
         assertThat(scan(stripComments(countSeedMinter), "X")).containsExactly("X#nextCode");
+        assertThat(scan(stripComments(countSeedMinterWithLocale), "X"))
+            .as("F2-416: an explicit Locale must not hide a count-seed minter")
+            .containsExactly("X#nextCode");
         assertThat(scan(stripComments(maxSeedMinter), "X")).isEmpty();
         assertThat(scan(stripComments(arraySizePlusOne), "X")).isEmpty();
         assertThat(scan(stripComments(countButNoReference), "X")).isEmpty();

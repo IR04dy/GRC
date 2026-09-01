@@ -36,6 +36,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -507,12 +508,12 @@ public class CptyService {
         Long org = org();
         int next = cptyRepo.findMaxReferenceSeq(org) + 1;
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = String.format("CP-%05d", seq);
+            String candidate = String.format(Locale.ROOT, "CP-%05d", seq);
             if (!cptyRepo.existsByOrganisationIdAndReference(org, candidate)) {
                 return candidate;
             }
         }
-        return String.format("CP-%05d-%s", next, UUID.randomUUID().toString().substring(0, 6));
+        return String.format(Locale.ROOT, "CP-%05d-%s", next, UUID.randomUUID().toString().substring(0, 6));
     }
 
     static BigDecimal computeUtilisationPct(BigDecimal limit, BigDecimal utilised) {

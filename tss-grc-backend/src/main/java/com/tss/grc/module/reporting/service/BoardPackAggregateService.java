@@ -28,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -175,7 +176,7 @@ public class BoardPackAggregateService {
         for (Risk r : risks) {
             out.add(new BoardPackAggregate.RiskRow(
                 r.getId(),
-                "R-" + String.format("%05d", r.getId()),
+                "R-" + String.format(Locale.ROOT, "%05d", r.getId()),
                 r.getTitleEn(),
                 r.getTitleAr(),
                 r.getInherentScore(),

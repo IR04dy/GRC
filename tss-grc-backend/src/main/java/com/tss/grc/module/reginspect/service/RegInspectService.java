@@ -29,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -378,12 +379,12 @@ public class RegInspectService {
         String pat = "%-OSI-" + today.getYear() + "-Q" + q + "-%";
         int next = inspectionRepo.findMaxOsiOrdinal(org, pat) + 1;
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = prefix + String.format("%03d", seq);
+            String candidate = prefix + String.format(Locale.ROOT, "%03d", seq);
             if (!inspectionRepo.existsByOrganisationIdAndExternalReference(org, candidate)) {
                 return candidate;
             }
         }
-        return prefix + String.format("%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
+        return prefix + String.format(Locale.ROOT, "%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
     }
 
     /**
@@ -400,12 +401,12 @@ public class RegInspectService {
         Long org = org();
         int next = drRepo.findMaxDrOrdinal(i.getId(), org) + 1;
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = prefix + String.format("%03d", seq);
+            String candidate = prefix + String.format(Locale.ROOT, "%03d", seq);
             if (!drRepo.existsByInspectionIdAndOrganisationIdAndReference(i.getId(), org, candidate)) {
                 return candidate;
             }
         }
-        return prefix + String.format("%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
+        return prefix + String.format(Locale.ROOT, "%03d", next) + "-" + UUID.randomUUID().toString().substring(0, 6);
     }
 
     private void timeline(Long inspectionId, String updateType, String statusFrom,

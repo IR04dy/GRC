@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.time.Instant;
 import java.util.Map;
 
@@ -52,8 +53,8 @@ public class RealtimeBroadcaster {
      * first to receive the full payload of just their record.
      */
     public void broadcastEntityUpdate(Long orgId, String entityType, String externalId, Object payload) {
-        String detailTopic = String.format("/topic/org.%d.entity.%s.%s", orgId, entityType, externalId);
-        String listTopic   = String.format("/topic/org.%d.changed.%s",   orgId, entityType);
+        String detailTopic = String.format(Locale.ROOT, "/topic/org.%d.entity.%s.%s", orgId, entityType, externalId);
+        String listTopic   = String.format(Locale.ROOT, "/topic/org.%d.changed.%s",   orgId, entityType);
         template.convertAndSend(detailTopic, envelope("entity.update", payload));
         template.convertAndSend(listTopic,   envelope("entity.changed", Map.of(
             "entityType", entityType, "externalId", externalId
@@ -68,7 +69,7 @@ public class RealtimeBroadcaster {
      * Topic shape: /topic/org.{orgId}.{kind}
      */
     public void broadcastOrgEvent(Long orgId, String kind, Object payload) {
-        String topic = String.format("/topic/org.%d.%s", orgId, kind);
+        String topic = String.format(Locale.ROOT, "/topic/org.%d.%s", orgId, kind);
         template.convertAndSend(topic, envelope(kind, payload));
     }
 

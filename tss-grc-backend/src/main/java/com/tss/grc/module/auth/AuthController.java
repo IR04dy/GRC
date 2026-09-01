@@ -21,6 +21,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -257,7 +258,7 @@ public class AuthController {
         // pins refresh tokens to first-party navigation only — if it gets
         // dropped, CSRF protection on the refresh endpoint disappears.
         response.addHeader("Set-Cookie",
-            String.format("grc_refresh=%s; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=%d",
+            String.format(Locale.ROOT, "grc_refresh=%s; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=%d",
                 refreshToken, refreshTokenExpiryMs / 1000));
     }
 

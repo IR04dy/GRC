@@ -29,6 +29,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -506,7 +507,7 @@ public class WhistleblowerCaseService {
         int year = java.time.Year.now().getValue();
         long count = caseRepo.countByOrganisationIdAndIsDeletedFalse(orgId);
         for (int seq = (int) count + 1; seq < count + 1000; seq++) {
-            String candidate = String.format("WB-%d-%03d", year, seq);
+            String candidate = String.format(Locale.ROOT, "WB-%d-%03d", year, seq);
             if (!caseRepo.existsByOrganisationIdAndCaseCodeAndIsDeletedFalse(orgId, candidate)) {
                 return candidate;
             }

@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -102,7 +103,7 @@ public class CommitteeCalendarService {
 
         for (int i = 0; i < dates.size(); i++) {
             LocalDate date = dates.get(i);
-            String code = String.format("MTG-%d-%s-%03d",
+            String code = String.format(Locale.ROOT, "MTG-%d-%s-%03d",
                 year, committee.getCode().replace("COM-", "").toUpperCase(), i + 1);
 
             if (meetings.findByOrganisationIdAndMeetingCode(org, code).isPresent()) {

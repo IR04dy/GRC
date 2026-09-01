@@ -32,6 +32,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -95,7 +96,7 @@ public class DocxExportService {
             for (Risk r : risks) {
                 String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
                 XWPFTableRow row = t.createRow();
-                setCell(row, 0, "R-" + String.format("%05d", r.getId()), ar);
+                setCell(row, 0, "R-" + String.format(Locale.ROOT, "%05d", r.getId()), ar);
                 setCell(row, 1, safe(name), ar);
                 setCell(row, 2, "—", ar);
                 setCell(row, 3, String.valueOf(r.getInherentLikelihood()), ar);
