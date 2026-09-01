@@ -15219,6 +15219,161 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-412 — a self-call bypasses the proxy, so the licences `@Cacheable` was never consulted on the hot path it exists for
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live, not latent ([[F2-283]]): every guarded request queried `organisation_licenses` past a warm cache entry. Not a correctness defect (the uncached path returns the *fresher* answer), which is exactly why nothing surfaced it |
+| **Source** | generalising [[F2-411]] past one annotation — `@Transactional` is not the only thing Spring honours only through the proxy |
+| **Size** | S — one class extracted, two delegations, one gate widened and renamed |
+
+⚠⚠ **A PROXY-BASED ANNOTATION GOES INERT IN TWO WAYS, AND [[F2-411]] GATED ONE OF THEM FOR ONE ANNOTATION.**
+
+Spring's advice lives in an interceptor on a proxy *around* the bean, so:
+
+1. **the method cannot be intercepted** — non-public or static ([[F2-411]]); or
+2. **the call never goes through the proxy** — `this.advised()` from inside the same bean.
+
+`LicensingService.isModuleEnabled` was mechanism 2:
+
+```java
+@Cacheable(value = "licenses", key = "#organisationId")
+@Transactional(readOnly = true)
+public Set<String> enabledModulesFor(Long organisationId) { … repo.findBy… … }
+
+@Transactional(readOnly = true)
+public boolean isModuleEnabled(Long organisationId, String moduleCode) {
+    if (moduleCode == null) return false;
+    return enabledModulesFor(organisationId).contains(moduleCode);   // ← self-call, cache bypassed
+}
+```
+
+🔑 **The class javadoc states the consequence itself.** It reads *"Cached via Caffeine — license
+rows don't change often and **the check sits on every authenticated request hot-path**"* — and "the
+check" is `isModuleEnabled`, called by `LicenseGuardAspect` on every `@RequireModule` controller
+method. So the `@Cacheable` was bypassed on **the one path the cache was created for**: no read,
+and no write either, so that path could never even populate the entry. Caching is genuinely live
+(`@EnableCaching` on `GrcApplication`, a `CaffeineCacheManager` in `CacheConfig`), and the cache
+*was* populated — by `JwtTokenProvider` at login, which calls `enabledModulesFor` externally. Every
+guarded request then queried the database past that warm entry.
+
+⚠⚠ **THE TWO-OF-N TELL IS THE EVICTION MACHINERY** ([[F2-215]]). The class carries **two**
+`@CacheEvict` sites on its admin write paths, both external calls, both always working — so the
+caching looked complete from every angle a reader checks. And `CacheConfig`'s own comment names
+**one** of the two consumers: *"F9 module-licensing cache — read on every JWT issuance."* That is
+accidentally precise about the defect: JWT issuance was the only consumer that reached it.
+
+⚙ **The staleness question had to be answered before the fix, because the naive fix could have been
+worse than the defect.** `enabledModulesFor` filters on `LocalDate.now()`, so a cached answer can
+outlive a licence's `valid_to` — meaning the bypassed path was the *more correct* one, and routing
+a licence-validity check through an untimed cache would have traded a performance defect for a
+correctness one ([[F2-214]]). Measured: `CacheConfig` is `expireAfterWrite(5, TimeUnit.MINUTES)`,
+and the two evicts fire on admin writes, so the window is bounded at five minutes against a JWT
+that already carries the same module list for **an hour**. Safe, and only because it was checked.
+
+⚙ **Fixed structurally, not by annotation.** The cached read moved to `LicensedModuleReader`, its
+own `@Component`, so every caller necessarily goes through a proxy and the bypass is
+**unrepresentable** rather than merely fixed. Two alternatives were rejected by measurement:
+putting `@Cacheable` on `isModuleEnabled` fragments the cache to a key per *(org, module)*, which
+the single `@CacheEvict(key = "#organisationId")` would then no longer evict — **a real bug**; and
+self-injection through `ObjectProvider` leaves the static owner of the call unchanged in bytecode,
+so no simple gate can tell it from `this.foo()`. **The fix that the reliable gate can enforce is
+the one to pick.**
+
+⚠⚠ **THE NARROWING IS THE WHOLE GATE, AND GETTING IT WRONG WOULD FAIL ON CORRECT CODE.** The raw
+self-invocation population is **416**, and almost all of it is right: the house idiom is a
+`@Transactional(readOnly = true) get(id)` called from a `@Transactional` write method, where the
+callee's annotation is bypassed and **nothing changes** — under default `REQUIRED` propagation it
+would have joined the caller's transaction anyway. A gate counting those reports 416 defects over a
+codebase doing the right thing ([[F2-214]]). Measured split:
+
+| subset | count | verdict |
+|---|---|---|
+| `@Transactional` joining `@Transactional` | **401** | harmless by construction; measured so the anti-vacuity floor sits above it |
+| non-transactional advice (`@Cacheable`/`@CacheEvict`/`@Async`/`@PreAuthorize`) | **1 → 0** | this defect; **hard zero, no exemption map** |
+| `REQUIRES_NEW` self-invoked | **0** | swept by [[F2-411]]; asserted so it stays there |
+| `@Transactional` from an untransacted caller | **13 distinct callees** | **exactly-asserted census, no verdicts** |
+
+🔑 **The hard zero on the non-transactional subset needs no exemptions because the alternative is
+always available**: annotate the public entry point and put the body in an unannotated private
+helper, or move the advised method to its own bean. There is no correct code for that leg to fail
+on — the same justification [[F2-411]]'s own hard zero rests on.
+
+⚠ **The 13 untransacted-caller callees ship with NO reasons, deliberately** ([[F2-188]] measured
+what happens otherwise: five claims, five false, with fluency doing the work). Several are the
+[[F2-322]] / [[F2-323]] per-tenant scheduler shape — four `#sweep` ← `#runSweep` pairs where losing
+the batch-wide boundary is what those findings argued **for** — so a decrease-only ratchet would
+pressure the next reader to "fix" members that are correct. It is asserted **exactly** ([[F2-204]]),
+so growth and shrinkage both fail and either forces an adjudication. ⚙ Keyed on the **callee**, not
+the caller: one caller is `lambda$rosterOnly$2`, and javac's lambda numbering is not something a
+gate should depend on.
+
+⚙ **Two census claims verified rather than assumed.** `AuditLogService#recordEvent` being bypassed
+from `#log` does **not** disturb [[F2-228]] / [[F2-322]]'s reasoning — their conclusion is that an
+audit write lands in the caller's transaction, and with the annotation bypassed it lands in whatever
+transaction is ambient, the same outcome by a different mechanism. And `AuditLogService` carries no
+class-level `@Transactional` either, which is what puts it in this subset at all.
+
+⚠⚠ **NO UNIT TEST COULD EVER HAVE CAUGHT THIS, AND THE PRE-FIX CONTROL PROVED IT.** On the reverted
+tree `LicensingServiceTest` and `LicenseGuardAspectTest` stayed **green** — 21 of 21 — because a
+mocked repository has no cache, so a bypassed `@Cacheable` is invisible to every mock-based test in
+the tree. Exactly the two gate legs went red. 🔑 **When a defect is "the framework was never
+invited", the gate is not a convenience — it is the only instrument that can see it.**
+
+⚙ **`TransactionalInterceptableContractTest` is renamed to `ProxyAdviceInterceptableContractTest`
+and widened to the family**, because a name keyed on one annotation is a claim about the population
+and an understating name is what stops a reader checking ([[F2-312]]). Mechanism 1 re-measured
+across all of `@Transactional` / `@Async` / `@Cacheable` / `@CacheEvict` / `@CachePut` /
+`@PreAuthorize` / `@PostAuthorize` / `@Secured`: **0 inert** of 2,018 + 2,202 + 7 + 1.
+🔑 **The annotation where mechanism 1 is worst is not `@Transactional` — it is `@PreAuthorize`,
+where inert means an authorization bypass rather than a lost transaction**, and F2-411's gate had no
+opinion about it.
+
+⚠ **`LicensingServiceTest` gets a REAL `LicensedModuleReader` over the mocked repository, never a
+`@Mock`** ([[F2-237]]): its entitlement-filtering legs assert enabled / valid-from / valid-to
+behaviour, and against a mocked reader they would assert the mock and pass over any filtering
+defect. Constructed by hand rather than by `@InjectMocks` for the same reason.
+
+⚠ **Three instrument errors of mine, each caught by running something.** (a) The bytecode fixture
+was read as `getSimpleName() + ".class"`, and a nested class's file is `Outer$Inner.class` — the
+resource resolved to `null`, and the **non-null assertion is what stopped that reading as "the
+detector found nothing"**, which would have sent me into the detector rather than the harness.
+(b) My patch script asserted *"no `@Cacheable` survives"* by substring, and my own explanatory
+javadoc quotes `{@code @Cacheable}` — [[F2-193]]'s quotation-versus-claim, in my own script; scoped
+to **annotation position**. (c) A `\\n` in a `<<'PY'` heredoc collapsed to a real newline inside a
+Python string literal for the third time this session — the recorded rule is *write file content
+with the editing tools, never a heredoc*, and it covers any inline script.
+
+⚠ **And the CRLF trap, fourth time in this lineage: my `\n` insertions left `LicensingServiceTest`
+with MIXED line endings and the targeted build went green over it.** Both new files were pure LF
+against a CRLF tree. All three normalised and re-verified byte-level before commit ([[F2-294]]:
+verify the endings of every touched file rather than believing a green build).
+
+⚙ **Two clean sweeps recorded so nobody re-runs them.** Division by a `size()`/`count()` denominator
+is **0 of 5** (three carry an `isEmpty() ? 0 :` ternary, two early-return on empty). Nullable
+`Comparator.comparing` sort keys are **0 of 32**: every nullable key is either filtered out one line
+above or handled with `nullsLast` / a null-coalescing lambda, and every unguarded key is a
+`nullable = false` column. `ReportComposerService` is the exemplar — its four sorts look
+inconsistent and are exactly right, which is the reminder that **the discriminator is the column's
+nullability, not the shape of the comparator**.
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — reflection plus `org.springframework.asm` over
+`target/classes`, no DB, no Spring context): `ProxyAdviceInterceptableContractTest` 8 legs, plus
+`LicensingServiceTest` 12 and `LicenseGuardAspectTest` 9 unchanged. Pre-fix control
+([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): surgically restore the `@Cacheable` and
+the self-call on `LicensingService`, **keeping `LicensedModuleReader` and the `modules` field so the
+tests still compile** — a control that cannot compile reads exactly like a gate that passed — →
+exactly `noNonTransactionalAdviceIsReachedByASelfCall` and `theLicensingCacheLivesOnItsOwnBean` RED,
+the other 27 green ([[F2-225]]).
+
+🔑 **Whenever you find a `@Cacheable`, `@Async`, `@PreAuthorize`, `@CacheEvict` or `@Transactional`,
+ask BOTH questions: can the proxy intercept this method, and does every caller go through the
+proxy? A self-call satisfies the compiler, the IDE and every mock-based test, and for a security
+annotation it is a silent bypass.**
+
+---
+
 ## F2-411 — `@Transactional` written above a javadoc attaches to the wrong method
 
 | | |
