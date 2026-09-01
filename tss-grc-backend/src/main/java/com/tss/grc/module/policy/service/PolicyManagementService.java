@@ -10,6 +10,7 @@ import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocumentControlLink;
 import com.tss.grc.module.policy.repository.PolicyDocumentControlLinkRepository;
+import com.tss.grc.module.policy.PolicyVersions;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
@@ -328,25 +329,12 @@ public class PolicyManagementService {
      * (the common case) are byte-identical to the old behaviour.
      */
     static int compareVersions(String a, String b) {
-        if (a == null || b == null) return a == null ? (b == null ? 0 : -1) : 1;
-        String[] pa = a.split("\\."), pb = b.split("\\.");
-        int n = Math.max(pa.length, pb.length);
-        for (int i = 0; i < n; i++) {
-            String sa = i < pa.length ? pa[i].trim() : "0";
-            String sb = i < pb.length ? pb[i].trim() : "0";
-            Integer ia = tryParseInt(sa), ib = tryParseInt(sb);
-            int c;
-            if (ia != null && ib != null) c = Integer.compare(ia, ib);
-            else if (ia != null)          c = -1;   // numeric segment sorts before non-numeric
-            else if (ib != null)          c = 1;
-            else                          c = sa.compareTo(sb);
-            if (c != 0) return c;
-        }
-        return 0;
-    }
-
-    private static Integer tryParseInt(String s) {
-        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
+        // F2-419 — DELEGATES. The algorithm moved to PolicyVersions so there is exactly one
+        // answer in the module: PolicyExceptionPromotionAdapter had hand-rolled a LEXICAL pick
+        // in a sibling package, which is the drift a second copy always eventually is (F2-177).
+        // This signature stays because F2-401's transitivity and numeric-ordering tests call it
+        // directly, and they pass unchanged — which is the corroboration that the move is faithful.
+        return PolicyVersions.compare(a, b);
     }
 
     @Transactional(readOnly = true)
@@ -686,7 +674,7 @@ public class PolicyManagementService {
             throw new EntityNotFoundException("Policy code not found: " + policyCode);
         // PM-H2: latest by NUMERIC version, not the lexical list order (get(0)).
         PolicyDocument latest = existing.stream()
-            .max((x, y) -> compareVersions(x.getVersion(), y.getVersion()))
+            .max(PolicyVersions.LATEST)
             .orElseThrow();
         if (docs.findByOrganisationIdAndPolicyCodeAndVersion(o, policyCode, newVersion).isPresent())
             throw new IllegalArgumentException("Version already exists: " + policyCode + " v" + newVersion);

@@ -15219,6 +15219,56 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-419 — the intake adapter picked the newest policy version lexically
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code on the intake promotion path; latent in data, since it needs one policy code with two versions whose lexical and numeric order disagree ([[F2-283]]) |
+| **Source** | six fresh-vein sweeps, all clean, and then a mechanical two-of-N: *which single-expression helper NAME is declared in several files with different bodies?* |
+| **Size** | S — one new primitive, two call sites, no schema and no migration |
+
+⚠⚠ **A LEXICAL SORT OVER A DOTTED VERSION STRING PUTS THE SUPERSEDED VERSION FIRST.** `PolicyExceptionPromotionAdapter.resolvePolicyId` resolved the policy an intake submission's exception hangs off with
+
+```java
+.max(Comparator.comparing(p -> nullSafe(p.getVersion())))
+```
+
+`"1.10"` sorts **below** `"1.9"` as text and `"10.0"` below `"9.0"`, so the exception was filed against a **superseded** version of the policy it excepts — on a path whose own error message reads *"An exception must hang off the policy it excepts."* ⚠ Reachability needs no exotic version string: a policy on its **tenth minor revision** is enough.
+
+🔑 **PM-H2 WAS A WHOLE FINDING ABOUT EXACTLY THIS, AND ITS COMMENTS SAY SO.** `PolicyManagementService` carries *"PM-H2: pick the latest version per code by NUMERIC comparison, not the lexical DB max() (which ranked "9.0" above "10.0")"* and, at a second site, *"PM-H2: latest by NUMERIC version, not the lexical list order (get(0))."* [[F2-401]] then **hardened** that comparison into a proper total order after measuring the old per-pair mix was intransitive. Neither reached this adapter, added later in a sibling package. Measured: **four sites in `module/policy` pick a latest policy version — three use the numeric comparator and one did not.** [[F2-205]] / [[F2-282]]'s lone-outlier tell, and [[F2-215]]'s two-of-N with the mechanism visibly present **three times over** and then improved on top.
+
+⚠ **The other five consumers of `…OrderByPolicyCodeAscVersionDesc` were read and do NOT depend on the order** — `ThreeLinesService` (×2) and `aggregate()` iterate and count, the other three re-sort with `compareVersions` — so the finder's lexical `VersionDesc`, which no derived query could order numerically, is **not** the defect. The adapter was the only caller that trusted it. Saying which is the point: [[F2-229]] / [[F2-230]] established that a lexical sort is a defect only where something *depends* on the order.
+
+⚙ **The fix is a primitive, and the boundary of what it shares is the judgement.** `module/policy/PolicyVersions` holds `compare(String, String)` and a `LATEST` `Comparator<PolicyDocument>` — a top-level intra-module class following `ChangeSoD`, because a pure comparison carries no tenant, no transaction and no policy about which documents are candidates. ⚠⚠ **The OPERATION is deliberately not shared**: the adapter matches a human-typed code with `equalsIgnoreCase(trim())` and `newVersion` matches with `equals`, so a shared *"latest of this code"* method would have to pick one rule and would change behaviour at one of the two sites. 🔑 **Share the primitive, not the operation** ([[F2-190]]) — and the giveaway that the operation is not shareable is that the two matching rules differ *on purpose*.
+
+⚙ **`PolicyManagementService.compareVersions` DELEGATES rather than keeping a copy**, because a second copy is precisely what drifted ([[F2-177]]). Its package-private signature stays, so [[F2-401]]'s transitivity and numeric-ordering tests call it directly and **all 44 pass unchanged** — which is the corroboration that the move is faithful, and it is asserted by a gate leg so nobody re-inlines it.
+
+⚙ **`nullSafe` is deleted.** Its only use was the broken sort key, and it was a helper *named for null-safety that also lower-cased* — worse than none, because the name answers the question a reader was about to ask ([[F2-184]]). Every other `nullSafe` in the platform returns its argument unchanged.
+
+⚠⚠ **HOW IT WAS FOUND IS THE REUSABLE PART: A MECHANICAL TWO-OF-N.** Six fresh veins came back clean (below), so the next question was asked structurally instead — *which single-expression `private static` helper name is declared in ≥2 files with **different** bodies?* **16 agree, 15 diverge.** Most of the 15 are context-appropriate (an exporter's `"—"` against an event payload's `""` — the house em-dash convention of [[F2-197]] / [[F2-209]]), and one was not: a `nullSafe` that lower-cased. 🔑 **That divergence was not itself the defect — the expression it sat in was.** ⚠ Note `nz(String)` returns `""` in two files and **`"—"`** in `BcpBinderPdfBuilder`: the same name, two behaviours, each right for its context, so **not** a defect and deliberately not consolidated ([[F2-188]]) — but a reader carrying the idiom between those files silently changes a rendered value.
+
+⚙ **SIX VEINS SWEPT CLEAN THIS FIRING, recorded so nobody re-runs them** ([[F2-216]]):
+
+- **`split()` on a regex metacharacter used as a literal delimiter** — 42 sites, 12 distinct delimiters, **0** unescaped. Every metacharacter is escaped (`\\.`, `\\|`) or bracketed; the literal delimiters are `,` `/` ` ` `:`.
+- **A native query built by string concatenation** — **0**. No `createNativeQuery`/`createQuery` takes a concatenated argument, and `@Query` concatenation is compile-time-constant literal joining, which JPA requires.
+- **`orphanRemoval = true` + an entity-bound write** (a PUT that omits the collection deletes every child) — **3** owners (`BiaQuantitative#lossLines`, `IntakeRecord#history`, `TreatmentPlan#actions`), **0** bound as a `@RequestBody`, **0** collection setters called in main. The shape is unrepresentable.
+- **`Map.of(…)` with a nullable value** (it throws NPE on a null value, no lenient variant) — **441** sites, **203** on a side-effect path, **604** getter arguments, **72** naming a nullable entity field, **0** genuinely unguarded.
+- **Outbound HTTP inside a `@Transactional` method** — **0**, and *deliberately*: all four integration services carry explicit `PERF-IO-001` / `PERF-IO-002` comments saying they are not transactional so the blocking round-trip holds no DB connection.
+- **An HTTP client with no timeout** — 4 clients, **4** setting both connect and read timeouts.
+
+⚠⚠ **THE `Map.of` FUNNEL IS THE ONE WORTH KEEPING, BECAUSE 61 OF 72 WERE SUBTRACTED BY GUARDS NO CALL-SITE SCAN CAN SEE.** Round 1 reported **72** and all four samples read were guarded. The house convention is an inline ternary in the argument itself (`x == null ? "" : x`), a `String.valueOf(…)` wrapper (which yields `"null"` rather than throwing), or an enclosing `if (x != null)` — [[F2-182]]'s rule verbatim: *reachability is a dataflow question; a regex can only tell you where to go and read.* With those subtracted, **11 survivors, and all 11 refuted by reading**: 6 wrapped in a null-tolerant helper, 2 `getId()` after a save (never null), 2 `nullable = false` columns, 1 `@NotBlank` on the DTO.
+
+⚠ **Three of my own detector errors in that funnel, each already on the record:** the wrapper allow-list named `String.valueOf` / `Objects.toString` / `Optional.ofNullable` / `*Or*` and **missed three house helpers** (`nullToEmpty`, `nz`, `nullSafeLabel`) → 6 false survivors, which is [[F2-217]]'s rule that *a census keyed on a list of names measures the list*; the enclosing-`if` regex could not span a multi-line `&&` chain → 1 more; and 🔑 **the receiver type resolved to the WRONG ENTITY** — `r` read as `CommitteeReferral` (nullable `meetingId`) where the code is a `CommitteeResolution` (`nullable = false`) — [[F2-187]]'s *resolve per owner type*, in my own scan.
+
+⚠⚠ **AND MY OWN ANTI-VACUITY FLOOR FIRED FIRST AND HID MY OWN CLAIM — [[F2-417]]'S LESSON, UNAPPLIED ONE SLICE LATER.** The gate's file-count floor was written **before** the offender list and **guessed at 20**; `module/policy` holds 16, so the first run failed on *"Expecting actual: 16 to be greater than: 20"* and the output read as **the detector is broken** rather than as **there are no offenders**. 🔑 **Put the primary claim first and the floors after it, and take the number from a measurement rather than a guess.** ⚠ The comment recording that number then said *"14 java files"* against a measured 16 — a copy of a measurement, wrong on arrival ([[F2-273]]), corrected before commit.
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — source reads plus direct calls on a pure comparator and a mocked repository; no DB, no Spring context): new `PolicyVersionOrderContractTest` (**6**) — a hard zero on lexical version ordering across the module with **no exemption map** (the primitive is always available and always correct, so there is no correct code for it to fail on — [[F2-214]]), a synthetic self-test firing the detector on both pre-fix shapes and **not** on the primitive, the delegation leg, and the ordinary `1.10 vs 1.9` case with `"1.10".compareTo("1.9")` as its own control. Plus `PolicyExceptionPromotionAdapterTest` (**4**) — the adapter's first test ([[F2-248]]). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert the two main sources and **keep `PolicyVersions`**, unreferenced, so both test classes still compile → **4 of 54 legs RED** (the invariant, the delegation leg, both version-pick legs), and 🔑 **the primitive's contract legs, the self-test and all 44 of `PolicyManagementServiceTest` correctly stay GREEN — which is what proves the revert was surgical and the delegation faithful in both directions** ([[F2-225]]).
+
+🔑 **When a module has already been swept for a defect, ask who was added AFTER the sweep. A later sibling package inherits none of it, and the three correct call sites are exactly what stops anyone asking about the fourth.**
+
+---
+
 ## F2-418 — a uniqueness guard that asks a narrower question than the index enforces
 
 | | |
