@@ -67,7 +67,6 @@ public class CyberAssessmentService {
         return assessmentRepo.save(a);
     }
 
-    @Transactional
     /**
      * F2-213 — the fields an operator can actually edit through this endpoint.
      *
@@ -93,6 +92,7 @@ public class CyberAssessmentService {
         existing.setStatus(req.getStatus());
     }
 
+    @Transactional
     public ControlAssessment updateAssessment(Long id, ControlAssessment req) {
         ControlAssessment existing = getAssessment(id);
         applyEditable(existing, req);

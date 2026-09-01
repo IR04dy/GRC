@@ -68,7 +68,6 @@ public class CyberActionPlanService {
         return actionPlanRepo.save(ap);
     }
 
-    @Transactional
     /**
      * F2-213 — the fields an operator can actually edit through this endpoint.
      *
@@ -96,6 +95,7 @@ public class CyberActionPlanService {
         existing.setCompletionEvidence(req.getCompletionEvidence());
     }
 
+    @Transactional
     public CyberActionPlan updateActionPlan(Long id, CyberActionPlan req) {
         CyberActionPlan existing = getActionPlan(id);
         applyEditable(existing, req);

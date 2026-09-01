@@ -15219,6 +15219,91 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-411 — `@Transactional` written above a javadoc attaches to the wrong method
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P3 — a latent-hazard closure, said out loud ([[F2-283]]): all four handlers are read-mutate-single-save and `save` carries its own transaction, so nothing was observably broken. The annotation was inert and the handler it was meant for was the lone non-transactional write method in its class |
+| **Source** | a fresh-vein sweep for Spring proxy semantics — `@Transactional` that silently does not apply |
+| **Size** | S — one annotation moved in four files, one deleted in a fifth, one gate |
+
+⚠⚠ **JAVA TREATS A COMMENT AS WHITESPACE, SO AN ANNOTATION WRITTEN ABOVE A JAVADOC SILENTLY ATTACHES TO THE NEXT METHOD — AND THE COMPILER CANNOT SEE IT.**
+
+```java
+    @Transactional
+    /** F2-213 — the fields an operator can actually edit through this endpoint. */
+    private void applyEditable(CyberActionPlan existing, CyberActionPlan req) { ... }
+
+    public CyberActionPlan updateActionPlan(Long id, CyberActionPlan req) { ... }   // no annotation
+```
+
+The annotation lands on the **private** helper. Spring's proxy-based transaction management
+considers **public** methods only, and a proxy cannot intercept a private one at all, so it is
+inert — while a reader who asks *"is this update path transactional?"* sees the word twelve lines
+above the handler and concludes that it is. [[F2-184]]'s decoy shape, at an annotation.
+
+🔑 **[[F2-213]] introduced four of these in one commit (`f46eb191`) — in the four `module/cyber`
+services whose data-erasure defect it was fixing.** The `applyEditable` extraction is what stranded
+the annotation, so **the mechanism that fixed the first defect caused the second** ([[F2-215]]'s
+two-of-N at its tightest range). And the public `updateXxx` handler it was meant for was left as the
+**only** non-transactional write method in each class, beside `create`, `complete`, `delete` and
+`transition` which all carry one — the lone-outlier tell ([[F2-205]] / [[F2-282]]).
+
+⚙ **The fifth was inert for TWO independent reasons and was deleted rather than promoted.**
+`NdiScheduler#distinctOrgIds` is `protected` (so outside the proxy's population) **and**
+self-invoked from `evidenceExpirySweep()` (so bypassed even if it were public). Deleting it is
+correct rather than tidy: a scheduler sweep must not hold one transaction across every tenant
+([[F2-322]] / [[F2-323]]), and its single `findAll()` is self-transactional through `SimpleJpaRepository`.
+
+⚠⚠ **MEASURE FROM REFLECTION, NEVER A SOURCE REGEX — AND THAT RULE EARNED ITS PLACE TWICE IN
+ONE SLICE.** A regex sweep of the same tree returned **6** sites of which **3 were wrong**: it
+attributed an annotation to the next signature it could parse (`CommitteeCatalogService#isMissingObjectError`, `ScmService#orgId` — neither annotated), and it **missed the `protected` one
+entirely**. Reflection over the shipped classes says **5 of 2,014** public `@Transactional` methods.
+🔑 **The regex was wrong in both directions at once, and the direction that inflates fails
+loudly while the direction that shrinks reads exactly like a clean tree.**
+
+⚠ **A second detector bug in the same sweep, and only reading the code caught it.** The
+self-invocation scan reported `NdiAuditPublisher#publish` calling itself — the match was
+`publish (` **inside the string literal** `"NDI audit publish (severity={}) failed for ..."`. I had
+skipped string literals in the paren-balanced argument walker and then failed to do it in the call
+scan. `REQUIRES_NEW` self-invocation is a **clean sweep: 0 real sites.**
+
+## Two clean sweeps recorded on the way, so the next reader does not re-run them
+
+⚙ **`BigDecimal.divide()` with no rounding: 0 of 56 call sites.** Every division in the backend
+carries a scale + `RoundingMode` or a `MathContext`, so the *"Non-terminating decimal expansion"*
+`ArithmeticException` is unrepresentable. ⚙ **Single-argument `setScale`: 0 genuine of 99.**
+Increasing a scale never needs rounding, so the four `BigDecimal.ZERO.setScale(2)` / `ONE.setScale(2)`
+sites cannot throw; the one non-constant hit was a `CreditRating` **domain setter** named `setScale`
+(the agency rating scale), not `BigDecimal`'s.
+
+⚠ **Both needed a paren-balanced walk.** `\.divide\([^,)]*\)` matches the **inner** paren of
+`.divide(BigDecimal.valueOf(n), 2, RoundingMode.HALF_UP)` and reports **every correct site** as a
+defect — it returned 20 hits, all false. Split the argument list on **depth-1** commas, skipping
+string and char literals so a `")"` in a message cannot end it.
+
+## The gate
+
+`TransactionalInterceptableContractTest` — a **hard zero with no exemption map**, safe because
+there is no correct code for it to fail on: a method that needs a transaction can always be public,
+and one that cannot be public can never be intercepted, so the annotation on it is never doing work.
+Four legs: the invariant; an **anti-vacuity floor above the largest WRONG answer, which is zero**
+(a scanner that resolves nothing, or a package rename — [[F2-215]]); the four handlers named
+**individually**, so a revert fails rather than shrinking a count; and a **synthetic control**
+firing on private / protected / static and **not** on public — without which the zero is
+indistinguishable from a detector that has stopped matching ([[F2-235]]), and which also pins that the
+gate does not fail on the legitimate shape ([[F2-214]]).
+
+Verified hermetically ([[F2-320]] / [[F2-325]] — reflection only, no Spring context, no database): 4 run /
+0 failed. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): a surgical revert of one
+of the four files makes exactly the two discriminating legs RED, naming
+`CyberActionPlanService#applyEditable [private]` and `#updateActionPlan lost its @Transactional`,
+while the synthetic control and the floor stay green — they are measurements, not claims about this
+fix ([[F2-225]]). Full backend build 4953/0/0.
+
+---
+
 ## F2-410 — A dispositioned standard kept its own scope, because the keepers were never given ids
 
 | | |
