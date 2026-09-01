@@ -409,6 +409,133 @@ class InertValidationConstraintTest {
                 .isEmpty();
     }
 
+    /**
+     * F2-413 — <b>the third depth of the same question, and the two legs above are blind to it for
+     * complementary reasons.</b>
+     *
+     * <p>{@link #everyValidationConstraintSitsOnATypeSomeEndpointActuallyValidates()} is per-TYPE: it
+     * asks whether a constrained type is validated <i>somewhere</i>.
+     * {@link #aConstrainedRequestTypeIsValidatedAtEverySiteThatBindsIt()} is per-SITE, and its
+     * population is <b>body parameters</b>. So a constrained type reached at one site through the
+     * cascade and at another through a <b>nested member that does not cascade</b> sits in neither:
+     * the first says "validated", the second sees only {@code @RequestBody} parameters.
+     *
+     * <p>That is [[F2-185b]]'s own headline one level deeper — <i>a per-type gate over a per-site
+     * defect reports the population it can see</i> — where "site" now means a field or record
+     * component rather than a parameter.
+     *
+     * <p>The defect it found: {@code IaDtos.UniverseBulkImportRequest.entries} was
+     * {@code @NotNull List<UniverseCreateRequest>} with <b>no {@code @Valid}</b>, so on
+     * {@code POST /universe/bulk-import} — a route whose own body IS {@code @Valid} — none of
+     * {@code UniverseCreateRequest}'s constraints ran: {@code @NotBlank entryCode},
+     * {@code @NotBlank titleEn}, {@code @NotBlank titleAr} (house rule 7), six {@code @Size} caps and
+     * the {@code @Pattern} on {@code plannedQuarter}. The single-entry {@code POST /universe} route is
+     * {@code @Valid}, so the <b>same type was validated at one site and not the other</b>.
+     *
+     * <p>🔑 The population is <b>three</b> and two of them were already right —
+     * {@code SanctionsDtos.entries} (fixed by [[F2-185]], which is what makes this [[F2-215]]'s
+     * two-of-N: the mechanism was visibly present twice) and {@code ApprovalChainDtos.steps}. A lone
+     * outlier out of three is the [[F2-205]] / [[F2-282]] tell.
+     *
+     * <p><b>Hard zero with no exemption map.</b> There is no correct code for it to fail on: if the
+     * element type carries constraints, either they are meant to run at this site — add
+     * {@code @Valid} — or they are inert, which the per-type leg above already refuses. ⚠ Enabling
+     * the cascade is only safe because every cap mirrors its column ([[F2-184]]'s <i>cap == column →
+     * enable</i>): it converts a truncation 8152 into a 400 naming the field and cannot break a
+     * request that works today.
+     */
+    @Test
+    void everyNestedMemberOfAValidatedTypeCascadesWhenItsElementIsConstrained() throws Exception {
+        Set<Class<?>> all = allTypesUnder(BASE);
+        Set<Class<?>> validated = cascadeClosure(validatedRoots(all));
+
+        List<String> gaps = new ArrayList<>();
+        int membersExamined = 0;
+        for (Class<?> owner : validated) {
+            if (owner.getName().startsWith("java.") || owner.isEnum()) continue;
+            for (Map.Entry<String, Type> member : nestedMembersOf(owner).entrySet()) {
+                membersExamined++;
+                for (Class<?> element : unwrap(member.getValue())) {
+                    if (element == owner || element.isEnum()) continue;
+                    if (element.getName().startsWith("java.")) continue;
+                    Set<String> constrained = constrainedMembersOf(element);
+                    if (constrained.isEmpty()) continue;
+                    gaps.add("%s#%s -> %s declares %s".formatted(
+                            owner.getSimpleName(), member.getKey(),
+                            element.getSimpleName(), constrained));
+                }
+            }
+        }
+
+        // Anti-vacuity: the largest WRONG answer is zero — a closure that resolves nothing, or a
+        // member walk that returns nothing — and a floor must sit above it (F2-215).
+        assertThat(validated.size())
+                .as("the cascade closure resolved almost nothing, so the emptiness below means nothing")
+                .isGreaterThan(MIN_VALIDATED_TYPES);
+        assertThat(membersExamined)
+                .as("no NON-cascading nested members were examined at all, so this leg cannot fire — "
+                    + "a detector that cannot match reads exactly like a clean tree (F2-235)")
+                .isGreaterThan(200);
+
+        assertThat(gaps.stream().sorted().toList()).as("""
+            A nested member of a validated type does NOT cascade, and its element type declares
+            constraints — so at THIS site those constraints do not run, however @Valid the enclosing
+            @RequestBody is. Bean validation cascades only where it is told to.
+
+            This is invisible to both legs above: the per-TYPE leg says the element is "validated
+            somewhere" (it is — at another site), and the per-SITE leg's population is @RequestBody
+            PARAMETERS, one level up from a field.
+
+            Add @Valid to the member (or `List<@Valid Foo>`). Do not add an exemption: if the
+            constraints are not meant to run here they are inert, which the per-type leg refuses.
+            ⚠ Check each @Size cap against its column first — F2-184: cap == column means enabling
+            only turns a truncation 500 into a 400 naming the field; a cap LOOSER than its column
+            means the annotation is what is wrong.
+
+            %s""".formatted(String.join("\n", gaps.stream().sorted().toList()))).isEmpty();
+    }
+
+    /** The body-bound roots marked for validation — the same derivation the per-type leg uses. */
+    private static Set<Class<?>> validatedRoots(Set<Class<?>> all) {
+        Set<Class<?>> roots = new LinkedHashSet<>();
+        for (Class<?> c : all) {
+            if (!isController(c)) continue;
+            for (Method m : declaredMethodsOf(c)) {
+                if (MAPPINGS.stream().noneMatch(m::isAnnotationPresent)) continue;
+                for (Parameter p : m.getParameters()) {
+                    if (BODY_BINDINGS.stream().noneMatch(p::isAnnotationPresent)) continue;
+                    if (marksForValidation(p)) roots.addAll(unwrap(p.getParameterizedType()));
+                }
+            }
+        }
+        return roots;
+    }
+
+    /**
+     * Fields and record components of {@code owner} that do <b>not</b> cascade, by name → generic
+     * type. Both shapes are needed: this codebase's request DTOs are overwhelmingly records, and
+     * {@code cascades(Field)} is the field half of the check the closure already performs.
+     */
+    private static Map<String, Type> nestedMembersOf(Class<?> owner) {
+        Map<String, Type> out = new java.util.LinkedHashMap<>();
+        for (Field f : declaredFieldsOf(owner)) {
+            if (f.isSynthetic() || cascades(f)) continue;
+            out.put(f.getName(), f.getGenericType());
+        }
+        if (owner.isRecord()) {
+            for (RecordComponent rc : owner.getRecordComponents()) {
+                boolean cascades = rc.isAnnotationPresent(Valid.class)
+                        || String.valueOf(rc.getAnnotatedType()).contains(Valid.class.getName());
+                if (cascades) {
+                    out.remove(rc.getName());       // the backing field read as non-cascading
+                } else {
+                    out.put(rc.getName(), rc.getGenericType());
+                }
+            }
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------ the two detectors
 
     /** Constraint members this class <b>declares</b> — {@code getDeclaringClass()}, never a guess. */

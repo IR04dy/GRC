@@ -1,6 +1,7 @@
 package com.tss.grc.module.audit_lc.ia_plan.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -114,7 +115,12 @@ public final class IaDtos {
         @Size(max = 255) String businessUnitAr,
         BigDecimal inherentRiskScore,
         BigDecimal controlEnvironmentScore,
-        BigDecimal residualRiskScore,
+        // F2-392 measured that create() ALWAYS derives the residual from
+        // inherent × (1 - controlEnvironmentScore) and ignores whatever the caller sends, the same
+        // as update() and recomputeResidual(). F2-413 removes the component rather than leaving it
+        // declared: a request field the server discards tells the caller their value matters
+        // (F2-184), and a field the bound type does not declare can never arrive (F2-233), which is
+        // the stronger closure. UniverseResponse still carries the DERIVED value.
         LocalDate lastAuditedDate,
         @Size(max = 20) String lastAuditRating,
         Integer plannedAuditYear,
@@ -142,7 +148,13 @@ public final class IaDtos {
 
     public record UniverseBulkImportRequest(
         Long planId,
-        @NotNull List<UniverseCreateRequest> entries
+        // F2-413: @Valid is load-bearing. @NotNull alone stops the cascade at this record, so on
+        // POST /universe/bulk-import NONE of UniverseCreateRequest's constraints ran — @NotBlank
+        // entryCode/titleEn/titleAr (house rule 7), six @Size caps and the @Pattern on
+        // plannedQuarter — although POST /universe binds the very same type with @Valid. Every cap
+        // mirrors its @Column(length), so enabling the cascade converts a truncation 8152 into a
+        // 400 naming the field and cannot break a request that works today (F2-184).
+        @NotNull @Valid List<UniverseCreateRequest> entries
     ) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

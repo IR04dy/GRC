@@ -106,7 +106,9 @@ class BowTieAnalysisServiceTest {
                 "CISO",
                 "ISO_31010",
                 null,
-                null, null, null, null
+                // F2-413: preventiveControls/mitigatingControls are gone from the request — no code
+                // read them and the frontend never sent them. Controls go through their own routes.
+                null, null
         );
     }
 
@@ -121,8 +123,7 @@ class BowTieAnalysisServiceTest {
                 "ISO_31010",
                 null,
                 List.of(threatDto("Insider", 1), threatDto("Ransomware", 2)),
-                List.of(consequenceDto("SDAIA fine", 1), consequenceDto("Customer churn", 2)),
-                null, null
+                List.of(consequenceDto("SDAIA fine", 1), consequenceDto("Customer churn", 2))
         );
     }
 
@@ -266,7 +267,7 @@ class BowTieAnalysisServiceTest {
                 "Updated description", null,
                 "OPERATIONAL",
                 null, null, null, null,
-                null, null, null, null
+                null, null
         );
 
         BowTieAnalysisResponse out = service.update(BOWTIE_EX, changed);

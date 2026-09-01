@@ -98,11 +98,12 @@ public class IaAuditUniverseService {
         e.setInherentRiskScore(req.inherentRiskScore());
         e.setControlEnvironmentScore(req.controlEnvironmentScore());
         // Residual: the service is source-of-truth for the formula, so a
-        // caller-supplied residualRiskScore is IGNORED and always recomputed —
-        // the same as the update() and recomputeResidual() siblings.
-        // F2-392: the previous ternary trusted req.residualRiskScore() when
-        // non-null, which contradicted this comment and let a caller store a
-        // residual that disagreed with inherent × (1 - controlEnvironmentScore).
+        // The residual is ALWAYS derived here, the same as update() and recomputeResidual().
+        // F2-392 fixed a ternary that trusted req.residualRiskScore() when non-null, which
+        // contradicted this comment and let a caller store a residual disagreeing with
+        // inherent × (1 - controlEnvironmentScore). F2-413 then removed the request component
+        // outright, so there is no longer a caller value to ignore — the absence IS the
+        // enforcement (F2-233), which is why no test can assert "a supplied residual is dropped".
         e.setResidualRiskScore(computeResidual(req.inherentRiskScore(), req.controlEnvironmentScore()));
         e.setLastAuditedDate(req.lastAuditedDate());
         e.setLastAuditRating(req.lastAuditRating());
@@ -181,7 +182,7 @@ public class IaAuditUniverseService {
                     effectivePlanId, entry.entryCode(), entry.titleEn(), entry.titleAr(),
                     entry.processNameEn(), entry.processNameAr(),
                     entry.businessUnitEn(), entry.businessUnitAr(),
-                    entry.inherentRiskScore(), entry.controlEnvironmentScore(), entry.residualRiskScore(),
+                    entry.inherentRiskScore(), entry.controlEnvironmentScore(),
                     entry.lastAuditedDate(), entry.lastAuditRating(),
                     entry.plannedAuditYear(), entry.plannedQuarter(),
                     entry.linkedRiskId(), entry.linkedControlIds()
