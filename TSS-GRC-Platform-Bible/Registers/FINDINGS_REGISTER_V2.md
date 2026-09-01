@@ -15219,6 +15219,107 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-414 — a constraint on a method parameter is inert unless the class carries `@Validated`
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P3 — live in code, bounded in effect ([[F2-283]]): the NCEC permit expiry sweep accepted any `leadDays`, filing premature renewal CAPAs for the whole register — but the sweep dedups on `sourceRef`, so it is one CAPA per (permit, expiry) rather than a flood. The `@Min`/`@Max` a reader relies on were doing nothing |
+| **Source** | the fourth carrier in the [[F2-411]] / [[F2-412]] / [[F2-413]] lineage — a Spring mechanism that silently does not apply |
+| **Size** | S — one class annotation, one gate leg |
+
+⚠⚠ **BEAN VALIDATION DOES NOT ENFORCE A PARAMETER CONSTRAINT BY ITSELF. SPRING DOES, AND ONLY FOR CLASSES THAT OPT IN.**
+
+```java
+@RestController
+@RequireModule("ESG")
+// ← no @Validated
+public class EsgHorizonController {
+
+    @PostMapping("/env-permits/expiry-sweep")
+    public Map<String, Integer> permitSweep(
+            @RequestParam(defaultValue = "90") @Min(1) @Max(365) int leadDays) { … }
+```
+
+`MethodValidationPostProcessor` advises only classes annotated `@Validated`, so those bounds were
+**inert**: no error, no log, the annotation visibly present. [[F2-184]]'s decoy shape at a parameter.
+
+⚙ **What the unbounded window does.** `EsgHorizonService.permitExpirySweep` walks every live permit
+and raises an auto-CAPA for each one expiring within `leadDays` — `HIGH`, target date = the permit's
+expiry, into the NCEC environmental-compliance register. So a large `leadDays` files a renewal CAPA
+for a permit expiring in a decade. ⚠ **State the bound honestly**: line 311 dedups on
+`sourceRef = "ENV_PERMIT:<number>:<expiry>"`, so a repeat call adds nothing and this is premature
+noise rather than an unbounded flood — unlike [[F2-371]], where the missing dedup was the defect.
+A *negative* `leadDays` is inconsequential in the other direction: `days > leadDays` then skips every
+future permit and processes only already-expired ones, which is what the sweep is for.
+
+<p>🔑 <b>The population is four constrained parameters and three were already right.</b> All three
+live on `TenableController` — the <b>only</b> class in the platform carrying `@Validated`, which it
+has had since its `@Pattern` path variables were written. A lone outlier out of four is the
+[[F2-205]] / [[F2-282]] tell, and the mechanism sitting correctly applied on a sibling is
+[[F2-215]]'s two-of-N: a reader who finds `@Validated` used properly somewhere has no reason to ask
+which classes lack it.
+
+⚠⚠ **THIS LEG MATTERS MORE THAN ITS POPULATION, BECAUSE THE PLATFORM HAS ALREADY FILED THE WORK THAT
+WOULD ADD THE NEXT INSTANCE.** [[F2-393]] fixed a negative page index crashing a manual `subList`
+and filed *"add `@Min(0)` to the page parameter"* as the boundary follow-up. **Applied naively, that
+filed remedy ships another inert annotation** — and an inert bound on a page index reads exactly like
+a fixed one, which is how the defect being closed here came to exist. The gate converts that into a
+build failure. 🔑 **A filed remedy can create the defect class it is meant to close; gate the
+mechanism before executing the filing.**
+
+⚙ **Fourth carrier of one question, and the class now holds all four.**
+`InertValidationConstraintTest` asks *"is this constraint enforced?"* of a **type** (F2-184), a
+**body parameter** ([[F2-185b]]), a **nested member** ([[F2-413]]) and now a **method parameter**.
+One class, one question — never a second gate ([[F2-190]]).
+
+⚠ **Constructors are excluded deliberately, and that is a claim rather than a convenience.** A
+record's canonical constructor carries its components' constraints, and those are enforced by the
+cascade when the record is validated as a body — nothing to do with `@Validated`. Counting them would
+report **every constrained request DTO in the platform** as a defect, which is the exact opposite of
+this leg's claim and would be a gate failing on correct code ([[F2-214]]).
+
+⚙ **Activation is safe for a measured reason, not an assumed one.**
+`GlobalExceptionHandler.handleConstraint` already maps an unwrapped `ConstraintViolationException` to
+**400** through `constraintProblem`, whose `errors` map is keyed by the violation's property path — so
+a rejected `leadDays` names the parameter instead of surfacing as a 500. Checked before annotating;
+`EsgHorizonController` has ten bound parameters and exactly one carries constraints, so `@Validated`
+cannot start refusing anything else.
+
+⚠⚠ **MY PRE-FIX CONTROL SILENTLY DID NOT RUN, AND ITS OUTPUT SAID THE GATE WAS FINE.** The revert
+script anchored on `"\n@Validated\npublic class EsgHorizonController {"` — but `@Validated` was
+inserted after `@RequireModule` and is followed by `@Tag`, so the anchor matched **zero** times, the
+file was untouched, and the subsequent run reported **4/4 green**. That reads as *"the new leg is
+vacuous"*, which is the [[F2-257]] / [[F2-295]] shape and the more misleading of the two failure
+modes. 🔑 **The assert is the only reason it cost one iteration rather than a wrong conclusion —
+a control that declines to run must fail loudly, never pass quietly.** Re-anchored on the exact
+stripped line, it fires and names `EsgHorizonController#permitSweep(int leadDays)` and nothing else.
+
+⚠ **And one of my own floors was wrong in a way worth recording.** I first wrote
+`validatedClasses >= 2`, which is exactly the post-fix count — so it would have failed the moment
+either class lost the annotation, duplicating what the inert list already says more precisely, and it
+would have made the pre-fix control fire on two assertions instead of one. 🔑 **An anti-vacuity floor
+must assert that the DETECTOR works, never re-assert the fix.** Corrected to `>= 1`, which is the
+honest claim: at one, the `classOptsIn` branch is still exercised.
+
+⚙ The constrained-parameter floor is deliberately **tight at 4** — it is the whole population, so a
+detector that stops reading parameter annotations fails there rather than reporting a clean tree
+([[F2-235]]).
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — reflection over the classpath, no DB, no Spring
+context): `InertValidationConstraintTest` 4 legs, plus `EsgHorizonServiceTest` 4 and
+`GlobalExceptionHandlerTest` 24 unchanged. ⚠ **No behaviour test can see this** — method validation
+is proxy-applied, so a unit test calling the controller directly bypasses it entirely, the same
+reason [[F2-412]]'s cache bypass and [[F2-413]]'s missing cascade were invisible to their services'
+tests. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): comment out
+**only** the `@Validated` line, keeping the import so it compiles → exactly the one leg RED naming
+the one site, the other three green ([[F2-225]]).
+
+🔑 **`@Valid` on a parameter marks a cascade; a constraint on a parameter needs `@Validated` on the
+class. They look alike, they sit in the same position, and only one of them works on its own.**
+
+---
+
 ## F2-413 — a nested member that does not cascade skips its element's constraints, and both existing legs are blind to it
 
 | | |
