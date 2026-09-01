@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -259,7 +260,7 @@ public class AttackSurfaceAssetService {
         String prefix = "ASM-" + year + "-";
         for (int i = 0; i < 50; i++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("%s%03d", prefix, seq);
+            String candidate = String.format(Locale.ROOT, "%s%03d", prefix, seq);
             if (assetRepo.countByOrganisationIdAndAssetCode(orgId, candidate) == 0) {
                 return candidate;
             }

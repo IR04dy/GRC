@@ -140,7 +140,7 @@ public class BoardPackService {
 
     private String generateExternalId(String periodLabel) {
         String safe = periodLabel == null ? "X" : periodLabel.replaceAll("[^A-Za-z0-9]", "");
-        return String.format("BP-%d-%s",
+        return String.format(Locale.ROOT, "BP-%d-%s",
             LocalDateTime.now().getYear(),
             safe.length() > 6 ? safe.substring(0, 6) : safe);
     }

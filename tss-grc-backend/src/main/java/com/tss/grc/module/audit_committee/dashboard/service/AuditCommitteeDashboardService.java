@@ -69,6 +69,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -815,7 +816,7 @@ public class AuditCommitteeDashboardService {
             case "OFFCYCLE" -> "OFFCYCLE";
             default -> "MEETING";
         };
-        return String.format("AC-DASH-%d-%s-%s", year, quarter, typeSuffix);
+        return String.format(Locale.ROOT, "AC-DASH-%d-%s-%s", year, quarter, typeSuffix);
     }
 
     /**

@@ -327,6 +327,6 @@ public class VendorEsgSurveyService {
     private String nextExternalId(Long orgId, Short year) {
         String prefix = "VES-" + year + "-";
         int next = Optional.ofNullable(repo.findMaxExternalIdSeq(orgId, prefix)).orElse(0) + 1;
-        return prefix + String.format("%04d", next);
+        return prefix + String.format(Locale.ROOT, "%04d", next);
     }
 }

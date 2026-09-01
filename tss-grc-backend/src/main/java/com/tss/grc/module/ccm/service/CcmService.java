@@ -24,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -402,7 +403,7 @@ public class CcmService {
         String prefix = "CCM-" + (testType == null ? "TEST" : testType.replace("_", "-"));
         for (int i = 0; i < 10; i++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("%s-%03d", prefix, seq);
+            String candidate = String.format(Locale.ROOT, "%s-%03d", prefix, seq);
             if (defRepo.countByOrganisationIdAndTestCode(orgId, candidate) == 0) {
                 return candidate;
             }

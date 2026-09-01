@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -291,7 +292,7 @@ public class KriDefinitionService {
         String prefix = "KRI-" + safeCat;
         for (int i = 0; i < 20; i++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("%s-%03d", prefix, seq);
+            String candidate = String.format(Locale.ROOT, "%s-%03d", prefix, seq);
             if (defRepo.countByOrganisationIdAndKriCode(orgId, candidate) == 0) {
                 return candidate;
             }

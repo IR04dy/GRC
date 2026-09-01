@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -214,7 +215,7 @@ public class RiskReviewService {
     }
 
     private static String riskCode(Long id) {
-        return id == null ? "RISK-0000" : "RISK-" + String.format("%04d", id);
+        return id == null ? "RISK-0000" : "RISK-" + String.format(Locale.ROOT, "%04d", id);
     }
 
     private static Map<String, Object> reassessPayload(Risk r, String decision) {

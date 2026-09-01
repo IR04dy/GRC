@@ -28,6 +28,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -380,7 +381,7 @@ public class IaEngagementService {
         // Count engagements for any plan in this cycle (good enough — code
         // is unique per org so a numeric sequence is fine).
         long n = engagementRepo.findByOrganisationIdAndIsDeletedFalseOrderByEngagementCodeAsc(orgId).size();
-        return String.format("ENG-%d-%03d", cycleYear, n + 1);
+        return String.format(Locale.ROOT, "ENG-%d-%03d", cycleYear, n + 1);
     }
 
     EngagementResponse toResponse(IaEngagement e, Long orgId) {

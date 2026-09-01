@@ -2,6 +2,7 @@ package com.tss.grc.module.risk.dto;
 
 import com.tss.grc.module.risk.entity.Risk;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,7 +23,7 @@ public final class RiskReportDtos {
 
         public static TopRiskRow from(Risk r) {
             return new TopRiskRow(
-                    r.getId(), "RISK-" + String.format("%04d", r.getId()),
+                    r.getId(), "RISK-" + String.format(Locale.ROOT, "%04d", r.getId()),
                     r.getTitleEn(), r.getTitleAr(), r.getStatus(), r.getRiskLevel(),
                     r.getResidualScore(), r.getInherentScore(), r.getOwnerId(), r.getCategoryId());
         }

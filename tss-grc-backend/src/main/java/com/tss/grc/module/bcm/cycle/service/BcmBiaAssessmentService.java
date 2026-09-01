@@ -398,6 +398,6 @@ public class BcmBiaAssessmentService {
         Long org = TenantContext.getCurrentTenant();
         int year = Year.now().getValue();
         long count = repo.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
-        return String.format("BIA-%d-%06d", year, count + 1);
+        return String.format(Locale.ROOT, "BIA-%d-%06d", year, count + 1);
     }
 }

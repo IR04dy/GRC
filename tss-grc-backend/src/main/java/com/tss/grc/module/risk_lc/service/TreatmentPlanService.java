@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -224,7 +225,7 @@ public class TreatmentPlanService {
         int year = LocalDateTime.now().getYear();
         Integer maxSeq = repo.findMaxExternalIdSeq(orgId, "TP-" + year + "-%");
         long next = (maxSeq == null ? 0 : maxSeq) + 1;
-        return String.format("TP-%d-%03d", year, next);
+        return String.format(Locale.ROOT, "TP-%d-%03d", year, next);
     }
 
     /**

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -84,7 +85,7 @@ public class StubCrowdStrikeClient implements CrowdStrikeClient {
             long s = seq.incrementAndGet();
             String hostId = "aid-" + FAKE_HOSTS[(int) ((s - 1) % FAKE_HOSTS.length)];
             int sev = FAKE_SEVERITIES[(int) ((s - 1) % FAKE_SEVERITIES.length)];
-            String detectionId = String.format("ldt:%s:%d", hostId, s);
+            String detectionId = String.format(Locale.ROOT, "ldt:%s:%d", hostId, s);
             if (emitted.contains(detectionId)) {
                 continue; // stub-side dedupe — never re-emit
             }

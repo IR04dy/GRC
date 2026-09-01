@@ -39,6 +39,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -607,7 +608,7 @@ public class ObService {
             next = Integer.parseInt(ref.substring(ref.lastIndexOf('-') + 1)) + 1;
         }
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = prefix + String.format("%03d", seq);
+            String candidate = prefix + String.format(Locale.ROOT, "%03d", seq);
             if (!incidentRepo.existsByOrganisationIdAndReference(org, candidate)) {
                 return candidate;
             }

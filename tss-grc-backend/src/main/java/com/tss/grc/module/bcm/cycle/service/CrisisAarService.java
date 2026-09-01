@@ -316,9 +316,9 @@ public class CrisisAarService {
      */
     private String nextReportCode(Long orgId) {
         int year = LocalDateTime.now().getYear();
-        String prefix = String.format("AAR-%d-", year);
+        String prefix = String.format(Locale.ROOT, "AAR-%d-", year);
         long n = aars.countByOrganisationIdAndReportCodeStartingWith(orgId, prefix) + 1;
-        String candidate = String.format("%s%06d", prefix, n);
+        String candidate = String.format(Locale.ROOT, "%s%06d", prefix, n);
         // Tiny race-tolerance loop: if the candidate collides (because two
         // concurrent generators picked the same N) bump and try again.
         // Bounded at +5 attempts so we never spin.
@@ -327,7 +327,7 @@ public class CrisisAarService {
                 return candidate;
             }
             n++;
-            candidate = String.format("%s%06d", prefix, n);
+            candidate = String.format(Locale.ROOT, "%s%06d", prefix, n);
         }
         return candidate;
     }

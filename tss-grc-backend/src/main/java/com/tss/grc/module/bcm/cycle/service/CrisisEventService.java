@@ -705,7 +705,7 @@ public class CrisisEventService {
         Long org = TenantContext.getCurrentTenant();
         int year = Year.now().getValue();
         long count = events.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
-        return String.format("CRIS-%d-%06d", year, count + 1);
+        return String.format(Locale.ROOT, "CRIS-%d-%06d", year, count + 1);
     }
 
     /**

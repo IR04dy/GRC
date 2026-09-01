@@ -46,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -499,7 +500,7 @@ public class WorkflowRequestService {
         requestRepo.save(r);
         if (bridgedEvidenceId != null)
             appendEvent(r, "EVIDENCE_BRIDGED", "DRAFT", "SENT",
-                "Opened evidence request REQ-" + String.format("%05d", bridgedEvidenceId)
+                "Opened evidence request REQ-" + String.format(Locale.ROOT, "%05d", bridgedEvidenceId)
                     + " in the evidence subsystem");
         appendEvent(r, "SENT", "DRAFT", "SENT", "Request sent to recipients");
         audit.log("WORKFLOW_REQUEST_SENT", "WorkflowRequest", r.getId(), code(r) + " · " + r.getTitleEn());
@@ -1654,7 +1655,7 @@ public class WorkflowRequestService {
         return note == null || note.isBlank() ? "" : " — " + note;
     }
 
-    private static String code(WorkflowRequest r) { return "WR-" + String.format("%05d", r.getId()); }
+    private static String code(WorkflowRequest r) { return "WR-" + String.format(Locale.ROOT, "%05d", r.getId()); }
 
     private RequestResponse toResponseShallow(WorkflowRequest r) { return toResponse(r, false); }
 

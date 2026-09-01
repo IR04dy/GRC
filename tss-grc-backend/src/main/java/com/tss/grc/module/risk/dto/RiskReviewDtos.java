@@ -3,6 +3,7 @@ package com.tss.grc.module.risk.dto;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskReview;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -78,7 +79,7 @@ public final class RiskReviewDtos {
             long days = r.getReviewDate() == null ? 0
                     : Math.max(0, ChronoUnit.DAYS.between(r.getReviewDate(), today));
             return new OverdueRow(
-                    r.getId(), "RISK-" + String.format("%04d", r.getId()),
+                    r.getId(), "RISK-" + String.format(Locale.ROOT, "%04d", r.getId()),
                     r.getTitleEn(), r.getTitleAr(), r.getStatus(), r.getRiskLevel(),
                     r.getResidualScore(), r.getReviewDate(), r.getReviewStatus(), days);
         }

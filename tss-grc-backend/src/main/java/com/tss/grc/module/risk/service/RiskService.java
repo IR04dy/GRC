@@ -17,6 +17,7 @@ import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -385,7 +386,7 @@ public class RiskService {
         String ownerFullNameEn = owner != null ? owner.getFullNameEn() : null;
         String ownerUsername = owner != null ? owner.getUsername() : null;
 
-        String riskCode = "RISK-" + String.format("%04d", r.getId());
+        String riskCode = "RISK-" + String.format(Locale.ROOT, "%04d", r.getId());
 
         return new RiskResponse(
             r.getId(), r.getExternalId(),
@@ -432,7 +433,7 @@ public class RiskService {
 
     /** Match the human-readable code shape used in {@link #toResponse}. */
     private static String riskCodeFor(Long id) {
-        return id == null ? "RISK-0000" : "RISK-" + String.format("%04d", id);
+        return id == null ? "RISK-0000" : "RISK-" + String.format(Locale.ROOT, "%04d", id);
     }
 
     private static String safe(String v) { return v == null ? "" : v; }

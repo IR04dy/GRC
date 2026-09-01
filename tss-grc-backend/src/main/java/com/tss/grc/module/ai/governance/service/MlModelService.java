@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -335,7 +336,7 @@ public class MlModelService {
         int year = Year.now().getValue();
         for (int attempt = 0; attempt < 10; attempt++) {
             int seq = 1 + (int) (Math.random() * 899);
-            String candidate = String.format("MODEL-%d-%03d", year, seq);
+            String candidate = String.format(Locale.ROOT, "MODEL-%d-%03d", year, seq);
             if (repo.countByOrganisationIdAndModelCode(orgId, candidate) == 0) {
                 return candidate;
             }

@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -79,7 +80,7 @@ public class CyberPdplBridgeService {
         Long id          = ((Number) row[0]).longValue();
         String title     = (String) row[1];
         Long existingFk  = row[2] == null ? null : ((Number) row[2]).longValue();
-        String incNumber = "INC-" + String.format("%05d", id);
+        String incNumber = "INC-" + String.format(Locale.ROOT, "%05d", id);
 
         if (existingFk != null) {
             // Already linked — record SKIPPED and return.

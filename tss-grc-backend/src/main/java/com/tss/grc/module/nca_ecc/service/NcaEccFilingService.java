@@ -97,7 +97,7 @@ public class NcaEccFilingService {
         // most one filing per year and the suffix can never collide. Checked against sys.indexes
         // rather than assumed — the identical shape WOULD be F2-48's collision bug on any table
         // without that constraint.
-        f.setExternalId(String.format("NCA-%d-001", req.getFiscalYear()));
+        f.setExternalId(String.format(Locale.ROOT, "NCA-%d-001", req.getFiscalYear()));
         f.setOrganisationId(orgId);
         f.setFiscalYear(req.getFiscalYear());
         f.setFrameworkVersion(req.getFrameworkVersion() != null ? req.getFrameworkVersion() : "ECC-2:2024");

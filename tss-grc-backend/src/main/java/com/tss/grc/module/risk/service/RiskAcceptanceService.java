@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,7 +46,7 @@ public class RiskAcceptanceService {
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
-    private static String code(Long riskId) { return "RISK-" + String.format("%04d", riskId); }
+    private static String code(Long riskId) { return "RISK-" + String.format(Locale.ROOT, "%04d", riskId); }
 
     @Transactional(readOnly = true)
     public List<RiskAcceptance> listForRisk(Long riskId) {

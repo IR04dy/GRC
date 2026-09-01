@@ -658,6 +658,6 @@ public class BcpPlanService {
         String prefix = "BCP".equals(planType) ? "BCP" : "DRP";
         // Cheap deterministic counter via current page-1 total
         long count = plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
-        return String.format("%s-%d-%06d", prefix, year, count + 1);
+        return String.format(Locale.ROOT, "%s-%d-%06d", prefix, year, count + 1);
     }
 }

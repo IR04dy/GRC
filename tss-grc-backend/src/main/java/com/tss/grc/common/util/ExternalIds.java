@@ -1,5 +1,6 @@
 package com.tss.grc.common.util;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -46,7 +47,7 @@ public final class ExternalIds {
      * @return an id of the form {@code PREFIX-2026-19FA8B4BF3C616E} (prefix, year, ms-hex, random)
      */
     public static String generate(String prefix) {
-        return String.format("%s-%d-%s%04X",
+        return String.format(Locale.ROOT, "%s-%d-%s%04X",
             prefix,
             LocalDateTime.now().getYear(),
             Long.toHexString(System.currentTimeMillis()).toUpperCase(),

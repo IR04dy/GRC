@@ -14,6 +14,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -165,5 +166,5 @@ public class WorkflowEvidenceBridge {
         catch (NumberFormatException e) { return null; }
     }
 
-    private static String code(WorkflowRequest r) { return "WR-" + String.format("%05d", r.getId()); }
+    private static String code(WorkflowRequest r) { return "WR-" + String.format(Locale.ROOT, "%05d", r.getId()); }
 }

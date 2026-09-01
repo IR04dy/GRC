@@ -32,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -610,12 +611,12 @@ public class ComplaintService {
         }
         // Avoid collisions if multiple writers race; loop is cheap.
         for (int seq = next; seq < next + 1000; seq++) {
-            String candidate = String.format("CMP-%d-%06d", year, seq);
+            String candidate = String.format(Locale.ROOT, "CMP-%d-%06d", year, seq);
             if (!complaintRepo.existsByComplaintNo(candidate)) {
                 return candidate;
             }
         }
-        return String.format("CMP-%d-%06d-%s", year, next,
+        return String.format(Locale.ROOT, "CMP-%d-%06d-%s", year, next,
                 UUID.randomUUID().toString().substring(0, 6));
     }
 

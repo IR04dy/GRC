@@ -52,6 +52,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -148,7 +149,7 @@ public class ExportService {
                 for (String h : hdr) headerCell(t, h);
                 for (Risk r : risks) {
                     String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
-                    cell(t, "R-" + String.format("%05d", r.getId()));
+                    cell(t, "R-" + String.format(Locale.ROOT, "%05d", r.getId()));
                     cell(t, safe(name));
                     cell(t, "");
                     cell(t, String.valueOf(r.getInherentLikelihood()));
@@ -1384,7 +1385,7 @@ public class ExportService {
             int rowIdx = 1;
             for (Risk r : risks) {
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue("R-" + String.format("%05d", r.getId()));
+                row.createCell(0).setCellValue("R-" + String.format(Locale.ROOT, "%05d", r.getId()));
                 Cell t1 = row.createCell(1); t1.setCellValue(safe(r.getTitleEn())); t1.setCellStyle(wrapStyle);
                 Cell t2 = row.createCell(2); t2.setCellValue(safe(r.getTitleAr())); t2.setCellStyle(wrapStyle);
                 row.createCell(3).setCellValue(safe(r.getStatus()));
