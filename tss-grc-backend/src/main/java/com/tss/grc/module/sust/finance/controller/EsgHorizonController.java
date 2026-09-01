@@ -23,6 +23,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +47,13 @@ import java.util.Map;
 @RequestMapping("/api/v1/sustainability/horizon")
 @RequiredArgsConstructor
 @RequireModule("ESG")
+// F2-414: @Validated is what makes the @Min/@Max on permitSweep's leadDays parameter run at
+// all. Spring enforces a constraint on a METHOD PARAMETER through MethodValidationPostProcessor,
+// which only advises classes carrying this annotation — so without it the bounds were inert and
+// a caller could sweep an arbitrary window, raising a premature NCEC renewal CAPA for every
+// permit in the register. TenableController is the model: it has carried @Validated since its
+// @Pattern path variables were written.
+@Validated
 @Tag(name = "Sustainability — Regulatory horizon (targets / IFRS / NCEC / CBAM)")
 public class EsgHorizonController {
 

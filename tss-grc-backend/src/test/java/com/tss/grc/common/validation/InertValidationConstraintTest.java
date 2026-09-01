@@ -495,6 +495,107 @@ class InertValidationConstraintTest {
             %s""".formatted(String.join("\n", gaps.stream().sorted().toList()))).isEmpty();
     }
 
+    /**
+     * F2-414 — <b>the fourth carrier of the same question, and the one where the annotation is
+     * inert unless the CLASS opts in.</b>
+     *
+     * <p>A constraint on a method <b>parameter</b> is not enforced by the bean-validation provider
+     * on its own: Spring runs it through {@code MethodValidationPostProcessor}, which advises only
+     * classes annotated {@code @Validated}. So {@code @RequestParam @Min(1) @Max(365) int leadDays}
+     * on a class without {@code @Validated} accepts <b>any</b> int — no error, no log, the bounds
+     * visibly present. [[F2-184]]'s decoy shape at a parameter.
+     *
+     * <p>The defect: {@code EsgHorizonController.permitSweep} bounded {@code leadDays} to 1..365 and
+     * the class carried no {@code @Validated}, so the NCEC environmental-permit expiry sweep could be
+     * driven over an arbitrary window — raising a premature {@code HIGH} renewal CAPA for every
+     * permit in the register, whatever its expiry. Bounded rather than unbounded only because the
+     * sweep dedups on {@code sourceRef}, so a repeat call adds nothing; the first call is the one
+     * that files the CAPAs.
+     *
+     * <p>🔑 The population is <b>four parameters</b> and <b>three were already right</b>: all three
+     * live on {@code TenableController}, the one class in the platform that carries
+     * {@code @Validated}. A lone outlier out of four is the [[F2-205]] / [[F2-282]] tell, and the
+     * mechanism being visibly present on a sibling is [[F2-215]]'s two-of-N.
+     *
+     * <p>⚠⚠ This leg matters more than its population suggests, because [[F2-393]] <b>filed</b>
+     * <i>"add {@code @Min(0)} to the page parameter"</i> as a follow-up after a negative page index
+     * crashed a manual {@code subList}. Applied naively that filed remedy ships another inert
+     * annotation — and an inert bound on a paging parameter reads exactly like a fixed one. The gate
+     * is what turns that into a build failure.
+     *
+     * <p><b>Hard zero, no exemption map.</b> Either the constraint is meant to run — add
+     * {@code @Validated} to the class or the method — or it is not, in which case it should be
+     * deleted rather than left answering a reader's question ([[F2-214]]: there is no correct code
+     * for this leg to fail on). ⚙ Activating it is safe here for a measured reason:
+     * {@code GlobalExceptionHandler.handleConstraint} already maps an unwrapped
+     * {@code ConstraintViolationException} to a <b>400</b> whose {@code errors} map is keyed by
+     * property path, so a violation names the parameter rather than surfacing as a 500.
+     *
+     * <p>⚙ Constructors are excluded deliberately, and not as a convenience: a record's canonical
+     * constructor carries its components' constraints, and those are enforced by the cascade when the
+     * record is validated as a body — nothing to do with {@code @Validated}. Counting them would
+     * report every constrained request DTO in the platform as a defect, which is the opposite of
+     * this leg's claim.
+     */
+    @Test
+    void everyParameterConstraintSitsOnAClassSpringMethodValidates() throws Exception {
+        List<String> inert = new ArrayList<>();
+        int parameters = 0;
+        int constrainedParameters = 0;
+        int validatedClasses = 0;
+
+        for (Class<?> c : allTypesUnder(BASE)) {
+            boolean classOptsIn = c.isAnnotationPresent(Validated.class);
+            if (classOptsIn) validatedClasses++;
+            for (Method m : declaredMethodsOf(c)) {
+                boolean enforced = classOptsIn || m.isAnnotationPresent(Validated.class);
+                for (Parameter p : m.getParameters()) {
+                    parameters++;
+                    if (!hasConstraint(p)) continue;
+                    constrainedParameters++;
+                    if (enforced) continue;
+                    inert.add("%s#%s(%s %s)".formatted(
+                            c.getName().replace("com.tss.grc.", ""), m.getName(),
+                            p.getType().getSimpleName(), p.getName()));
+                }
+            }
+        }
+
+        // Floors above the largest WRONG answer, which for a scan that resolves nothing is zero
+        // (F2-215). The constrained count is deliberately tight: it is the whole population, so a
+        // detector that stops reading parameter annotations fails here rather than reporting clean.
+        assertThat(parameters)
+                .as("almost no method parameters were examined, so the emptiness below means nothing")
+                .isGreaterThan(3_000);
+        assertThat(constrainedParameters)
+                .as("no CONSTRAINED parameter was found at all, so this leg cannot fire — a detector "
+                    + "that cannot match reads exactly like a clean tree (F2-235)")
+                .isGreaterThanOrEqualTo(4);
+        // ⚠ Deliberately >= 1, not >= 2. After the fix there are exactly two @Validated classes, so
+        // a floor of 2 would fail the moment either loses the annotation — which is what the inert
+        // list below already says, more precisely. An anti-vacuity floor must assert that the
+        // DETECTOR works, never re-assert the fix: at 1 the classOptsIn branch is still exercised.
+        assertThat(validatedClasses)
+                .as("no @Validated class was found, so the enforcement side of the check is dead "
+                    + "and every parameter would read as inert")
+                .isGreaterThanOrEqualTo(1);
+
+        assertThat(inert.stream().sorted().toList()).as("""
+            A bean-validation constraint on a method PARAMETER is enforced by Spring's
+            MethodValidationPostProcessor, which advises only classes annotated @Validated. Without
+            it the constraint is INERT — the value is accepted and the annotation answers the
+            question a reader was about to ask (F2-184).
+
+            Add @Validated to the declaring class (TenableController is the model), or delete the
+            constraint. Do not add an exemption: there is no correct code for this leg to fail on.
+
+            ⚠ Note for whoever executes F2-393's filed `@Min(0)` on a paging parameter: adding the
+            bound WITHOUT @Validated ships an inert annotation, and an inert bound on a page index
+            reads exactly like a fixed one.
+
+            %s""".formatted(String.join("\n", inert.stream().sorted().toList()))).isEmpty();
+    }
+
     /** The body-bound roots marked for validation — the same derivation the per-type leg uses. */
     private static Set<Class<?>> validatedRoots(Set<Class<?>> all) {
         Set<Class<?>> roots = new LinkedHashSet<>();
