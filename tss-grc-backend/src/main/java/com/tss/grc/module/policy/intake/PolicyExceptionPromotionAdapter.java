@@ -3,6 +3,7 @@ package com.tss.grc.module.policy.intake;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.intake.spi.IntakePromotionContext;
 import com.tss.grc.module.intake.spi.RegisterPromotionPort;
+import com.tss.grc.module.policy.PolicyVersions;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
@@ -12,9 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * {@code POLICY_EXCEPTION} → {@code policy.policy_exception} — F2-172.
@@ -74,16 +73,19 @@ public class PolicyExceptionPromotionAdapter implements RegisterPromotionPort {
             .filter(p -> p.getPolicyCode() != null
                 && p.getPolicyCode().trim().equalsIgnoreCase(code.trim()))
             // Newest version of that code — an exception is raised against what is in force.
-            .max(Comparator.comparing(p -> nullSafe(p.getVersion())))
+            //
+            // ⚠⚠ F2-419 — this was `Comparator.comparing(p -> nullSafe(p.getVersion()))`, a
+            // LEXICAL sort key, so "1.9" beat "1.10" and "9.0" beat "10.0" and the exception was
+            // hung off a SUPERSEDED version of the policy it excepts. PM-H2 had already swept the
+            // module's other three latest-version picks onto a numeric comparison, and F2-401 had
+            // hardened that into a total order; neither reached this adapter, which was added
+            // later in a sibling package. PolicyVersions is now the module's only answer.
+            .max(PolicyVersions.LATEST)
             .map(PolicyDocument::getId)
             .orElseThrow(() -> new IllegalStateException(
                 "Policy-exception request " + ctx.referenceCode() + " cites policy '" + code
                 + "', which this organisation has no policy document for. An exception must hang "
                 + "off the policy it excepts. Register the policy first, or correct the code."));
-    }
-
-    private static String nullSafe(String s) {
-        return s == null ? "" : s.toLowerCase(Locale.ROOT);
     }
 
     private LocalDate sunset(IntakePromotionContext ctx) {
