@@ -66,12 +66,8 @@ public class UserService {
      */
     @Transactional
     public UserResponse createIn(Long orgId, UserRequest req) {
-        if (userRepository.existsByUsernameAndOrganisationId(req.username(), orgId)) {
-            throw new IllegalArgumentException("Username already exists: " + req.username());
-        }
-        if (userRepository.existsByEmailAndOrganisationId(req.email(), orgId)) {
-            throw new IllegalArgumentException("Email already exists: " + req.email());
-        }
+        requireUsernameAvailable(req.username());
+        requireEmailAvailable(req.email(), null);
         User user = new User();
         user.setOrganisationId(orgId);
         user.setUsername(req.username());
@@ -92,6 +88,7 @@ public class UserService {
         User user = userRepository.findById(id)
             .filter(u -> u.getOrganisationId().equals(orgId))
             .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+        requireEmailAvailable(req.email(), user.getId());
         user.setEmail(req.email());
         user.setFullNameEn(req.fullNameEn());
         user.setFullNameAr(req.fullNameAr());
@@ -131,6 +128,52 @@ public class UserService {
             .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
         user.setIsDeleted(true);
         userRepository.save(user);
+    }
+
+    /**
+     * Refuse a username the platform's own unique index would refuse — F2-418.
+     *
+     * <p>The guard this replaced asked whether the username was taken <em>in the caller's
+     * organisation, among rows that are not soft-deleted</em>. {@code ix_users_username} is global
+     * and unfiltered (V227 documents both as deliberate: login resolves a user by username with no
+     * tenant context), so the guard passed for exactly the rows the index rejects and the caller
+     * got a bare 409 instead of a 400 naming the field.
+     *
+     * <p>⚠ Two reachable cases, and the second is the provisioning path. A username held by a
+     * <b>soft-deleted</b> user — {@link #delete(Long)} is a soft delete — and a username held in
+     * <b>another organisation</b>. {@link com.tss.grc.module.iam.onboarding.service.TenantOnboardingService}
+     * creates a new tenant's first administrator inside the onboarding transaction, so a collision
+     * there discarded the organisation, its licences and its administrator — while telling the
+     * operator the username must be unique within an organisation that had no users at all.
+     *
+     * <p>On disclosure: the refusal says the username is unavailable, which is observable from the
+     * index's own 409 today and is inherent to a globally-unique username space. It says nothing
+     * about <em>which</em> organisation holds it or anything about that user, which is the line
+     * {@code CommitteeMemberRegistryService#requireUserInTenant} draws for the same reason.
+     */
+    private void requireUsernameAvailable(String username) {
+        if (userRepository.countByUsernameIncludingDeleted(username) > 0) {
+            throw new IllegalArgumentException(
+                "Username already in use: " + username
+                + " — usernames are unique across the whole platform, not per organisation, "
+                + "because login resolves a user by username with no tenant context.");
+        }
+    }
+
+    /**
+     * Email counterpart of {@link #requireUsernameAvailable}. {@code excludeUserId} is the row
+     * being edited, so a user keeping their own address does not collide with themselves; pass
+     * {@code null} on a create.
+     */
+    private void requireEmailAvailable(String email, Long excludeUserId) {
+        long held = (excludeUserId == null)
+            ? userRepository.countByEmailIncludingDeleted(email)
+            : userRepository.countByEmailIncludingDeletedExcludingId(email, excludeUserId);
+        if (held > 0) {
+            throw new IllegalArgumentException(
+                "Email already in use: " + email
+                + " — email addresses are unique across the whole platform, not per organisation.");
+        }
     }
 
     private void assignRolesByNameOrId(User user, Set<String> roleNames, Set<Long> roleIds) {

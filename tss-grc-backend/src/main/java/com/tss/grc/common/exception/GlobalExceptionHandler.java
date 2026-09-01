@@ -618,8 +618,28 @@ public class GlobalExceptionHandler {
             case 2627, 2601 -> {                     // UNIQUE KEY / unique index violation
                 kind = "UNIQUE";
                 status = HttpStatus.CONFLICT;
+                // ⚠⚠ F2-418 — this used to end "must be unique within your organisation", and that
+                // clause was unconditional. Measured over the packaged migration chain: of the 260
+                // unique guarantees that sit on a table an @Entity maps, 48 omit organisation_id
+                // altogether, so for 18% of the population the sentence is false by construction.
+                //
+                // The sharpest is iam.users. V227 creates ix_users_username / ix_users_email GLOBAL
+                // and says why — "login authenticates by username with no tenant context" — so a
+                // tenant admin creating a user whose name is taken in ANOTHER organisation was told
+                // to check the one thing that was already true, and the fact that would have
+                // explained the refusal was the one the sentence denied. Worst on the provisioning
+                // path: onboarding a second tenant whose administrator is named `admin` — the
+                // username this platform's own docs use — reported it as non-unique within an
+                // organisation that had zero users, and rolled the whole onboarding back.
+                //
+                // 🔑 F2-180's rule, one `case` label up in this same switch: a diagnostic that is
+                // wrong in a specific, plausible direction is worse than a vague one — it does not
+                // slow the reader down, it sends them somewhere. Scope is not derivable from the
+                // exception (the driver names the constraint, not its key columns), so the honest
+                // move is to stop asserting it; `constraint` is already on the response for support.
                 detail = "A record with these values already exists. One of the fields you supplied "
-                       + "must be unique within your organisation — change it and try again.";
+                       + "must be unique — change it and try again. That uniqueness is scoped "
+                       + "per field: some fields are per-organisation, some are platform-wide.";
             }
             case 547 -> {
                 // ⚠⚠ F2-180 — SQL Server error 547 is BOTH "FOREIGN KEY" and "CHECK", and this arm

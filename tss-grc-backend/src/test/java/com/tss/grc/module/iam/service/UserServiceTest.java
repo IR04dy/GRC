@@ -36,7 +36,13 @@ import static org.mockito.Mockito.when;
  * Locks the IAM tenant-scoping invariants:
  *   - All reads/writes filter by organisationId from TenantContext.
  *   - Cross-tenant lookups surface as EntityNotFoundException, never leak data.
- *   - Username/email uniqueness checked per-org (not global).
+ *   - Username/email uniqueness checked GLOBALLY, including soft-deleted rows — F2-418.
+ *     This line used to read "checked per-org (not global)" and was one of the two artefacts
+ *     that disagreed about the same index. V227 creates ix_users_username / ix_users_email
+ *     with a key of username / email ALONE and no filter, and says why: login resolves a user
+ *     by username with no tenant context. The guard followed this comment rather than the
+ *     migration, so it answered "available" for a username held in another organisation or by
+ *     a soft-deleted user — exactly the rows the index rejects.
  *   - Passwords always hashed via PasswordEncoder; never stored verbatim.
  *   - Role assignment honors role names first (UI), falls back to roleIds (legacy).
  *   - Soft delete sets isDeleted=true and saves; never calls deleteById.
@@ -119,8 +125,8 @@ class UserServiceTest {
 
     @Test
     void create_hashes_password_and_stamps_org() {
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
-        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(0L);
+        when(userRepository.countByEmailIncludingDeleted("alice@tss.example")).thenReturn(0L);
         when(passwordEncoder.encode("Sup3rSecret!")).thenReturn("$2a$10$new-hash");
         when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID))
             .thenReturn(List.of(role(7L, "RISK_MANAGER", ORG_ID)));
@@ -149,8 +155,8 @@ class UserServiceTest {
     void create_withInactiveRole_isRefused_byName() {
         Role dormant = role(7L, "RISK_MANAGER", ORG_ID);
         dormant.setIsActive(false);
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
-        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(0L);
+        when(userRepository.countByEmailIncludingDeleted("alice@tss.example")).thenReturn(0L);
         when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID)).thenReturn(List.of(dormant));
 
         assertThatThrownBy(() -> service.create(createReq()))
@@ -169,8 +175,8 @@ class UserServiceTest {
         UserRequest byId = new UserRequest(
             "alice", "alice@tss.example", "Sup3rSecret!", "Alice Example", "أليس",
             "Engineer", null, true, null, Set.of(7L));
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
-        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(0L);
+        when(userRepository.countByEmailIncludingDeleted("alice@tss.example")).thenReturn(0L);
         when(roleRepository.findAllById(Set.of(7L))).thenReturn(List.of(dormant));
 
         assertThatThrownBy(() -> service.create(byId))
@@ -193,24 +199,27 @@ class UserServiceTest {
     }
 
     @Test
-    void create_duplicate_username_in_same_org_throws() {
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(true);
+    void create_refusesAUsernameHeldAnywhereOnThePlatform() {
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(createReq()))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Username already exists");
+            .hasMessageContaining("Username already in use")
+            .as("the refusal must say where the uniqueness actually applies — the old message "
+              + "left the caller checking their own organisation, which was already clean")
+            .hasMessageContaining("across the whole platform");
 
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    void create_duplicate_email_in_same_org_throws() {
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
-        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(true);
+    void create_refusesAnEmailHeldAnywhereOnThePlatform() {
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(0L);
+        when(userRepository.countByEmailIncludingDeleted("alice@tss.example")).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(createReq()))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Email already exists");
+            .hasMessageContaining("Email already in use");
 
         verify(userRepository, never()).save(any());
     }
@@ -222,8 +231,8 @@ class UserServiceTest {
             null, null,                       // both isActive + enabled null
             Set.of("RISK_MANAGER"), null
         );
-        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
-        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(0L);
+        when(userRepository.countByEmailIncludingDeleted("alice@tss.example")).thenReturn(0L);
         when(passwordEncoder.encode("Sup3rSecret!")).thenReturn("$2a$10$h");
         when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID))
             .thenReturn(List.of(role(7L, "RISK_MANAGER", ORG_ID)));
@@ -341,5 +350,86 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> service.delete(USER_ID))
             .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ─── F2-418: the guard asks the question the index enforces ──────────────
+
+    /**
+     * The soft-delete axis. {@link UserService#delete(Long)} is a soft delete and
+     * {@code ix_users_username} is unfiltered, so the username stays taken — while the guard that
+     * stood here was a derived finder and therefore could not see the row at all.
+     *
+     * <p>The count is stubbed on the NATIVE finder specifically: a mocked repository has no
+     * {@code @Where} and no index, so what this can assert is which question the service asks
+     * (F2-374's reason for a structural gate alongside).
+     */
+    @Test
+    void create_refusesAUsernameHeldByASoftDeletedUser() {
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.create(createReq()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Username already in use");
+
+        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).countByEmailIncludingDeleted(any());
+    }
+
+    /**
+     * The tenant axis, on the provisioning path. {@code createIn} is what
+     * {@code TenantOnboardingService} calls to create a new tenant's first administrator, and the
+     * organisation it creates them in has no users at all — so the tenant-scoped guard was
+     * <em>always</em> satisfied there and the global index was the only thing that refused,
+     * rolling the whole onboarding back.
+     */
+    @Test
+    void createIn_refusesAUsernameHeldByAnotherOrganisation() {
+        when(userRepository.countByUsernameIncludingDeleted("alice")).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.createIn(OTHER_ORG, createReq()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .as("the count is org-agnostic on purpose: asking about OTHER_ORG's own rows would "
+              + "answer 'available' for a username org 1 holds")
+            .hasMessageContaining("across the whole platform");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    /**
+     * The update path had NO uniqueness guard at all, so changing a user's email to one held
+     * anywhere was a bare 409. It must now refuse — and the count must EXCLUDE the row being
+     * edited, or a user keeping their own address collides with themselves.
+     */
+    @Test
+    void update_refusesAnEmailHeldByAnotherRowAndExcludesItsOwn() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(USER_ID, ORG_ID)));
+        when(userRepository.countByEmailIncludingDeletedExcludingId("alice@tss.example", USER_ID))
+            .thenReturn(1L);
+
+        assertThatThrownBy(() -> service.update(USER_ID, createReq()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Email already in use");
+
+        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).countByEmailIncludingDeleted(any());
+    }
+
+    @Test
+    void update_allowsAUserToKeepItsOwnEmail() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(USER_ID, ORG_ID)));
+        when(userRepository.countByEmailIncludingDeletedExcludingId("alice@tss.example", USER_ID))
+            .thenReturn(0L);
+        when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID))
+            .thenReturn(List.of(role(7L, "RISK_MANAGER", ORG_ID)));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.update(USER_ID, createReq());
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail())
+            .as("excluding its own id is what stops the guard refusing an edit that changes "
+              + "nothing about the email")
+            .isEqualTo("alice@tss.example");
     }
 }

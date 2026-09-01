@@ -15219,6 +15219,47 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-418 — a uniqueness guard that asks a narrower question than the index enforces
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code on the provisioning path. Whether a tenant has already collided is a data question this hermetic slice did not measure ([[F2-283]]) |
+| **Source** | a fresh-vein sweep of `@Column(unique = true)` / `@UniqueConstraint` as an inert-declaration candidate ([[F2-184]] at the schema). **That sweep came back CLEAN — 8 of 8 backed by a real constraint in the chain** ([[F2-216]]) — and reading the eight is what surfaced this |
+| **Size** | S — three code edits, one gate, no schema and no migration |
+
+⚠⚠ **A GUARD NARROWER THAN THE INDEX PASSES FOR EXACTLY THE ROWS THE DATABASE IS ABOUT TO REJECT.** `UserService.createIn` refused a duplicate with `existsByUsernameAndOrganisationId(username, orgId)`. That is a *derived* finder, so it runs against the entity and inherits `User`'s `@Where(clause = "is_deleted = 0")`; and it is tenant-scoped. `ix_users_username` is **neither** — V227 creates it GLOBAL and UNFILTERED and states both as deliberate:
+
+> *"login authenticates by username with no tenant context, so the uniqueness here is GLOBAL (username/email unique across the platform), NOT per-organisation"* … *"keeps username/email globally unique even across soft-deleted rows"*
+
+So the guard was narrower on **two axes at once** — the tenant and the soft-delete flag. That is [[F2-374]]'s shape (a `@Where`-filtered finder over a plain unique constraint) with **a second axis**, and the second one is the reachable half.
+
+🔑 **TWO ARTEFACTS STATED OPPOSITE THINGS ABOUT THE SAME INDEX AND NOBODY WAS MAINTAINING THE AGREEMENT** ([[F2-177]]). V227's comment says the scope is global. `UserServiceTest`'s class javadoc listed *"Username/email uniqueness checked per-org (not global)"* among the invariants it locks — and **the guard followed the test.** Its two duplicate tests bake the narrowing into their *names* (`create_duplicate_username_in_same_org_throws`), which is what a reader trusts before the body ([[F2-260]]). Nth instance of a test locking in a defect after [[F2-159]], [[F2-175]], [[F2-227]], [[F2-234]], [[F2-236]], [[F2-243]], [[F2-244]], [[F2-279]] — and the first where the claim is stated as an *invariant* in the artefact a reader consults first.
+
+⚠⚠ **THE PROVISIONING PATH IS THE SHARP CASE, AND IT IS WORSE THAN A BAD MESSAGE.** `TenantOnboardingService` creates the new tenant's first administrator through `createIn`, passing the operator's chosen username. The organisation it creates them in **has no users at all**, so the tenant-scoped guard was *always* satisfied there and the global index was the only thing that refused — and the comment directly below that call records that the whole onboarding is one transaction: *"if any step above rolls back, the claim that a tenant was onboarded rolls back with it."* So onboarding a second tenant whose administrator is named **`admin`** — the username this platform's own `CLAUDE.md` documents — discarded the organisation, its licences and its administrator, and told the operator the username must be unique within an organisation that no longer existed and had never had a user.
+
+⚠ **The index is NOT the half that is wrong, and the gate must not be read as saying so.** V227's reason holds: `UserRepository.findByUsername` takes no tenant, so login *requires* global uniqueness. What changed is the guard — and the load-bearing gate leg pins the two together, so a migration that later tenant-scopes or filters either index fails the build and forces the guard to be revisited with it ([[F2-299]]).
+
+⚙ **The fix, three edits and no schema:**
+
+- **`UserRepository`** — the two tenant-scoped `existsBy…AndOrganisationId` finders (exactly **one** production caller each, so deleting them is free) become three **native**, deleted-inclusive, org-agnostic counts that mirror the indexes exactly. ⚠ Native is not a style choice: a derived finder inherits `@Where`, which applies to entity queries **only**, so the very row the index counts is the row it cannot see. And **no `COLLATE`** — the predicate is on the column, so it compares under the column's own collation, which is the collation the unique index compares under; guard and index therefore agree about case **by construction** rather than by coincidence ([[F2-179]]).
+- **`UserService`** — one helper per field, called by `createIn` and by `update`. ⚠ **`update` had no uniqueness guard at all** and writes `email` unconditionally, so it is the same defect at its limit; its count **excludes the row being edited**, or a user keeping their own address collides with themselves.
+- **`GlobalExceptionHandler`** — the 2601/2627 arm stops asserting the uniqueness is *"within your organisation"*. 🔑 **[[F2-180]]'s rule, one `case` label up in the same `switch`**: *a diagnostic that is wrong in a specific, plausible direction is worse than a vague one — it does not slow the reader down, it sends them somewhere.* [[F2-215]]'s two-of-N at the tightest range this register has recorded it, adjacent arms of one statement.
+
+⚙ **Measured, because a claim about the whole platform needs a number.** Parsing every `CONSTRAINT … UNIQUE`, `CREATE UNIQUE INDEX` and `ALTER TABLE … ADD CONSTRAINT … UNIQUE` out of the packaged chain and pairing each against the entity that maps its table: **284 guarantees, 260 over a mapped table, and 48 of those omit `organisation_id` on a table whose entity declares it.** So the retired clause was false for **18%** of the population by construction. ⚠ **State what the 48 is made of, or the number misleads** ([[F2-273]]): it is dominated by two legitimately-global patterns — a child keyed on its **parent's PK** (`(plan_id, section_key)`, `(target_id, year)`, `(resolution_id, member_name)`), which is transitively tenant-scoped because the parent id is unique platform-wide; and a **globally-unique token or UUID** (`external_id`, `submission_token`, `access_token`, `jti`). The residue after those is small, and `iam.users` is in it.
+
+⚠⚠ **THE FIRST SWEEP MISSED 2 OF 3 BECAUSE IT REQUIRED THE TABLE NAME AND `UNIQUE` ON ONE LINE.** Six of the eight `unique = true` declarations are backed by a `CONSTRAINT … UNIQUE` **inside the `CREATE TABLE` body**, on its own line — so a two-token single-line grep reported them as unenforced. 🔑 **A single-line grep cannot see a multi-line statement, and it fails toward *"the declaration is inert"*, which is the finding you were hoping for.** The honest answer required reading each body.
+
+⚠⚠ **AND THE GATE FIRED ON MY OWN REPLACEMENT MESSAGE.** The first rewrite read *"…some are unique within your organisation and some across the whole platform"* — a sentence that does **not** assert organisation scope, and which nonetheless contains the banned clause verbatim. Two ways out, and only one is honest: loosen the ban so the new wording passes, or reword. 🔑 **Loosening a ban so your own new wording passes is how a gate stops meaning anything** — so the message was reworded (*"some fields are per-organisation, some are platform-wide"*), which is also shorter and clearer, and the ban stays coarse, which is more robust than a clever pattern that has to tell an assertion from a mention.
+
+⚙ **The gate's comment strippers are CHARACTER SCANNERS, not regexes, and that was measured.** `/*[\s\S]*?*/` recurses once per character on the JVM and throws `StackOverflowError` over whole-file input — [[F2-416]] lost an iteration to exactly this and `MeasuredBaselineFreshnessTest` keeps a scanner for the same reason; `GlobalExceptionHandler` is over a thousand lines. A scanner also buys what the regex could not: it **skips string literals**, so the `//` inside this handler's own `URI.create("https://…")` can never open a comment, and the self-test's fixture deliberately puts the banned phrase inside a literal, which must survive.
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — a source read plus a migration read; no DB, no Spring context): new `UniquenessGuardScopeContractTest` (**4**), `UserServiceTest` 18 → **22**, `DataIntegrityErrorContractTest` 10/10 unchanged (its assertions are `contains("already exists")` and `contains("unique")`, both of which survive the rewording — checked, not assumed). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert the three main sources to master and **re-apply only the three repository finders**, unused, so the test file at HEAD still compiles — a control that cannot compile reads exactly like a gate that passed. Result: **leg 2 and leg 3 RED, the six behavioural legs RED**, and 🔑 **leg 1 and the synthetic self-test correctly stay GREEN, which is what proves the revert was surgical** — leg 1 asserts the migration, which this slice never touched ([[F2-225]]: label which legs discriminate).
+
+🔑 **When you find a uniqueness guard, ask what the INDEX enforces rather than what the guard checks — the two can differ on the tenant axis, the soft-delete axis, or both, and every axis where the guard is narrower is a row the database rejects after the guard has said yes.**
+
+---
+
 ## F2-417 — a bare `toUpperCase()` folds against the ambient deployment locale
 
 | | |
