@@ -337,7 +337,12 @@ class LocaleSensitiveFormatContractTest {
      * {@code "grc_refresh=%s; …Path=/api/auth/refresh; …"}, whose {@code //}-free but slash-bearing
      * text a naive scanner could mangle.
      */
-    private static String strip(String src) {
+    // Package-private rather than private since F2-422: UnsortedWindowContractTest
+    // reuses it instead of adding a FOURTH private copy of a character scanner to this
+    // package. Test-to-test helper reuse is the house idiom here (this class already
+    // borrows three helpers from ServerStampedFieldContractTest), and it makes the filed
+    // consolidation into support/ cheaper rather than harder.
+    static String strip(String src) {
         char[] out = src.toCharArray();
         int i = 0;
         int n = out.length;

@@ -118,6 +118,28 @@ class RiskAppetiteServiceTest {
      * APPETITE_BREACHED F8 escalation on an edit that changed nothing. Post-fix
      * (compareTo == 0) the value is unchanged, so no re-evaluation.
      */
+    /**
+     * F2-422 — {@code dashboard()} counts every statement, not the 200 most recent.
+     *
+     * <p>It read {@code Pageable.ofSize(200)}, so {@code total} was the size of a window
+     * and the four severity buckets were counted over it. Creation order is orthogonal to
+     * how many statements exist, which is F2-420's case. {@code dashboard()} had no test
+     * of any kind before this, which is not the same as a path somebody decided was safe
+     * (F2-248).
+     */
+    @Test void dashboard_countsEveryStatementNotTheMostRecentWindow() {
+        RiskAppetiteStatement a = stmt(5L, 8);
+        RiskAppetiteStatement b = stmt(6L, 8);
+        when(repo.findByOrganisationIdOrderByCreatedAtDesc(ORG)).thenReturn(List.of(a, b));
+
+        var out = service.dashboard();
+
+        assertThat(out.get("total")).isEqualTo(2);
+        verify(repo).findByOrganisationIdOrderByCreatedAtDesc(ORG);
+        verify(repo, never()).findByOrganisationIdOrderByCreatedAtDesc(
+            any(Long.class), any(org.springframework.data.domain.Pageable.class));
+    }
+
     @Test void update_sameExposureAtDifferentScale_doesNotReEvaluateBreach() {
         RiskAppetiteStatement s = stmt(5L, 5);           // toleranceUpper = 5 → 7 is EXCEEDED
         s.setCurrentExposure(new BigDecimal("7"));

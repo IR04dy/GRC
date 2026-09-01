@@ -28,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -477,12 +476,15 @@ public class ThreeLinesService {
 
     private List<Risk> openRisksFor(Long orgId) {
         // No "status NOT IN" finder on Risk — pull and filter in memory.
-        // Risk register typically has < a few hundred rows per tenant. We
-        // page through with a generous size so the dashboard sees the whole
-        // open set (the alternative is a native query, but the Page-based
-        // finder already supports tenant scoping and soft-delete).
-        var page = riskRepo.findByOrganisationId(orgId, Pageable.ofSize(1000));
-        return page.getContent().stream()
+        //
+        // F2-422: this read `Pageable.ofSize(1000)` under a comment saying it paged "with a
+        // generous size so the dashboard sees the whole open set" and that "the alternative
+        // is a native query". The first half stated the intent the code did not deliver -- an
+        // unsorted cap keeps whichever 1000 rows the plan yields -- and the second half was
+        // false: openFindingsFor and openCapasFor, the two methods directly below, both use an
+        // UNCAPPED derived finder. The alternative was the idiom already in use three lines
+        // down, so this was the lone outlier of three sibling accessors.
+        return riskRepo.findByOrganisationId(orgId).stream()
             .filter(r -> !RISK_CLOSED_STATUSES.contains(r.getStatus()))
             .toList();
     }

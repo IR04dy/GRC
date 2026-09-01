@@ -14,6 +14,20 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
 
     Page<Incident> findByOrganisationId(Long organisationId, Pageable pageable);
 
+    /**
+     * The same population, UNCAPPED -- F2-422.
+     *
+     * <p>AuditCommitteeDashboardService#incidentSection took this register through
+     * {@code Pageable.ofSize(2000)} and then filtered to the last quarter -- so the window
+     * and the question were selected on unrelated keys.
+     *
+     * <p>Derived, so it inherits {@code Incident}'s {@code @Where(is_deleted = 0)} and agrees
+     * with the paged overload on soft-delete scoping (checked, not assumed). Deliberately NOT
+     * a SQL {@code COUNT} beside the paged fetch: that leaves two populations and re-creates
+     * F2-365's defect. The paged overload stays -- the list endpoints are genuine paged reads.
+     */
+    List<Incident> findByOrganisationId(Long organisationId);
+
     /** CY-B: the canonical register row mirroring a given /cyber workspace incident (if any). */
     Optional<Incident> findByOrganisationIdAndSourceWorkspaceIncidentId(Long organisationId, Long sourceWorkspaceIncidentId);
 
