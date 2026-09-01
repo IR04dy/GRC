@@ -15219,6 +15219,47 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-417 — a bare `toUpperCase()` folds against the ambient deployment locale
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-01 |
+| **Severity** | P2 — live in code, **deployment-latent** ([[F2-283]]): fires on any JVM whose default locale is `tr`, `az` or `lt`. Not measured against a deployed server; the build box is `user.language=en` |
+| **Source** | executing [[F2-416]]'s own filing — which that slice deliberately deferred *because* it interacts with `ClosedVocabulary`'s normalisation contract and every CHECK-constrained column |
+| **Size** | S — one mechanical change at 182 sites, two gate legs. No schema, no migration |
+
+⚠⚠ **THE FILED FIGURE WAS WRONG, AND RE-DERIVING IT FIRST IS THE ONLY REASON THAT IS KNOWN.** [[F2-416]] filed *"87 bare sites against 99 that pass a `Locale`"*. Re-derived with comment-stripping over the same tree: **182 bare / 116 with a `Locale`** — the filing under-counted the bare half by more than half, because its number came from a raw `grep -c` over a differently-scoped population. 🔑 [[F2-221]]'s rule paying immediately, and in the direction that matters: **a filed count that is too small makes the work look smaller than it is.**
+
+⚠⚠ **THE TURKISH-I PROBLEM MEETS A PLATFORM WHOSE VOCABULARIES ARE ALMOST ALL `i`-BEARING.** Under `tr-TR`, `"i".toUpperCase()` is `İ` (U+0130) and `"I".toLowerCase()` is `ı` (U+0131) — measured on this JDK, not assumed. And the closed vocabularies this codebase enforces are `IN_PROGRESS`, `CRITICAL`, `HIGH`, `MITIGATING`, `ACTIVE`, `IDENTIFIED`, `INVESTIGATING`, `PRIVACY`, `EFFECTIVE`. So a bare conversion on a normalisation path produces a value the column's `CHECK` refuses and a case-sensitive `.equals` cannot match: **[[F2-179]]'s entire family, reached by a locale rather than by a careless caller.**
+
+⚙ **33 of the 182 sit on a vocabulary path**, and the sharpest is a governance number rather than a token:
+
+- ⚠⚠ **`RiskExposureService.effectivenessFactor`** maps a control's assessed effectiveness to the mitigation credit it earns. **All three non-default tokens contain an `i`** — `EFFECTIVE`, `INEFFECTIVE`, `NEEDS_IMPROVEMENT` — so under `tr-TR` every one becomes `EFFECTİVE` / `İNEFFECTİVE` / `NEEDS_İMPROVEMENT`, none matches, and **every assessed control falls to `default -> 0.0`, *"no credit until proven"*. Residual risk then equals inherent risk for the whole register.** ⚠ State the direction: that is **pessimistic**, over-stating risk rather than hiding it — the opposite of [[F2-193]] / [[F2-195]] / [[F2-205]] and the same direction as [[F2-210]], which is the less likely of the two to be reported because *"our residual scores look high"* is a plausible thing for an organisation to believe about itself.
+- `IncidentService`'s `category` / `severity` / `status` normalisers — feeding exactly the CHECK-constrained columns [[F2-180]] measured, where 19 of 22 offered categories were already being refused.
+- The severity → SLA ladders in `SocOpsIngestService` and `AppsecFindingService`: a lower-case `critical` would miss the `case "CRITICAL"` arm and take the default window, so a critical finding gets the relaxed remediation deadline.
+- `DetectionRuleService`, which writes the folded value **straight to the column** (`d.setStatus(d.getStatus().toUpperCase())`).
+- 🔑 And **`ExerciseObserverService`, the file CLAUDE.md names as *"the pattern to copy"* for [[F2-179]]** — its `normaliseRole`/`normaliseType`/`normaliseSeverity` do carry `Locale.ROOT`, and `mapSeverity` beside them did not. [[F2-215]]'s two-of-N inside the exemplar itself: a reader who finds three correct normalisers in a file has no reason to ask about the fourth.
+
+⚙ **All 182 were swept rather than the 33, as a HARD ZERO with no exemption map, and the argument is what makes that safe rather than strict.** There is no site where *"whatever locale the server happens to be configured with"* is the answer. A backend case conversion means one of exactly two things: Unicode-default folding for a token, a comparison or a key → `Locale.ROOT`; or folding for a human in a **named** language → that language, passed explicitly. The ambient deployment locale is neither, so there is no correct code for the gate to fail on ([[F2-214]]) and therefore nothing to exempt — the same argument [[F2-413]] used for its hard zero. ⚠ It is also **byte-identical on `en-US` and on `ar`** (Arabic has no case), so the full suite is a complete regression check: the change can only differ on the locales that are currently broken.
+
+⚙ **The gate is a new leg on `LocaleSensitiveFormatContractTest`, not a new class** — the same question ([[F2-416]]'s *"is this locale-sensitive?"*) asked of a different carrier, which is the shape `InertValidationConstraintTest` uses for its four carriers of *"is this constraint enforced?"* ([[F2-190]]: one question, one class, never a second gate).
+
+⚠ **The behavioural leg lives beside the SERVICE, not in the gate, and the compiler settled that.** `effectivenessFactor` is package-private (the [[F2-390]] idiom, where `IncidentService#template` was opened for the same reason), so a test in `com.tss.grc.config` **cannot reach it** — the first attempt failed to compile with *"is not public … cannot be accessed from outside package"*. 🔑 The right answer was not to widen the method to `public` for a test's convenience but to put the behavioural assertion where it belongs: with that service's own tests. The **structural** gate stays in `config`, because its population is the whole main tree.
+
+⚠⚠ **AND MY OWN GATE'S ASSERTION ORDER HID ITS OWN FINDING — F2-414's LESSON, UNAPPLIED BY THE SLICE AFTER IT.** The first draft asserted the anti-vacuity floor `withLocale > 200` **before** the bare-site list. On the pre-fix tree that short-circuited at *"Expecting actual: 116 to be greater than: 200"*, so the control's output read as **the detector changed** rather than as **182 bare sites** — a reader is sent to the instrument instead of to the code. Worse, `withLocale > 200` can only hold *because of* the sweep, so it **re-asserted the fix** rather than asserting the detector, which is verbatim what [[F2-414]] recorded one slice earlier (*"an anti-vacuity floor must assert that the DETECTOR works, never re-assert the fix"*). 🔑 **Put the primary claim first and the floors after it; and where a floor would restate the fix, replace it with a synthetic self-test.** The floor is now `isPositive()` and the detector is asserted over synthetic input in both directions, including that a commented-out `toUpperCase()` does not count.
+
+⚠ **One detector is now shared between the corpus leg and the self-test**, so the two cannot disagree about what a bare conversion is — the failure mode where a synthetic control passes over a shape the corpus scan does not recognise.
+
+⚙ **A file with no import block at all refused the sweep, and that refusal was correct.** `CommitteeSqlGuards` has a `package` line and no imports, so the *"insert before the first `java.` import"* rule had nowhere to anchor and the script raised rather than writing. 🔑 **Fail-before-write ordering ([[F2-247]]) turned an unhandled shape into a stopped run with nine files already committed to disk and none corrupted** — `git checkout` reset them and the widened script (insert after the `package` declaration) re-applied all 182 cleanly. The alternative — special-casing that one file by hand — would have left the next such file to fail the same way.
+
+⚠ **One touched file is pure LF and was left that way.** `CyberDashboardService.java` is `0 CRLF / 139 bare LF` **on master**, so it is one of this tree's LF files rather than something the sweep converted; the script detects per-file endings and preserved it, and its diff is a clean 3-insert / 2-delete. 🔑 **Line endings are a per-file fact in this tree** — normalising it would have produced a spurious 140-line whole-file diff.
+
+**Verification.** Hermetic ([[F2-320]] / [[F2-325]] — a source walk plus one `Locale.setDefault` in a `try/finally`; no DB, no Spring context): `LocaleSensitiveFormatContractTest` 5 → **7**, `RiskExposureServiceTest` 7 → **8**. Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert `src/main/java` to master and **re-apply only the one-line visibility change**, so the behavioural leg still compiles — a control that cannot compile reads exactly like a gate that passed → **2 of 15 legs RED**, the invariant naming the bare sites and the behavioural leg failing on the effectiveness ladder. The case self-test and the five [[F2-416]] legs correctly stay green, since none depends on this fix ([[F2-225]]).
+
+🔑 **`toUpperCase()` with no argument is not "uppercase", it is "uppercase according to a deployment setting nobody in the code chose". For a token that is never what is meant — and the tell is that the vocabulary contains the letter `i`.**
+
+---
+
 ## F2-416 — an identifier built with `String.format("%d", …)` is not ASCII on every JVM
 
 | | |
