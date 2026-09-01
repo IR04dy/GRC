@@ -117,16 +117,25 @@ public class SocOpsDashboardService {
                        + regulatorExams.countByOrganisationIdAndStatus(org, "DRAFT_REPORT")
                        + regulatorExams.countByOrganisationIdAndStatus(org, "AWAITING_RESPONSE")
                        + regulatorExams.countByOrganisationIdAndStatus(org, "REMEDIATION");
-        List<RegulatorExamination> examPage =
-            regulatorExams.findByOrganisationIdOrderByNotifiedAtDesc(org, PageRequest.of(0, 200)).getContent();
-        long examsDueSoon = examPage.stream()
-            .filter(e -> e.getResponseDueAt() != null
-                && e.getResponseSubmittedAt() == null
-                && e.getResponseDueAt().isAfter(now)
-                && e.getResponseDueAt().isBefore(now.plusDays(14)))
-            .count();
+        // F2-420 -- UNCAPPED. This read the 200 most-recently-NOTIFIED examinations
+        // (PageRequest.of(0, 200)) and derived three published figures from that window. The
+        // cap's order -- notified_at DESC -- is ORTHOGONAL to what two of them ask, so an
+        // examination notified long ago with an imminent written-response deadline fell outside
+        // the window and vanished from both the fortnight KPI and the "due soonest" list, in the
+        // flattering direction. The tell was two lines up: examsOpen is an all-time countBy, and
+        // a windowed figure sitting beside an all-time countBy in one method is the signature
+        // (F2-406 / F2-415). One list now feeds every derivation over it.
+        List<RegulatorExamination> allExams =
+            regulatorExams.findByOrganisationIdOrderByNotifiedAtDesc(org);
+        // F2-420 -- read the repository's own definition of "a response falls due in this band"
+        // instead of hand-rolling it in Java. findResponseDueBetween is the query
+        // SocOpsScheduledSweep.sweepRegulatorResponseDue fires REGULATOR_EXAM_RESPONSE_DUE from,
+        // over the identical now..now+14d band -- so this KPI and that escalation were two
+        // implementations of one predicate, and only this one was capped: the scheduler could
+        // page someone about an examination the dashboard did not count (F2-177 / F2-282).
+        long examsDueSoon = regulatorExams.findResponseDueBetween(org, now, now.plusDays(14)).size();
         Map<String, Long> examsByRegulator = new LinkedHashMap<>();
-        examPage.stream()
+        allExams.stream()
             .filter(e -> !"CLOSED".equalsIgnoreCase(e.getStatus()))
             .forEach(e -> examsByRegulator.merge(e.getRegulator(), 1L, Long::sum));
 
@@ -152,7 +161,7 @@ public class SocOpsDashboardService {
                 e.getSlaDueAt() == null ? null : e.getSlaDueAt().toString()))
             .toList();
 
-        List<SocOpsDashboardResponse.RegulatorExamBucket> upcomingExams = examPage.stream()
+        List<SocOpsDashboardResponse.RegulatorExamBucket> upcomingExams = allExams.stream()
             .filter(e -> e.getResponseDueAt() != null && e.getResponseSubmittedAt() == null)
             .sorted((a, b) -> a.getResponseDueAt().compareTo(b.getResponseDueAt()))
             .limit(5)

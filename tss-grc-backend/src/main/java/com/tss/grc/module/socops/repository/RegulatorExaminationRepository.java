@@ -18,6 +18,23 @@ public interface RegulatorExaminationRepository extends JpaRepository<RegulatorE
 
     Page<RegulatorExamination> findByOrganisationIdOrderByNotifiedAtDesc(Long organisationId, Pageable pageable);
 
+    /**
+     * F2-420 -- the UNCAPPED counterpart, for figures published over the whole register.
+     *
+     * <p>{@code SocOpsDashboardService} used the paged overload above with
+     * {@code PageRequest.of(0, 200)} and then derived three published figures from that
+     * window. The cap's order (notified_at DESC) is orthogonal to what two of them ask --
+     * how many written responses fall due in the next fortnight, and which five are due
+     * soonest -- so an examination notified long ago with an imminent deadline was dropped
+     * from both (F2-406 / F2-415 / F2-197: a capped list is fine to RENDER and wrong to
+     * AGGREGATE). One list now feeds every derivation, so the mismatch is unrepresentable.
+     *
+     * <p>The paged overload stays: {@code RegulatorExaminationService.list} is a genuine
+     * paged register read. Both respect the entity's {@code @Where(is_deleted = 0)}, so the
+     * two agree on soft-delete scoping.
+     */
+    List<RegulatorExamination> findByOrganisationIdOrderByNotifiedAtDesc(Long organisationId);
+
     long countByOrganisationIdAndStatus(Long organisationId, String status);
 
     long countByOrganisationIdAndRegulator(Long organisationId, String regulator);
