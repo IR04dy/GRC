@@ -175,7 +175,6 @@ public class CyberControlService {
         return t.isEmpty() ? null : t;
     }
 
-    @Transactional
     /**
      * F2-213 — the fields an operator can actually edit through this endpoint.
      *
@@ -209,6 +208,7 @@ public class CyberControlService {
         applyFrameworkReference(existing, req, existing.getOrganisationId(), false);
     }
 
+    @Transactional
     public CyberControl updateControl(Long id, CyberControl req) {
         CyberControl existing = getControl(id);
         applyEditable(existing, req);

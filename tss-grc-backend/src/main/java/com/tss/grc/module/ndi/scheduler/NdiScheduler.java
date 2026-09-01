@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -117,7 +116,6 @@ public class NdiScheduler {
     }
 
     /** Distinct organisations that have an NDI footprint. */
-    @Transactional(readOnly = true)
     protected List<Long> distinctOrgIds() {
         return reportDefs.findAll().stream()
             .map(NdiReportDefinition::getOrganisationId)
