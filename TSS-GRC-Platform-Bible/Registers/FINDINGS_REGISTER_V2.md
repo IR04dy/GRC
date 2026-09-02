@@ -15219,6 +15219,75 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-428 — a form cap must mirror its column, not its neighbour
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P3 — an opaque 500 on a CMA/SAMA board-paper circulation, reachable through the platform's own form with a 121–128 character role title. The instrument gap is the larger half: **297 `maxLength` declarations across 75 frontend files and nothing had ever compared one to its column** |
+| **Source** | a fresh vein — the user-visible half of the cap family [[F2-185b]] and [[F2-425]] swept server-side |
+| **Size** | S — one integer literal; four legs on an existing gate; no migration, no backend change |
+
+⚠⚠ **A DECLARED CAP MUST MIRROR THE COLUMN IT GUARDS, AND THE FRONTEND DECLARES 297 OF THEM THAT NOTHING CHECKED.** [[F2-185b]] built `RequestSizeCapMirrorTest` to hold `@Size` against `@Column(length)`; [[F2-425]] extended it to `@DecimalMax` against `decimal(p,s)`. Both are **server-side**. `FormModal` enforces `maxLength` client-side —
+
+```ts
+if (f.kind === 'text' && f.maxLength != null && typeof fv === 'string' && fv.length > f.maxLength) {
+  errs[f.key] = isAr ? `الحد ${f.maxLength} حرفًا` : `Max ${f.maxLength} characters`;
+}
+```
+
+— so a cap **LOOSER** than its column means the form accepts text the server then refuses. Measured: **184 caps located, 78 paired to exactly one column length, 1 looser.**
+
+🔑🔑 **THE ONE LOOSER CAP IS F2-215's TWO-OF-N, AND THE TWO FIELDS ARE ADJACENT LINES IN BOTH ARTEFACTS.** `MeetingPapersPanel`'s circulate form and `CommitteeMeetingPaper`, resolved end to end:
+
+| form key | cap | column | length | |
+|---|---|---|---|---|
+| `paperCode` | 64 | `paper_code` | 80 | tighter |
+| `titleEn` | 255 | `title_en` | 500 | tighter |
+| `titleAr` | 255 | `title_ar` | 500 | tighter |
+| **`authorName`** | **128** | `author_name` | **255** | tighter |
+| **`authorRole`** | **128** | `author_role` | **120** | **LOOSER — live** |
+| `reason` | 300 | `late_paper_reason` | 500 | tighter |
+
+Every other column on that entity is a round 80 / 255 / 500. **`author_role` at 120 is the only one that is not, so the 128 mirrored `authorName` on the line above rather than the column underneath** — and the two form fields sit on consecutive lines carrying the identical number over columns of 255 and 120.
+
+⚠⚠ **AND THERE IS NO `@Size` TO SOFTEN IT.** `POST /api/v1/committees/papers/circulate` binds `@RequestBody CommitteeMeetingPaper` — the **entity**, with no `@Valid` — so a 121–128 character role title reaches `NVARCHAR(120)` and raises SQL Server **8152**: an opaque 500 (prod strips the class, SEC-CFG-001) after the operator has typed the text. An Arabic role title is exactly where it bites, because Arabic text is not shorter (house rule 7).
+
+⚙ **Fixed by lowering the cap to the column** ([[F2-184]]'s cap == column rule): the database already refuses more, so this **cannot break a request that works today** — it converts an 8152 into an inline `Max 120 characters` / `الحد 120 حرفًا` before submit, in both languages. Nothing stored can exceed 120 either, so every existing row still loads and re-saves through the edit form — worth checking, because a tightened cap over a column holding longer values would block editing those rows.
+
+⚠ **`authorName` (cap 128, column 255) is deliberately NOT touched, and that boundary is asserted.** A cap **TIGHTER** than its column is the other direction and is not a defect: the form refuses text the schema permits, which is protective. F2-184 gives a rule for a cap that is looser and **none** for one that is tighter, so widening it is a product decision. **18 tighter caps** are filed, not fixed.
+
+⚠⚠ **THE GATE IS THE THIRD CARRIER OF ONE QUESTION, NOT A SECOND CLASS** ([[F2-190]]) — exactly as [[F2-414]] added a fourth carrier to `InertValidationConstraintTest`. Four legs on `RequestSizeCapMirrorTest`:
+
+1. **the declared landing** — the one form resolved end to end, all six caps, `cap <= column` and never equality;
+2. **a derived hard zero** — every cap whose key resolves to exactly one `@Column(length)` across all 421 entities. No exemption map: there is no correct reason for a form to accept more characters than its column can hold, so there is no correct code for it to fail on ([[F2-214]]);
+3. **an anti-vacuity census** that also asserts the **NON-EMPTINESS of the blind set**;
+4. **a synthetic self-test** that a cap takes the key of its own object literal.
+
+⚠⚠ **LEG 3's BLIND-SPOT ASSERTION IS THE LOAD-BEARING ONE, BECAUSE THE DERIVED LEG COVERS 78 OF 184 CAPS.** `titleEn` alone is declared with **eight different lengths** across the platform, so pairing it needs the endpoint resolved per form — which this gate does not do. **A hard zero over a population the instrument cannot see is the most reassuring possible artefact** ([[F2-205]]), so the count of ambiguous caps is asserted `>= 1`: a reader who "fixes" the ambiguity by narrowing the scan fails the leg, because a scan that stopped matching and a genuine resolution look identical ([[F2-424]]'s shape).
+
+⚠⚠ **AND A WRONG NAME-PAIRING IS RESOLVED BY READING, NOT BY RELAXING THE GATE.** The derived leg **skips any key that has a declared landing**, so when its name-based pairing is wrong the remedy is to declare the true landing — which forces the next reader to trace the endpoint ([[F2-246]]: a scan locates, THE PAIRING IS THE MEASUREMENT). The failure message says so.
+
+⚠ **`columnDefinition` is a CLAIM, not a constraint** ([[F2-276]]), so `@Column(columnDefinition = "NVARCHAR(MAX)")` still reports `length() == 255` through reflection. A form capping such a column at 500 would pair as 500 > 255 and read as a defect on **correct** code, so MAX columns are excluded — the schema deliberately leaves those unbounded ([[F2-184]]).
+
+⚠⚠ **CONTROL C FOUND TWO ERRORS IN MY OWN GATE AND THEY ARE THE SAME ERROR TWICE.** Reverting the key resolution to a 400-character lookback left the self-test **GREEN**: taking the LAST `key:` before a cap is *right* for a plain sequential list, which was all the fixture contained, so **a fixture made only of well-formed fields passes under both resolutions and the leg's name claimed more than its assertion could see.** A cap whose own literal carries no key is the only shape that separates them. 🔑 **And the reason I gave for the resolution was wrong**: pass 1 of the sweep paired `MeetingPapersPanel :: reason` against `BreakGlassEvent.reason` and I wrote that the lookback had *"crossed object literals"*. It had not — `reason` **is** that object's own key, and what mis-paired was the **ENTITY**, resolved from the field name across 421 entities. The scoping buys something narrower than I claimed: it refuses to guess a key its literal does not carry.
+
+⚠ **Four controls, one per claim** ([[F2-289]]), each keeping every symbol so the class still compiles ([[F2-287]]): **A** the cap reverted → the declared leg alone; **B** A plus the landing dropped → the derived leg, **plus my own `FORM_MIRRORED >= 6` floor**, both correct, and my expectation was the incomplete thing; **C** the key resolution → the self-test; **D** `formCaps()` emptied → the declared and census legs.
+
+⚙ **Three veins swept CLEAN this firing, recorded so nobody re-runs them** ([[F2-216]]):
+
+- **a migration that fails on a POPULATED database and passes on an empty one** — `ALTER TABLE … ADD <col> NOT NULL` with no `DEFAULT` raises SQL Server 4901 on a table with rows: **0 of 240** `ALTER … ADD` statements. This matters because 53 migrations (V345–V397) have only ever been applied to dev.
+- **a self-check `THROW` predicated on the table being EMPTY** — [[F2-260]]'s rule, which found the shape prospectively in its own file and never swept the corpus. **20 `IF … THROW` pairs read a business table, 17 in the safe direction (a bad row PRESENT — the `ADD CONSTRAINT` pre-flight), 3 candidates, 2 refuted by reading** (the `NOT EXISTS` is nested *inside* an `EXISTS`, so the outer test is "a bad row is present"). The one real site, `V331` check 3c, is **unreachable**: 13 `demo_fill` migrations seed the chain unconditionally, so V121 puts 4 board packs in before V331 counts them. Its own comment states the correct instinct — *"Anti-vacuity. If the table were empty, 3a passes trivially"* — in the wrong place, because a migration runs on every database including a brand-new one.
+- **the READ side of [[F2-242]]**, which swept only writes. A read that returns another tenant's row is a data exposure rather than a dangling reference: **4 candidates, 4 refuted.** Every one resolves the **parent** in-tenant (`ensureRiskInTenant`, `require(subjectId)`, `getVendor(vendorId)`), the correct idiom for a child with no tenant column, and three carry a comment naming the control (SEC-RISK-001, SEC-TPRM-001). 🔑 **A detector looking for a literal tenant token in the method body cannot see a guard in a named helper** ([[F2-182]]) — which is why the population read as 4 rather than 0.
+
+⚠⚠ **AND MY OWN READ-SIDE SCAN HIT [[F2-276]]'s KEYING HAZARD**: `tenant_entities` keyed on the **simple** class name, and two `VendorAssessment` classes exist (`scm`, `tprm`) with different shapes — the recorded hazard, in a scan written after quoting it.
+
+⚙ **Filed:** the **18 tighter caps** (a product decision each, sharpest being `titleEn`/`titleAr` at 255 over a 500 column on an Arabic-primary platform); the **86 ambiguous caps** needing per-endpoint resolution, with **no verdicts** ([[F2-188]]) — the `min`-across-40-candidates over-approximation cannot adjudicate them, which is exactly why the first one I checked (`RiskRegisterPage :: titleEn`, cap 500) turned out to be the risk-**appetite-statement** form landing in a 500 column, correct, and refuted by reading; the **13 `demo_fill` migrations** that seed demo rows into every database including production, whose removal is a destructive operation on customer data (house rule 6) and therefore an **owner decision**; and `V331` check 3c as a dead check.
+
+⚠⚠ **THE FRONTEND TEST SUITE IS DARK AND IT IS NOT THIS SLICE'S DOING.** `node_modules/.pnpm/…/picocolors` is a **dangling symlink pointing at a POSIX-style `/d/AYMAN/GRC/…` path** that Node on Windows cannot resolve, dated 2026-08-31 16:59 — so `@testing-library/jest-dom`'s setup import fails and **all 81 frontend test files report `Tests: no tests`**. Proven pre-existing by stashing this slice's change and reproducing it. That takes every FE gate this programme relies on offline — `demoFallbackContract`, `kpiProvenance`, `pageDataProvenance`, `exportProvenance`, `tabLinkTargets`. The repair is `pnpm install` and it is **deliberately not run here**: reinstalling `node_modules` under a live Vite is [[F2-199]]'s blank-page landmine, the dev server is up, and this is a shared tree. `tsc --noEmit` is clean, which is meaningful coverage for a change that is one integer literal.
+
+---
+
 ## F2-427 — the column F2-372 did not normalise, three lines from the one it did
 
 | | |

@@ -32,6 +32,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeetingPaper;
+import jakarta.persistence.Entity;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 
 /**
  * F2-185(b) — the number, not the annotation.
@@ -453,6 +462,202 @@ class RequestSizeCapMirrorTest {
         }
     }
 
+    // ─── F2-428: the third carrier — a form field's maxLength ───────────────────
+
+    /**
+     * A form cap and the column its value lands in.
+     *
+     * <p>F2-428 — the same question the two carriers above ask ("does a declared cap match the
+     * column it guards?"), asked of the FRONTEND. {@code FormModal} enforces {@code maxLength}
+     * client-side, so a cap LOOSER than its column means the form accepts text the server then
+     * refuses. Where no {@code @Size} guards the write — and the committee-papers circulate route
+     * binds the entity with no {@code @Valid}, so none does — that surfaces as SQL Server 8152, an
+     * opaque 500, after the operator has written the text.
+     *
+     * <p>⚠ A cap TIGHTER than its column is the other direction and is NOT a defect: the form
+     * refuses text the schema permits, which is protective. Whether to widen one is a product
+     * decision (F2-184 gives a rule for a cap that is looser and none for one that is tighter), so
+     * every leg here asserts {@code cap <= column} and never equality. {@code authorName} is
+     * capped 128 over a 255 column on purpose and must keep passing.
+     */
+    private record FormLanding(String feFile, String key, Class<?> entity, String field, String why) {}
+
+    /** A located form cap: where it is declared, and the number. */
+    private record FormCap(String file, int line, String key, int cap) {}
+
+    private static final Path FE_SRC = Path.of("..", "tss-grc-ui-v2", "src");
+
+    /**
+     * The one form resolved END TO END in F2-428, kept as a declared landing for the reason the
+     * {@code MIRRORED} list above is declared: nothing in the code connects a form field to a
+     * column, and {@link #noFormCapExceedsTheColumnItUniquelyResolvesTo} can only pair a key whose
+     * name resolves to exactly one column length across all 421 entities. That derived leg covers
+     * 78 of 184 caps; these six are covered whatever the name ambiguity, and they are the positive
+     * control for the derived one.
+     */
+    private static final List<FormLanding> FORM_MIRRORED = List.of(
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "paperCode",
+            CommitteeMeetingPaper.class, "paperCode",
+            "POST /api/v1/committees/papers/circulate binds the entity, so the form key IS the column"),
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "titleEn",
+            CommitteeMeetingPaper.class, "titleEn", "same route; cap 255 over a 500 column (tighter)"),
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "titleAr",
+            CommitteeMeetingPaper.class, "titleAr", "same route; cap 255 over a 500 column (tighter)"),
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "authorName",
+            CommitteeMeetingPaper.class, "authorName",
+            "same route; cap 128 over a 255 column — TIGHTER on purpose, and the sibling whose "
+            + "number authorRole was mirroring when it should have been reading its own column"),
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "authorRole",
+            CommitteeMeetingPaper.class, "authorRole",
+            "F2-428's defect: cap was 128 over NVARCHAR(120), so FormModal accepted 121-128 "
+            + "characters and the INSERT raised 8152. Now 120 — the column's own ceiling"),
+        new FormLanding("components/committees/MeetingPapersPanel.tsx", "reason",
+            CommitteeMeetingPaper.class, "latePaperReason",
+            "POST /papers/{id}/mark-late binds LateRequest(String reason), which the service writes "
+            + "to late_paper_reason; cap 300 over a 500 column (tighter)")
+    );
+
+    @Test
+    void everyDeclaredFormCapFitsTheColumnItGuards() {
+        List<FormCap> caps = formCaps();
+        List<String> bad = new ArrayList<>();
+        for (FormLanding l : FORM_MIRRORED) {
+            Integer cap = caps.stream()
+                .filter(c -> c.file().equals(l.feFile()) && c.key().equals(l.key()))
+                .map(FormCap::cap)
+                .findFirst().orElse(null);
+            assertThat(cap)
+                .as("""
+                    %s declares no maxLength for `%s`, so this landing is stale. Delete the entry \
+                    or re-derive it — a landing that resolves to nothing passes every assertion \
+                    below it and reads exactly like a verified one.""".formatted(l.feFile(), l.key()))
+                .isNotNull();
+            Integer col = columnLengthOf(l.entity(), l.field());
+            assertThat(col)
+                .as("%s#%s declares no @Column(length) — the landing names the wrong field, or the "
+                    + "column is NVARCHAR(MAX) and the cap should be deleted rather than mirrored",
+                    l.entity().getSimpleName(), l.field())
+                .isNotNull();
+            if (cap > col) {
+                bad.add("%s :: %s cap %d > %s.%s column %d — %s"
+                    .formatted(l.feFile(), l.key(), cap, l.entity().getSimpleName(), l.field(),
+                               col, l.why()));
+            }
+        }
+        assertThat(bad).as("""
+            A form cap exceeds the column its value lands in. FormModal enforces maxLength \
+            client-side, so the form ACCEPTS what the column refuses: with no @Size on the write \
+            path that is SQL 8152 — an opaque 500 — after the operator has typed the text. Lower \
+            the cap to the column (F2-184: the database already refuses more, so this cannot break \
+            a request that works today), never widen the column to match a form.
+              %s""".formatted(String.join("\n  ", bad))).isEmpty();
+    }
+
+    @Test
+    void noFormCapExceedsTheColumnItUniquelyResolvesTo() {
+        Map<String, Set<Integer>> lengths = columnLengthsByFieldName();
+        List<String> bad = new ArrayList<>();
+        Set<String> declared = new java.util.HashSet<>();
+        for (FormLanding l : FORM_MIRRORED) declared.add(l.feFile() + "::" + l.key());
+        for (FormCap c : formCaps()) {
+            if (declared.contains(c.file() + "::" + c.key())) continue;  // declared leg owns it
+            Set<Integer> ls = lengths.get(c.key());
+            if (ls == null || ls.size() != 1) continue;   // measured by the census leg below
+            int col = ls.iterator().next();
+            if (c.cap() > col) {
+                bad.add("%s:%d :: %s cap %d > column %d".formatted(c.file(), c.line(), c.key(),
+                                                                   c.cap(), col));
+            }
+        }
+        assertThat(bad).as("""
+            A form cap exceeds the ONLY column length its field name resolves to across every \
+            @Entity. This is a hard zero with no exemption map: there is no correct reason for a \
+            form to accept more characters than its column can hold, so there is no correct code \
+            for this leg to fail on (F2-214). ⚠ The pairing is by FIELD NAME, so if it names \
+            the wrong column, declare the real landing in FORM_MIRRORED and this leg skips it -- \
+            resolve it by READING, never by relaxing the assertion (F2-246).
+              %s""".formatted(String.join("\n  ", bad))).isEmpty();
+    }
+
+    @Test
+    void theFormCapPopulationIsMeasuredAndItsBlindSpotIsNotEmpty() {
+        assertThat(Files.isDirectory(FE_SRC))
+            .as("the frontend tree is not at %s — this gate reads across the module boundary and "
+                + "must FAIL rather than skip, because unresolved reads identically to clean "
+                + "(F2-206)", FE_SRC.toAbsolutePath())
+            .isTrue();
+
+        List<FormCap> caps = formCaps();
+        Map<String, Set<Integer>> lengths = columnLengthsByFieldName();
+
+        // Anti-vacuity. Both legs above are "no problems found", which an empty scan satisfies
+        // perfectly — and a floor must sit above the largest WRONG answer, which here is zero
+        // (a rotted regex, or a frontend root that stopped resolving). F2-215.
+        assertThat(caps).as("the frontend maxLength scan found nothing").hasSizeGreaterThanOrEqualTo(150);
+        assertThat(lengths).as("the @Column(length) reflection found nothing")
+            .hasSizeGreaterThanOrEqualTo(300);
+        assertThat(FORM_MIRRORED).hasSizeGreaterThanOrEqualTo(6);
+
+        long unique = caps.stream().filter(c -> {
+            Set<Integer> ls = lengths.get(c.key());
+            return ls != null && ls.size() == 1;
+        }).count();
+        long ambiguous = caps.stream().filter(c -> {
+            Set<Integer> ls = lengths.get(c.key());
+            return ls != null && ls.size() > 1;
+        }).count();
+
+        assertThat(unique).as("no cap pairs uniquely, so the hard-zero leg above measures nothing")
+            .isGreaterThanOrEqualTo(60);
+
+        // ⚠ The blind spot, asserted rather than implied. A hard zero over a population the
+        // instrument cannot see is the most reassuring possible artefact (F2-205), so the
+        // NON-EMPTINESS of the unresolved set is a claim about the resolver: `titleEn` alone is
+        // declared with eight different lengths across the platform, so pairing it needs the
+        // endpoint resolved per form, which this gate does not do. Do not delete this by
+        // narrowing the scan until something actually resolves them — re-derive first.
+        assertThat(ambiguous)
+            .as("""
+                No form cap resolves ambiguously any more. Either something now pairs a form field \
+                to its endpoint (in which case widen the hard-zero leg to cover them and delete \
+                this assertion deliberately), or the scan has stopped matching — and the second \
+                looks exactly like the first.""")
+            .isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void theFormCapDetectorReadsTheKeyOfItsOwnObjectLiteral() {
+        // A synthetic self-test, because both corpus legs pass equally over a clean tree and over a
+        // dead regex (F2-235).
+        //
+        // ⚠ The fixture's SECOND field is the one that discriminates, and the first draft of this
+        // test did not have it. Taking the LAST `key:` before a cap is right for a plain sequential
+        // list, so a fixture made only of well-formed fields passes under BOTH resolutions and the
+        // leg's name then claims more than its assertion can see. A cap whose own literal carries
+        // no key is the only shape that separates them: object scoping SKIPS it, a lookback
+        // attributes the previous field's key to it.
+        //
+        // ⚠ And what the scoping buys is narrower than it looks: it refuses to guess a key its
+        // literal does not carry. It is NOT what fixed the mis-pairing that started F2-428 —
+        // `MeetingPapersPanel :: reason` was paired against BreakGlassEvent.reason because the
+        // ENTITY was resolved from the field NAME across 421 entities, which is F2-246's rule and
+        // is why the derived leg above pairs only a name that resolves to exactly one length.
+        String fixture = """
+            const a: FieldDef[] = [
+              { key: 'alpha', kind: 'text', maxLength: 10 },
+              { kind: 'text', maxLength: 20 },
+            ];
+            // { key: 'commented', kind: 'text', maxLength: 999 }
+            const b = [{ key: 'beta', kind: 'text', span: 6, maxLength: 30 }];
+            """;
+        List<FormCap> found = capsIn("fixture.tsx", fixture);
+        assertThat(found).extracting(FormCap::key, FormCap::cap)
+            .as("""
+                A cap must take the key of ITS OWN object literal: `alpha` and `beta` resolve, the                 keyless field is skipped rather than attributed to `alpha`, and a commented-out                 field is not read as a declaration (F2-193 — a scan that reads the epitaph as the                 corpse fails on a correct tree).""")
+            .containsExactly(org.assertj.core.api.Assertions.tuple("alpha", 10),
+                             org.assertj.core.api.Assertions.tuple("beta", 30));
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────────
 
     private static String key(Class<?> c, String member) {
@@ -532,4 +737,128 @@ class RequestSizeCapMirrorTest {
         }
         return null;
     }
+
+    // ─── F2-428 helpers ─────────────────────────────────────────────────────────
+
+    /** One left-to-right alternation: at a `//` an inner `/*` can never open a block (F2-198). */
+    private static final Pattern TS_COMMENT =
+        Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+    private static final Pattern MAX_LENGTH = Pattern.compile("maxLength\\s*:\\s*(\\d+)");
+    private static final Pattern FIELD_KEY = Pattern.compile("key\\s*:\\s*['\"](\\w+)['\"]");
+
+    /** Blank a comment with spaces, keeping newlines so reported line numbers stay true. */
+    private static String stripTs(String s) {
+        Matcher m = TS_COMMENT.matcher(s);
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (m.find()) {
+            out.append(s, at, m.start());
+            out.append(m.group().replaceAll("[^\\n]", " "));
+            at = m.end();
+        }
+        return out.append(s.substring(at)).toString();
+    }
+
+    /** Every `maxLength: N` in the frontend, keyed by the `key:` of its own object literal. */
+    private static List<FormCap> formCaps() {
+        List<FormCap> out = new ArrayList<>();
+        try (var walk = Files.walk(FE_SRC)) {
+            for (Path p : walk.filter(Files::isRegularFile).toList()) {
+                String nm = p.getFileName().toString();
+                if (!nm.endsWith(".ts") && !nm.endsWith(".tsx")) continue;
+                String raw = Files.readString(p);
+                if (!raw.contains("maxLength")) continue;
+                String rel = FE_SRC.relativize(p).toString().replace('\\', '/');
+                out.addAll(capsIn(rel, raw));
+            }
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("cannot read the frontend tree at " + FE_SRC, e);
+        }
+        return out;
+    }
+
+    private static List<FormCap> capsIn(String rel, String raw) {
+        String s = stripTs(raw);
+        List<FormCap> out = new ArrayList<>();
+        Matcher m = MAX_LENGTH.matcher(s);
+        while (m.find()) {
+            int open = enclosingObject(s, m.start());
+            if (open < 0) continue;
+            Matcher k = FIELD_KEY.matcher(s.substring(open, m.start()));
+            String key = null;
+            while (k.find()) key = k.group(1);       // the LAST key before the cap, same literal
+            if (key == null) continue;
+            int line = (int) s.substring(0, m.start()).chars().filter(c -> c == '\n').count() + 1;
+            out.add(new FormCap(rel, line, key, Integer.parseInt(m.group(1))));
+        }
+        return out;
+    }
+
+    /** The offset of the `{` opening the brace-balanced object literal containing {@code at}. */
+    private static int enclosingObject(String s, int at) {
+        int depth = 0;
+        for (int i = at; i > 0; i--) {
+            char c = s.charAt(i);
+            if (c == '}') depth++;
+            else if (c == '{') {
+                if (depth == 0) return i;
+                depth--;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Every bounded String column in the platform, as {@code field name -> the lengths declared
+     * for it}. Reflection, never a source regex: this codebase has twice under-counted a security
+     * surface with one, and a field name is far more ambiguous than a class name — 15 entity simple
+     * names are declared in two packages (F2-222 / F2-276), so anything multi-valued is left to the
+     * census leg rather than guessed.
+     */
+    private static Map<String, Set<Integer>> columnLengthsByFieldName() {
+        Map<String, Set<Integer>> out = new LinkedHashMap<>();
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
+        for (var bd : scanner.findCandidateComponents("com.tss.grc")) {
+            Class<?> c;
+            try {
+                c = Class.forName(bd.getBeanClassName());
+            } catch (ClassNotFoundException e) {
+                continue;
+            }
+            // Exclude test fixtures by CODE SOURCE, never by a name ending in "Test": a name test
+            // lets any member escape by being renamed (F2-192), and F2-241 recorded a scan of this
+            // shape reaching target/test-classes and reporting its own fixture.
+            var src = c.getProtectionDomain().getCodeSource();
+            if (src != null && src.getLocation().toString().contains("test-classes")) continue;
+            for (Field f : c.getDeclaredFields()) {
+                if (f.getType() != String.class) continue;
+                Column col = f.getAnnotation(Column.class);
+                if (col == null) continue;
+                // ⚠ @Column(columnDefinition = "NVARCHAR(MAX)") still reports
+                // length() == 255 through reflection -- F2-276 recorded that columnDefinition
+                // is a CLAIM, not a constraint, because Hibernate only emits it when
+                // generating DDL and this platform runs ddl-auto=none. A form capping such a
+                // column at 500 would pair as 500 > 255 and read as a defect on CORRECT code,
+                // which is the one failure a gate must never have (F2-214). The schema
+                // deliberately leaves those unbounded (F2-184).
+                if (col.columnDefinition().toUpperCase(java.util.Locale.ROOT)
+                        .contains("MAX")) {
+                    continue;
+                }
+                out.computeIfAbsent(f.getName(), k -> new TreeSet<>()).add(col.length());
+            }
+        }
+        return out;
+    }
+
+
+    /** The declared {@code @Column(length)} on an entity field, or null when it declares none. */
+    private static Integer columnLengthOf(Class<?> entity, String field) {
+        Field f = fieldOf(entity, field);
+        if (f == null) return null;
+        Column col = f.getAnnotation(Column.class);
+        return col == null ? null : col.length();
+    }
+
 }
