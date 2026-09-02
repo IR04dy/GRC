@@ -1921,8 +1921,6 @@ export const ar = {
 
   // ESG — production hardening: tabs, calculator, CMA, SGI, vendor survey
   esgKpiCma:                'إفصاح CMA',
-  esgDownloadAnnex:         'تحميل ملحق ESG',
-  esgAnnexDownloadedToast:  'تم إنشاء ملحق ESG — أرفِقه بالتقرير السنوي.',
   esgTabOverview:           'نظرة عامة',
   esgTabCalc:               'الحاسبة',
   esgTabCma:                'مواد CMA',
@@ -1930,6 +1928,7 @@ export const ar = {
   esgTabSgi:                'التزامات SGI',
   esgTabGhg:                'سجلّ الانبعاثات',
   esgTabClimate:            'المخاطر والفرص المناخية',
+  esgOpenAnnexTab:          'ملحق التقرير السنوي',
   esgTabAnnex:              'الملحق السنوي',
   esgTabCapa:               'الإجراءات التصحيحية',
   esgTabMateriality:        'الأهمية النسبية',

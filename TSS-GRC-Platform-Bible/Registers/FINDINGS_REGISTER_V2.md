@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-435** | **A fabricated CMA Art. 91-94 / TCFD annual-report annex, emitted four ways beside the real one on the same page — the de-mocking stopped at the TABS and left the constants they were promoted off feeding the EXPORT** | Fabricated data | P1 |
 | **F2-434** | **A row must not be able to opt itself out of the audit seal's check — the skip condition was a column in the same database, and it discarded the LINK, which needs no key** | Security / integrity | P1 |
 | **F2-433** | **A unique key over a nullable column must be filtered — V396 fixed nine registers of this shape and missed the tenth, because the tenth is the TWIN of one it fixed** | Data integrity | P2 |
 | **F2-21** | **Committee votes are recorded under a caller-supplied name** — recusal, quorum and SoD all bypassable | **Security** | **P0** |
@@ -15218,6 +15219,175 @@ question of the register the refutation had walked into is what found the P1.
 - **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
   left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
   upstream-owned, and the nullable ones are inert.
+
+---
+
+## F2-435 — a fabricated CMA Art. 91-94 / TCFD annex, emitted beside the real one
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P1 — a regulator-facing annual-report annex that LEAVES the platform (downloaded, printed `CONFIDENTIAL`, or produced as a branded `.xlsx`/`.docx`) with every figure a browser constant. F2-199's harm ladder: nothing downstream of the download can tell the numbers were invented. Routed, sidebar-linked, and the **primary** button on the page |
+| **Source** | a fresh vein — F2-416's question asked of the frontend carrier, which surfaced a locale-formatted GHG figure inside a `lines.push` builder and led to what the builder was |
+| **Size** | S — a retire: two builders, three corpora, four emitters, two dead keys |
+
+### What it emitted
+
+`lib/esg.ts`'s `buildEsgAnnex` / `buildEsgAnnexSheets` built an **"ESG / SUSTAINABILITY ANNEX —
+ANNUAL REPORT"** — GHG Scope 1/2/3 with third-party **verification flags**, the **CMA Articles
+91-94** disclosure statuses, the **TCFD** four-pillar alignment — from `EMISSIONS_TIMESERIES`,
+`CMA_ARTICLES` and `TCFD_ITEMS`. That file makes **zero server calls**.
+
+`EsgPage` emitted it **four ways, from the PageHeader, so on every tab**:
+
+```
+Download PDF   -> printPacket(... classificationEn: 'CONFIDENTIAL — SUSTAINABILITY' ...)   [primary]
+Export Excel   -> reportingApi.packetXlsx({ exportType: 'SustainabilityAnnex', sheets: … })
+Export Word    -> reportingApi.packetDocx(…)
+esgDownloadAnnex -> new Blob([text]) -> ESG-Annex-2025.txt
+```
+
+⚙ Worth stating precisely: unlike F2-199's `/nca-ecc-export`, this cover named the **tenant's**
+brand (`brand.organisationNameEn/Ar`) rather than the software vendor. **It got the filing entity
+right and the figures wrong**, which is what made it credible.
+
+### 🔑🔑 The tell was already in the tree, as prose
+
+- `lib/sustainabilityCma.ts` — *"CmaTab on /esg — **replaces the static CMA_ARTICLES constant**"*
+- `lib/sustainabilityTcfd.ts` — *"static TCFD_ITEMS constant"*
+- `EsgCmaTab` / `EsgTcfdTab` — *"**Promoted from** the static … constant **to a live API-driven**"*
+- `EsgPage:137` — *"TCFD_ITEMS / CMA_ARTICLES; **V60 + V61 promoted both tabs** to API-"*
+
+**All seven references to those constants outside `lib/esg.ts` are COMMENTS recording that a tab
+was promoted off them.** So both tabs were de-mocked, the corpora they were promoted OFF were left
+in place, and the only remaining consumer was the annex builder in the page header.
+
+🔑 **The de-mocking stopped at the visible surface, which is exactly why the page reads as
+finished** — F2-193's rule (*when you de-mock a store, grep for every KPI that summarised it*) with
+**EXPORTED** in place of *summarised*.
+
+### Why F2-199's `exportProvenance` was green, and the gap that remains
+
+That gate asks whether the emitting page has server data in scope, and F2-205 corrected its
+**direction**-blindness (an outbound `reportingApi.packet*` POST is a printer, not provenance).
+`EsgPage` calls `esgDashboardApi.get` and five `vendorEsgApi.*` methods **for its other tabs**, so
+after stripping the emitter it still resolves `backedVia: 'itself'` and drops out of `UNBACKED` —
+which is why it is not among that map's two filed members.
+
+🔑 **That is F2-203's lesson, which the gate states for a DIFFERENT gate and not for itself: a
+one-hop "is there server data in scope" rule certifies the FILE, not the FIGURE.**
+
+⚠ Closing it in general was measured and **deferred**: the payload reaches the emitter through a
+local (`printPacket({ sections: packetTextToSections(text) })`, where `text` came from the builder
+two statements earlier), so the identifier resolvable without dataflow is the **FORMATTER at all
+five** emitter call sites in the tree. That is F2-431's two-hop shape and real dataflow (F2-182), so
+it is its own slice. This one guards the member and records the number.
+
+### The fix — retire, per ADR-017 §D-5
+
+⚙ Retired rather than rewired, as F2-199 retired `/nca-ecc-export` and F2-207 the privacy
+registers — and safe for the reason F2-205 could **not** satisfy for `BcmLifecyclePage`: **the real
+annex is a SIBLING TAB on the same page.** `EsgAnnexTab` drives `lib/sustainabilityAnnex.ts` end to
+end — `generateAnnex` → `submitReport` → `approveReport` → `publishReport` → `exportReport('md' |
+'html' | 'json')` — against `POST /api/sustainability/reporting-years/{id}/generate-annex`, over
+registers measured populated in **both** databases:
+
+| register | dev | prod |
+|---|---|---|
+| `sust.cma_disclosure` | 91 | 91 |
+| `sust.tcfd_item` | 85 | 85 |
+| `sust.ghg_emission_record` | 41 | 40 |
+| `sust.climate_risk_opportunity` | 20 | 20 |
+| `sust.sgi_commitment` | 17 | 17 |
+
+⚠ **The affordance is not deleted, it is repointed** (F2-137/F2-207): the header keeps one button,
+which opens the Annex tab. And the sentence that advertised it went with it — `EsgPage`'s own
+header comment read *"Overview — multi-year scope trend, KPI strip, **ESG annex download**"*, which
+is F2-207's rule that retiring a surface means retiring the prose that sold it.
+
+⚙ **What deliberately stays:** `EMISSION_FACTORS` (the GHG-Protocol factor catalogue the calculator
+needs — a reference table, F2-194's kept class), the `TcfdItem` / `CmaArticle` **types** (shared by
+the live clients; `CmaArticle['status']` keys the platform-wide `STATUS_LABEL`), and the label/tone
+maps (`STATUS_TONE` is read at **84** sites). The gate asserts the CONSTANTS are gone, never the
+interfaces.
+
+### Errors of mine, each caught by running something
+
+⚠⚠ **A BRACKET-BALANCED CUT OVER TYPESCRIPT MATCHED THE TYPE ANNOTATION'S OPENER.**
+`export const TCFD_ITEMS: TcfdItem[] = [` has **two** `[`, and the first belongs to the type — so
+the cut balanced an empty `[]`, deleted only the declaration head and left ` = [` behind. Same for
+the builder, whose return type `: { name: string; … }[] {` carries its own braces. `tsc` named all
+three breakages. 🔑 **A brace matcher cannot tell a type from a value** — the family of F2-196's
+`readonly string[]` parse and F2-425's `new BigDecimal(` argument. Fixed by anchoring on the
+VALUE's opener; fail-before-write meant nothing was half-written when it was restored.
+
+⚠ **My consumer census attributed a consumer to an unrelated same-named local.** It reported
+`lib/esg.ts`'s `EMISSIONS` array as consumed by `lib/climate.ts` — where `EMISSIONS` is a local
+`const EMISSIONS = '/api/v1/sustainability/financed-emissions'`, an API path string. Believing it
+would have meant **keeping the fabricated GHG series to protect a consumer that does not exist**.
+F2-187's *resolve per owner type*, in my own scan; the honest answer is 0 importers.
+
+⚠ **`const { t, lang } = useI18n()` occurs three times in that file** (it has sub-components), so a
+content-anchored patch asserted 1 and got 3. Fail-before-write held; patched by the line `tsc`
+named.
+
+⚠⚠ **AND THE CONTROL HARNESS ACCUSED THE GATE.** Its first run reported `DID-NOT-RUN` on the
+**baseline**, because vitest colours its summary and the ANSI escapes sit between `Tests` and the
+number. 🔑 **A harness that cannot read its own output reads exactly like a broken gate** (F2-290),
+and the leg that catches it is the baseline: *a control run whose baseline cannot be read is a
+parser bug every time, never a finding.*
+
+### Verification
+
+⚠ **Browser-verified without authentication, deliberately.** Signing in would mean typing a
+password, which I do not do; so the check is on **what actually ships** — the modules Vite serves.
+Since the transform strips comments, those counts are over real code rather than prose:
+
+```
+/src/pages/esg/EsgPage.tsx : new Blob 0 · printPacket 0 · packetXlsx 0 · packetDocx 0
+                             buildEsgAnnex 0 · esgDownloadAnnex 0
+                             setTab("annex") 1 · esgOpenAnnexTab 1 · esgDashboardApi 2
+/src/lib/esg.ts            : EMISSIONS_TIMESERIES 0 · CMA_ARTICLES 0 · TCFD_ITEMS 0
+                             buildEsgAnnexSheets 0 · EMISSION_FACTORS 2
+```
+
+⚙ `esgAnnexRetirement.test.ts` **7 legs**; frontend suite **848/848** (+7, +1 file); `tsc` clean;
+`exportProvenance` and `translationKeysDeclared` still green. Three controls (F2-289):
+
+| control | fires |
+|---|---|
+| **A** the four emitters restored | the emit leg + the landing leg |
+| **B** a builder + a corpus restored | the builder leg + the corpus leg |
+| **C** the comment stripper disabled | **the gate FAILS ON A CORRECT TREE** |
+
+⚠ **C is the one worth having.** `lib/esg.ts`'s own retirement note quotes `CMA_ARTICLES` to record
+what it replaced, so without stripping the gate reads the epitaph as the corpse (F2-193) — which
+proves the stripping is load-bearing rather than decorative. ⚙ And the two legs differ in
+sensitivity: the builder leg requires `\bbuildEsgAnnex\s*\(`, so a prose mention cannot satisfy it,
+while the corpus leg is a bare `\b…\b` and needed the stripper. **5 of 7 legs discriminate**
+(F2-225); the real-surface leg is a **guard** whose tripwire is a future deletion, and the
+translation-key leg was not exercised by any control.
+
+### Filed
+
+⚙ **F2-203's question at the export gate**, needing the emitted payload resolved through locals —
+measured above at 5 of 5 sites resolving to the formatter, so it is dataflow and its own slice.
+
+⚙ **`lib/esg.ts` still holds pre-existing dead exports** the S-O vendor-survey promotion left
+behind — `VENDOR_SURVEYS`, `loadSurveyOverrides`, `saveSurveyOverride`, `effectiveSurveys`, none
+with a consumer outside the file. Same shape as this finding (a promotion that stopped at the
+surface) and **not** swept here, because that is F2-194's filed ~50-corpus census rather than this
+member (F2-188).
+
+⚠ **The `sust` registers hold reporting years of 2091–2099** (`cma_disclosure` 11 rows at 2099,
+`tcfd_item` 11, `ghg_emission_record` 1), byte-identical in dev and prod — so seed-origin rather
+than probe residue. A CMA disclosure filed against year 2099 is not a defect this slice created and
+correcting live governance rows in two databases is an **owner decision**.
+
+⚙ **The frontend locale vein that led here is otherwise clean:** 137 files use a locale formatter
+at 252 sites, and of the 17 whose file also emits a machine-readable artefact the only bare
+`toLocaleString()` feeding one was this annex. The four `'en-GB'` + `timeZone: 'Asia/Riyadh'` sites
+in `bcmLifecycle.ts` / `crisis.ts` are F2-416's remedy applied correctly.
 
 ---
 
