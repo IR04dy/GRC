@@ -25,6 +25,8 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-442** | **F2-438 shipped a change that stops the application starting, with 5,081 tests green — Spring refuses `@TransactionalEventListener` + plain `@Transactional`, and the gate written to prevent this class asserted the shape Spring refuses** | Correctness | P1 |
+| **F2-441** | **The IIA management-response VERDICT had no writer anywhere — three of the four response fields were on the request and not the fourth — and the badge rendered "no answer" as a management rejection** | Correctness | P2 |
 | **F2-440** | **The ESG evidence silo accepts an expiry nothing honours and its sweep cannot reach 6 of 13 approved rows — measured, and deliberately NOT fixed, because retiring that clientless endpoint is an OPEN owner decision (F2-85)** | Measurement | P3 |
 | **F2-439** | **Two ways a mapping can be unusable that a hermetic build cannot see — a path placeholder no `@PathVariable` can satisfy (500 for every caller) and two handlers claiming one (verb, path) (the app refuses to start). Both measured at ZERO and gated; the query-key sibling measured and rejected as undecidable by a scan** | Latent hazard | P3 |
 | **F2-438** | **Two event listeners, neither commit-phased, failing in OPPOSITE directions — the platform's own rule names both modes in one sentence and was applied at one service and at neither listener** | Correctness | P2 |
@@ -15226,6 +15228,175 @@ question of the register the refutation had walked into is what found the P1.
   upstream-owned, and the nullable ones are inert.
 
 ---
+
+## F2-442 — F2-438 shipped a change that stops the application starting, with 5,081 tests green
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — the propagation fixed, the gate's narrowing removed, the false claim corrected |
+| **Severity** | **P1 — the application did not start.** Not a data defect: a deployment of that jar would have failed at context refresh |
+| **Source** | found by launching the dev backend to run F2-441's probe |
+| **Size** | S — one annotation argument, one gate leg re-scoped, one javadoc corrected |
+
+### What Spring refuses
+
+> `@TransactionalEventListener method must not be annotated with @Transactional unless when declared
+> as REQUIRES_NEW or NOT_SUPPORTED: AutomationRuleEngine.onDomainEvent`
+
+Thrown by `RestrictedTransactionalEventListenerFactory` while `EventListenerMethodProcessor`
+processes the bean — i.e. **at context startup**. F2-438 put `@Async
+@TransactionalEventListener(AFTER_COMMIT, fallbackExecution = true) @Transactional` on the engine,
+with plain REQUIRED.
+
+### 🔑🔑 The gate written to prevent this asserted the shape Spring refuses
+
+F2-438 reasoned that the propagation mattered only for the **synchronous** listener, and wrote into
+its own gate — and into this register — that demanding it on an `@Async` one *"would be a gate
+asking for something pointless"*. The rule is **unconditional**. So the narrowing that made the leg
+feel principled is exactly what let the regression through, and the build stayed green because
+**nothing here boots a context** and `mvn -o clean package` is deliberately hermetic.
+
+🔑 **F2-247's class, landing on the gate written to prevent it** — and F2-439, one slice earlier,
+gated two more members of that same class (a path placeholder no `@PathVariable` can satisfy; two
+handlers claiming one route) **while this one was live in the tree**. The lesson is not that the
+class needs another gate; it is that a gate for a startup failure must not carry a narrowing whose
+justification is about semantics rather than about what the framework accepts.
+
+⚠ It is semantically a no-op: an `@Async` listener is on another thread and creates its own
+transaction regardless. **That is precisely why the reasoning felt safe** — the propagation genuinely
+changes nothing there, and Spring rejects it anyway.
+
+### ⚠⚠ `BUILD SUCCESS` was printed over it, twice
+
+CLAUDE.md's own words: *"For `spring-boot:run`, `BUILD SUCCESS` is not a start signal — DevTools'
+`RestartLauncher` swallows the app's failure … grep `Started GrcApplication in` instead."* Both
+launches printed `BUILD SUCCESS`; the start-marker count was **0** both times. **The only reason
+this was caught is that rule.**
+
+⚠ And the second launch printed *"Port 8084 was already in use"* under a `BUILD SUCCESS` while
+`/actuator/health` answered **200** — a listener left over from the first attempt. 🔑 **Health 200
+from a listener whose provenance you have not established is the most misleading possible signal**
+(F2-217): kill by argument match on the session's `-Djava.io.tmpdir`, guarded on 8090/8091 belonging
+to the prod jar, then relaunch and grep the marker.
+
+### ⚠⚠ And the control harness destroyed the fix, which is F2-297's other half
+
+F2-297's rule is *commit the fix first so the controls are recoverable by `git checkout`*. F2-441
+was committed first, correctly — and **the F2-442 fix was made after that commit**, so control C's
+`git checkout HEAD -- <engine>` restored the engine to the F2-441 commit and **silently discarded
+the propagation fix**. The post-restore run then failed, and the failure was the gate being *right*
+about a tree that had been reverted underneath it.
+
+🔑 **Corollary to record: `git checkout HEAD --` restores to HEAD, so a harness restore discards
+every uncommitted change to the files it touches. Commit BEFORE running controls — including any fix
+made after the first commit.** The gate leg is what caught it; `git status` showing the engine
+unmodified against a HEAD that predates the fix is the tell.
+
+### Verification
+
+- **The app starts** — `Started GrcApplication in` present, `/actuator/health` 200, from the
+  committed tree. That is the only instrument that can see this defect.
+- Control C reverts the propagation and exactly the corrected leg fires.
+- `CommitPhasedEventListenerContractTest` 6 → 7; the synchronous-only claim survives as its own leg,
+  because there the propagation is not merely Spring's rule but what stops the write happening with
+  no live transaction (`AccessRequestService`'s live-found *"the created request came back with a
+  null id"*).
+
+---
+
+## F2-441 — the IIA management-response verdict could not be recorded, and a finding with no verdict displayed as one management rejected
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — recordable on the wire, named in the trail, three states on the screen |
+| **Severity** | P2 — on the IIA Standard 2500 step whose entire purpose is management's verdict, the verdict had no writer anywhere; and the badge rendered "no answer" as a rejection |
+| **Source** | a bytecode census: which boolean flag on an entity is READ by something and written by nothing? |
+| **Size** | S — one request field, one null-guarded copy, one audit clause, one badge |
+
+### The census, and why it had to be bytecode
+
+F2-280 found `iam.roles.is_privileged` in exactly this state — a privileged-access security
+classification with no writer, so every role took the database default. Asked of every boolean field
+on every entity, resolved **per owner type from ASM** (a name-keyed scan is useless here: `isDeleted`,
+`isActive` and `expiryDate` are declared on dozens of entities, and F2-440 is this programme's own
+most recent instance of that mistake): **443 flag fields, 161 with no cross-class setter caller**,
+of which most are `is_deleted` — handled by `@Where` and `ServerOwnedFieldsModule` — or entity-bound
+types, where **Jackson writes the setter reflectively and bytecode cannot see it** (F2-256).
+
+Three of the survivors gate something, and the data settles all three:
+
+| flag | distribution | verdict |
+|---|---|---|
+| `platform.automation_rules.audit_required` | **True on all 214 / 211** | no defect — no writer, and the value is the safe one everywhere |
+| `workflow.states.is_terminal` | 8 True / 26 False | no defect — genuinely populated by migration |
+| `change_mgmt.change_authorisation_matrix.requires_model` | **False on all 36** | **refuted by the code's own javadoc** — V354 asserts it, and the control is deliberately opt-in *"because 5 STANDARD changes exist and 3 are in flight"* |
+
+⚠ The third one's javadoc says *"until a tenant switches a cell on"* and **there is no write route
+for the matrix at all** (`GET /authorisation-matrix` is the only one, and `setRequiresModel` has no
+caller). So the S8e/CE-2 control can never fire — F2-112's shape with F2-184's comment on top.
+Filed, because building the switch is a feature.
+
+### 🔑 The defect: three of four, in one adjacent block
+
+`audit_lc.findings` carries four management-response columns. The server's `TransitionRequest`
+declared **three** — the response text in both languages, and the author — and **not** `mgmt_accepts`,
+while `FindingDto` returned it on the READ wire. So a management response could be recorded and
+**whether management accepts the finding could not be recorded at all**.
+
+**F2-215's two-of-N at 3 of 4**: a reader who finds three management-response fields on the request
+has no reason to ask about a fourth. And the audit line read `" · response by " + author` — it
+records that somebody answered and **not what they said**, so the one fact an audit committee reads
+the trail for was the one it omitted.
+
+### ⚠⚠ Both halves had to land together, because fixing the wire is what detonates the badge
+
+`AuditLifecycleTabs` rendered `tone={f.mgmtAccepts ? 'success' : 'warning'}` — **two states over a
+three-state fact**. While nothing could write the column that was invisible; **making the verdict
+recordable is exactly what would have started asserting a dispute** for every finding that still had
+none. F2-203's rule: when you fix a filter, a selector or a fallback, assume something downstream has
+never run.
+
+🔑 **The assertion that matters most is `== null`, never `!f.mgmtAccepts`.** A recorded disagreement
+is `false`, and a truthiness test renders it as *"no verdict recorded"* — hiding a real dispute inside
+the fix meant to expose the un-answered ones. F2-195 records that exact mistake (`isNoData` must be
+`value == null`, not `!value`).
+
+⚙ `Badge` gained an optional `ariaLabel`: it offered only `title`, so a badge saying *"no verdict
+recorded"* was a tooltip a screen-reader user never received. UX-008 built the hint convention for
+`Kpi` with the text on **both**, and F2-209 records it as the rule. Additive; all other call sites
+unchanged.
+
+### Measured live
+
+**7 of 20 findings in dev and 6 of 20 in prod are at or past the management-response step of the
+declared machine with no response, no author and no verdict — one of them CLOSED.** (The
+`IN_PROGRESS`/`REMEDIATED`/`VERIFIED` rows are F2-203's already-recorded undeclared statuses and are
+excluded; counting them would over-report.) `mgmt_accepts` is NULL on all 20 in both databases, which
+is why nobody had seen the badge: **0 of 20 have a response at all**, so it never renders today —
+live in code, latent in render (F2-283).
+
+### Deliberately NOT built (F2-188)
+
+**The response form.** There is none anywhere, and **both `transitionFinding` call sites pass no
+`mgmt` argument at all**, so advancing a finding through `MGMT_RESPONSE` from the platform's own
+screen records nothing. Who may respond, whether the author is the authenticated principal — the
+server takes it from the **body** today, which F2-236 says is the wrong direction, so the fix there is
+to stop accepting it rather than to start sending it — and whether a verdict is mandatory at that
+transition are all product decisions.
+
+### Verification
+
+- Live probe **12/12** as `auditor` (never `admin`; the persona resolved from `iam.role_permissions`,
+  not guessed — F2-314), against a finding the probe **plants itself** (F2-206) and removes with
+  `CHARINDEX` in a `finally` (house rule 5). Register back to 20 live rows, 0 tagged rows left in
+  either database.
+- Three controls, one per half (F2-289): the service dropping the copy fires the two backend value
+  legs; the badge reverting to two states fires the frontend gate; control C is F2-442's.
+- `FindingServiceTest` 7 → 12, `mgmtResponseVerdict` 5 legs, frontend suite 848 → 853, `tsc` clean,
+  build **5092/0/0**.
+- ⚠ I predicted **5093** and the measured figure is 5092: I counted a *renamed* gate leg as an
+  addition. 5086 + 5 + **1** net. F2-421's rule — a predicted count is a copy of a measurement, and
+  that measurement can be of your own diff.
 
 ## F2-440 — the ESG evidence silo's expiry apparatus is internally inconsistent, which sharpens F2-85 rather than needing its own fix
 
