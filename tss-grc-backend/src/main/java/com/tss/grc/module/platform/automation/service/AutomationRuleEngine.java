@@ -16,6 +16,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
@@ -110,6 +111,18 @@ public class AutomationRuleEngine {
      * rolled back, all of that stood over a change that never happened</b>, because the engine's
      * transaction commits independently of the one that told it.
      *
+     * <p>⚠⚠ F2-442 — {@code REQUIRES_NEW} here is NOT optional, and F2-438 shipped it without.
+     * Spring's {@code RestrictedTransactionalEventListenerFactory} refuses the combination at
+     * CONTEXT STARTUP: <i>"@TransactionalEventListener method must not be annotated with
+     * &#64;Transactional unless when declared as REQUIRES_NEW or NOT_SUPPORTED"</i>. That rule holds
+     * whether or not the listener is {@code @Async} — F2-438 reasoned the propagation mattered only
+     * for the synchronous listener, wrote that demanding it here <i>"would be a gate asking for
+     * something pointless"</i>, and scoped its gate to the synchronous ones accordingly. 🔑 <b>The
+     * application then did not start, with 5,081 tests green, because nothing in this build boots a
+     * context</b> — F2-247's class, landing on the gate written to prevent it. The only instrument
+     * that could see it was launching the app, and the only reason that was noticed is the recorded
+     * rule to grep for {@code Started GrcApplication in} rather than trusting {@code BUILD SUCCESS}.
+     *
      * <p>⚙ {@code fallbackExecution = true} is load-bearing, not defensive: a
      * {@code @TransactionalEventListener} does <b>not</b> receive an event published outside a
      * transaction, and the schedulers publish outside one — {@code SocOpsScheduledSweep} alone has
@@ -120,7 +133,7 @@ public class AutomationRuleEngine {
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onDomainEvent(DomainEvent event) {
         if (event.organisationId() == null) {
             log.warn("[automation] event without organisation_id: {}", event);

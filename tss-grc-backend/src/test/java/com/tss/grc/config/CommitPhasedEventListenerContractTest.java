@@ -185,12 +185,47 @@ class CommitPhasedEventListenerContractTest {
     }
 
     @Test
-    void aSynchronousAfterCommitListenerUsesRequiresNew() {
-        // The half that is easy to get wrong and expensive: AFTER_COMMIT runs with the COMPLETED
-        // transaction still bound, so REQUIRED would join it and write without a live transaction —
-        // AccessRequestService's live-found "the created request came back with a null id".
-        // Asserted only for the synchronous ones: an @Async listener is on another thread and gets
-        // its own transaction regardless, so demanding it there would be a pointless gate.
+    void everyCommitPhasedListenerThatIsTransactionalUsesAPropagationSpringPermits() {
+        // ⚠⚠ F2-442 — THIS LEG WAS SCOPED TO THE SYNCHRONOUS LISTENERS, AND THAT SCOPING ASSERTED
+        // THE EXACT SHAPE SPRING REFUSES. Its previous comment read: "Asserted only for the
+        // synchronous ones: an @Async listener is on another thread and gets its own transaction
+        // regardless, so demanding it there would be a pointless gate." Spring disagrees, and
+        // fatally — RestrictedTransactionalEventListenerFactory throws while
+        // EventListenerMethodProcessor processes the bean, i.e. at CONTEXT STARTUP:
+        //
+        //   "@TransactionalEventListener method must not be annotated with @Transactional unless
+        //    when declared as REQUIRES_NEW or NOT_SUPPORTED"
+        //
+        // So F2-438 shipped an @Async listener with plain @Transactional, the application stopped
+        // starting, and 5,081 tests stayed green because nothing in this build boots a context.
+        // 🔑 F2-247's class landing on the gate written to prevent it — and the gate's own
+        // narrowing is what let it through.
+        //
+        // The requirement is unconditional: any @TransactionalEventListener carrying @Transactional
+        // must declare REQUIRES_NEW or NOT_SUPPORTED, async or not. The REASON still differs by
+        // listener (see the leg below), but the assertion does not.
+        Map<String, Listener> permitted = domainEventListeners();
+        assertThat(permitted).as("the scan found no DomainEvent listener at all").isNotEmpty();
+        for (Map.Entry<String, Listener> e : permitted.entrySet()) {
+            Transactional t = AnnotationUtils.findAnnotation(e.getValue().method(), Transactional.class);
+            if (t == null) continue;                       // no @Transactional, nothing to restrict
+            assertThat(t.propagation()).as(
+                "%s carries @TransactionalEventListener AND @Transactional, so Spring REFUSES TO "
+                + "START unless the propagation is REQUIRES_NEW or NOT_SUPPORTED — and no test here "
+                + "boots a context, so the build cannot see it. This is F2-442: the leg used to be "
+                + "scoped to the synchronous listeners and that scoping let exactly this through.",
+                e.getKey())
+                .isIn(Propagation.REQUIRES_NEW, Propagation.NOT_SUPPORTED);
+        }
+    }
+
+    @Test
+    void theSynchronousListenerNeedsRequiresNewForItsOwnReasonAsWell() {
+        // Kept as a distinct claim: for a synchronous after-commit listener the propagation is not
+        // merely Spring's rule, it is what stops the write happening with no live transaction —
+        // AccessRequestService's live-found "the created request came back with a null id". If the
+        // population ever loses its synchronous member this leg says so rather than passing
+        // vacuously (F2-219: a leg that can no longer fail is not a leg).
         Map<String, Listener> listeners = domainEventListeners();
         List<String> sync = listeners.entrySet().stream()
             .filter(e -> !e.getValue().async()).map(Map.Entry::getKey).toList();
