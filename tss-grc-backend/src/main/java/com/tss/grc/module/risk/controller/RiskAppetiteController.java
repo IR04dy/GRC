@@ -75,9 +75,12 @@ public class RiskAppetiteController {
 
     @PostMapping("/appetite/{id}/approve")
     @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskAppetiteStatement approveAppetite(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        String approver = body.get("approvedBy") != null ? body.get("approvedBy").toString() : null;
-        return appetiteService.approve(id, approver);
+    public RiskAppetiteStatement approveAppetite(@PathVariable Long id) {
+        // F2-431 — no body. The approver is the authenticated principal, so an `approvedBy`
+        // field would be one the server ignores, which tells a caller their value matters
+        // (F2-184). Removing it is safe under Spring Boot's disabled
+        // FAIL_ON_UNKNOWN_PROPERTIES: an existing client that still posts one is unaffected.
+        return appetiteService.approve(id);
     }
 
     @PostMapping("/appetite/{id}/retire")

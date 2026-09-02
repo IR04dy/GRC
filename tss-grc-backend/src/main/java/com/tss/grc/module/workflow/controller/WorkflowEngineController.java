@@ -64,9 +64,8 @@ public class WorkflowEngineController {
     @Operation(summary = "Execute a transition by action code on a running instance")
     public WorkflowInstance executeTransition(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String actionCode = (String) body.get("actionCode");
-        Long executedById = body.get("executedById") instanceof Number n ? n.longValue() : null;
         String comments   = (String) body.get("comments");
-        return engine.executeTransition(id, actionCode, executedById, comments);
+        return engine.executeTransition(id, actionCode, comments);
     }
 
     @GetMapping("/instances/by-target")

@@ -1785,7 +1785,9 @@ export const ermAdvancedApi = {
   createAppetite: (body: Partial<RiskAppetiteStatementDto>) => api.post<RiskAppetiteStatementDto>('/api/v1/risk/appetite', body),
   updateAppetite: (id: number, body: Partial<RiskAppetiteStatementDto>) => api.put<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}`, body),
   deleteAppetite: (id: number) => api.delete<void>(`/api/v1/risk/appetite/${id}`),
-  approveAppetite: (id: number, approvedBy: string) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/approve`, { approvedBy }),
+  // F2-431 — no `approvedBy`. The server records the authenticated principal, so sending
+  // one was a field the server ignores, which tells a caller their value matters (F2-184).
+  approveAppetite: (id: number) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/approve`),
   retireAppetite:  (id: number) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/retire`),
   updateExposure:  (id: number, value: number, notes?: string) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/exposure`, { value, notes }),
   appetiteBreaches: (id: number) => api.get<AppetiteBreachEventDto[]>(`/api/v1/risk/appetite/${id}/breaches`),
@@ -3908,8 +3910,11 @@ export const workflowApi = {
   startInstance:  (body: { definitionId: number; targetModule: string; targetEntity: string; targetEntityId: number; ownerId?: number }) =>
     api.post<WorkflowInstanceDto>('/api/v1/workflow/instances', body),
   getInstance:    (id: number) => api.get<unknown>(`/api/v1/workflow/instances/${id}`),
-  executeTransition: (id: number, actionCode: string, executedById?: number, comments?: string) =>
-    api.post<WorkflowInstanceDto>(`/api/v1/workflow/instances/${id}/transitions`, { actionCode, executedById, comments }),
+  // F2-431 — no `executedById`. workflow.action_log records who moved the instance, taken
+  // from the principal; `ownerId` on startInstance stays, because an ASSIGNMENT is the
+  // caller's to choose and an ATTRIBUTION is not (F2-226).
+  executeTransition: (id: number, actionCode: string, comments?: string) =>
+    api.post<WorkflowInstanceDto>(`/api/v1/workflow/instances/${id}/transitions`, { actionCode, comments }),
   findInstance:   (targetModule: string, targetEntity: string, targetEntityId: number) =>
     api.get<WorkflowInstanceDto | null>(`/api/v1/workflow/instances/by-target?targetModule=${targetModule}&targetEntity=${targetEntity}&targetEntityId=${targetEntityId}`),
 };

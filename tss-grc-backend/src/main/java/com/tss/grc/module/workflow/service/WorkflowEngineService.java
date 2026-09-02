@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.workflow.entity.*;
@@ -125,7 +126,11 @@ public class WorkflowEngineService {
         log.setActionCode("__init__");
         log.setFromStateId(null);
         log.setToStateId(initial.getId());
-        log.setExecutedById(ownerId);
+        // F2-431 — this recorded the ASSIGNEE as having performed the start. `ownerId` is a
+        // legitimate assignment (i.setOwnerId above, the caller's to choose) and it was ALSO
+        // being reused as the actor: two different facts from one value, which is F2-226's
+        // distinction between a name who WILL act and the person who DID.
+        log.setExecutedById(CurrentActor.requireUserId("start a workflow instance"));
         log.setExecutedAt(LocalDateTime.now());
         log.setComments("Instance started; entered initial state " + initial.getCode());
         logRepo.save(log);
@@ -153,7 +158,7 @@ public class WorkflowEngineService {
     }
 
     @Transactional
-    public WorkflowInstance executeTransition(Long instanceId, String actionCode, Long executedById, String comments) {
+    public WorkflowInstance executeTransition(Long instanceId, String actionCode, String comments) {
         Long org = TenantContext.getCurrentTenant();
         WorkflowInstance i = instanceRepo.findById(instanceId)
             .filter(x -> x.getOrganisationId().equals(org))
@@ -198,7 +203,11 @@ public class WorkflowEngineService {
         log.setActionCode(actionCode);
         log.setFromStateId(fromStateId);
         log.setToStateId(tr.getToStateId());
-        log.setExecutedById(executedById);
+        // F2-431 — the caller used to name the executor, beside setExecutedAt(now()) two
+        // lines down. workflow.action_log IS the trail of who moved an instance through
+        // which transition, on the engine 14 modules adopt, so a caller-declared executor
+        // is the one field in it that could not be relied on.
+        log.setExecutedById(CurrentActor.requireUserId("execute a workflow transition"));
         log.setExecutedAt(LocalDateTime.now());
         log.setComments(comments);
         logRepo.save(log);

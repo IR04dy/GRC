@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
@@ -79,12 +80,17 @@ public class RiskAppetiteService {
     }
 
     @Transactional
-    public RiskAppetiteStatement approve(Long id, String approvedBy) {
+    public RiskAppetiteStatement approve(Long id) {
         RiskAppetiteStatement s = require(id);
         if (!"DRAFT".equals(s.getStatus()) && !"UNDER_REVIEW".equals(s.getStatus()))
             throw new IllegalArgumentException("Cannot approve from status: " + s.getStatus());
         s.setStatus("APPROVED");
-        s.setApprovedBy(approvedBy);
+        // F2-431 — the caller used to name the approver, beside setApprovedAt(now()) on the
+        // next line. The clock is the proof: by stamping WHEN itself the server has already
+        // declared that it is the recorder of this act, so WHO comes from the principal
+        // (F2-223's family, F2-236's remedy). A risk-appetite statement's approval is the
+        // artefact a board or CRO signs off; an approver the caller typed is not one.
+        s.setApprovedBy(CurrentActor.requireUsername("approve a risk appetite statement"));
         s.setApprovedAt(java.time.LocalDate.now());
         return repo.save(s);
     }

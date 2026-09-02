@@ -463,14 +463,63 @@ class SplitAttributionContractTest {
             Set<String> receivers = new LinkedHashSet<>();
             while (fld.find()) receivers.add(fld.group(1));
             for (String recv : receivers) {
-                Matcher call = Pattern.compile(
-                    "\\b" + Pattern.quote(recv) + "\\s*\\.\\s*" + Pattern.quote(method) + "\\s*\\(")
-                    .matcher(src);
+                Pattern callPat = Pattern.compile(
+                    "\\b" + Pattern.quote(recv) + "\\s*\\.\\s*" + Pattern.quote(method) + "\\s*\\(");
+
+                // Pass A — the argument expression itself reads the request (F2-234).
+                Matcher call = callPat.matcher(src);
                 while (call.find()) {
                     String[] parts = balancedArg(src, call.start()).split(",(?![^()]*\\))");
                     if (idx < parts.length && REQUEST_VALUE.matcher(parts[idx]).find()) return true;
                 }
+
+                // Pass B (F2-431) — the argument is a LOCAL that aliases a request read. Scoped to
+                // the enclosing controller method, because a local is only resolvable in its own
+                // scope; strictly additive, so this can only ever ADD a site.
+                for (String[] m : methodsWithParams(src)) {
+                    String mBody = m[2];
+                    Matcher inner = callPat.matcher(mBody);
+                    while (inner.find()) {
+                        String[] parts = balancedArg(mBody, inner.start()).split(",(?![^()]*\\))");
+                        if (idx < parts.length && localAliasesARequestValue(parts[idx], mBody)) {
+                            return true;
+                        }
+                    }
+                }
             }
+        }
+        return false;
+    }
+
+    /**
+     * F2-431 — is {@code arg} a bare local whose assignment, in this same method, reads the request?
+     *
+     * <p>⚠⚠ <b>Why this hop is load-bearing.</b> The house idiom for a raw {@code Map} body is two
+     * hops, and the first is not the call:
+     *
+     * <pre>
+     *   String approver = body.get("approvedBy") != null ? body.get("approvedBy").toString() : null;
+     *   return appetiteService.approve(id, approver);
+     * </pre>
+     *
+     * So {@link #REQUEST_VALUE} sees {@code approver} — a bare identifier — and the site is
+     * classified as not-from-the-wire, which is indistinguishable from a server stamp. That is the
+     * <b>third</b> time this two-hop shape has defeated a detector in this lineage: F2-233 for a
+     * local bound by an {@code instanceof} pattern (12 setter sites across 6 services), F2-234 for
+     * the scalar parameter itself, and now for the argument at the call site. <b>Assume a fourth.</b>
+     *
+     * <p>⚠ Deliberately ONE hop and scoped to the enclosing method. Following a chain would need
+     * real dataflow, which a regex cannot do (F2-182); and resolving a local against the whole file
+     * would pair an assignment in one handler with a call in another.
+     */
+    static boolean localAliasesARequestValue(String arg, String enclosingMethodBody) {
+        String bare = arg.trim();
+        if (!bare.matches("\\w+")) return false;
+        Matcher a = Pattern.compile(
+            "\\b[\\w<>\\[\\]?.,]+\\s+" + Pattern.quote(bare) + "\\s*=\\s*([^;]+);")
+            .matcher(enclosingMethodBody);
+        while (a.find()) {
+            if (REQUEST_VALUE.matcher(a.group(1)).find()) return true;
         }
         return false;
     }
@@ -793,6 +842,73 @@ class SplitAttributionContractTest {
                 + "F2-223: where a method lets the caller supply the clock too, the act may not "
                 + "be this call, so its performer need not be the caller.")
             .isEmpty();
+    }
+
+    /**
+     * F2-431 — the call-site resolver must follow ONE HOP of local aliasing, in both directions.
+     *
+     * <p>Pass A (F2-234) asks whether the argument EXPRESSION reads the request. The house idiom
+     * for a raw {@code Map} body is two hops and the first is not the call, so the argument is a
+     * bare local and the site was classified as not-from-the-wire — which is indistinguishable
+     * from a server stamp. That narrowing hid <b>four</b> sites, two of them in the workflow
+     * engine's action log, and only one of the four had been found by reading.
+     *
+     * <p>⚠ Both directions matter. A local assigned from something that is <em>not</em> the request
+     * — {@code CurrentActor.requireUserId(...)}, a repository read — must NOT pair, or this gate
+     * would fail on precisely the fix it exists to demand (F2-214).
+     */
+    @Test
+    @DisplayName("the call-site resolver follows one hop of local aliasing, and only one")
+    void aLocalThatAliasesARequestValueIsResolvedAndOneThatDoesNotIsSpared() {
+        String fromBody = """
+                public X approve(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+                    String approver = body.get("approvedBy") != null ? body.get("approvedBy").toString() : null;
+                    return svc.approve(id, approver);
+                }
+            """;
+        assertThat(localAliasesARequestValue("approver", fromBody))
+            .as("the exact shape that hid RiskAppetiteService#approve: bound in a ternary, "
+                + "passed as a bare identifier")
+            .isTrue();
+
+        String fromInstanceof = """
+                public X act(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+                    Long executedById = body.get("executedById") instanceof Number n ? n.longValue() : null;
+                    return svc.act(id, executedById);
+                }
+            """;
+        assertThat(localAliasesARequestValue("executedById", fromInstanceof))
+            .as("the workflow engine's shape — an instanceof pattern is still a request read")
+            .isTrue();
+
+        String fromPrincipal = """
+                public X approve(@PathVariable Long id) {
+                    String approver = CurrentActor.requireUsername("approve");
+                    return svc.approve(id, approver);
+                }
+            """;
+        assertThat(localAliasesARequestValue("approver", fromPrincipal))
+            .as("THE FIX must not pair — a gate that fires on the remedy it demands trains the "
+                + "next reader to edit the assertion instead of the code (F2-214)")
+            .isFalse();
+
+        String fromStore = """
+                public X approve(Long id) {
+                    String approver = repo.findById(id).orElseThrow().getOwnerName();
+                    return svc.approve(id, approver);
+                }
+            """;
+        assertThat(localAliasesARequestValue("approver", fromStore))
+            .as("a value read from the STORE is the server's, not the caller's (F2-233's rule: "
+                + "the id is the caller's; the row it names is the server's)")
+            .isFalse();
+
+        assertThat(localAliasesARequestValue("body.get(\"x\").toString()", fromBody))
+            .as("only a BARE identifier is a candidate — a whole expression is Pass A's job")
+            .isFalse();
+        assertThat(localAliasesARequestValue("approver", ""))
+            .as("no enclosing method body, nothing to resolve")
+            .isFalse();
     }
 
     /**
