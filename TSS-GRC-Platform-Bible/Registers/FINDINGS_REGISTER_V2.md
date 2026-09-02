@@ -15219,6 +15219,80 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-427 — the column F2-372 did not normalise, three lines from the one it did
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — reachable through the API today, on a PDPL Article 4 statutory figure; the classification half of the same shape is **latent**, held harmless by F2-372's writer rather than by anything the reader does ([[F2-182]] / [[F2-283]]) |
+| **Source** | a fresh instrument — censusing the fingerprint that produced [[F2-420]], [[F2-421]] and [[F2-422]] |
+| **Size** | S — one helper rename, two write paths, five counts, one shared constant; three behavioural legs; no migration |
+
+⚠⚠ **A DECLARED-AND-UNCALLED AGGREGATE FINDER IS THE FINGERPRINT OF A HAND-ROLLED COUNT, AND THE HAND-ROLLED COUNT IS WHERE THE POPULATION QUESTION HIDES.** Three findings began from exactly that tell and nobody had censused it:
+
+| finding | the uncalled finder | what the hand-rolled count did instead |
+|---|---|---|
+| [[F2-420]] | `countByOrganisationIdAndRegulator` | grouped a **capped** page whose order was orthogonal to the figure's question |
+| [[F2-421]] | `countByOrganisationId` | derived an overdue count from a window ordered **adversely** to overdue-ness |
+| [[F2-422]] | `countByOrganisationIdAndSeverity` (declared twice) | computed four severity counts over an **unsorted** cap |
+
+Measured: **325 aggregate finder declarations in repositories, 276 called, 49 DECLARED AND UNCALLED.** Paired against a hand-rolled count on the same field in the same module — because an uncalled finder is only a locator, and what makes it a defect is a service computing the same figure by hand ([[F2-252]]) — **7 candidates**, and `DataAssetRepository` carries **two** uncalled counts sitting beside a dashboard that hand-counts **both** their columns.
+
+🔑🔑 **THE DEFECT IS THREE LINES FROM A FIX THAT ALREADY LANDED.** [[F2-372]] closed the case-sensitivity bypass on `dataclass.data_asset.classification` — normalise on write, because the column is case-insensitively collated, has no CHECK, and every reader compares case-**sensitively**. `classifyAsset` now reads:
+
+```java
+String classification = normaliseToken(req.classification());          // F2-372
+String prev           = normaliseToken(a.getClassification());         // F2-372, for legacy rows
+a.setClassification(classification);
+if (req.pdplSpecialCategory() != null) a.setPdplSpecialCategory(req.pdplSpecialCategory());   // RAW
+```
+
+**[[F2-215]]'s two-of-N at the closest range this register has recorded it** — the next statement, in the same method, in the same commit. And `createAsset` had its own raw write of the same column. The shape is identical: the **`dataclass` schema carries ZERO check constraints**, neither DTO component declares a validation annotation (`String pdplSpecialCategory`, unannotated on both records), and the collation is case-insensitive. So `"none"` was stored verbatim.
+
+⚠⚠ **THREE READERS, ALL CASE-SENSITIVE AGAINST `NONE`, AND THE FIGURE IS STATUTORY.** `pdpl_special_category` is the PDPL Article 4 special category (`NONE | HEALTH | BIOMETRIC | GENETIC | RELIGIOUS | RACIAL | POLITICAL | CRIMINAL`):
+
+- the dashboard's `aSpec` — `!"NONE".equals(...)` — so a lowercase `none` is **counted AS a special category**, over-reporting how many data assets hold biometric/criminal/health data;
+- the `DATA_ASSET_CLASSIFIED` event payload, which is what an automation rule matches against — [[F2-372]]'s own mechanism, one field over;
+- the frontend's uppercase-keyed `SpecialCategory` label map, so a non-canonical value renders unlabelled.
+
+🔑 **The direction is PESSIMISTIC** ([[F2-210]]) — it over-states a statutory exposure, which is the less likely of the two to be reported, because *"we hold more special-category data than I thought"* is a plausible thing for an organisation to believe about itself.
+
+⚠⚠ **AND THE CLASSIFICATION HALF IS THE MIRROR, FAILING THE OTHER WAY FROM ONE CAUSE.** Its four bucket counts were case-sensitive too, so a single non-canonical row falls into **NO** bucket while `aTotal` is `allA.size()` computed independently — the four then silently **under**-sum the total ([[F2-407]]'s subset-versus-umbrella shape). **Two figures on one dashboard failing in opposite directions from one cause**, which is [[F2-196]]'s rule that a vocabulary mismatch has no direction, freshly instanced.
+
+⚙ **Fix, both halves.**
+
+- **Writer**: normalise `pdpl_special_category` on **both** write paths with the helper F2-372 introduced, renamed `normaliseClassification` → **`normaliseToken`** because it now serves two columns and a helper named after one of its two callers answers the question a reader was about to ask ([[F2-184]]). **Coerce, not require** ([[F2-182]]): no CHECK and no validation anywhere, so an out-of-vocabulary value succeeds today and refusing it would break a request that works — the identical call F2-372 made for the classification half.
+- **Reader**: the dashboard's five bucket counts now use the **two uncalled repository finders**, so the **database** compares under the column's own collation and the answer is correct **by construction** rather than by a Java comparison the next reader could copy wrongly ([[F2-213]] — absent rather than latent). ⚠ They are **derived** finders, so they respect `DataAsset`'s `@Where(is_deleted = 0)` exactly as the list fetch does and the buckets still describe the same population as the total — checked, not assumed. ⚠ And `<> 'NONE'` is **UNKNOWN for NULL**, so a null category is excluded precisely as the Java `!= null` guard excluded it: same semantics, now case-correct.
+- `SPECIAL_CATEGORY_NONE` declared once for what had been three literal copies ([[F2-217]]).
+- ⚠ **The four classification literals stay literals**, deliberately: `classOrder` below already holds that vocabulary, and a second list over the same tokens is [[F2-196]]'s own defect. The shared constant exists because *that* token had three copies, not because sharing is tidier.
+
+⚠ **Measured in both databases** ([[F2-183]]): 26 rows each, every stored value canonical, **0 rows outside a bucket** — so the special-category half is **live and reachable through the API** while the classification half is **latent**, held harmless by F2-372's writer rather than by the reader. Say which you have ([[F2-283]]).
+
+⚠⚠ **THREE DETECTOR ERRORS OF MINE IN THE FUNNEL THAT FOUND IT, AND TWO WERE IN THE QUIET DIRECTION.** The census that preceded this went **1,362 → 49 → 0** on a different question and the subtractions are the content:
+
+| pass | answer | what was wrong |
+|---|---|---|
+| *which NOT NULL column has no filling mechanism?* | **1,362** across 408 tables | **the framing** — a NOT NULL business column *should* be caller-supplied, so the number measures nothing |
+| narrowed to *no setter call, no builder method, no record component anywhere* | **49** | usable, but still two false-positive classes |
+| subtract entity-bound (JACKSON fills them reflectively, so there is no `setX(` in source at all) and seed-only catalogue tables | **0** | — |
+
+⚠ And the third error: `new\s+X\s*\(\s*\)` requires **empty** parens, so an entity built with a constructor argument reported 0 constructions. It cost exactly one label — `PolicyDocumentControlLink` **is** constructed in Java (`new PolicyDocumentControlLink(orgId, policyId, cid)` at `PolicyManagementService:196`), so its column is filled by the constructor and my "seed-only" verdict for it was wrong. 🔑 **A label published for the wrong reason is worse than a missing one, because it looks measured.**
+
+⚙ **Clean sweeps recorded so nobody re-runs them** ([[F2-216]]): the NOT NULL funnel above (**0** columns nothing can fill, with every subtraction named); an instant-typed field over a `DATE` column **0 of 1,033**; a `LocalDate` over a `datetime2` column **0**; `@DecimalMax` looser than its column **0 of 18**; an `@Query` with `JOIN FETCH` **and** a `Pageable` (HHH000104's in-memory pagination) **0**; `@Scheduled(fixedRate)` **0 of 22**; and cache eviction bounded rather than defective, all five caches sharing one `expireAfterWrite(5, TimeUnit.MINUTES)`.
+
+⚙ **Filed, not forced** ([[F2-188]]):
+
+- ⚠⚠ **A `CHECK` on `pdpl_special_category` is NOW CHEAP and was not before**, because this slice closed the column's last open writer — which is exactly the sequence [[F2-183]] demands, and exactly what F2-372 filed for the classification half. Both columns are candidates in one migration. The entity's javadoc declares the 8-token PDPL vocabulary and only 3 tokens are stored, so the constraint would need the declared set read rather than the observed one.
+- **`opres` — the uncalled finder there is the WRONG fix, and that is worth recording.** `countByAssessmentIdAndOrganisationIdAndCurrentScoreIsNotNull` counts all scored cells, which is the *current* numerator; the denominator is the **active PILLAR** count, so using the finder would enshrine in SQL the population mismatch [[F2-363]] filed (a ratio that can read `6/5`). ⚠ And it is **unreachable**: `setIsActive` has **zero** call sites and there is no pillar endpoint at all, so a pillar can never be deactivated through the platform. A narrowing of a filed item rather than a new one.
+- The remaining **5 pairings** of the 49-member census (`KriMeasurementRepository` ×2, `RiskAttestationRepository`, `RiskReviewRepository`, `AppsecFindingRepository` and the rest), as a work list with **no verdicts**.
+- `assetsByStatus` groups by `getStatus()` case-sensitively too — safe today because `status` is written from Java literals and is therefore server-owned, checked rather than assumed.
+
+⚙ **Verification.** `DataclassLifecycleTest` 12 → 15 legs, green; hermetic ([[F2-320]] / [[F2-325]] — Mockito, `ArgumentCaptor` on the save and on the published event, no DB and no Spring context). ⚠ The dashboard leg's **fixture is what makes it discriminate**: every asset in the stubbed list carries a lowercase classification and category, so a Java `.equals()` against an upper-case literal counts zero of them and only a reader that lets the database compare returns the finders' values. **Two surgical pre-fix controls** ([[F2-274]] / [[F2-287]] / [[F2-289]], fix committed first — [[F2-297]]): reverting both write paths to raw fired legs 1 and 2 with leg 3 green; reverting the dashboard to the hand-rolled streams fired leg 3 alone. So each leg discriminates on its own half. ⚠ Two errors of mine caught by running it — a fixture in the wrong precondition state (`classifyAsset` requires `DRAFT` or `RECLASSIFY`), and a post-check asserting 4 `normaliseToken` occurrences where there are 5; both stopped before anything was written, which is what fail-before-write is for ([[F2-247]]).
+
+🔑 **Grep for a `countBy`/`sumBy` finder nothing calls. It marks a place where somebody counted by hand — and the hand-rolled count is where the cap, the ordering, or the casing goes wrong. Then ask whether the finder is the FIX or would merely enshrine the same wrong population in SQL: for `dataclass` it was the fix, for `opres` it would have been the defect.**
+
+---
+
 ## F2-426 — a check-then-insert with no unique index is a guard that breaks itself
 
 | | |
