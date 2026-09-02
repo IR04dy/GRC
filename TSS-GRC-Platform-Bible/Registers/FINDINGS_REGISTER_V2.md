@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-440** | **The ESG evidence silo accepts an expiry nothing honours and its sweep cannot reach 6 of 13 approved rows — measured, and deliberately NOT fixed, because retiring that clientless endpoint is an OPEN owner decision (F2-85)** | Measurement | P3 |
 | **F2-439** | **Two ways a mapping can be unusable that a hermetic build cannot see — a path placeholder no `@PathVariable` can satisfy (500 for every caller) and two handlers claiming one (verb, path) (the app refuses to start). Both measured at ZERO and gated; the query-key sibling measured and rejected as undecidable by a scan** | Latent hazard | P3 |
 | **F2-438** | **Two event listeners, neither commit-phased, failing in OPPOSITE directions — the platform's own rule names both modes in one sentence and was applied at one service and at neither listener** | Correctness | P2 |
 | **F2-437** | **Three self-reporting controls with nothing that reads them — and the slice that counted three instances of "a channel with no reader" made its own remedy the fourth** | Assurance | P2 |
@@ -15225,6 +15226,133 @@ question of the register the refutation had walked into is what found the P1.
   upstream-owned, and the nullable ones are inert.
 
 ---
+
+## F2-440 — the ESG evidence silo's expiry apparatus is internally inconsistent, which sharpens F2-85 rather than needing its own fix
+
+| | |
+|---|---|
+| **Status** | 📏 **MEASURED 2026-09-03 — no code change, deliberately.** The defect is real and sits on a superseded, clientless endpoint whose retirement is an OPEN owner decision (F2-85) |
+| **Severity** | P3 — a wire that accepts an expiry nothing honours, and a sweep that cannot reach 6 of 13 approved rows, on a register the product no longer shows |
+| **Source** | two data censuses over both databases, then F2-387's filed "unbounded end" vein re-derived |
+| **Size** | S — the whole finding is a measurement against an existing filing |
+
+### The outcome is a measurement, and the reason is the point
+
+`sust.evidence` carries **two** end-of-validity columns and **`SustainabilityEvidence` is the only
+entity in the platform that does** (measured by reflection over every `@Entity`: 1 of 421). The
+expiry sweep keys on `valid_to`; `expiry_date` is accepted on the wire — the controller binds the
+**entity** on both `POST` and `PUT /{id}`, and `update` copies it — stored, round-tripped in the
+response, and **honoured by nothing**: not the sweep, not `validate()` (which checks only the
+`valid_from`/`valid_to` interval), not `aggregate()`'s expiring-soon window.
+
+🔑 **And the platform's own naming convention points a caller at the dead column.** Nine entities
+call their expiry column `expiry_date` — `CyberEvidence`, `NdiEvidenceItem`, `PolicyDocument`,
+`PolicyException`, `CrossBorderTransfer`, `EnvPermit`, `DigitalSignatureTransaction` among them —
+and seven call it `valid_to`. So a caller setting the expiry on an ESG evidence item would reach for
+the name three other **evidence** registers use, get a 200 with their value echoed back, and the
+sweep would ignore it for ever.
+
+⚠⚠ **It is not fixed, and forcing a fix would be the error.** `/api/sustainability/evidence` is a
+**superseded silo with no frontend client at all** — `lib/evidenceItems.ts` says so in its own
+header (*"The old `/api/sustainability/evidence` silo is superseded by this"*), F2-68(c) deleted its
+last client, and **retiring the endpoint, entity, service and table is already an open filed owner
+decision: F2-85**. Hardening an endpoint the platform has decided to retire is exactly the
+low-value change the working discipline forbids (F2-188), and it is the inverse of F2-201, where
+hardening a clientless server side first was right *because the decision was to wire it*.
+
+### 🔑🔑 What this adds to F2-85, which is the useful half
+
+F2-85's argument is *"half a retirement is worse than either end of it — the endpoint still carries
+an authorisation surface **and a `sweep-expired` mutator** for data the product no longer shows."*
+Measured, that mutator is **partly inert**:
+
+- `sweepExpiredForOrg` is `findByOrganisationIdAndApprovalStatusAndValidToBefore(org, "APPROVED",
+  today)`, so a row whose `valid_to` is NULL makes the predicate UNKNOWN and is **never selected**.
+- **6 of the 13 APPROVED rows have no `valid_to` at all**, and a 7th is dated **2056-01-15** —
+  identical in dev and prod. So the sweep can never reach nearly half the approved population.
+- `expiry_date` is set on **0 of 21 rows** including the soft-deleted ones, so the second column has
+  never once been written.
+
+Figures, both databases, byte-identical: **21 rows total, 18 live** (F2-85 quotes 21; the live
+figure is what a reader sees), APPROVED 13 / PENDING_REVIEW 4 / EXPIRED 1.
+
+⚙ So the measurement points the same way F2-85 does — retire it — and if anyone chooses to **keep**
+it instead, they now know the expiry apparatus needs two fixes first: refuse or honour
+`expiry_date`, and decide what a NULL end means.
+
+### ⚠ F2-387's filing was right about the shape and named the wrong registers
+
+That finding filed *"a degenerate/unbounded end (no `@Future`, no bound) letting stale evidence read
+as covered forever, a distinct 'missing temporal bound' vein"* and named
+`EvidenceItem.validFrom/validTo` and `DataException.validFrom/validUntil`. Measured, in both
+databases:
+
+| register | rows | no end | beyond 10 years |
+|---|---|---|---|
+| `evidence.evidence_items` (APPROVED) | 26 | **0** | **0** |
+| `dataclass.data_exception` | 7 | **0** | **0** |
+| `sust.evidence` (APPROVED) | 13 | **6** | **1** |
+
+🔑 **Both registers the filing named are clean, and the third — which it did not name — carries all
+of it.** F2-198's shape at a filing's own population: a filing inherits the registers the slice that
+wrote it happened to be looking at.
+
+⚙ Whether a NULL end is a defect at all is a **product question and is filed as such**: a
+sustainability-committee charter arguably never expires, while *"Authority GHG inventory FY2027 —
+verification statement"* covers exactly one reporting year, and both are in the six. Refusing a NULL
+end would fail on the first — the one failure a fix must never have (F2-214).
+
+### Two censuses recorded so nobody re-runs them (F2-216)
+
+**(A) Implausible dates.** Every date/datetime column in both databases, **1,937 of them**, against
+a plausibility window. Outside 2015–2040: **8 columns**, of which the counterparty-onboarding and
+sanctions date-of-birth ones are **legitimate** (a counterparty onboarded in 2008, a subject born in
+1968 — ⚠ my window was simply wrong for a DOB). Excluding DOB and looking only **beyond 2040**, the
+honest answer is **3 columns, 1 row each**: `sust.evidence.valid_to` at 2056 and
+`sust.reporting_year.period_start`/`period_end` at 2099, which **F2-435 already filed**.
+
+**(B) Duplicate business references.** **399** reference-shaped text columns; **55** have a duplicate
+group. ⚠⚠ **That number is my grouping's artefact, not a defect count.** I keyed on
+`(organisation_id, code)` while most of the 55 are **parent references scoped to something else** —
+`rrp.rrp_indicator.indicator_code` is unique per *cycle*, `cyber.cyber_controls.control_number` per
+*framework*, `platform.authority_document_citations.citation_code` per *document*,
+`policy.documents.policy_code` per *version*. 🔑 **F2-252's rule: a scan locates, and THE PAIRING IS
+THE MEASUREMENT.** Doing this properly needs the intended key read per register, which is a reading
+job and a population (F2-433's territory), not a slice — filed with the caveat attached so the 55 is
+never mistaken for a finding.
+
+### ⚠⚠ My own usage scan cleared the very field under investigation
+
+The census of *"which mapped temporal field does nothing read or write?"* returned **INERT = 0**,
+including `SustainabilityEvidence.expiryDate` — which had just been shown to have no reader. The
+detector was keyed on the field **NAME**, and `expiryDate` is one of the most duplicated field names
+in the tree, so a bare-token search finds it everywhere. 🔑 **CLAUDE.md records this exact mistake —
+*"a method-NAME fallback silently clears the methods most likely to be duplicated elsewhere; resolve
+per owner type"* (F2-187) — and I made it in a scan whose whole subject was a duplicated name.**
+And the over-approximation was **deliberate**, because F2-201's rule is that for a DELETE the safe
+direction is to over-approximate usage; here that same choice is what produced the false clear.
+
+Resolved properly — **ASM over the shipped bytecode, per owner type**, which CLAUDE.md also
+prescribes — the answer is exact and decisive: `getExpiryDate`/`setExpiryDate` have **one**
+cross-class caller each (`SustainabilityEvidenceService#update`), against **five** for `getValidTo`.
+So the field is not inert; it is **written from the request and consulted by nothing**, which is the
+worse shape, because the caller gets positive confirmation.
+
+### Verification
+
+- No code change, no migration, no database write. Every database access was read-only, in **both**
+  databases, and every figure published here was re-derived by a confirming script rather than
+  carried from a first pass (F2-273).
+- Build untouched at **5086/0/0**.
+
+### Filed
+
+- **F2-85 stands, better argued.** Retire the silo, or keep it and fix the two expiry defects first.
+- **The NULL-end question** on `sust.evidence` — 6 of 13 APPROVED rows — as an owner decision, with
+  the two example rows that pull in opposite directions named.
+- **The duplicate-reference census**, with the pairing caveat: 55 columns is a starting point for
+  reading, not a defect count.
+- **`sust.reporting_year`'s 2099 period** remains where F2-435 filed it.
 
 ## F2-439 — two ways a mapping can be unusable that a hermetic build cannot see
 
