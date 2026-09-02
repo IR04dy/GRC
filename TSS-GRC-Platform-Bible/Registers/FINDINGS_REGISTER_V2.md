@@ -15219,6 +15219,92 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-431 — the call-site resolver stopped at the argument, and four split attributions sat behind it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — four governance records where the server stamped WHEN with certainty and took WHO on the caller's word: a risk-appetite statement's approval, an emergency-notification dispatch, and **both** writers of `workflow.action_log`, the trail of who moved an instance through which transition on the engine 14 modules adopt |
+| **Source** | executing [[F2-234]]'s own mechanism against a site found by reading — the detector then found three more |
+| **Size** | S — four call sites, one resolver clause, one behavioural test repurposed; no migration |
+
+⚠⚠ **A CALL-SITE RESOLVER THAT READS THE ARGUMENT EXPRESSION CANNOT SEE A LOCAL THAT ALIASES THE REQUEST, AND THE HOUSE `Map`-PAYLOAD IDIOM IS EXACTLY THAT SHAPE.** [[F2-223]] established the family: a method stamps a `<verb>At` from the server's own clock and takes the person who performed that same act from the request body. **The clock is the proof** — by stamping WHEN itself the server has already declared that it is the recorder of this act.
+
+[[F2-234]] built the detector for the parameter-borne variant, on exactly the right principle ([[F2-222]]'s): the wire-ness of a bare scalar parameter is a fact about the method's **call sites**. Its resolver is
+
+```java
+if (idx < parts.length && REQUEST_VALUE.matcher(parts[idx]).find()) return true;
+```
+
+and the house idiom for a raw `Map` body is **two hops, of which the first is not the call**:
+
+```java
+String approver = body.get("approvedBy") != null ? body.get("approvedBy").toString() : null;
+return appetiteService.approve(id, approver);
+```
+
+so the argument is a bare local, `REQUEST_VALUE` does not match it, and the site is classified as *not from the wire* — **which is indistinguishable from a server stamp.**
+
+🔑 **THIRD TIME THIS TWO-HOP SHAPE HAS DEFEATED A DETECTOR IN THIS LINEAGE.** [[F2-233]] recorded it for a local bound by an `instanceof` pattern (*"the house `Map`-payload idiom is two hops and the first is not an assignment"* — 12 setter sites across 6 services); [[F2-234]] hit it for the scalar parameter itself and built the pass that resolves it; and it recurs one noun over, at the **argument** of that very pass. **Assume a fourth.**
+
+### What the widening found
+
+One site was found by reading. The widened resolver found **four**:
+
+| site | what it records |
+|---|---|
+| `RiskAppetiteService#approve::approvedBy` | the approval of a risk-appetite statement — the artefact a board or CRO signs off — with the approver **typed into a `window.prompt`** |
+| `CrisisCommsService#send::sentById` | who dispatched an emergency notification. ⚠ The controller's own `@Operation` summary documents the body as `{templateId, audienceId, planId?, placeholders?}` — **`sentById` is undocumented and was trusted anyway** |
+| `WorkflowEngineService#executeTransition::executedById` | `workflow.action_log` **is** the trail of who moved an instance through which transition, on the engine 14 modules adopt |
+| `WorkflowEngineService#startInstance::executedById` | see below — a different sub-shape |
+
+🔑 **Closing a detector gap is how you find the population you did not know you had** ([[F2-233]]/[[F2-262]]'s rule): 1 by reading, 4 by the instrument.
+
+### The `startInstance` sub-shape is [[F2-226]]'s distinction
+
+```java
+i.setOwnerId(ownerId);          // a legitimate ASSIGNMENT — the caller's to choose
+...
+log.setExecutedById(ownerId);   // ...ALSO used as the actor
+log.setExecutedAt(LocalDateTime.now());
+```
+
+**One value served two different facts** — who the instance is *assigned to* and who *started it* — so the log credited the assignee with an act they had not performed. F2-226: *a name who WILL act is an assignment, not an attribution.* ⚙ So the fix here is **not** to stop taking `ownerId` from the body (that is correct); it is to stop reusing it as the actor. `ownerId` survives on the wire and in the entity, and a gate leg asserts it.
+
+### Verification
+
+All four take the actor from `CurrentActor`, which **refuses rather than recording a blank** ([[F2-236]]). Both routes per site are `@PreAuthorize`-guarded so a principal always exists; a refusal leg pins that a future off-request caller fails loudly rather than writing an unattributed row.
+
+⚠⚠ **THE PAIRED CONTROL IS THE WHOLE ARGUMENT, AND IT IS ONE CLAUSE APART** ([[F2-289]]): on the **same** pre-fix tree, the widened gate reports **exactly the four** and the gate with Pass B disabled reports **ZERO**. Reverting both halves at once could not have told you which leg sees which half. The gate file stays at its new state throughout, which is the point; the behavioural test is reverted with the production files because the signature change would otherwise fail to **compile**, and a control that cannot run reads exactly like a gate that passed ([[F2-287]]/[[F2-414]]).
+
+⚠⚠ **`git checkout <commit> -- <paths>` WRITES THE INDEX AS WELL AS THE WORKTREE, SO A BARE `git checkout -- <paths>` IS NOT A RESTORE.** My harness reverted with `git checkout 6a7cab96^ -- …` and restored with `git checkout -- …`, which reads **from the index** — and the index now held the pre-fix content, so the "restore" put the tree back to pre-fix. The post-fix leg then measured the reverted code and reported the four again. 🔑 **Without that third leg I would have committed with the fix silently reverted.** Restore with `git checkout HEAD -- <paths>`, and always run a post-restore leg that must be green.
+
+⚠⚠ **[[F2-193]] IN MY OWN POST-CONDITION FOR THE SECOND SLICE RUNNING.** The repurposed assertions quote `isEqualTo(99L)` to record what they replace, and my patch script's post-condition asserted that string was absent — so it fired on the comment explaining its own removal. Fail-before-write held both times. 🔑 **This register's convention of quoting the sentence you replace makes every raw-text post-condition a false positive waiting to happen; two consecutive slices is enough to say the check belongs in the patch-script idiom rather than in memory.**
+
+⚠ The behavioural test asserted `assertThat(log.getExecutedById()).isEqualTo(99L)` — **that the value the caller passed is the value stored**, i.e. the defect. Repurposed rather than deleted ([[F2-236]]'s precedent), with the principal's id deliberately **different** from the owner id: had they been equal, no assertion could tell an attribution taken from the principal from one copied out of the argument. That single test now carries the assignment-versus-attribution distinction in one assertion pair.
+
+⚙ Frontend: the two request fields are **deleted** rather than left as decoration ([[F2-184]]) — `sentById` was never sent by any client, and the two workflow clients are dark, so only `approveAppetite` had a call site. Its `window.prompt('Approver name?')` is replaced by the confirmation idiom **its own sibling `retireAppetite` already uses**, so the act stays deliberate and the actor is no longer typed. `tsc` clean, **841/841**.
+
+### Five things refuted, recorded so nobody re-derives them
+
+⚠ **2 of my 3 census hits were my own detector.** F2-394's own note says to *"grep `body.get("...").` across controllers that bind a raw `@RequestBody Map`"*, and nobody had. Run properly: **54 such controllers, 17 dereferences of a `Map.get` result, 14 guarded.** My classifier knew `!= null` and `containsKey` and **missed the inverted polarity** `== null ? null : …`, so it reported both `ThreatIntelController` sites as unguarded when both are guarded. 🔑 **A guard detector that knows one polarity reports the other as absent** — [[F2-182]]: a regex tells you where to read, not what is reachable. The honest survivor was one `instanceof`-only site, which is instructive on its own: **`x instanceof T` IS a null check, for the then-branch, which is exactly why the expression reads as guarded while the else-branch dereferences null.**
+
+⚠ **`hasPermission('PLATFORM_ADMIN','WRITE')` looks like a role name in a module slot and is not** — `PLATFORM_ADMIN` is a catalogued module with **3 permissions** in both databases, so the guard resolves. Not [[F2-255]]'s phantom-pair shape.
+
+⚠ **`SustainabilityDashboardService`'s `new BigDecimal(st.getEsgReadinessWarningThreshold())` is not a parse** — the getter returns `Integer`, so it is `new BigDecimal(int)`, and the field is NOT NULL with a `@PrePersist` default. My detector matched `new BigDecimal(` without knowing the argument's type.
+
+⚙ **Three clean sweeps** ([[F2-216]]): `DateTimeFormatter.ofPattern` with a locale-sensitive TEXT field (`MMM`/`EEEE`/`G`/`QQQ`/`a`/`zzz`) and no `Locale` — **0 of 22**, so [[F2-416]]/[[F2-417]]'s `Locale.getDefault()` family has no third carrier here; `@Scheduled(cron)` with **both** day-of-month and day-of-week restricted, where Spring's `CronExpression` **ANDs** them while Unix cron ORs — **0 of 15**; and an `@Entity` overriding `equals`/`hashCode` on a nullable id — **0**.
+
+⚙ **And the `LIKE '%TYPE%'` substring hypothesis is refuted by measurement**: `CommitteeCatalogService#getFormsForCommitteeType` matches a comma-separated list with `%TYPE%`, and the `committee_type` CHECK vocabulary holds **22 values with 0 substring pairs** in both databases — so no token can produce a false positive against another.
+
+### Filed
+
+* `RiskAppetiteController#updateExposure` still reads `new BigDecimal(body.get("value").toString())` in the `else` of an `instanceof`, so a body omitting `value` is an **NPE → opaque 500** where a 400 naming the field is due — F2-394's family, API-reachable only (the page guards `NaN`, and *a defence in one client is not a defence* — [[F2-237]]). Left because it is a different question from this slice's, and because the honest fix is F2-394's manual check: a `@NotNull` DTO would 400 an unauthorized caller before the 403, since `@Valid` fires before `@PreAuthorize`.
+* `workflow.action_log` holds **17 rows with 6 NULL `executed_by_id`** in both databases. Whether those six predate the column's use or came from a caller sending nothing is not resolvable from the rows; nothing is back-filled, because inventing an actor is the defect this slice closed.
+* The **fourth** place the two-hop idiom could hide: neither pass follows a chain (`a = body.get(..); b = a; svc.f(b)`), which needs real dataflow rather than a regex ([[F2-182]]).
+
+---
+
 ## F2-430 — a text-to-bytes conversion with no charset, and the regulator CSV lost the arrow and the Arabic
 
 | | |
