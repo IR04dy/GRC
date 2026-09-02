@@ -10,7 +10,9 @@ import com.tss.grc.module.workflow.requests.repository.WorkflowRequestEventRepos
 import com.tss.grc.module.workflow.requests.repository.WorkflowRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,8 +58,37 @@ public class WorkflowEvidenceBridge {
     private final NotificationService            notifications;
     private final AuditLogService                audit;
 
-    @EventListener
-    @Transactional
+    /**
+     * ⚠⚠ F2-438 — this was {@code @EventListener} + {@code @Transactional}, and unlike the
+     * automation engine it is <b>synchronous</b>, so it JOINED the publisher's transaction.
+     *
+     * <p>🔑 <b>The two listeners in this platform failed in opposite directions, which is why one
+     * fix could not have been reasoned from the other.</b> The engine is {@code @Async}: it could
+     * not poison a publisher but acted before commit. This one saw the publisher's uncommitted
+     * state correctly — and could <b>poison the commit</b>: it writes a request event, sends a
+     * notification, audits, and hops the request's status, so a failure in any of that rolled back
+     * the evidence decision that triggered it. That is the first half of the rule
+     * {@code AccessRequestService} states — <i>"outside the governance TX it can neither poison it
+     * nor race the row's ROWVERSION"</i> — and the second half applied too, because saving the
+     * request here while the publisher also saves it is the double-flush shape CLAUDE.md records
+     * for a {@code @Version} entity.
+     *
+     * <p>⚠⚠ {@code REQUIRES_NEW} is not tidiness and getting it wrong reintroduces a defect this
+     * platform has already found live. An {@code AFTER_COMMIT} listener runs with the <b>completed</b>
+     * transaction still bound, so a plain {@code @Transactional} (REQUIRED) would join it and write
+     * without a live transaction. {@code AccessRequestService}'s comment records exactly that
+     * symptom from a live probe: <i>"a plain @Transactional(REQUIRED) engine call would join it and
+     * write without a live transaction (live-found: the created request came back with a null
+     * id)"</i>. So the phase change alone would have been worse than no change.
+     *
+     * <p>⚙ The semantics do change, deliberately and in the platform's ratified direction: the
+     * bridge's work is no longer atomic with the evidence decision. A bridge failure used to 500
+     * the approval; now the approval stands and the bridge's failure is its own. That is the same
+     * judgement F2-322/F2-323 made for the schedulers — a batch control that is all-or-nothing
+     * fails closed on the whole tenant the first time one row misbehaves.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onEvidenceOutcome(DomainEvent event) {
         String trigger = event.triggerEvent();
         boolean approved = "EVIDENCE_REQUEST_APPROVED".equals(trigger);

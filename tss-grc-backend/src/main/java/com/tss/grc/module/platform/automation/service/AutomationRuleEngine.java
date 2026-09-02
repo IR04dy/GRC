@@ -12,7 +12,8 @@ import com.tss.grc.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,8 +89,37 @@ public class AutomationRuleEngine {
      * processing. On a pool thread the ambient value is null, so restoring is clearing — but writing
      * it as a restore keeps the idiom identical at all four sites in this family.
      */
+    /**
+     * ⚠⚠ F2-438 — this was {@code @EventListener}, so the engine fired the moment
+     * {@code publishEvent} was called, <b>not when the publisher committed</b>.
+     *
+     * <p>The platform's own rule for this is written down at {@code AccessRequestService}, which
+     * applies it by hand with {@code TransactionSynchronizationManager.registerSynchronization}:
+     * <i>"Engine wiring runs AFTER COMMIT: outside the governance TX it can neither poison it nor
+     * race the row's ROWVERSION."</i> It names both failure modes in one sentence, and the tree
+     * held <b>zero</b> {@code @TransactionalEventListener} — so the rule was followed at one
+     * service and at neither listener, while <b>136 of 242</b> publish sites sit inside a
+     * transaction.
+     *
+     * <p>Being {@code @Async} means this listener could never <em>poison</em> a publisher's
+     * transaction — it runs on a pool thread with its own — so only the second half applied, and
+     * it applied to the actions rather than to the read: {@link #dispatch} evaluates conditions
+     * from {@code event.payload()} and never re-reads the subject, but {@code NOTIFY} sends,
+     * {@code CREATE_RECORD} delegates to a real {@code RecordCreator}, and {@code recordRun} writes
+     * an {@code automation_rule_runs} row naming {@code entity_id}. 🔑 <b>If the publisher then
+     * rolled back, all of that stood over a change that never happened</b>, because the engine's
+     * transaction commits independently of the one that told it.
+     *
+     * <p>⚙ {@code fallbackExecution = true} is load-bearing, not defensive: a
+     * {@code @TransactionalEventListener} does <b>not</b> receive an event published outside a
+     * transaction, and the schedulers publish outside one — {@code SocOpsScheduledSweep} alone has
+     * 12 such sites and is a {@code @Component} with no class-level {@code @Transactional}. Without
+     * the flag this fix would have silently stopped delivering every swept event, which is a worse
+     * defect than the one it closes. With it the change is strictly an improvement in both cases:
+     * deferred where there is a transaction, unchanged where there is not.
+     */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional
     public void onDomainEvent(DomainEvent event) {
         if (event.organisationId() == null) {
