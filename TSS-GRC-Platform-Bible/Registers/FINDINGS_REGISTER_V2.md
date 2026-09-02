@@ -15219,6 +15219,118 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-430 — a text-to-bytes conversion with no charset, and the regulator CSV lost the arrow and the Arabic
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — the `audit_log.csv` of the BCM audit evidence package, the ZIP a SAMA/NCA reviewer imports into their own SIEM. **137 of the 1,488 BCM-scoped rows it exports in dev (11 of 387 in prod)** carried a character `Cp1252` cannot represent, so a transition read `DRAFT ? UNDER_REVIEW` and a crisis communication contact's Arabic name read `????? ?????????` |
+| **Source** | a fresh vein — the **charset** sibling of [[F2-416]]/[[F2-417]]'s **locale** family, never swept |
+| **Size** | S — nine call sites across six files, every one byte-identical for ASCII input; one new gate; no migration |
+
+⚠⚠ **A TEXT-TO-BYTES CONVERSION WITH NO CHARSET IS PLATFORM-DEPENDENT, AND ON THIS JVM THE PLATFORM IS `Cp1252`.** `String.getBytes()` and `new String(byte[])` use `Charset.defaultCharset()`. On JDK 18+ that is UTF-8 (JEP 400); this platform is **pinned to JDK 17**, where it is the host's ANSI code page. Measured on this machine, not reasoned about:
+
+```
+file.encoding = Cp1252   native.encoding = Cp1252   defaultCharset = windows-1252
+
+"مخاطر الأمن".getBytes()       -> 3f 3f 3f 3f 3f 20 3f 3f 3f 3f 3f     (eleven '?')
+"مخاطر الأمن".getBytes(UTF_8)  -> 21 bytes, lossless
+```
+
+🔑 **This is [[F2-416]]/[[F2-417]]'s shape with a different ambient setting and nothing else in common**: there it is `Locale.getDefault()`, here `Charset.defaultCharset()` — a different JDK mechanism, a different remedy vocabulary (`StandardCharsets` rather than `Locale.ROOT`), and a different **direction of harm**. A locale mangles digits and case reversibly; **a charset destroys bytes.**
+
+### What it cost
+
+`BcmEvidencePackageService.writeAuditCsv` ended `sb.toString().getBytes()`, and that CSV is the `audit_log.csv` entry of the BCM audit evidence package — the method's own comment says regulators *"import these into their own SIEM tools that prefer CSV."* Measured against `platform.audit_log` in **both** databases, scoped to the rows the package's own query selects:
+
+| | dev | prod |
+|---|---|---|
+| BCM-scoped rows exported | 1,488 | 387 |
+| …carrying a character Cp1252 cannot represent | **137** | **11** |
+| occurrences of the transition arrow `U+2192` | 136 | 10 |
+| Arabic personal name in `message` | 1 | 1 |
+
+Two kinds, and both matter:
+
+* **the platform's own transition arrow.** `"BIA BIA-2026-000007 DRAFT → UNDER_REVIEW"` reaches the regulator as `"DRAFT ? UNDER_REVIEW"` — 🔑 **which no longer says which state the record came from.** The arrow is not decoration in an audit trail; it is the direction.
+* **an Arabic personal name** — `"Created communication contact: نورة القحطاني"` as `"????? ?????????"`. That is the crisis **communication contact**, the person a BCM plan calls during an incident.
+
+### The convention already existed one module away
+
+🔑 **`CalendarController` — the platform's *other* text-download path — declares `charset=UTF-8` on its `text/calendar` response *and* encodes with `StandardCharsets.UTF_8`.** Measured: **27** sites in `src/main/java` name a charset explicitly, including **every hash chain** — [[F2-31]]'s audit seal (`AuditChainHasher`, three sites), the evidence chain, the CCM digest, the signature digest, the NDI submission package. So the discipline is the house rule and the byte-emission site was the exception: [[F2-215]]'s two-of-N, with the mechanism visibly present at every digest.
+
+⚠ **No BOM is written anywhere in the codebase**, so "plain UTF-8" is settled by measurement rather than by taste — and a BOM would have put `\ufeff` on the first header cell for a strict CSV parser.
+
+### The nine sites
+
+| file | site | why |
+|---|---|---|
+| `BcmEvidencePackageService` | `audit_log.csv` | **the live one** |
+| `BcmEvidencePackageService` | `MANIFEST.txt` | the sibling in the same file — its em-dash **is** in Cp1252 (0x97), so benign *here* and not on ISO-8859-1 or ASCII ([[F2-215]]) |
+| `CalendarService#synthId` | `UUID.nameUUIDFromBytes` | a stable id: the same row would yield a different UUID on a different platform |
+| `IcsBuilder#uid` | `UUID.nameUUIDFromBytes` | an **ICS UID** — a calendar client seeing a changed UID creates a duplicate event instead of updating |
+| `JwtTokenProvider` ×3 | the HMAC signing key | two nodes with different `file.encoding` would sign **incompatibly** |
+| `StubServiceNowClient` | `UUID.nameUUIDFromBytes` | a stub |
+| `FileUploadController` | the EICAR probe | → **`ISO_8859_1`**, deliberately not UTF-8 |
+
+⚠ **The EICAR probe is a BYTE SCAN, so `ISO_8859_1` is correct and UTF-8 is not**: 8859-1 maps every byte to exactly one code point, so no byte can be lost or merged into a replacement character. Pinned in **both** directions, so a later *"make it consistent"* sweep to `UTF_8` fails and forces the paragraph to be re-read.
+
+⚙ Every one of the nine is **byte-identical for ASCII input**, so the change cannot break a request that works today except in the one case where the input is non-ASCII — which is precisely the broken case ([[F2-417]]'s argument verbatim).
+
+⚠ **Refuted and left alone:** the two remaining bare `.getBytes()` calls are **`MultipartFile.getBytes()`**, a different method on a different type returning the raw upload with no charset involved.
+
+### 🔑🔑 The test that should have caught it could not, and the reason is structural
+
+[[F2-325]]'s `auditCsv_carriesTheActorAndRoleAndBlanksItHonestlyWhenAbsent` drives the real service, reads the real ZIP entry and asserts the CSV's contents. It passed identically before and after this fix, for **two independent reasons**:
+
+* its helper decoded with `new String(zin.readAllBytes())` — **the same platform default the writer encoded with.** ⚠⚠ **Encoding and decoding through one charset round-trips losslessly whatever that charset is, so a round-trip test is structurally blind to a charset defect**; and
+* its fixture was entirely ASCII (`"Plan approved"`, `"so_officer"`), so **even a UTF-8 reader would have passed over it.**
+
+⚙ The helper is split by what the **consumer** reads: `readZipText` (UTF-8, as a SIEM will) and `readZipBinaryHead` (ISO-8859-1, byte-transparent, for the two `%PDF` header probes — which is *more* correct than what it replaced). The new legs carry the arrow and the Arabic name, taken verbatim from `platform.audit_log`.
+
+### The gate
+
+`PlatformDefaultCharsetContractTest` — six legs, **every hard zero with NO exemption map**, and the argument is what makes that safe rather than strict: a String↔bytes conversion is either an encoding of text (→ UTF-8, or a charset the consumer requires) or a byte scan (→ ISO-8859-1). **There is no third case, so there is no correct code for these legs to fail on ([[F2-214]]) and nothing to exempt.**
+
+1. no String is encoded with the platform default — receiver type **resolved**, unresolved **FAILS**;
+2. no `byte[]` is decoded with it — first-argument type resolved, unresolved **FAILS**;
+3. nine always-default APIs (`FileWriter`, `FileReader`, `PrintWriter`, `Scanner`, `Charset.defaultCharset()`, `file.encoding`, `IOUtils.toString`, 1-arg `InputStreamReader`/`OutputStreamWriter`) — all **0** today, so the zero is free and stops the next one arriving;
+4. anti-vacuity: the disciplined population;
+5. a synthetic self-test in **both** directions;
+6. the fixed sites and the exemplar, pinned both ways.
+
+⚠ **The two `MultipartFile` receivers are spared STRUCTURALLY, by resolving the declared type, and never by name** — a named exemption would let the next `String.getBytes()` escape by being called on a variable somebody happened to list. An unresolvable receiver **fails**, because unresolved reads identically to clean ([[F2-206]]).
+
+⚠ `Files.readString` / `writeString` / `newBufferedReader` are deliberately **not** in the always-default family: their no-charset overloads are **specified** as UTF-8, not defaulted.
+
+⚙ It reuses `LocaleSensitiveFormatContractTest.strip` rather than adding a fifth private character scanner to `config` ([[F2-422]]'s precedent) — and that helper *skips* string literals rather than blanking them, which is exactly what a detector needing to see `"literal".getBytes()` requires.
+
+### Verification
+
+* **Pre-fix control** ([[F2-274]]/[[F2-287]], fix committed first — [[F2-297]]): a **surgical** revert of only the nine production call sites, keeping every `StandardCharsets` import so nothing fails to compile. Fires **exactly and only** the five legs it should — gate legs 1, 2 and 6 plus both new behavioural legs — with legs 3, 4 and 5 green.
+* **Mutation harness: 8 killed / 0 survived / 0 anchor-miss / 0 did-not-compile**, after closing one real hole (below).
+* **Live probe** (house rule 4) — the real ZIP over HTTP, `auditor` (INTERNAL_AUDITOR + AUDITOR), **10/10**: `audit_log.csv` **73,865 bytes / 460 rows**, decodes as **strict UTF-8**, **138 arrow byte-sequences = 138 characters**, `?` count **0**, MANIFEST strict UTF-8 with its em-dash as `E2 80 94`, and the manifest's SHA-256 matching the bytes actually shipped.
+
+⚠⚠ **The harness found a hole in my own gate and it is [[F2-194]]'s shape, in a leg written after quoting it.** The mutation removing `charset=UTF-8` from `CalendarController`'s `produces` attribute **SURVIVED**, because that controller declares the charset **twice** — once as the content-negotiation attribute and once in the header it writes — and my `contains("charset=UTF-8")` was satisfied by the other occurrence. The mutated code is genuinely wrong (`produces` is what Spring negotiates on), so this was a hole rather than an equivalent mutant. Each site is now asserted by its own shape.
+
+⚠⚠ **A post-condition of my own patch script read the epitaph as the corpse** ([[F2-193]]). It asserted the retired text `new String(zin.readAllBytes())` was absent — and fired on **the javadoc explaining its removal**. Fail-before-write held, so nothing was written; the assertion now runs over comment-stripped code and checks the real claim (every decode names its charset). 🔑 **This register's convention of quoting the sentence you replace makes every raw-text post-condition a false positive waiting to happen.**
+
+⚠⚠ **And my anti-vacuity floor was nearly set from arithmetic rather than measurement.** I predicted the pre-fix disciplined count as `27 − 9 = 18`, which would have put it **below** a floor of 20 — so the floor would have fired on the pre-fix tree, i.e. it would have been **restating the fix rather than guarding the detector**, which is precisely what [[F2-417]] recorded about its own floor. Measured by running the gate's own pattern over `git show HEAD~1:`, the honest figures are **26 pre-fix and 35 post-fix**: the 27 came from a *different* pattern answering a narrower question, and a baseline lifted from a measurement of something else is worse than none because it looks measured ([[F2-195]]). The floor of 20 sits below the pre-fix count and above the largest wrong answer (0).
+
+### Two measurement corrections of mine
+
+⚠ **My hypothesis was wrong in an instructive way.** I went in expecting **Arabic** in the audit trail and the first scan reported 1,376 dev rows — almost all of them the **arrow**, not Arabic. `·` (U+00B7) *is* in Cp1252 and `→`/`↔` are not, so the platform's own house punctuation is the bulk of the population. **Get the character distribution before naming the cause.**
+
+⚠⚠ **The live probe found a character my scoped SQL missed.** It reports **12** distinct unmappable characters including **`↔` (U+2194)**, where my BCM-scoped query found only `→` and Arabic — because I hand-approximated the entity-type set with a `LIKE` prefix list while `BcmEvidencePackageService` **derives it from the JPA metamodel**, whose own javadoc says *"derived, never listed"* and cites [[F2-217]]. 🔑 **F2-217's warning, in my own measurement of the very method that heeds it.**
+
+### Filed
+
+* the **two remaining `MultipartFile.getBytes()`** sites are correct and are recorded so nobody re-files them;
+* the **test tree's seven bare `getBytes()`** are ASCII fixtures and the gate is scoped to `src/main/java`, matching [[F2-417]]'s precedent — said out loud, because a scope is a population;
+* `so_officer` (**CISO**) holds `BCM:EXPORT` and **not** `BCM:READ`, so the CISO **cannot pull the BCM evidence package at all** — measured from `iam.role_permissions`, and exactly the shape [[F2-314]] recorded when it deleted this file's persona enumeration. Whether the CISO should be able to is an **owner decision**.
+
+---
+
 ## F2-428 — a form cap must mirror its column, not its neighbour
 
 | | |
