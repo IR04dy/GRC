@@ -474,13 +474,23 @@ class GlobalExceptionHandlerTest {
     }
 
     /**
-     * The limit is deliberately not stated: 2628 names the column and the value but NOT the
-     * maximum length, so a number here would be invented (F2-197 / F2-425).
+     * The limit is deliberately not stated: 2628 names the column and the truncated value but NOT
+     * the maximum length, so any number here would be invented (F2-197 / F2-425).
+     *
+     * <p>⚠ This asserted {@code doesNotContain("120")} — the width of the column the probe
+     * overflowed — and the mutation harness walked straight through it by inventing a DIFFERENT
+     * plausible number ({@code "values here are limited to 255 characters"}). <b>The leg's name
+     * claimed more than its assertion could see</b>, which is this programme's most-repeated
+     * instrument defect. The claim is "no number", so that is what is asserted: the sentence has
+     * nothing to interpolate a limit from, so it may contain no digit at all.
      */
     @Test
     void truncation_doesNotClaimALimitTheDatabaseNeverGave() {
         ProblemDetail pd = handler.handleMissingDbObject(truncation(2628));
-        assertThat(pd.getDetail()).doesNotContain("120").doesNotContain("characters or fewer");
+        assertThat(pd.getDetail())
+            .as("the database does not report the maximum length, so no digit in this sentence "
+                + "could be anything but invented")
+            .doesNotMatch(".*\\d.*");
     }
 
     @Test
