@@ -62,6 +62,18 @@ class UniquenessGuardScopeContractTest {
     private static final Path HANDLER =
         MAIN.resolve("com/tss/grc/common/exception/GlobalExceptionHandler.java");
 
+    // ── F2-426: the mirror question — is a check-then-insert backed by an index at all? ──
+    private static final Path WF_ENGINE =
+        MAIN.resolve("com/tss/grc/module/workflow/service/WorkflowEngineService.java");
+    private static final Path WF_INSTANCE_REPO =
+        MAIN.resolve("com/tss/grc/module/workflow/repository/WorkflowInstanceRepository.java");
+    private static final Path V397 =
+        MIGRATIONS.resolve("V397__workflow_instance_target_unique.sql");
+    private static final Path V1 = MIGRATIONS.resolve("V1__core_schemas.sql");
+
+    private static final List<String> INSTANCE_TARGET_KEY = List.of(
+        "organisation_id", "target_module", "target_entity", "target_entity_id");
+
     /** The clause the 2601/2627 arm may not carry: it is false for every global unique guarantee. */
     private static final String ORG_SCOPE_CLAIM = "unique within your organisation";
 
@@ -216,7 +228,161 @@ class UniquenessGuardScopeContractTest {
             .doesNotContain(ORG_SCOPE_CLAIM);
     }
 
+    // ══ F2-426 — a check-then-insert with no unique index is a guard that breaks itself ══════
+    //
+    // F2-418 above asks whether a uniqueness GUARD matches what the index enforces. This is the
+    // same question from the other end: `WorkflowEngineService.startInstance` refuses a second
+    // instance for one target by asking an Optional-returning finder `isPresent()`, and
+    // workflow.instances carried NO unique index on those columns. Two concurrent starts both see
+    // nothing and both insert.
+    //
+    // ⚠⚠ The consequence is not a duplicate row, it is that THE GUARD ITSELF THEN FAILS: from the
+    // moment two rows exist the finder throws IncorrectResultSizeDataAccessException, so
+    // startInstance can neither succeed nor correctly refuse, and findInstanceForTarget — what
+    // every screen asking for a record's workflow state calls — 500s too. WorkflowInstance has no
+    // is_deleted column and there is no delete route for an instance anywhere, so it is permanent.
+    //
+    // 🔑 The tell was in the schema: V1 creates IX_wf_inst_target on the same three target columns
+    // and leaves it NON-unique, and omits the tenant. This platform's own idiom says what was
+    // missing — F2-267 recorded that SubprocessorService's check-then-insert is safe *because*
+    // UQ_subp_code backstops it.
+
+    /**
+     * Leg 1 — the backstop exists, and is the exact shape the guard needs.
+     *
+     * <p>Asserted from the migration SQL because the migration is the only artefact that decides
+     * it. ⚠ UNFILTERED is not a style note here: all four columns are {@code nullable = false}, so
+     * unlike V385's filtered index on a nullable code there is no NULL-equality trap to work
+     * around, and a {@code WHERE} clause would be a statement about absence the schema forbids.
+     */
+    @Test
+    @DisplayName("F2-426 — workflow.instances has a UNIQUE index on the four columns startInstance guards")
+    void theInstanceTargetGuardIsBackedByAUniqueIndex() throws IOException {
+        Matcher m = uniqueIndexOn(stripSqlComments(read(V397)),
+                                 "uq_wf_instance_target", "workflow\\.instances");
+
+        assertThat(m.find())
+            .as("V397 must create uq_wf_instance_target as a UNIQUE index on workflow.instances. "
+              + "Without it startInstance is a check-then-insert whose own guard 500s the moment "
+              + "the race it cannot prevent happens — and there is no delete route to repair it")
+            .isTrue();
+
+        assertThat(keyColumnsOf(m.group(1)))
+            .as("the key must be exactly the four columns the guard reads, LEADING with the "
+              + "tenant. A subset leaves the race open; dropping organisation_id would let one "
+              + "tenant's instance stop another starting a workflow on the same target ids, which "
+              + "is a multi-tenancy defect dressed as strictness (F2-309)")
+            .containsExactlyElementsOf(INSTANCE_TARGET_KEY);
+
+        assertThat(m.group(2).toUpperCase(java.util.Locale.ROOT))
+            .as("uq_wf_instance_target is UNFILTERED. All four columns are NOT NULL, so there is "
+              + "no NULL-equality trap for a filter to solve — a WHERE here would exempt rows the "
+              + "schema does not permit to exist")
+            .doesNotContain(" WHERE ");
+    }
+
+    /**
+     * Leg 2 — the pair. The index and the guard have to keep reading the same columns, and the
+     * guard has to keep running: either half alone is satisfiable by an accident, which is F2-418's
+     * own precedent for pinning a guard and its index together (F2-299).
+     *
+     * <p>The finder's column list is DERIVED from its method name rather than declared, so adding a
+     * fifth predicate to the finder — or renaming one — fails here instead of silently widening the
+     * query past what the index makes unique.
+     */
+    @Test
+    @DisplayName("F2-426 — the guard and the index read the same four columns, and the guard still runs")
+    void theGuardAndTheIndexReadTheSameFourColumns() throws IOException {
+        String repo = stripJavaComments(read(WF_INSTANCE_REPO));
+        Matcher f = Pattern.compile(
+            "Optional\\s*<\\s*WorkflowInstance\\s*>\\s+(findBy\\w+)\\s*\\(").matcher(repo);
+        assertThat(f.find())
+            .as("WorkflowInstanceRepository must still declare an Optional finder for the target — "
+              + "it is the guard's own query")
+            .isTrue();
+        String finder = f.group(1);
+
+        List<String> fromName = new ArrayList<>();
+        for (String part : finder.substring("findBy".length()).split("(?<=[a-z0-9])And(?=[A-Z])")) {
+            fromName.add(part.replaceAll("(?<!^)(?=[A-Z])", "_").toLowerCase(java.util.Locale.ROOT));
+        }
+        assertThat(fromName)
+            .as("%s reads these columns; uq_wf_instance_target makes THESE unique: %s. A finder "
+              + "that asks a WIDER question than the index answers can still match two rows, "
+              + "which is exactly the state that breaks it", finder, INSTANCE_TARGET_KEY)
+            .containsExactlyInAnyOrderElementsOf(INSTANCE_TARGET_KEY);
+
+        String engine = stripJavaComments(read(WF_ENGINE));
+        assertThat(engine)
+            .as("startInstance must still CALL the finder — asserted as a call shape rather than "
+              + "as a token, because an import or a comment satisfies a bare substring (F2-194)")
+            .containsPattern(finder + "\\s*\\(");
+        assertThat(engine)
+            .as("and must still refuse on it. The index turns the concurrent loser into a 409; the "
+              + "guard is what gives the single-threaded caller a message naming the reason")
+            .contains("Workflow instance already exists for this target entity");
+    }
+
+    /**
+     * Leg 3 — the self-test, and it is load-bearing rather than decorative.
+     *
+     * <p>V1 declares {@code IX_wf_inst_target} on the same target columns, NON-unique and without
+     * the tenant — sitting in the corpus this gate reads. A pattern loose enough to match it would
+     * report the backstop as present while nothing enforced anything, so the detector is run
+     * against that declaration and must NOT accept it. The same leg pins V397's additivity claim:
+     * the seek index has to survive.
+     */
+    @Test
+    @DisplayName("F2-426 — the detector rejects the non-unique seek index on the same columns")
+    void theUniqueIndexDetectorRejectsTheNonUniqueSeekIndexOnTheSameColumns() throws IOException {
+        String v1 = stripSqlComments(read(V1));
+
+        assertThat(v1)
+            .as("V397 claims to be ADDITIVE and its check 5 asserts IX_wf_inst_target survives, so "
+              + "V1 must still declare it")
+            .containsPattern("CREATE\\s+INDEX\\s+\\[?IX_wf_inst_target");
+
+        assertThat(uniqueIndexOn(v1, "IX_wf_inst_target", "workflow\\.instances").find())
+            .as("IX_wf_inst_target is NOT unique and omits the tenant — it is the index somebody "
+              + "built for this very lookup and left non-unique. A detector that accepted it would "
+              + "report the backstop as present over a table that enforces nothing, so this is the "
+              + "control that makes leg 1 mean something")
+            .isFalse();
+
+        // and the detector must still accept the real thing, or leg 1 could be passing vacuously
+        assertThat(uniqueIndexOn(stripSqlComments(read(V397)),
+                                 "uq_wf_instance_target", "workflow\\.instances").find())
+            .as("the same detector accepts the UNIQUE declaration — without this the leg above "
+              + "would pass just as well over a pattern that matches nothing (F2-235)")
+            .isTrue();
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * {@code CREATE UNIQUE [NONCLUSTERED] INDEX <name> ON <table> (<key>)<tail up to ;>}.
+     * Group 1 is the key list, group 2 the tail — so a caller can assert the columns and the
+     * presence or absence of a filter separately.
+     */
+    private static Matcher uniqueIndexOn(String sql, String index, String tableRegex) {
+        return Pattern.compile(
+            "CREATE\\s+UNIQUE\\s+(?:NONCLUSTERED\\s+)?INDEX\\s+\\[?" + index + "\\]?"
+            + "\\s+ON\\s+" + tableRegex + "\\s*\\(([^)]*)\\)([^;]*)",
+            Pattern.CASE_INSENSITIVE).matcher(sql);
+    }
+
+    /** Key columns of an index, brackets and ASC/DESC stripped, lower-cased, in declared order. */
+    private static List<String> keyColumnsOf(String keyList) {
+        List<String> key = new ArrayList<>();
+        for (String c : keyList.split(",")) {
+            String t = c.trim().replace("[", "").replace("]", "")
+                        .replaceAll("(?i)\\s+(ASC|DESC)$", "").trim();
+            if (!t.isEmpty()) {
+                key.add(t.toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        return key;
+    }
 
     private static String read(Path p) throws IOException {
         assertThat(Files.exists(p)).as("%s must exist", p).isTrue();
