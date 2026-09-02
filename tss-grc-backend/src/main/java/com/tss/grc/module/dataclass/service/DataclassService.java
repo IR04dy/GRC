@@ -59,6 +59,15 @@ public class DataclassService {
     private final DataclassEventRepository eventRepo;
     private final ApplicationEventPublisher publisher;
 
+    /**
+     * The PDPL Article 4 token meaning "not a special category".
+     *
+     * <p>F2-427: it was a literal at three sites — the create default, the timeline payload and
+     * the dashboard's exclusion — and the dashboard's was a case-SENSITIVE Java comparison. One
+     * declaration with three readers rather than three copies (F2-217).
+     */
+    private static final String SPECIAL_CATEGORY_NONE = "NONE";
+
     // ─────────────────────────────────────── Asset CRUD + transitions
 
     public AssetResponse createAsset(CreateAssetRequest req) {
@@ -72,7 +81,13 @@ public class DataclassService {
         a.setDescriptionEn(req.descriptionEn()); a.setDescriptionAr(req.descriptionAr());
         a.setDomain(req.domain());
         a.setHostSystemLabel(req.hostSystemLabel());
-        a.setPdplSpecialCategory(req.pdplSpecialCategory() != null ? req.pdplSpecialCategory() : "NONE");
+        // F2-427: normalised for exactly the reason F2-372 normalised `classification` in
+        // classifyAsset — this column has NO check constraint (the dataclass schema has none at
+        // all), neither DTO component carries a validation annotation, and all three of its
+        // readers compare case-SENSITIVELY against NONE. So "none" was stored verbatim and then
+        // counted AS a PDPL Article 4 special category by the dashboard.
+        a.setPdplSpecialCategory(normaliseToken(
+                req.pdplSpecialCategory() != null ? req.pdplSpecialCategory() : SPECIAL_CATEGORY_NONE));
         a.setPdplLawfulBasis(req.pdplLawfulBasis());
         a.setOwnerRole(req.ownerRole());
         a.setOwnerUserId(req.ownerUserId());
@@ -103,10 +118,16 @@ public class DataclassService {
         // sending "confidential" would store it verbatim, bypass the high-classification automation
         // gate, mis-rank the upgrade ladder, and render unlabelled. Coerce, not require (F2-182): no
         // upstream coercion and no CHECK, so a 400 would break a request that succeeds today.
-        String classification = normaliseClassification(req.classification());
-        String prev = normaliseClassification(a.getClassification());
+        String classification = normaliseToken(req.classification());
+        String prev = normaliseToken(a.getClassification());
         a.setClassification(classification);
-        if (req.pdplSpecialCategory() != null) a.setPdplSpecialCategory(req.pdplSpecialCategory());
+        // F2-427: F2-372 normalised `classification` three lines above and left this one RAW,
+        // in the same method — F2-215's two-of-N at the closest range this register has recorded
+        // it. Same column shape, same case-sensitive readers, and the emit below then carries the
+        // canonical token rather than whatever the caller typed.
+        if (req.pdplSpecialCategory() != null) {
+            a.setPdplSpecialCategory(normaliseToken(req.pdplSpecialCategory()));
+        }
         if (req.pdplLawfulBasis() != null) a.setPdplLawfulBasis(req.pdplLawfulBasis());
         if (req.nextReviewDue() != null) a.setNextReviewDue(req.nextReviewDue());
         a.setStatus("CLASSIFIED");
@@ -123,12 +144,23 @@ public class DataclassService {
         emit("DATA_ASSET_CLASSIFIED", "DATA_ASSET", a.getId(),
                 Map.of("classification", classification,
                         "specialCategory",
-                        a.getPdplSpecialCategory() == null ? "NONE" : a.getPdplSpecialCategory()));
+                        a.getPdplSpecialCategory() == null
+                                ? SPECIAL_CATEGORY_NONE : a.getPdplSpecialCategory()));
         return toAsset(a);
     }
 
-    /** F2-372 — the canonical NDMO classification token (trim + upper-case, null-safe). */
-    private static String normaliseClassification(String c) {
+    /**
+     * The canonical NDMO / PDPL token: trim + upper-case, null-safe.
+     *
+     * <p>F2-372 introduced this for {@code classification}. F2-427 renamed it off that column
+     * because it now normalises {@code pdpl_special_category} as well, and a helper named after
+     * one of its two callers answers the question a reader was about to ask (F2-184).
+     *
+     * <p>Coerce, not require (F2-182): the {@code dataclass} schema carries NO check constraints
+     * at all and neither DTO component declares a validation annotation, so an out-of-vocabulary
+     * value succeeds today and refusing it would break a request that works.
+     */
+    private static String normaliseToken(String c) {
         return c == null ? null : c.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
@@ -322,13 +354,38 @@ public class DataclassService {
         List<DataException> allE = excRepo.findByOrganisationIdOrderByCreatedAtDesc(o);
 
         long aTotal = allA.size();
-        long aTop  = allA.stream().filter(a -> "TOP_SECRET".equals(a.getClassification())).count();
-        long aConf = allA.stream().filter(a -> "CONFIDENTIAL".equals(a.getClassification())).count();
-        long aInt  = allA.stream().filter(a -> "INTERNAL".equals(a.getClassification())).count();
-        long aPub  = allA.stream().filter(a -> "PUBLIC".equals(a.getClassification())).count();
-        long aSpec = allA.stream()
-                .filter(a -> a.getPdplSpecialCategory() != null
-                        && !"NONE".equals(a.getPdplSpecialCategory())).count();
+
+        // ── F2-427: the DATABASE compares these, not Java ──────────────────────────────────────
+        //
+        // These five were hand-rolled streams over the fetched list, each comparing with
+        // `.equals()` against an upper-case literal — on two columns that are case-INSENSITIVELY
+        // collated and constrained by nothing (the dataclass schema has zero CHECKs). A single
+        // non-canonical row therefore fell into NO classification bucket, so the four buckets
+        // silently under-summed `aTotal`; and a lowercase `none` was counted AS a PDPL Article 4
+        // special category, over-reporting the statutory figure. Two figures on one dashboard,
+        // failing in OPPOSITE directions from one cause (F2-196: a vocabulary mismatch has no
+        // direction).
+        //
+        // A derived `countBy` compares under the column's OWN collation, so these are correct by
+        // construction rather than by a Java comparison the next reader could copy wrongly — and
+        // it respects `DataAsset`'s @Where(is_deleted = 0) exactly as the list fetch above does,
+        // so the buckets and `aTotal` still describe the same population.
+        //
+        // 🔑 Both finders were DECLARED AND UNCALLED, which is what pointed here: an unused
+        // aggregate finder is the fingerprint of a hand-rolled count, and the hand-rolled count is
+        // where the population question hides (F2-420 / F2-421 / F2-422 each began the same way).
+        //
+        // ⚠ The literals stay literals rather than becoming a declared set: `classOrder` below
+        // already holds this vocabulary, and a second list over the same tokens is F2-196's own
+        // defect. `SPECIAL_CATEGORY_NONE` is shared because it had three copies, not four.
+        long aTop  = assetRepo.countByOrganisationIdAndClassification(o, "TOP_SECRET");
+        long aConf = assetRepo.countByOrganisationIdAndClassification(o, "CONFIDENTIAL");
+        long aInt  = assetRepo.countByOrganisationIdAndClassification(o, "INTERNAL");
+        long aPub  = assetRepo.countByOrganisationIdAndClassification(o, "PUBLIC");
+        // `<> 'NONE'` is UNKNOWN for NULL, so a null category is excluded exactly as the Java
+        // `!= null` guard excluded it — same semantics, and now case-correct.
+        long aSpec = assetRepo.countByOrganisationIdAndPdplSpecialCategoryNot(
+                o, SPECIAL_CATEGORY_NONE);
         long fAct = flowRepo.countByOrganisationIdAndStatus(o, "ACTIVE");
         long fCross = allF.stream()
                 .filter(f -> "ACTIVE".equals(f.getStatus()))

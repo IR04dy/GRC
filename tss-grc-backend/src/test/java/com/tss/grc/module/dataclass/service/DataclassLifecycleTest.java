@@ -47,6 +47,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.tss.grc.module.dataclass.dto.DataclassDtos.CreateAssetRequest;
 
 /**
  * F2-03(f) — the Tier-1 floor for {@code dataclass} (PDPL data classification). Sixth in the row's
@@ -321,6 +322,133 @@ class DataclassLifecycleTest {
             .as("PUBLIC → CONFIDENTIAL is an upgrade; the RECLASSIFIED_UP event must fire (a "
                 + "case-mismatched token ranked 0, so a real upgrade went undetected before the fix)")
             .isTrue();
+    }
+
+    /**
+     * F2-427 — the column F2-372 did not normalise, three lines from the one it did.
+     *
+     * <p>{@code classifyAsset} normalised {@code classification} and wrote
+     * {@code pdpl_special_category} RAW on the very next statement: F2-215's two-of-N at the
+     * closest range this register has recorded it. The column shape is identical — the
+     * {@code dataclass} schema carries <b>zero</b> check constraints, neither DTO component
+     * declares a validation annotation, and the collation is case-INSENSITIVE — while all three
+     * readers compare case-SENSITIVELY against {@code NONE}: the dashboard's special-category
+     * count, this event payload, and the frontend's uppercase-keyed {@code SpecialCategory} label
+     * map.
+     *
+     * <p>So {@code "none"} was stored verbatim and then counted AS a PDPL Article 4 special
+     * category — over-reporting a statutory figure, the pessimistic direction (F2-210).
+     */
+    @Test
+    @DisplayName("F2-427: the PDPL special-category token is normalised on the classify path")
+    void specialCategoryIsNormalisedOnTheClassifyPath() {
+        when(assetRepo.findByOrganisationIdAndId(eq(ORG), eq(1L)))
+            .thenReturn(Optional.of(asset("RECLASSIFY", "INTERNAL")));
+
+        svc.classifyAsset(1L, new ClassifyAssetRequest("CONFIDENTIAL", " biometric ", null, null));
+
+        org.mockito.ArgumentCaptor<DataAsset> saved = org.mockito.ArgumentCaptor.forClass(DataAsset.class);
+        org.mockito.Mockito.verify(assetRepo).save(saved.capture());
+        assertThat(saved.getValue().getPdplSpecialCategory())
+            .as("the caller sent ' biometric ' — it must be stored as the canonical BIOMETRIC, or "
+                + "the FE's uppercase-keyed label map renders it unlabelled")
+            .isEqualTo("BIOMETRIC");
+
+        org.mockito.ArgumentCaptor<com.tss.grc.module.platform.automation.event.DomainEvent> ev =
+            org.mockito.ArgumentCaptor.forClass(com.tss.grc.module.platform.automation.event.DomainEvent.class);
+        org.mockito.Mockito.verify(publisher, org.mockito.Mockito.atLeastOnce()).publishEvent(ev.capture());
+        var classified = ev.getAllValues().stream()
+            .filter(e -> "DATA_ASSET_CLASSIFIED".equals(e.triggerEvent())).findFirst().orElseThrow();
+        assertThat(classified.payload().get("specialCategory"))
+            .as("an automation rule matching this payload does so case-sensitively, exactly as "
+                + "F2-372 established for the classification half")
+            .isEqualTo("BIOMETRIC");
+    }
+
+    /**
+     * F2-427 — and the create path had its own raw write.
+     *
+     * <p>{@code createAsset} did
+     * {@code setPdplSpecialCategory(req.pdplSpecialCategory() != null ? req.pdplSpecialCategory() : "NONE")},
+     * so a caller sending {@code "none"} produced a row that the dashboard's
+     * {@code !"NONE".equals(...)} then counted as a special category. Both write paths, one commit
+     * — fixing only the one you noticed leaves the other looking covered (F2-215).
+     */
+    @Test
+    @DisplayName("F2-427: the create path normalises it too, so the NONE exclusion still matches")
+    void specialCategoryIsNormalisedOnTheCreatePath() {
+        svc.createAsset(new CreateAssetRequest(
+                "DA-F427-1", "Payroll extract", "مستخرج الرواتب",
+                null, null, null, null,
+                " none ", null,
+                null, null, null, null, null, null, null, null));
+
+        org.mockito.ArgumentCaptor<DataAsset> saved = org.mockito.ArgumentCaptor.forClass(DataAsset.class);
+        org.mockito.Mockito.verify(assetRepo).save(saved.capture());
+        assertThat(saved.getValue().getPdplSpecialCategory())
+            .as("' none ' must be stored as NONE — otherwise the asset is counted as holding PDPL "
+                + "Article 4 special-category data when it holds none")
+            .isEqualTo("NONE");
+    }
+
+    /**
+     * F2-427 — the reader half: the DATABASE compares, not Java.
+     *
+     * <p>The five bucket counts were hand-rolled streams over the fetched list, comparing with
+     * {@code .equals()} against upper-case literals. A single non-canonical row therefore fell into
+     * NO classification bucket, so the four silently under-summed {@code assetsTotal}; and a
+     * lowercase {@code none} was counted as a special category. Two figures on one dashboard
+     * failing in OPPOSITE directions from one cause (F2-196: a vocabulary mismatch has no
+     * direction).
+     *
+     * <p>A derived {@code countBy} compares under the column's own case-insensitive collation, so
+     * the answer is correct BY CONSTRUCTION rather than by a Java comparison the next reader could
+     * copy wrongly — and it respects {@code DataAsset}'s {@code @Where(is_deleted = 0)} exactly as
+     * the list fetch does, so the buckets and the total still describe one population.
+     *
+     * <p>🔑 Both finders were DECLARED AND UNCALLED, which is what pointed here. An unused
+     * aggregate finder is the fingerprint of a hand-rolled count, and the hand-rolled count is
+     * where the population question hides — F2-420, F2-421 and F2-422 each began the same way.
+     *
+     * <p>The fixture is what makes this leg discriminate: every asset in the list carries a
+     * LOWERCASE classification and category, so a Java {@code .equals()} against an upper-case
+     * literal counts zero of them. Only a reader that lets the database compare returns the
+     * finders' values.
+     */
+    @Test
+    @DisplayName("F2-427: the dashboard reads the repository counts, so casing cannot lose a row")
+    void theDashboardLetsTheDatabaseCountRatherThanJava() {
+        DataAsset lower = asset("IN_USE", "top_secret");
+        lower.setPdplSpecialCategory("biometric");
+        DataAsset lower2 = asset("CLASSIFIED", "confidential");
+        lower2.setPdplSpecialCategory("none");
+
+        when(assetRepo.findByOrganisationIdOrderByCreatedAtDesc(eq(ORG)))
+            .thenReturn(List.of(lower, lower2));
+        when(flowRepo.findByOrganisationIdOrderByCreatedAtDesc(eq(ORG))).thenReturn(List.of());
+        when(excRepo.findByOrganisationIdOrderByCreatedAtDesc(eq(ORG))).thenReturn(List.of());
+
+        when(assetRepo.countByOrganisationIdAndClassification(eq(ORG), eq("TOP_SECRET"))).thenReturn(7L);
+        when(assetRepo.countByOrganisationIdAndClassification(eq(ORG), eq("CONFIDENTIAL"))).thenReturn(11L);
+        when(assetRepo.countByOrganisationIdAndClassification(eq(ORG), eq("INTERNAL"))).thenReturn(4L);
+        when(assetRepo.countByOrganisationIdAndClassification(eq(ORG), eq("PUBLIC"))).thenReturn(3L);
+        when(assetRepo.countByOrganisationIdAndPdplSpecialCategoryNot(eq(ORG), eq("NONE"))).thenReturn(5L);
+
+        var d = svc.dashboard();
+
+        assertThat(d.assetsTopSecret()).as("TOP_SECRET comes from the repository count").isEqualTo(7L);
+        assertThat(d.assetsConfidential()).isEqualTo(11L);
+        assertThat(d.assetsInternal()).isEqualTo(4L);
+        assertThat(d.assetsPublic()).isEqualTo(3L);
+        assertThat(d.assetsSpecialCategory())
+            .as("and so does the PDPL special-category figure — the finder's `<> 'NONE'` excludes "
+                + "NULL exactly as the Java `!= null` guard did, and now excludes 'none' too")
+            .isEqualTo(5L);
+
+        org.mockito.Mockito.verify(assetRepo)
+            .countByOrganisationIdAndPdplSpecialCategoryNot(eq(ORG), eq("NONE"));
+        org.mockito.Mockito.verify(assetRepo, org.mockito.Mockito.times(4))
+            .countByOrganisationIdAndClassification(eq(ORG), org.mockito.ArgumentMatchers.anyString());
     }
 
     // ── the authorisation branches ───────────────────────────────────────────
