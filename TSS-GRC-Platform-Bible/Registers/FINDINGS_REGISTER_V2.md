@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-436** | **A runtime-composed trigger name cannot be found by ANY static scan, so "which automation rule is inert?" is not statically decidable — measured, filed, and the 8 decisive candidates named** | Measurement | P3 |
 | **F2-435** | **A fabricated CMA Art. 91-94 / TCFD annual-report annex, emitted four ways beside the real one on the same page — the de-mocking stopped at the TABS and left the constants they were promoted off feeding the EXPORT** | Fabricated data | P1 |
 | **F2-434** | **A row must not be able to opt itself out of the audit seal's check — the skip condition was a column in the same database, and it discarded the LINK, which needs no key** | Security / integrity | P1 |
 | **F2-433** | **A unique key over a nullable column must be filtered — V396 fixed nine registers of this shape and missed the tenth, because the tenth is the TWIN of one it fixed** | Data integrity | P2 |
@@ -15219,6 +15220,112 @@ question of the register the refutation had walked into is what found the P1.
 - **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
   left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
   upstream-owned, and the nullable ones are inert.
+
+---
+
+## F2-436 — which automation rule is inert? measured, and not statically decidable
+
+| | |
+|---|---|
+| **Status** | 📏 MEASURED 2026-09-02 — **no code change**, and the reason is the finding |
+| **Severity** | P3 — an enabled rule whose trigger nothing publishes is an inert control that reads as configured (F2-193's shape). The fix for every candidate is a **feature** (publish the event) or a **deletion of seeded rows from a customer database** (house rule 6), so neither is a bounded code fix |
+| **Source** | a fresh vein — F2-193's *"a route is not a trigger"* asked of the automation engine |
+| **Size** | the measurement was S; every remedy is an owner decision |
+
+### The question, and why it looked answerable
+
+`AutomationRuleEngine` matches a stored `platform.automation_rules.trigger_event` against the
+`triggerEvent` of a published `DomainEvent`. A rule whose trigger is a token no code emits is inert
+— and **several rules are seeded by migrations** (V208, V210, plus a batch stamped
+`source = 'PROMPT_14'`), so nobody has necessarily checked that the token they name is one the
+platform produces. Measured: **142 distinct triggers over 214 live rules**, identical in both
+databases.
+
+### 🔑🔑 It is not statically decidable, and the proof is in the data
+
+Three passes, each corrected by the previous one's error:
+
+| pass | published types found | flagged as unpublished | refuted by `fire_count` |
+|---|---|---|---|
+| literal immediately after `publishEvent(` | 162 | **82** | — |
+| argument 2 of `DomainEvent.of(…)`, paren-balanced across newlines | 305 | 61 | **19** |
+| + concatenation prefixes over-approximated | 305 + 16 prefixes | 61 | 19 |
+
+⚠⚠ **The first pass would have reported ~100 seeded rules as dead.** The house idiom is
+`publisher.publishEvent(DomainEvent.of(org, "TRIGGER", entityType, id))` — the trigger is the
+**second** argument and the call wraps, so a pattern demanding the string immediately after the
+paren matched almost nothing. F2-422's lesson: **a detector keyed on the spelling you imagined
+returns a SMALLER population, and a smaller population reads exactly like a finding.**
+
+🔑🔑 **And then the decisive test refuted itself.** *Does the token appear anywhere in either
+codebase?* is sound where a scan is not — an opaque `trigger` variable still has to be assigned
+from somewhere. Run over 3,154 files: **0 tokens absent everywhere**, and **22 appear in no Java
+file at all** — of which **`COMMITTEE_RESOLUTION_APPROVED` has fired 22 times and
+`COMMITTEE_RESOLUTION_DEFERRED` 38 times.**
+
+Because the house **composes trigger names at runtime**:
+
+```java
+publisher.publishEvent(DomainEvent.of(org, "COMMITTEE_RESOLUTION_" + r.getOutcome(), …));
+publisher.publishEvent(DomainEvent.of(org, "MODEL_VALIDATION_"     + req.toStatus(), …));
+publisher.publishEvent(DomainEvent.of(org, "COMMITTEE_ACTION_"     + toStatus,       …));
+```
+
+**The full token string exists nowhere, and the platform publishes it anyway.** So absence from the
+tree is not evidence, absence from a scan is not evidence, and `202 of the trigger expressions are
+fully opaque` (a bare variable). 🔑 **`fire_count > 0` is the only ground truth available: a rule
+that has fired was matched by a real event.** Answering this properly needs each prefix expanded
+against its own module's state vocabulary — per-module reading, not a sweep.
+
+### The 8 decisive candidates
+
+Each: **appears in no Java file**, **matches none of the 16 concatenation prefixes**, and **has
+never fired**. Identical in both databases.
+
+| trigger | rules | enabled | source |
+|---|---|---|---|
+| `BCM_EXERCISE_FAILED` | 1 | 1 | `BCM_MODULE` |
+| `BOARD_APPROVAL_REQUIRED` | 1 | 1 | `PROMPT_14` |
+| `CLOUD_REGION_CHANGED` | 1 | 1 | `PROMPT_14` |
+| `CROSS_BORDER_REQUEST` | 1 | 1 | `PROMPT_14` |
+| `MODEL_ANNUAL_ETHICS_ATTESTATION_DUE` | 1 | 1 | `CUSTOM` |
+| `SUPPLIER_EVIDENCE_GAP` | 1 | 1 | `PROMPT_14` |
+| `SUPPLIER_SLA_REPEATED` | 1 | 1 | `PROMPT_14` |
+| `VENDOR_CLASSIFIED` | 1 | 1 | `PROMPT_14` |
+
+⚠ **Still not proof, and saying so is the point.** `CLOUD_REGION_CHANGED` sits beside a published
+`CLOUD_SERVICE_` prefix; a token could be composed from a prefix this scan did not harvest because
+its own construction is one of the 202 opaque expressions. What these 8 are is **the readable
+shortlist** — the set where reading one file settles it, which is what a work list is for
+(F2-188: no verdicts).
+
+### Why nothing was fixed
+
+⚙ Each remedy is outside a bounded slice. **Publishing the event is a feature**
+(`BOARD_APPROVAL_REQUIRED` and `CROSS_BORDER_REQUEST` are governance capabilities, not omissions in
+existing code). **Retiring the rule means deleting seeded rows from `TSS_GRC_Deployment`**, which
+needs the user's explicit OK (house rule 6). And the third option — **disclosing "this rule has
+never fired" to an operator** — has nowhere to land: `GET /api/v1/automation/rules` exists and
+**the frontend has no client for it at all** (only `AutomationRuleRunDto`, the runs), so all 214
+rules are invisible to the UI. That is F2-214's invitation shape, filed below.
+
+### Filed
+
+⚙ **The 8-member shortlist above**, each settled by reading one module.
+
+⚙ **`GET /api/v1/automation/rules` and `/rules/{id}` have no frontend client**, so a tenant cannot
+see, enable or disable an automation rule through the platform — 214 live rules, 190 enabled,
+administered only by SQL. Building that console is a feature, and it is the surface a
+"never fired" disclosure would need.
+
+⚙ **`GET /api/v1/automation/notification-reachability` already exists** — somebody built a
+reachability report for the *notification* half of this engine. Whether it has F2-253's zero-holder
+problem (a recipient role nobody holds) was **not** measured here and is the natural next question
+in this vein.
+
+⚙ **A prefix-expanding trigger census** — resolve each `"PREFIX_" + expr` against the state
+vocabulary of the machine that produces `expr` — would make this question decidable. It is
+per-module work, and it is the only thing that would turn the 61 into a defensible number.
 
 ---
 
