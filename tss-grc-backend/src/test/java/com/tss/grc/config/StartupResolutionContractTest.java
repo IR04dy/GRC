@@ -204,10 +204,21 @@ class StartupResolutionContractTest {
 
     // ─────────────────────────── the detectors ───────────────────────────
 
-    /** What a single query resolved to. Every field is reported; nothing is silently dropped. */
+    /**
+      * What a single query resolved to. Every field is reported; nothing is silently dropped.
+      *
+      * <p>⚠ {@code checkedPaths} exists because the mutation harness found the gate could
+      * degrade in silence. Reverting fully-qualified entity resolution made
+      * {@code JOIN com.tss.…Citation c} fall through to the <em>path-join</em> branch, which
+      * records the alias as untyped and skips its property reads — so the mutation
+      * <b>SURVIVED</b>: no false report, and one query's properties quietly no longer checked.
+      * An empty report is what a working resolution and a degraded one both produce (F2-235), so
+      * the corpus leg floors this count and the negative is not the only claim.
+      */
     record Resolution(List<String> unknownEntities,
                       List<String> unknownProperties,
-                      List<String> untypedAliases) { }
+                      List<String> untypedAliases,
+                      int checkedPaths) { }
 
     /**
      * Extracted so {@link #theDetectorsFireOnTheShapesTheyClaimToCatch()} can drive it over
@@ -218,6 +229,7 @@ class StartupResolutionContractTest {
         List<String> unknownEntities = new ArrayList<>();
         List<String> unknownProperties = new ArrayList<>();
         List<String> untypedAliases = new ArrayList<>();
+        int checkedPaths = 0;
 
         Map<String, Class<?>> alias = new LinkedHashMap<>();
         Set<String> pathAlias = new LinkedHashSet<>();
@@ -265,11 +277,12 @@ class StartupResolutionContractTest {
             if (pathAlias.contains(al)) continue;
             Class<?> ent = alias.get(al);
             if (ent == null) { untypedAliases.add(site + "   " + al + "." + prop); continue; }
+            checkedPaths++;
             if (!declaresField(ent, prop)) {
                 unknownProperties.add(site + "   " + ent.getSimpleName() + "." + prop);
             }
         }
-        return new Resolution(unknownEntities, unknownProperties, untypedAliases);
+        return new Resolution(unknownEntities, unknownProperties, untypedAliases, checkedPaths);
     }
 
     /** An unqualified name is a JPQL entity name; a qualified one is a class. Both are legal. */
@@ -472,29 +485,45 @@ class StartupResolutionContractTest {
 
         // ── must NOT flag: the three legal shapes a first draft could not resolve ──
         assertThat(resolve("t", "UPDATE " + real + " a SET a.id = 1 WHERE a.id = 2", byName))
-            .as("UPDATE binds its alias with no FROM at all")
+            .as("UPDATE binds its alias with no FROM at all, and its paths are CHECKED")
             .satisfies(r -> assertThat(r.unknownEntities()).isEmpty())
             .satisfies(r -> assertThat(r.unknownProperties()).isEmpty())
-            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty());
+            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty())
+            .satisfies(r -> assertThat(r.checkedPaths()).isEqualTo(2));
         assertThat(resolve("t", "SELECT c.id FROM " + real + " m JOIN " + realClass.getName() + " c ON c.id = m.id", byName))
-            .as("a fully-qualified entity reference is legal, and its package is not a property path")
+            .as("""
+                A fully-qualified entity reference is legal; its package is not a property path;
+                and its paths must be CHECKED.
+
+                ⚠ The `checkedPaths` claim is the load-bearing one and was added because the
+                mutation reverting that resolution SURVIVED without it: the qualified name then
+                falls through to the path-join branch, which records the alias as untyped and
+                SKIPS its properties — so every negative assertion above still passed while one
+                query silently stopped being checked (F2-235).""")
             .satisfies(r -> assertThat(r.unknownEntities()).isEmpty())
             .satisfies(r -> assertThat(r.unknownProperties()).isEmpty())
-            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty());
+            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty())
+            .satisfies(r -> assertThat(r.checkedPaths()).isEqualTo(3));
         assertThat(resolve("t", "SELECT c.anything FROM " + real + " e JOIN e.someChildren c", byName))
-            .as("a path join binds an alias this gate deliberately does not type")
+            .as("""
+                A path join binds an alias this gate deliberately does not type — so zero paths
+                are checked here, and that is the one shape where zero is the RIGHT answer. It is
+                asserted so the two cases above cannot be satisfied by the same silent
+                fall-through.""")
             .satisfies(r -> assertThat(r.unknownEntities()).isEmpty())
             .satisfies(r -> assertThat(r.unknownProperties()).isEmpty())
-            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty());
+            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty())
+            .satisfies(r -> assertThat(r.checkedPaths()).isZero());
         assertThat(resolve("t", "SELECT new java.util.ArrayList(e.id) FROM " + real + " e", byName)
             .untypedAliases())
             .as("a constructor expression's qualified type is not a property path").isEmpty();
         assertThat(resolve("t", "DELETE FROM " + real + " a WHERE a.id = :id", byName).unknownEntities())
             .as("DELETE FROM binds its alias through the FROM branch").isEmpty();
         assertThat(resolve("t", "select l, c from " + real + " l, " + real + " c where c.id = l.id", byName))
-            .as("a comma-continued root is a legal implicit join and binds its alias")
+            .as("a comma-continued root is a legal implicit join, binds its alias, and is CHECKED")
             .satisfies(r -> assertThat(r.unknownEntities()).isEmpty())
-            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty());
+            .satisfies(r -> assertThat(r.untypedAliases()).isEmpty())
+            .satisfies(r -> assertThat(r.checkedPaths()).isEqualTo(2));
         assertThat(resolve("t", "SELECT e.id, e.titleEn FROM " + real + " e WHERE e.id IN (:a, :b)", byName)
             .unknownEntities())
             .as("""
@@ -556,5 +585,28 @@ class StartupResolutionContractTest {
             .isGreaterThan(20);
         assertThat(declaredProperties())
             .as("property keys read by Spring's own YAML loader").hasSizeGreaterThan(300);
+
+        Map<String, Class<?>> byName = entityNames(classes);
+        int checked = 0;
+        for (Jpql q : jpqlQueries(classes)) checked += resolve(q.site(), q.query(), byName).checkedPaths();
+        assertThat(checked)
+            .as("""
+                Property paths actually CHECKED against an entity — the POSITIVE claim, without
+                which this gate can degrade in silence. Every alias-binding branch (FROM, UPDATE,
+                a fully-qualified reference, a comma-continued root) that stops resolving pushes
+                its query's paths into the untyped set instead, and an empty report is what a
+                working resolution and a dead one both produce (F2-235).
+
+                ⚠ Measured 883. The first draft floored this at 900 from an ARITHMETIC guess of
+                1050 and failed on a correct tree — F2-438's lesson in the very slice that quotes
+                it. The largest WRONG answer is 0 (a broken walk), so 800 separates them
+                (F2-215).
+
+                ⚠ This floor is GROSS by construction: reverting fully-qualified resolution
+                costs ONE query's two paths, 883 → 881, which no floor can distinguish from a
+                new query being added. The assertion that catches a NARROW degradation is the
+                per-shape `checkedPaths` claim in the self-test below — that mutation SURVIVED
+                until it existed.""")
+            .isGreaterThan(800);
     }
 }
