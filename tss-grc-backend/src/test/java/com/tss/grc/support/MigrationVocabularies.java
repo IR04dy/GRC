@@ -340,6 +340,224 @@ public final class MigrationVocabularies {
         return out;
     }
 
+    /* ══════════════════════════════════════════════════════════════════════════════════════
+       F2-433 — column NULLABILITY and UNIQUE keys, as the whole chain leaves them.
+
+       Why these sit here rather than in a private parser inside the gate that needs them: this
+       class's own trap 3 — <b>later versions win</b> — is LOAD-BEARING for the question they
+       answer.  V25 declares {@code CONSTRAINT uk_eng_code UNIQUE (organisation_id,
+       engagement_code)} and V398 drops it; a parser that read only the first declaration would
+       report that constraint as present forever, and the gate over it would fail on a tree that
+       has already been fixed.  A copy that predates the discovery does not know about it.
+
+       ⚠ Two traps of their own, both measured:
+       <ol>
+         <li><b>The filter clause is on the NEXT LINE.</b> The house style writes
+             {@code CREATE UNIQUE INDEX x ON t (a, b)} and then {@code WHERE b IS NOT NULL} on its
+             own line below.  A newline-bounded tail cannot see it, and the first census run
+             reported <b>17</b> unfiltered keys over nullable columns where <b>6</b> exist.  It
+             OVER-reports, which fails loudly — the opposite direction from F2-198's stripper bug,
+             and the reason it was caught at all.</li>
+         <li><b>Strip the comments.</b> V398's own header quotes the constraint it retires, so a
+             raw scan reads the epitaph as the corpse (F2-193) and reports the defect as live on a
+             fixed tree.</li>
+       </ol>
+       ══════════════════════════════════════════════════════════════════════════════════════ */
+
+    /** A UNIQUE key (constraint- or index-form) that survives the whole migration chain. */
+    public record UniqueKey(String name, String table, List<String> keyColumns, boolean filtered) {}
+
+    private static final String SQL_TYPE =
+        "(?:NVARCHAR|VARCHAR|NCHAR|CHAR|BIGINT|INT|SMALLINT|TINYINT|BIT|DATETIME2|DATETIME|DATE"
+        + "|TIME|DECIMAL|NUMERIC|FLOAT|REAL|UNIQUEIDENTIFIER|ROWVERSION|TIMESTAMP|MONEY"
+        + "|VARBINARY|XML)";
+
+    private static final Pattern COMMENT = Pattern.compile("--[^\\n]*|/\\*[\\s\\S]*?\\*/");
+    private static final Pattern CREATE_TABLE = Pattern.compile(
+        "CREATE\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s*\\(", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COLUMN_DECL = Pattern.compile(
+        "^\\s*\\[?(\\w+)\\]?\\s+" + SQL_TYPE + "\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NOT_A_COLUMN = Pattern.compile(
+        "^\\s*(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|INDEX)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALTER_ADD_COLUMN = Pattern.compile(
+        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ADD\\s+\\[?(\\w+)\\]?\\s+"
+        + SQL_TYPE + "\\b([^;\\n]*)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALTER_COLUMN = Pattern.compile(
+        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ALTER\\s+COLUMN\\s+"
+        + "\\[?(\\w+)\\]?\\s+" + SQL_TYPE + "\\b([^;\\n]*)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INBODY_UNIQUE = Pattern.compile(
+        "CONSTRAINT\\s+\\[?(\\w+)\\]?\\s+UNIQUE\\s*\\(([^)]*)\\)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALTER_ADD_UNIQUE = Pattern.compile(
+        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ADD\\s+CONSTRAINT\\s+"
+        + "\\[?(\\w+)\\]?\\s+UNIQUE\\s*\\(([^)]*)\\)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CREATE_UNIQUE_INDEX = Pattern.compile(
+        "CREATE\\s+UNIQUE\\s+(?:NONCLUSTERED\\s+|CLUSTERED\\s+)?INDEX\\s+\\[?(\\w+)\\]?\\s+ON\\s+"
+        + "(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s*\\(", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DROP_CONSTRAINT = Pattern.compile(
+        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+DROP\\s+CONSTRAINT\\s+"
+        + "(?:IF\\s+EXISTS\\s+)?\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DROP_UNIQUE_INDEX = Pattern.compile(
+        "DROP\\s+INDEX\\s+(?:IF\\s+EXISTS\\s+)?\\[?(\\w+)\\]?\\s+ON\\s+"
+        + "(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
+
+    private static Map<String, Map<String, Boolean>> columnCache;
+    private static List<UniqueKey> uniqueKeyCache;
+
+    record Ev(int pos, boolean add, String key, UniqueKey value) {}
+
+    /**
+     * {@code schema.table -> column -> is the column NULLABLE}, over the whole chain.
+     *
+     * <p>Absent {@code NOT NULL} and absent {@code PRIMARY KEY} means nullable, which is SQL's own
+     * default. {@code ALTER TABLE ... ADD} and {@code ALTER COLUMN} are replayed in version order,
+     * so a column later tightened to {@code NOT NULL} reads as NOT NULL.
+     */
+    public static synchronized Map<String, Map<String, Boolean>> columns() {
+        if (columnCache == null) {
+            Map<String, Map<String, Boolean>> out = new LinkedHashMap<>();
+            for (Path f : migrationFiles()) {
+                String src = stripComments(read(f));
+                Matcher ct = CREATE_TABLE.matcher(src);
+                while (ct.find()) {
+                    String body = balanced(src, ct.end() - 1);
+                    if (body == null) continue;
+                    Map<String, Boolean> cols = out.computeIfAbsent(
+                        qualify(ct.group(1), ct.group(2)), k -> new LinkedHashMap<>());
+                    for (String line : body.split("\n")) {
+                        if (NOT_A_COLUMN.matcher(line).find()) continue;
+                        Matcher cd = COLUMN_DECL.matcher(line);
+                        if (cd.find()) cols.put(cd.group(1).toLowerCase(), isNullable(line));
+                    }
+                }
+                for (Matcher m : List.of(ALTER_ADD_COLUMN.matcher(src), ALTER_COLUMN.matcher(src))) {
+                    while (m.find()) {
+                        out.computeIfAbsent(qualify(m.group(1), m.group(2)),
+                                k -> new LinkedHashMap<>())
+                            .put(m.group(3).toLowerCase(), isNullable(m.group(4)));
+                    }
+                }
+            }
+            columnCache = out;
+        }
+        return columnCache;
+    }
+
+    /** Every UNIQUE key the chain leaves in place, constraint- and index-form alike. */
+    public static synchronized List<UniqueKey> uniqueKeys() {
+        if (uniqueKeyCache == null) {
+            Map<String, UniqueKey> live = new LinkedHashMap<>();
+            for (Path f : migrationFiles()) {
+                for (Ev e : eventsIn(read(f))) {
+                    if (e.add()) live.put(e.key(), e.value());
+                    else live.remove(e.key());
+                }
+            }
+            uniqueKeyCache = List.copyOf(live.values());
+        }
+        return uniqueKeyCache;
+    }
+
+    /**
+     * Every add/drop of a UNIQUE key in one migration's text, in TEXT ORDER.
+     *
+     * <p>Package-private so the contract test can drive it over a synthetic corpus: a census that
+     * can only be run against the real tree cannot be shown to fire, and a detector that has
+     * stopped matching reads exactly like a clean tree (F2-235).
+     */
+    static List<Ev> eventsIn(String raw) {
+        String src = stripComments(raw.replace("\r\n", "\n"));
+        List<Ev> evs = new ArrayList<>();
+            Matcher ct = CREATE_TABLE.matcher(src);
+            while (ct.find()) {
+                String body = balanced(src, ct.end() - 1);
+                if (body == null) continue;
+                String table = qualify(ct.group(1), ct.group(2));
+                Matcher iu = INBODY_UNIQUE.matcher(body);
+                while (iu.find()) {
+                    evs.add(add(ct.end() + iu.start(), table, iu.group(1), iu.group(2), false));
+                }
+            }
+            Matcher au = ALTER_ADD_UNIQUE.matcher(src);
+            while (au.find()) {
+                evs.add(add(au.start(), qualify(au.group(1), au.group(2)),
+                    au.group(3), au.group(4), false));
+            }
+            Matcher ui = CREATE_UNIQUE_INDEX.matcher(src);
+            while (ui.find()) {
+                String cols = balanced(src, ui.end() - 1);
+                if (cols == null) continue;
+                evs.add(add(ui.start(), qualify(ui.group(2), ui.group(3)), ui.group(1),
+                    cols.substring(1, cols.length() - 1),
+                    hasFilter(src, ui.end() - 1 + cols.length())));
+            }
+            Matcher dc = DROP_CONSTRAINT.matcher(src);
+            while (dc.find()) {
+                evs.add(new Ev(dc.start(), false,
+                    qualify(dc.group(1), dc.group(2)) + "." + dc.group(3).toLowerCase(), null));
+            }
+            Matcher di = DROP_UNIQUE_INDEX.matcher(src);
+            while (di.find()) {
+                evs.add(new Ev(di.start(), false,
+                    qualify(di.group(2), di.group(3)) + "." + di.group(1).toLowerCase(), null));
+            }
+
+        evs.sort(Comparator.comparingInt(Ev::pos));
+        return evs;
+    }
+
+    private static Ev add(int pos, String table, String name, String cols, boolean filtered) {
+        List<String> key = new ArrayList<>();
+        for (String c : cols.split(",")) {
+            key.add(c.trim().replace("[", "").replace("]", "")
+                .replaceAll("(?i)\\s+(asc|desc)$", "").toLowerCase());
+        }
+        return new Ev(pos, true, table + "." + name.toLowerCase(),
+            new UniqueKey(name, table, List.copyOf(key), filtered));
+    }
+
+    /**
+     * Is there a {@code WHERE} between the end of the key list and the end of the statement?
+     *
+     * <p>⚠ This span MUST be allowed to cross newlines — see trap 1 above.
+     */
+    private static boolean hasFilter(String src, int afterKeyList) {
+        int stop = src.length();
+        Matcher semi = Pattern.compile(";|\\bGO\\b", Pattern.CASE_INSENSITIVE)
+            .matcher(src).region(afterKeyList, src.length());
+        if (semi.find()) stop = semi.start();
+        return Pattern.compile("\\bWHERE\\b", Pattern.CASE_INSENSITIVE)
+            .matcher(src.substring(afterKeyList, stop)).find();
+    }
+
+    private static boolean isNullable(String decl) {
+        String up = decl == null ? "" : decl.toUpperCase();
+        return !up.contains("NOT NULL") && !up.contains("PRIMARY KEY");
+    }
+
+    private static String qualify(String schema, String table) {
+        return ((schema == null ? "dbo" : schema) + "." + table).toLowerCase();
+    }
+
+    /** Blank every comment, preserving newlines so line structure survives (F2-242). */
+    static String stripComments(String src) {
+        Matcher m = COMMENT.matcher(src);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            m.appendReplacement(out,
+                Matcher.quoteReplacement(m.group().replaceAll("[^\\n]", " ")));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    private static String read(Path f) {
+        try {
+            return Files.readString(f).replace("\r\n", "\n");
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot read " + f, e);
+        }
+    }
+
     /** The nearest {@code CREATE TABLE} / {@code ALTER TABLE} above this point owns the constraint. */
     private static String tableOf(String src, int at) {
         Matcher m = TABLE_REF.matcher(src.substring(0, at));
