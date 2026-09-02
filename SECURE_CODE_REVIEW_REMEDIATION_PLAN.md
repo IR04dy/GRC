@@ -48,7 +48,7 @@ reviewer.
 | SCR-006 | High | **UPHELD, severity over-rated** | **CODE-CONFIRMED** | Correct as written; blast radius is 3 roles, not "global". See §2 |
 | SCR-007 | High | UPHELD | **UNVERIFIED** | Needs a browser check of `localStorage` after logout |
 | SCR-008 | High | UPHELD | **UNVERIFIED** | Absence-of-control claim; verify no scanner hook exists before accepting |
-| SCR-009 | High | UPHELD | **UNVERIFIED** | Re-run `npm audit --omit=dev`; advisories move |
+| SCR-009 | High | **UPHELD → SIZED, and the severity ordering INVERTS** | **RE-RUN 2026-09-02** | 4 production advisories: 1 critical + 3 moderate. The **critical is NOT reachable in the shipped bundle**; the **moderate ones are**, and their only fix is a react-router v6→v7 **major migration**. See §5a |
 | SCR-010 | Medium | UPHELD | **UNVERIFIED** | — |
 | SCR-011 | Medium | **PARTLY — partly describes deliberate design** | **PARTLY** | Two of the "fail-open contexts" are documented exemptions added 2026-07-26. See §2 |
 | SCR-012 | Medium | UPHELD (conditional) | **UNVERIFIED** | Only bites if CCM custom SQL is enabled |
@@ -234,8 +234,60 @@ V324** and nothing is blocked.
 | Findings refuted | **0** |
 | Corrections made to the report | 4 — SCR-001's rollout cost, SCR-002's mechanism, SCR-006's severity, and **SCR-004's severity is under-stated**: that surface accepted writes into records the caller could not see, not only reads |
 | Second opinion | **NOT OBTAINED** — Fable 5 blocked by cyber safeguards, twice |
-| Code changed | **Slices 1–3 shipped.** Slice 1 (2026-07-28) closed SCR-001's reproduced attack; slice 2 (2026-07-29) closed SCR-002 — account liveness on the bearer path, tenant bound to the loaded user; slice 3 (2026-07-29) closed SCR-004 — attachments inherit their parent record's read guard. ⚠ Slices 2 and 3 are **committed on `fix/scr002-filter-liveness` and `fix/scr004-attachment-object-authz`, NOT merged** (both `/loop` invocations omitted "then merge", so house rule 2 applies). Slices 4–12 not started |
+| Code changed | **Slices 1–3 shipped.** Slice 1 (2026-07-28) closed SCR-001's reproduced attack; slice 2 (2026-07-29) closed SCR-002 — account liveness on the bearer path, tenant bound to the loaded user; slice 3 (2026-07-29) closed SCR-004 — attachments inherit their parent record's read guard. ⚠⚠ **CORRECTED 2026-09-02.** This cell read *"Slices 2 and 3 are committed on `fix/scr002-filter-liveness` and `fix/scr004-attachment-object-authz`, NOT merged"* — **they were merged in `c5b0119b`** ("merge: SCR-002 filter liveness + SCR-004 attachment object-level authorization"), and SCR-002's fix is readable on `master` in `security/JwtAuthenticationFilter.java` today. Only the two local branches linger, which is what makes the stale sentence credible. 🔑 **A stale claim on a security backlog is worse than a stale count: a reader concludes two security fixes are sitting unmerged and either re-merges a no-op or reads the posture as weaker than it is.** **Slices 4–12 are still not started** — that half is TRUE and was re-verified: `SCR-001`, `SCR-002` and `SCR-004` are the only ids referenced anywhere in main source (6 / 3 / 7 occurrences) |
 | Next action | **Merge slices 2 and 3** when the user says so, then slice 4 (SCR-005 public-token hygiene) — and §5's first check comes before any sizing there, because half that finding is an infrastructure claim about the nginx log format. Two decisions now wait on the user; see §8 |
+
+---
+
+
+### §5a — SCR-009 re-run and sized (2026-09-02)
+
+§5 ranked this third of the four cheap checks and said to re-run it *"before sizing"* because
+*"advisory data changes"*. Re-run, it is **UPHELD and current** — and sizing it **inverts the
+severity ordering the audit output implies**, which is the part worth keeping.
+
+`npm audit --omit=dev` in `tss-grc-ui-v2`: **4 vulnerabilities, 1 critical + 3 moderate**, all in
+**production** dependencies.
+
+| package | severity | advisory | reachable in the browser bundle? |
+|---|---|---|---|
+| `websocket-driver` | **critical** | GHSA-mp7j-qc5w-4988 (resource-limit bypass via message compression), GHSA-xv26-6w52-cph6 (message corruption) | **NO — proven below** |
+| `@remix-run/router` | moderate | GHSA-2j2x-hqr9-3h42 (same-origin redirect with a path starting `//`) | yes |
+| `react-router` | moderate | GHSA-wrjc-x8rr-h8h6 (open redirect via backslash in `<Link>`), GHSA-337j-9hxr-rhxg (arbitrary constructor injection via deserialisation), GHSA-2j2x-hqr9-3h42 | yes |
+| `react-router-dom` | moderate | GHSA-jjmj-jmhj-qwj2 (**open redirect leading to XSS**) | yes |
+
+⚠⚠ **THE CRITICAL IS NOT IN THE SHIPPED BUNDLE, AND THAT IS PROVEN RATHER THAN ASSUMED.** The
+chain is `websocket-driver` ← `faye-websocket` ← **`sockjs-client`**, which is a direct
+`dependencies` entry (`^1.6.1`, used by `@stomp/stompjs`). But `sockjs-client@1.6.1`'s
+`package.json` declares a **`browser` field map**:
+
+```json
+"browser": { "./lib/transport/driver/websocket.js": "./lib/transport/browser/websocket.js", ... }
+```
+
+and `lib/transport/driver/websocket.js` is one line — `module.exports = require('faye-websocket')
+.Client;` — while its browser replacement is `var Driver = global.WebSocket || global.MozWebSocket`.
+`vite.config.ts` sets **no `resolve.mainFields` and no `browserField` override** (its only `resolve`
+entry is the `@` alias), so Vite's defaults honour that map and **`faye-websocket` — and therefore
+`websocket-driver` — is never bundled.** The config's own Sprint 4 §2.7 comment corroborates it: it
+shims `global` precisely because `sockjs-client` carries Node-shaped code paths.
+
+🔑 **So `npm audit`'s one CRITICAL is a Node-transport dependency of a browser-only build, and the
+three MODERATE findings are the ones that actually ship.** An audit severity is a property of the
+advisory, never of this application's reachability — and here reading it as a priority ordering
+would have put the whole effort on the one finding that cannot fire.
+
+⚠⚠ **AND THE REACHABLE ONES CANNOT BE PATCHED — ONLY MIGRATED.** The vulnerable range is
+`6.0.0-alpha.0 – 7.17.0` and `package.json` pins `react-router-dom: ^6.28.0`, so **the entire 6.x
+line is vulnerable and the first fixed version is 7.17.1**: a **v6 → v7 major migration**, not an
+`npm audit fix`. `npm` reports `fixAvailable: true`, which is true of the dependency graph and
+misleading about the work. That is an **owner decision**, and it is the real content of SCR-009.
+
+⚠ Not attempted here, deliberately: this tree has **no `pnpm-lock.yaml`** (the tracked lockfile is
+npm's), so any upgrade re-resolves rather than patches, the pnpm store still has 5 unmaterialised
+package directories, and the dev server is running — reinstalling `node_modules` under a live Vite
+is the recorded blank-page landmine. A dependency migration is not a side effect of a verification
+pass.
 
 ---
 
