@@ -9,7 +9,13 @@ import com.tss.grc.module.audit_lc.ia_plan.dto.IaDtos.UniverseUpdateRequest;
 import com.tss.grc.module.audit_lc.ia_plan.entity.IaAuditUniverseEntry;
 import com.tss.grc.module.audit_lc.ia_plan.repository.IaAuditUniverseEntryRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -308,5 +316,114 @@ class IaAuditUniverseServiceTest {
 
         verify(repo).save(cap.capture());
         assertThat(cap.getValue().getResidualRiskScore()).isEqualByComparingTo("10.80");
+    }
+    // ═══ F2-425 — the derived residual cannot leave its column once its inputs are bounded ═════
+
+    private static ValidatorFactory validatorFactory;
+    private static Validator validator;
+
+    @BeforeAll
+    static void startValidator() {
+        validatorFactory = Validation.buildDefaultValidatorFactory();
+        validator = validatorFactory.getValidator();
+    }
+
+    @AfterAll
+    static void stopValidator() {
+        if (validatorFactory != null) validatorFactory.close();
+    }
+
+    private static Set<String> violatedFields(Object req) {
+        return validator.validate(req).stream()
+                .map(ConstraintViolation::getPropertyPath)
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+    }
+
+    private static UniverseCreateRequest scored(String inherent, String strength) {
+        return new UniverseCreateRequest(null, "AU-F425-001", "T", "ت", null, null, null, null,
+                new BigDecimal(inherent), new BigDecimal(strength),
+                null, null, null, null, null, null);
+    }
+
+    /**
+     * The arithmetic that the caps exist for. This leg does NOT discriminate — {@code
+     * computeResidual} is unchanged, so it passes before and after F2-425 (F2-225). It is here
+     * because the two numbers it records are the whole reason the bounds are what they are, and a
+     * reader who deletes a cap should meet them.
+     */
+    @Test
+    void computeResidual_unboundedStrengthLeavesTheColumnInBothDirections() {
+        // A control strength written as a PERCENTAGE rather than the documented 0-1 fraction — the
+        // obvious slip on the bulk-paste form, which does Number(cell) with no range check at all.
+        assertThat(IaAuditUniverseService.computeResidual(
+                new BigDecimal("22"), new BigDecimal("75")))
+            .as("strength as a percentage derives a residual far outside decimal(4,2) -> SQL 8115")
+            .isEqualByComparingTo("-1628.00");
+
+        // Only slightly out of range, and this one is the quiet half: it STORES.
+        assertThat(IaAuditUniverseService.computeResidual(
+                new BigDecimal("22"), new BigDecimal("1.5")))
+            .as("a strength above 1 derives a NEGATIVE residual, which decimal(4,2) accepts — it "
+                + "then bands 'low' (residualBand's fall-through is green) and sorts LAST in both "
+                + "surfaces that rank the audit universe by residual DESC")
+            .isEqualByComparingTo("-11.00");
+
+        // A negative strength inverts (1 - strength) and pushes the residual up instead.
+        assertThat(IaAuditUniverseService.computeResidual(
+                new BigDecimal("25"), new BigDecimal("-3")))
+            .as("a negative strength overflows decimal(4,2) upward")
+            .isEqualByComparingTo("100.00");
+    }
+
+    /**
+     * The invariant the caps buy: over the whole bounded input box the residual is between zero and
+     * inherent, so it is inside decimal(4,2) BY CONSTRUCTION rather than by a check somebody has to
+     * remember to keep (F2-213 — absent rather than latent).
+     */
+    @Test
+    void computeResidual_staysInsideItsColumnOverTheWholeBoundedBox() {
+        BigDecimal ceiling = new BigDecimal("99.99");
+        for (String inherent : new String[] {"0.00", "0.01", "22.00", "50.00", "99.99"}) {
+            for (String strength : new String[] {"0.00", "0.30", "0.99", "1.00"}) {
+                BigDecimal res = IaAuditUniverseService.computeResidual(
+                        new BigDecimal(inherent), new BigDecimal(strength));
+                assertThat(res)
+                    .as("residual for inherent=%s strength=%s must not be negative", inherent, strength)
+                    .isGreaterThanOrEqualTo(BigDecimal.ZERO);
+                assertThat(res)
+                    .as("residual for inherent=%s strength=%s must fit decimal(4,2)", inherent, strength)
+                    .isLessThanOrEqualTo(ceiling);
+            }
+        }
+    }
+
+    @Test
+    void theBoundaryRefusesAControlStrengthWrittenAsAPercentage() {
+        assertThat(violatedFields(scored("22", "75")))
+            .as("75 means 75% to a human and 7500% to the formula")
+            .contains("controlEnvironmentScore");
+        assertThat(violatedFields(scored("22", "1.5")))
+            .as("anything above 1 makes the residual negative")
+            .contains("controlEnvironmentScore");
+        assertThat(violatedFields(scored("22", "-0.1")))
+            .as("a negative strength pushes the residual above its column")
+            .contains("controlEnvironmentScore");
+        assertThat(violatedFields(scored("100", "0.30")))
+            .as("inherent above the column's own decimal(4,2) ceiling")
+            .contains("inherentRiskScore");
+    }
+
+    @Test
+    void theBoundaryStillAcceptsEveryScoreTheRegisterHolds() {
+        // Both databases measure 20 rows with inherent in [13.00, 22.00] and strength in
+        // [0.30, 0.55], 0 out of range on either axis — which is what makes the caps safe to
+        // enable at all (F2-183). The extremes of the register plus the exact bounds:
+        for (String[] ok : new String[][] {{"13.00", "0.30"}, {"22.00", "0.55"},
+                                           {"0.00", "0.00"}, {"99.99", "1.00"}}) {
+            assertThat(violatedFields(scored(ok[0], ok[1])))
+                .as("inherent=%s strength=%s is legitimate and must not be refused", ok[0], ok[1])
+                .doesNotContain("inherentRiskScore", "controlEnvironmentScore");
+        }
     }
 }

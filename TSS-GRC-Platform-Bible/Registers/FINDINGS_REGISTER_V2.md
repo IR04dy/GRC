@@ -15219,6 +15219,79 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-425 — a derived value whose inputs are unbounded can leave its own column
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — reachable from the platform's own bulk-paste form, and **latent in data**: both databases hold 20 rows with every axis in range ([[F2-283]]) |
+| **Source** | a fresh vein — the NUMERIC analogue of the closed string-overflow family ([[F2-338]] / [[F2-346]] / [[F2-347]] / [[F2-349]] / [[F2-350]]), which had never been swept |
+| **Size** | S — four annotations, two imports; three gate legs and four behavioural legs; no migration |
+
+⚠⚠ **A `decimal(p,s)` COLUMN HOLDS AT MOST `(p-s)` INTEGER DIGITS, AND MORE RAISES SQL SERVER 8115 — THE NUMERIC TWIN OF THE 8152 THE STRING-OVERFLOW FAMILY PRODUCED.** For a `String` the boundary declares its cap with `@Size` and `RequestSizeCapMirrorTest` checks it against `@Column(length)`. For a `BigDecimal` the cap is `@DecimalMax` and **nothing had ever checked it against the column's own ceiling.** Measured: **102 `BigDecimal` components of request-bound records, 18 capped, 0 caps looser than their column, 13 uncapped landing in a column with fewer than 4 integer digits.**
+
+🔑🔑 **THE MIRROR IS CLEAN AND THE ABSENCE IS THE POPULATION — AND MOST OF THE 13 ARE HARMLESS, WHICH IS WHY THIS IS ONE FIX AND NOT THIRTEEN.** A 0-100 score in a `decimal(5,2)` has 999 of room; a `probabilityWeight` or an `attributionFactor` is a 0-1 fraction with two orders of magnitude to spare. What made the IA audit universe the sharp member is that its column receives a **DERIVED** value: `IaAuditUniverseService`'s own javadoc declares `residual = inherent × (1 - controlEnvironmentScore)` with the control strength *"on a 0-1 scale"*, all three columns are `decimal(4,2)` (max **99.99**), and **the derivation's range is bounded by neither input's own column.**
+
+⚠⚠ **THE TWO CONSEQUENCES POINT IN OPPOSITE DIRECTIONS AND ONLY ONE OF THEM IS LOUD.** With the strength unbounded:
+
+| input | derived residual | outcome |
+|---|---|---|
+| inherent 22, strength **75** | **-1628.00** | outside `decimal(4,2)` → **8115 → opaque 500** |
+| inherent 22, strength **1.5** | **-11.00** | **stores fine** → bands `low` → sorts **LAST** |
+| inherent 25, strength **-3** | **100.00** | outside `decimal(4,2)` upward → 8115 |
+| inherent 99.99, strength 0.00 | 99.99 | in range — the bounded box's own corner |
+
+🔑 **The quiet half needs no overflow at all.** `residualBand`'s fall-through is `return 'low'`, so a negative residual bands **green**; and **both** surfaces that render the universe sort it *descending by residual* — `IaPlanDetailPage.tsx:121` and `IaUniversePage.tsx:147`, the IIA annual audit-plan prioritisation. So an out-of-range control strength does not merely mis-score one entry: it drops it to the bottom of the list that decides what internal audit examines this year, in the flattering direction ([[F2-193]] / [[F2-195]] / [[F2-210]]).
+
+⚠⚠ **THE REACHABLE PATH IS THE PLATFORM'S OWN BULK-PASTE FORM, AND THE LIKELIEST DATA-ENTRY ERROR IS EXACTLY THE ONE THAT BREAKS IT.** `IaUniversePage.tsx:99-100` parses pasted rows with `inherentRiskScore: inh ? Number(inh) : undefined` and `controlEnvironmentScore: ctrl ? Number(ctrl) : undefined` — **no range check of any kind**. A human writing a control-environment *strength* as a percentage (`75` for 75%) rather than the 0-1 fraction the formula documents is the single most natural mistake for that column, and it is the one that derives `-1628.00`.
+
+⚠⚠ **F2-215'S TWO-OF-N INSIDE ONE RECORD: the two numeric fields were the ONLY unbounded components of both request records.** `UniverseCreateRequest` carries `@NotBlank @Size(max = 64)` on `entryCode`, `@Size(max = 255)` on five names, `@Size(max = 20)` on the rating, `@Pattern` on the quarter and `@Size(max = 500)` on the control ids — **every String is capped and neither number was.** A reader who finds a record annotated that thoroughly has no reason to ask which components carry nothing.
+
+⚙ **Fix = bound both inputs on both records, and both caps mirror something already true, so neither can refuse a request that works today** ([[F2-214]]):
+
+- `inherentRiskScore` → `@DecimalMin("0.00") @DecimalMax("99.99")`. **99.99 IS the column's own `decimal(4,2)` ceiling** — [[F2-184]]'s cap == column rule: the database already refuses more, so enabling it can only turn an 8115 into a 400 naming the field.
+- `controlEnvironmentScore` → `@DecimalMin("0.00") @DecimalMax("1.00")`. **1.00 is NOT the column's ceiling** (`decimal(4,2)` would hold 99.99) — it is the 0-1 scale the service's own javadoc declares, and it is the **load-bearing** one: bounded, the residual is always between 0 and inherent and therefore inside its column **by construction** rather than by a second check somebody has to remember ([[F2-213]] — absent rather than latent).
+- ⚠ **The lower bound is not symmetry.** For a value the server then MULTIPLIES, a negative strength inverts `1 - strength` and pushes the residual **above** its column; a gate leg refuses an upper bound declared without a `@DecimalMin` for exactly that reason.
+- ⚠ **Both records, same commit.** `update()` recomputes the residual from whichever half the caller sent plus the **stored** other half, so an uncapped update path re-opens precisely what the create closes — the shape [[F2-246]] records.
+
+⚠ **Both routes are `@RequestBody @Valid`, checked rather than assumed**, so the caps are enforced and not [[F2-184]]'s inert decoration; and `UniverseBulkImportRequest` cascades into `UniverseCreateRequest` because [[F2-413]] put the `@Valid` on the nested collection, so the paste path inherits them too.
+
+⚠ **No migration, and the measurement is why** ([[F2-183]]): dev and prod each hold **20 rows, inherent ∈ [13.00, 22.00], strength ∈ [0.30, 0.55], residual ∈ [5.85, 15.40], and 0 rows out of range on any axis** — so no live row can start failing an echo update, and there is nothing to widen or backfill. **Latent in data, live in code** ([[F2-283]]).
+
+⚠ **No `@Digits`, deliberately, and the next reader will ask.** The columns are `scale = 2`, so a request sending `12.345` is accepted today and SQL Server rounds it to `12.35`; `@Digits(integer = 2, fraction = 2)` would refuse it and break a request that works ([[F2-214]]). The platform is already comfortable rounding to two places — `computeResidual` ends `setScale(2, HALF_UP)`.
+
+⚠ **`inherentRiskScore` is capped at the COLUMN and not at the scoring scale, and that boundary is a decision.** `residualBand`'s critical threshold is `>= 20` and the seeded register maxes at 22, so the convention is plainly a 5×5 matrix — but capping at 25 would be a **product decision about the scoring scale** ([[F2-188]]), where capping at the column's ceiling is the non-judgement fix. Filed.
+
+⚙ **Gate: the numeric mirror extends `RequestSizeCapMirrorTest` rather than starting a second class** ([[F2-190]] — one question, a different carrier). Its expected cap is **declared as well as checked against the column**, because 1.00 is deliberately *tighter* than the column and a cap loosened to 99.99 would satisfy a fits-the-column test while leaving the finding wide open. ⚠ It reads the cap **component-first-then-field** for the reason [[F2-185b]] recorded: a constraint annotation with no `RECORD_COMPONENT` target is propagated by javac to the field and the accessor, and `RecordComponent#getAnnotation` then answers null — a sweep that asked only the component would report every cap as absent, and absent is indistinguishable from nothing-to-check-here.
+
+⚠⚠ **MY OWN LOCATOR REPORTED 59 AND THE ANSWER IS 13, BECAUSE IT COUNTED EVERY FIELD TWICE.** The first pass scanned every `BigDecimal <name>` in a DTO *file* — so each field matched once from the request record (annotated) and once from the bare **response** record (not), and the response copy was reported as uncapped. `VulnSlaDtos.PolicyRequest` in fact caps all ten of its numeric fields at `@DecimalMax("9.999")` / `("9999.00")`, and it was in my list. 🔑 **A population inflated by response records reads exactly like a finding** — [[F2-252]]'s rule that a scan locates and the PAIRING is the measurement. Scoped to records a controller binds with `@RequestBody`, parsed with a paren-balanced walk, the honest answer is 102 / 18 / 0 / 13.
+
+⚠⚠ **AND THE PASS BEFORE THAT WAS WORSE: A TEMPORAL SWEEP IN THE SAME FIRING COMMITTED [[F2-424]]'S OWN DEFECT.** Asking *which instant-typed field is mapped to a `DATE` column, silently truncating the time?* — the first draft resolved `@Column` with an optional 200-character lookahead in front of the field, which attributed the **previous** member's annotation to it (`deletedAt` → column `is_deleted`, `dueDate` → `owner_name`) and left **656 of 1,071** unresolved. It answered **0**, and 🔑 **"0 truncating" over a broken detector reads exactly like a clean tree** ([[F2-235]]). Re-resolved by the **member boundary** — F2-424's own fix, one slice later, in my own scan — the population is **1,307 temporal fields, 1,033 of instant type, and a genuine 0** over a `DATE` column.
+
+⚙ **Six veins swept CLEAN in this firing, recorded so nobody re-runs them** ([[F2-216]]):
+
+| vein | result |
+|---|---|
+| `@Query` with `JOIN FETCH` **and** a `Pageable` (Hibernate HHH000104 paginates in memory — wrong page contents) | **0** — one repository uses `join fetch` at all, and none of its three queries is paged |
+| `@Scheduled(fixedRate)` (an overlapping sweep double-processes) | **0 of 22** — every scheduled method uses `fixedDelay` |
+| an instant-typed entity field mapped to a `DATE` column (time silently truncated) | **0 of 1,033** |
+| a `LocalDate` field over a `datetime2` column | **0** |
+| `@DecimalMax` looser than the column it guards | **0 of 18** caps |
+| a `@Cacheable` read with no eviction on its write path | bounded rather than defective — all five caches share one `expireAfterWrite(5, TimeUnit.MINUTES)`, so staleness is capped at five minutes even for the three dashboard caches that evict nowhere |
+
+⚙ **Filed, not forced** ([[F2-188]]):
+
+- **`bcm.exercise_run_response.quality_score` has NO WRITER.** The entity's javadoc says *"Facilitator post-run score, 0..100"* and its column is `decimal(4,2)` — max **99.99** — so **100, the documented maximum and the best possible score, is the one value that column cannot hold.** It is unreachable because `setQualityScore` has **zero call sites**, `ResponseRequest` declares no quality component, and only `ResponseView` returns it: [[F2-256]]'s dark-column shape with [[F2-198]]'s always-null wire on top. Adding a facilitator-scoring route is a **feature**, and widening the column while nothing writes it changes nothing observable — so both halves are an owner decision, and the entity javadoc's own `0..100` is the evidence that whoever wrote it did not check the column.
+- **The 11 remaining uncapped numeric components**, as a work list with **no verdicts**: `TcfdScenarioRequest.globalWarmingCelsius` (max 99.99), `CreateQualityRuleRequest.thresholdPct`, `RecordQualityRunRequest.passPct`, `GhgCreateRequest.coveragePercent`, `StrategyRoiRequest.discountRatePercent` (all 999.99), `UniverseCreate/UpdateRequest.controlEnvironmentScore`'s sibling `residualRiskScore` (derived, so covered by construction), and `MaterialTopicCreateRequest`'s four axes — ⚠ those four are **already guarded upstream** by [[F2-237]]'s `requireAxis` range check and V379's `0..5` CHECK constraints, which is why they are named here rather than capped: a cap would duplicate a guard that already exists.
+- **`inherentRiskScore`'s scoring scale** (0-25 by convention, 0-99.99 by column) — a product decision.
+- **`permissions` is a declared cache with no `@Cacheable` reader**, and `CacheConfig`'s own comment claims *"Spring's licensing/permissions caches"* are read on every request. An inert declaration plus a stale claim about it ([[F2-184]]), P4.
+
+⚙ **Verification.** `RequestSizeCapMirrorTest` 4 → 7 legs, `IaAuditUniverseServiceTest` 14 → 18, both green; hermetic throughout ([[F2-320]] / [[F2-325]] — reflection over the annotations, a real Hibernate Validator, and `computeResidual` driven directly as a `public static`; no DB and no Spring context). Pre-fix control ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): a **surgical** revert of only the four annotations, keeping every symbol so both classes still compile → **3 of the 7 new legs RED**, exactly the three predicted (`everyEnabledDecimalMaxFitsTheColumnItGuards`, `theNumericMappingItselfIsNotEmpty`, `theBoundaryRefusesAControlStrengthWrittenAsAPercentage`). ⚠ **Which legs do NOT discriminate, said out loud** ([[F2-225]]): the two `computeResidual` legs assert arithmetic this slice did not change, `everyNumericComponentOfTheseRequestTypesIsMirrored` checks the declared mapping either way, and `theBoundaryStillAcceptsEveryScoreTheRegisterHolds` passes **trivially** pre-fix because with no caps nothing is refused — it exists to catch a cap that is too TIGHT, which is the failure this family's fix could introduce.
+
+🔑 **Whenever a column receives a DERIVED value, the cap that matters is the one the derivation's range depends on — not the one the column would tolerate. And ask it of numbers as well as strings: `@Size` has a gate against `@Column(length)` and `@DecimalMax` had none against `decimal(p,s)`.**
+
+---
+
 ## F2-424 — an annotation a javadoc separates from its method is invisible to a fixed lookback window
 
 | | |

@@ -2,6 +2,8 @@ package com.tss.grc.module.audit_lc.ia_plan.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -113,8 +115,23 @@ public final class IaDtos {
         @Size(max = 255) String processNameAr,
         @Size(max = 255) String businessUnitEn,
         @Size(max = 255) String businessUnitAr,
-        BigDecimal inherentRiskScore,
-        BigDecimal controlEnvironmentScore,
+        // F2-425: the two numeric fields were the ONLY unbounded components of this record --
+        // every String beside them carries a @Size (F2-215's two-of-N inside one record) -- and
+        // they are exactly the pair residual = inherent x (1 - controlEnvironmentScore) reads.
+        // Both caps mirror something already true, so neither can refuse a request that works
+        // today: 99.99 IS inherent_risk_score's own decimal(4,2) ceiling (F2-184's cap == column
+        // rule), and 1.00 is the 0-1 control-strength scale IaAuditUniverseService's javadoc
+        // declares. The strength cap is the load-bearing one. Unbounded, a control strength
+        // written as a PERCENTAGE (75 for 75%) -- the obvious error on the bulk-paste form, which
+        // does Number(cell) with no range check -- derived -1628.00 and overflowed decimal(4,2)
+        // as SQL Server 8115, an opaque 500; and 1.5 derived a NEGATIVE residual that stored
+        // fine, banded 'low' (residualBand's fall-through is green) and sorted LAST in both
+        // surfaces that rank the audit universe by residual DESC -- the IIA annual audit-plan
+        // prioritisation, quietly flattering. Bounded, the residual is always between 0 and
+        // inherent and therefore inside its own column, by construction rather than by a second
+        // check somebody has to remember (F2-213).
+        @DecimalMin("0.00") @DecimalMax("99.99") BigDecimal inherentRiskScore,
+        @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal controlEnvironmentScore,
         // F2-392 measured that create() ALWAYS derives the residual from
         // inherent × (1 - controlEnvironmentScore) and ignores whatever the caller sends, the same
         // as update() and recomputeResidual(). F2-413 removes the component rather than leaving it
@@ -136,8 +153,13 @@ public final class IaDtos {
         @Size(max = 255) String processNameAr,
         @Size(max = 255) String businessUnitEn,
         @Size(max = 255) String businessUnitAr,
-        BigDecimal inherentRiskScore,
-        BigDecimal controlEnvironmentScore,
+        // F2-425: the same two caps as UniverseCreateRequest, for the same reason and in the
+        // same commit. update() recomputes the residual from whichever half the caller sent plus
+        // the STORED other half, so leaving the update path uncapped would let it re-open exactly
+        // what the create closes -- the shape F2-246 records, where an update undoes a create's
+        // guard. RequestSizeCapMirrorTest asserts both records' caps against the same column.
+        @DecimalMin("0.00") @DecimalMax("99.99") BigDecimal inherentRiskScore,
+        @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal controlEnvironmentScore,
         LocalDate lastAuditedDate,
         @Size(max = 20) String lastAuditRating,
         Integer plannedAuditYear,

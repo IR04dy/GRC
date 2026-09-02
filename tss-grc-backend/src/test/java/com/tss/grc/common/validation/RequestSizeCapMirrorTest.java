@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos;
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRun;
+import com.tss.grc.module.audit_lc.ia_plan.dto.IaDtos;
+import com.tss.grc.module.audit_lc.ia_plan.entity.IaAuditUniverseEntry;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos;
 import com.tss.grc.module.cyber.vuln_sla.dto.VulnSlaDtos;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos;
@@ -18,8 +20,11 @@ import com.tss.grc.module.tprm.bcp_attestation.entity.VendorBcpAttestation;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos;
 import com.tss.grc.module.tprm.outsourcing.entity.OutsourcingMonitoringEvent;
 import jakarta.persistence.Column;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -301,6 +306,153 @@ class RequestSizeCapMirrorTest {
         assertThat(caps.values()).allMatch(v -> v != null && v > 0);
     }
 
+    // ═══ F2-425 — the same question, asked of a NUMBER ═══════════════════════════════════════
+    //
+    // A decimal(p,s) column holds at most (p-s) integer digits; a value with more raises SQL Server
+    // 8115, the numeric twin of the 8152 the @Size family above produced. For a String the boundary
+    // declares its cap with @Size and the legs above check it against @Column(length). For a
+    // BigDecimal the cap is @DecimalMax and NOTHING checked it against the column's own ceiling --
+    // measured: 102 BigDecimal components of request-bound records, 18 capped, 0 caps looser than
+    // their column, and 13 uncapped landing in a column with fewer than 4 integer digits.
+    //
+    // Most of those 13 are harmless: a 0-100 score in a decimal(5,2) has 999 of room. What made the
+    // IA audit universe the sharp one is that its column receives a DERIVED value -- residual =
+    // inherent x (1 - controlEnvironmentScore) -- so the derivation's range is not bounded by either
+    // input's own column, and an out-of-range strength takes the residual OUT of decimal(4,2) in one
+    // direction and NEGATIVE in the other.
+
+    /**
+     * A numeric request field, the entity field its value lands in, and the cap that guards it.
+     * {@code cap} is declared as well as asserted so that LOOSENING the annotation fails here
+     * rather than silently passing the fits-the-column test.
+     */
+    private record NumericLanding(Class<?> requestType, String component,
+                                  Class<?> entityType, String entityField,
+                                  String cap, String why) {}
+
+    private static final List<NumericLanding> NUMERIC_MIRRORED = List.of(
+        new NumericLanding(IaDtos.UniverseCreateRequest.class, "inherentRiskScore",
+            IaAuditUniverseEntry.class, "inherentRiskScore", "99.99",
+            "IaAuditUniverseService#create copies it straight across. The cap IS the column's own "
+            + "decimal(4,2) ceiling, which is F2-184's cap == column rule: the database already "
+            + "refuses more, so enabling it can only turn an 8115 into a 400 naming the field."),
+        new NumericLanding(IaDtos.UniverseUpdateRequest.class, "inherentRiskScore",
+            IaAuditUniverseEntry.class, "inherentRiskScore", "99.99",
+            "Same column via update(). Both records are listed because update() recomputes the "
+            + "residual from whichever half the caller sent plus the STORED other half, so an "
+            + "uncapped update path re-opens exactly what the create closes (F2-246)."),
+        new NumericLanding(IaDtos.UniverseCreateRequest.class, "controlEnvironmentScore",
+            IaAuditUniverseEntry.class, "controlEnvironmentScore", "1.00",
+            "The load-bearing one. 1.00 is NOT this column's ceiling -- decimal(4,2) would hold "
+            + "99.99 -- it is the 0-1 control-strength scale IaAuditUniverseService's own javadoc "
+            + "declares, and it is what makes the DERIVED residual provably non-negative and no "
+            + "larger than inherent. A cap at the column's ceiling would satisfy the leg below and "
+            + "leave the finding open, which is why the expected value is declared here."),
+        new NumericLanding(IaDtos.UniverseUpdateRequest.class, "controlEnvironmentScore",
+            IaAuditUniverseEntry.class, "controlEnvironmentScore", "1.00",
+            "Same, update path.")
+    );
+
+    /** The types F2-425 bounded. Every BigDecimal component on them must be accounted for above. */
+    private static final List<Class<?>> NUMERIC_COVERED = List.of(
+        IaDtos.UniverseCreateRequest.class,
+        IaDtos.UniverseUpdateRequest.class);
+
+    @Test
+    void everyEnabledDecimalMaxFitsTheColumnItGuards() {
+        List<String> problems = new ArrayList<>();
+
+        for (NumericLanding l : NUMERIC_MIRRORED) {
+            BigDecimal cap = numericCapOf(l.requestType(), l.component(), DecimalMax.class);
+            if (cap == null) {
+                problems.add("%s#%s declares no @DecimalMax — the mapping is stale, or the cap was "
+                        + "removed. %s".formatted(l.requestType().getSimpleName(), l.component(),
+                                l.why()));
+                continue;
+            }
+            if (cap.compareTo(new BigDecimal(l.cap())) != 0) {
+                problems.add(("%s#%s @DecimalMax is %s where this mapping expects %s. A cap change "
+                        + "is a decision: make it here too, with the reason. %s")
+                        .formatted(l.requestType().getSimpleName(), l.component(), cap.toPlainString(),
+                                l.cap(), l.why()));
+                continue;
+            }
+            if (numericCapOf(l.requestType(), l.component(), DecimalMin.class) == null) {
+                problems.add(("%s#%s has an upper bound and no @DecimalMin. For a value the server "
+                        + "then MULTIPLIES, the lower bound is not symmetry: a negative control "
+                        + "strength inverts 1 - strength and pushes the residual ABOVE its column.")
+                        .formatted(l.requestType().getSimpleName(), l.component()));
+                continue;
+            }
+            Field ef = fieldOf(l.entityType(), l.entityField());
+            if (ef == null) {
+                problems.add("%s has no field '%s' — the entity was renamed under this mapping."
+                        .formatted(l.entityType().getSimpleName(), l.entityField()));
+                continue;
+            }
+            Column col = ef.getAnnotation(Column.class);
+            if (col == null || col.precision() == 0) {
+                problems.add(("%s#%s declares no @Column precision, so the column's ceiling is "
+                        + "unverifiable and a cap of %s rests on nothing.")
+                        .formatted(l.entityType().getSimpleName(), l.entityField(), cap.toPlainString()));
+                continue;
+            }
+            BigDecimal ceiling = ceilingOf(col);
+            if (cap.compareTo(ceiling) > 0) {
+                problems.add(("%s#%s @DecimalMax(%s) vs %s.%s decimal(%d,%d), which holds at most "
+                        + "%s — the CAP IS LOOSER THAN THE COLUMN, so an accepted value still fails "
+                        + "at the insert with SQL Server 8115 and an opaque 500. %s")
+                        .formatted(l.requestType().getSimpleName(), l.component(), cap.toPlainString(),
+                                l.entityType().getSimpleName(), l.entityField(),
+                                col.precision(), col.scale(), ceiling.toPlainString(), l.why()));
+            }
+        }
+
+        assertThat(problems).as("""
+            A @DecimalMax on a request field must FIT the column its value lands in — and where the \
+            server derives another column from it, the cap that matters is the one the derivation's \
+            range depends on, not the one the column would tolerate.
+
+            %s""".formatted(String.join("\n  ", problems))).isEmpty();
+    }
+
+    @Test
+    void everyNumericComponentOfTheseRequestTypesIsMirrored() {
+        var declared = new TreeSet<String>();
+        for (NumericLanding l : NUMERIC_MIRRORED) declared.add(key(l.requestType(), l.component()));
+
+        var undeclared = new TreeSet<String>();
+        for (Class<?> t : NUMERIC_COVERED) {
+            for (RecordComponent rc : componentsOf(t)) {
+                if (!BigDecimal.class.equals(rc.getType())) continue;
+                String k = key(t, rc.getName());
+                if (!declared.contains(k)) undeclared.add(k);
+            }
+        }
+
+        assertThat(undeclared).as("""
+            A BigDecimal component was added to a request type F2-425 bounded, and nothing says what \
+            column it lands in or what bounds it. The reverse direction is the one that matters here: \
+            these two records had a @Size on every String and NOTHING on their two numbers (F2-215's \
+            two-of-N inside one record), so an unbounded number is exactly the shape that arrives \
+            looking finished.
+
+            %s""".formatted(String.join("\n  ", undeclared))).isEmpty();
+    }
+
+    @Test
+    void theNumericMappingItselfIsNotEmpty() {
+        // Anti-vacuity, same reason as theMappingItselfIsNotEmpty above: both numeric legs are
+        // "no problems found", which an empty NUMERIC_MIRRORED satisfies perfectly.
+        assertThat(NUMERIC_MIRRORED).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(NUMERIC_COVERED).hasSizeGreaterThanOrEqualTo(2);
+        for (NumericLanding l : NUMERIC_MIRRORED) {
+            assertThat(numericCapOf(l.requestType(), l.component(), DecimalMax.class))
+                .as("%s#%s cap resolves", l.requestType().getSimpleName(), l.component())
+                .isNotNull();
+        }
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────────
 
     private static String key(Class<?> c, String member) {
@@ -328,6 +480,46 @@ class RequestSizeCapMirrorTest {
             return s == null ? null : s.max();
         }
         return null;
+    }
+
+    /**
+     * The declared {@code @DecimalMax} / {@code @DecimalMin} value on a record component.
+     *
+     * <p>Component first, then the backing field — the same fallback {@link #capOf} needs and for
+     * the same reason: a constraint annotation without a {@code RECORD_COMPONENT} target is
+     * propagated by javac to the field and the accessor, and {@code RecordComponent#getAnnotation}
+     * then answers null for it. A sweep that asked only the component would report every cap here
+     * as absent, and absent is indistinguishable from nothing-to-check-here (F2-185(b)).
+     */
+    private static BigDecimal numericCapOf(Class<?> type, String component,
+                                           Class<? extends java.lang.annotation.Annotation> kind) {
+        for (RecordComponent rc : componentsOf(type)) {
+            if (!rc.getName().equals(component)) continue;
+            String raw = valueOf(rc.getAnnotation(kind));
+            if (raw == null) {
+                Field f = fieldOf(type, component);
+                if (f != null) raw = valueOf(f.getAnnotation(kind));
+            }
+            return raw == null ? null : new BigDecimal(raw);
+        }
+        return null;
+    }
+
+    private static String valueOf(java.lang.annotation.Annotation a) {
+        if (a instanceof DecimalMax max) return max.value();
+        if (a instanceof DecimalMin min) return min.value();
+        return null;
+    }
+
+    /**
+     * The largest value a {@code decimal(precision, scale)} column can hold: {@code (precision -
+     * scale)} nines, then a point and {@code scale} nines. decimal(4,2) is 99.99 — which is why an
+     * IA universe entry cannot store a score of 100 however reasonable the number looks.
+     */
+    private static BigDecimal ceilingOf(Column col) {
+        int room = col.precision() - col.scale();
+        String whole = room > 0 ? "9".repeat(room) : "0";
+        return new BigDecimal(col.scale() > 0 ? whole + "." + "9".repeat(col.scale()) : whole);
     }
 
     private static Field fieldOf(Class<?> type, String name) {
