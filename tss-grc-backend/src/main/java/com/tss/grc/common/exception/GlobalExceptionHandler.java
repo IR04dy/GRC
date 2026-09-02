@@ -606,6 +606,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(
             org.springframework.dao.DataIntegrityViolationException ex) {
+        return integrityResponse(ex);
+    }
+
+    /**
+     * The single decode of a SQL Server error number into a status, a kind and a sentence — F2-432.
+     *
+     * <p>Extracted from {@link #handleDataIntegrityViolation} because a truncation does not arrive
+     * as a {@code DataIntegrityViolationException} at all (see {@link #TRUNCATION_ERRORS}), so two
+     * public handlers have to reach the same decision. One decode, two entry points: a second copy
+     * of this switch would drift the moment one of them learned a new error number.
+     */
+    private ProblemDetail integrityResponse(Throwable ex) {
         int sqlError = sqlErrorCode(ex);
         String constraint = constraintName(ex);
 
@@ -673,10 +685,55 @@ public class GlobalExceptionHandler {
                       + "and cannot be removed.";
             }
             case 515 -> {                            // cannot insert NULL
+                // ⚠⚠ F2-432 — this named no field, and the driver's own message names the column:
+                // "Cannot insert the value NULL into column 'paper_code', table '…'". The extractor
+                // for exactly that, `column(ex)`, sits in this class and was called by the arm ONE
+                // `case` LABEL UP. F2-215's two-of-N at the tightest range this register has
+                // recorded it — adjacent arms of one switch — and F2-214 wrote the consequence down
+                // without connecting it to the handler: the PDPL Article 20 breach wizard's one
+                // unsent NOT NULL field produced "A required field was not supplied", naming
+                // nothing, on a form where nothing looks missing.
                 kind = "REQUIRED_FIELD";
                 status = HttpStatus.BAD_REQUEST;
-                detail = "A required field was not supplied. Check the request body against the "
-                       + "endpoint's schema.";
+                detail = "A required field was not supplied" + column(ex) + ". Check the request "
+                       + "body against the endpoint's schema.";
+            }
+            case 2628, 8152 -> {                     // string or binary data would be truncated
+                // ⚠⚠ F2-432 — a caller string longer than its column answered 500. EIGHT findings
+                // (F2-185b, F2-338, F2-346, F2-347, F2-349, F2-350, F2-381, F2-428) each recorded
+                // "→ an opaque 500, where a 400 naming the field is due" as the CONSEQUENCE of a
+                // length defect, fixed its own cap or truncation, and left the diagnostic. F2-266's
+                // headline: filings one at a time is what a population looks like when nothing
+                // counts it — and F2-88's argument for this very arm, one `case` label away, was
+                // already "a pre-flight fixes one; this maps the whole class onto the right status
+                // so the next unique index cannot repeat it." The class was mapped for UNIQUE and
+                // never for TRUNCATION.
+                //
+                // 🔑 Why it was a 500 rather than the `default` 409: SQL Server reports a
+                // truncation with SQLSTATE **42000** — the syntax/access-rule class — where 515 and
+                // 547 use 23000 (integrity constraint). Measured, both databases. So Hibernate
+                // classifies it SQLGrammarException and Spring wraps it
+                // InvalidDataAccessResourceUsageException, which is not a
+                // DataIntegrityViolationException at all: every generic translator in the stack
+                // files a caller's over-long string as a broken query. That is why
+                // handleMissingDbObject routes it here, and why this keys on the ERROR NUMBER and
+                // never on the exception class or the SQLSTATE.
+                //
+                // ⚠ Both numbers on purpose. This server (2019, compat 150) reports **2628**, the
+                // enhanced message; 8152 is the legacy number for the identical condition on older
+                // servers or lower compatibility levels. CLAUDE.md said 8152 in twelve places, so
+                // an arm written from the register's own prose would have been dead code here.
+                kind = "VALUE_TOO_LONG";
+                status = HttpStatus.BAD_REQUEST;
+                // ⚠ The 2628 message carries the column AND the truncated VALUE — unlike 547's,
+                // which carries no value at all. `column(ex)` extracts the identifier by regex and
+                // therefore cannot carry the value; the raw message stays server-side, which is the
+                // whole point of SEC-CFG-001. The LIMIT is not in the message, so it is not
+                // claimed: stating a number the database did not give would be the invented figure
+                // this programme keeps finding.
+                detail = "One of the values supplied is too long for its field" + column(ex)
+                       + ". Shorten it and try again — the database does not report the maximum "
+                       + "length, so check the endpoint's schema for the limit.";
             }
             default -> {
                 kind = "INTEGRITY";
@@ -746,6 +803,23 @@ public class GlobalExceptionHandler {
         return m.find() ? " (column '" + m.group(1) + "')" : "";
     }
 
+    /**
+     * SQL Server's error numbers for <em>"String or binary data would be truncated"</em> — F2-432.
+     *
+     * <p>{@code 2628} is the enhanced message, which names the table, the column and the truncated
+     * value; {@code 8152} is the legacy number for the identical condition, still reported by older
+     * servers and by lower database compatibility levels. Measured on both of this platform's
+     * databases (SQL Server 2019, compatibility 150): <b>2628</b>. Handling only the number a
+     * register's prose happens to quote is how a {@code case} label ends up unreachable while
+     * looking like a fix.
+     */
+    private static final java.util.Set<Integer> TRUNCATION_ERRORS = java.util.Set.of(2628, 8152);
+
+    /** Whether this failure is a value too long for its column, by error number — F2-432. */
+    private static boolean isTruncationError(Throwable ex) {
+        return TRUNCATION_ERRORS.contains(sqlErrorCode(ex));
+    }
+
     /** Vendor error number from anywhere in the cause chain, or 0 when there is no SQLException. */
     private static int sqlErrorCode(Throwable ex) {
         for (Throwable t = ex; t != null; t = t.getCause()) {
@@ -774,7 +848,15 @@ public class GlobalExceptionHandler {
         int at = msg.lastIndexOf("constraint [");
         if (at < 0) return null;
         int close = msg.indexOf(']', at);
-        return close < 0 ? null : msg.substring(at + "constraint [".length(), close);
+        if (close < 0) return null;
+        String name = msg.substring(at + "constraint [".length(), close);
+        // ⚠ F2-432 — Hibernate writes "constraint [null]" when the failure had no constraint at
+        // all, so this returned the four-character string "null" and the response carried
+        // `"constraint": "null"`. Probed on the live server: every 515 and every 547 shipped it.
+        // A property naming a constraint called `null` is an invented identifier reading as
+        // measured data (F2-197's shape, on a response body) — and it points a support engineer
+        // at something that does not exist, which is worse than saying nothing (F2-180).
+        return "null".equals(name) || name.isBlank() ? null : name;
     }
 
     /**
@@ -839,6 +921,12 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleMissingDbObject(DataAccessException ex) {
         if (isMissingObjectError(ex)) {
             return missingObjectResponse(ex);
+        }
+        // F2-432 — a truncation arrives HERE rather than at handleDataIntegrityViolation, because
+        // SQL Server reports it with the SQLSTATE of a grammar error (42000) and every translator
+        // in the stack believes it. Re-file it as what it is: one decode, two entry points.
+        if (isTruncationError(ex)) {
+            return integrityResponse(ex);
         }
         // F2-227 — this used to build its own bare 500, while the comment here said "let the
         // catch-all handle it with a 500". It did not: `handleGeneral` is where SEC-CFG-001's

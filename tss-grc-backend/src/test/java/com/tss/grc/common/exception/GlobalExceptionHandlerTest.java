@@ -396,6 +396,187 @@ class GlobalExceptionHandlerTest {
             .isEqualTo("handleUploadTooLarge");
     }
 
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // F2-432 — a value too long for its column answered 500, and a required field named nothing.
+    //
+    // The messages below are VERBATIM from the live server (SQL Server 2019, compatibility 150,
+    // both databases), captured by the probe against
+    // POST /api/v1/committees/papers/circulate as `compliance`. The truncated value is in the
+    // 2628 fixture on purpose: the SEC-CFG-001 leg is worth nothing unless it is really there.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /** The 2628 message this server actually produces, truncated value and all. */
+    private static final String TRUNCATION_2628 =
+        "String or binary data would be truncated in table "
+        + "'TSS_GRC.admin.committee_meeting_papers', column 'author_role'. "
+        + "Truncated value: 'RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR'.";
+
+    /** The 515 message this server actually produces. */
+    private static final String NULL_515 =
+        "Cannot insert the value NULL into column 'paper_code', table "
+        + "'TSS_GRC.admin.committee_meeting_papers'; column does not allow nulls. INSERT fails.";
+
+    /**
+     * A truncation as it really arrives: wrapped {@link InvalidDataAccessResourceUsageException},
+     * because SQL Server reports it with SQLSTATE 42000 — the <em>grammar</em> class — so Hibernate
+     * classifies it {@code SQLGrammarException} and Spring wraps it as a resource-usage problem
+     * rather than an integrity one. That misclassification is the whole reason it was a 500.
+     */
+    private static InvalidDataAccessResourceUsageException truncation(int errorCode) {
+        return new InvalidDataAccessResourceUsageException(
+            "could not execute statement",
+            new SQLException(TRUNCATION_2628, "42000", errorCode));
+    }
+
+    @Test
+    void truncation_2628_is400NamingTheColumn_notAnOpaque500() {
+        ProblemDetail pd = handler.handleMissingDbObject(truncation(2628));
+
+        assertThat(pd.getStatus())
+            .as("eight findings recorded this as an opaque 500; a caller's over-long string is a "
+                + "400")
+            .isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(pd.getProperties()).containsEntry("conflictKind", "VALUE_TOO_LONG");
+        assertThat(pd.getDetail())
+            .as("the driver names the column and this used to discard it")
+            .contains("author_role");
+    }
+
+    /**
+     * 8152 is the legacy number for the identical condition. It is handled because CLAUDE.md quoted
+     * it twelve times while this server reports 2628 — so an arm written from the register's prose
+     * alone would have been unreachable, and one written from the measurement alone would break on
+     * an older server.
+     */
+    @Test
+    void truncation_legacy8152_isTreatedIdentically() {
+        ProblemDetail pd = handler.handleMissingDbObject(truncation(8152));
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(pd.getProperties()).containsEntry("conflictKind", "VALUE_TOO_LONG");
+    }
+
+    /**
+     * The load-bearing safety leg. The 2628 message carries the truncated VALUE — tenant row data,
+     * and unlike 547's message, which carries none. The column name is extracted by regex, so the
+     * value cannot ride along; this asserts it in the mode that leaks most (verbose = dev).
+     */
+    @Test
+    void truncation_neverEchoesTheTruncatedValue_evenVerbose() {
+        for (GlobalExceptionHandler h : new GlobalExceptionHandler[]{handler, verboseHandler()}) {
+            ProblemDetail pd = h.handleMissingDbObject(truncation(2628));
+            String body = String.valueOf(pd.getDetail()) + pd.getProperties();
+            assertThat(body)
+                .as("SEC-CFG-001 — the row value must stay server-side")
+                .doesNotContain("RRRRRRRRRR")
+                .doesNotContain("Truncated value");
+        }
+    }
+
+    /**
+     * The limit is deliberately not stated: 2628 names the column and the value but NOT the
+     * maximum length, so a number here would be invented (F2-197 / F2-425).
+     */
+    @Test
+    void truncation_doesNotClaimALimitTheDatabaseNeverGave() {
+        ProblemDetail pd = handler.handleMissingDbObject(truncation(2628));
+        assertThat(pd.getDetail()).doesNotContain("120").doesNotContain("characters or fewer");
+    }
+
+    @Test
+    void requiredField_515_namesTheColumnTheDriverNamed() {
+        org.springframework.dao.DataIntegrityViolationException ex =
+            new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement", new SQLException(NULL_515, "23000", 515));
+
+        ProblemDetail pd = handler.handleDataIntegrityViolation(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(pd.getProperties()).containsEntry("conflictKind", "REQUIRED_FIELD");
+        assertThat(pd.getDetail())
+            .as("`column(ex)` sat in the same class, called by the arm one case label up")
+            .contains("paper_code");
+    }
+
+    /**
+     * Hibernate writes {@code constraint [null]} when the failure had no constraint, and the
+     * extractor returned the four-character string. Probed live: every 515 and every 547 shipped
+     * {@code "constraint": "null"} — an invented identifier reading as measured data.
+     */
+    @Test
+    void aFailureWithNoConstraintDoesNotShipAConstraintCalledNull() {
+        org.springframework.dao.DataIntegrityViolationException ex =
+            new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement [n/a]; SQL [n/a]; constraint [null]",
+                new SQLException(NULL_515, "23000", 515));
+
+        ProblemDetail pd = handler.handleDataIntegrityViolation(ex);
+
+        assertThat(pd.getProperties()).doesNotContainKey("constraint");
+    }
+
+    /** A real constraint name still reaches the response — the other direction of the same fix. */
+    @Test
+    void aRealConstraintNameIsStillReported() {
+        org.springframework.dao.DataIntegrityViolationException ex =
+            new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement [n/a]; SQL [n/a]; "
+                + "constraint [CK_meeting_paper_confidentiality]",
+                new SQLException("The INSERT statement conflicted with the CHECK constraint "
+                    + "\"CK_meeting_paper_confidentiality\". The conflict occurred in database "
+                    + "\"TSS_GRC\", table \"admin.committee_meeting_papers\", column "
+                    + "'confidentiality'.", "23000", 547));
+
+        ProblemDetail pd = handler.handleDataIntegrityViolation(ex);
+
+        assertThat(pd.getProperties())
+            .containsEntry("constraint", "CK_meeting_paper_confidentiality")
+            .containsEntry("conflictKind", "VALUE_NOT_ALLOWED");
+        assertThat(pd.getDetail())
+            .as("F2-180's arm is untouched and still names its column")
+            .contains("confidentiality");
+    }
+
+    /**
+     * The narrowing that keeps this from failing on correct code: a truncation is recognised by its
+     * ERROR NUMBER, never by its exception class or its SQLSTATE — both of which it shares with a
+     * genuine grammar error and with a missing table. So a missing object still answers 503 and a
+     * syntax error still answers 500, although all three arrive as the same Spring class.
+     */
+    @Test
+    void aMissingTableAndASyntaxErrorAreNotMistakenForATruncation() {
+        InvalidDataAccessResourceUsageException missing =
+            new InvalidDataAccessResourceUsageException("could not prepare statement",
+                new SQLException("Invalid object name 'privacy_lc.dsr_cases'.", "42S02", 208));
+        assertThat(handler.handleMissingDbObject(missing).getStatus())
+            .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+
+        InvalidDataAccessResourceUsageException grammar =
+            new InvalidDataAccessResourceUsageException("could not execute query",
+                new SQLException("Incorrect syntax near the keyword 'WHERE'.", "42000", 156));
+        assertThat(handler.handleMissingDbObject(grammar).getStatus())
+            .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+    }
+
+    /**
+     * Anti-vacuity for the decode itself: one switch, two entry points. If a later reader gives
+     * {@code handleMissingDbObject} its own copy of the truncation wording, these two stop agreeing
+     * and this fails — which is the only thing stopping the two arms drifting (F2-177).
+     */
+    @Test
+    void bothEntryPointsReachTheSameDecode() {
+        ProblemDetail viaResourceUsage = handler.handleMissingDbObject(truncation(2628));
+        ProblemDetail viaIntegrity = handler.handleDataIntegrityViolation(
+            new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement",
+                new SQLException(TRUNCATION_2628, "42000", 2628)));
+
+        assertThat(viaIntegrity.getStatus()).isEqualTo(viaResourceUsage.getStatus());
+        assertThat(viaIntegrity.getDetail()).isEqualTo(viaResourceUsage.getDetail());
+        assertThat(viaIntegrity.getProperties().get("conflictKind"))
+            .isEqualTo(viaResourceUsage.getProperties().get("conflictKind"));
+    }
+
     /** A genuine DateTimeParseException, built by triggering a real parse (its constructor is fiddly). */
     private static java.time.format.DateTimeParseException parseFailure(String bad) {
         try {
