@@ -36,7 +36,14 @@ import java.util.List;
  *       {@code grc.audit.integrity-key} set, the key lives in {@code external.properties} beside the
  *       jar and NOT in the database — so a database-only compromise (SQL injection, a stolen
  *       {@code sa} password, a DBA without filesystem access) cannot forge a valid chain. Unkeyed,
- *       it can: plain SHA-256 over public inputs is reproducible by anyone.</li>
+ *       it can: plain SHA-256 over public inputs is reproducible by anyone.
+ *       <p>⚠ F2-434: that holds only because a row cannot opt itself out of being checked. It
+ *       could — {@code hash_alg} is a column in the same database, and a value the verifier does
+ *       not recognise used to make the row skip its content hash AND its link. Marking a row
+ *       unverifiable is cheaper than forging one, so the verifier now treats an unrecognised
+ *       algorithm as tampering ({@link #isRecognisedAlgorithm}) and checks the link regardless.
+ *       A row whose content genuinely cannot be re-hashed is reported as <i>not ruled out</i>,
+ *       never as benign.</li>
  *   <li><b>NOT detected:</b> truncation of the chain's TAIL. Removing the newest N rows leaves a
  *       shorter but internally valid chain. Nothing stored inside the same database can fix that —
  *       it needs an external anchor (an off-box append-only sink, or publishing the head hash
@@ -96,6 +103,23 @@ public class AuditChainHasher {
     public String algorithm() { return algorithm; }
 
     public boolean isKeyed() { return key != null; }
+
+    /**
+     * Is {@code stored} a value some sealing pass could have written?
+     *
+     * <p>F2-434. {@link AuditChainService#sealTenant} stamps {@link #algorithm()}, which is one of
+     * exactly two constants, so <b>no code path in this platform can produce anything else — NULL
+     * included.</b> A sealed row carrying a third value therefore did not come from a sealing pass;
+     * it came from a direct write to the column, which is the actor the keyed mode exists to
+     * detect. The verifier treats that as tampering rather than as an algorithm it cannot handle.
+     *
+     * <p>This is the vocabulary's ONE declaration, read by the sealer (which writes it) and the
+     * verifier (which checks membership). A second list would be free to drift from the constants
+     * above, which is the defect this platform keeps finding rather than a hypothetical.
+     */
+    public static boolean isRecognisedAlgorithm(String stored) {
+        return ALG_KEYED.equals(stored) || ALG_UNKEYED.equals(stored);
+    }
 
     /**
      * The MAC of one row, chained to its predecessor. The three integrity columns and

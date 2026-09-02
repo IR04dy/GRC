@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-434** | **A row must not be able to opt itself out of the audit seal's check — the skip condition was a column in the same database, and it discarded the LINK, which needs no key** | Security / integrity | P1 |
 | **F2-433** | **A unique key over a nullable column must be filtered — V396 fixed nine registers of this shape and missed the tenth, because the tenth is the TWIN of one it fixed** | Data integrity | P2 |
 | **F2-21** | **Committee votes are recorded under a caller-supplied name** — recusal, quorum and SoD all bypassable | **Security** | **P0** |
 | **F2-24** | **CAB approvals carry a caller-supplied approver name** — a requester can approve their own change | **Security** | **P0** |
@@ -15217,6 +15218,183 @@ question of the register the refutation had walked into is what found the P1.
 - **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
   left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
   upstream-owned, and the nullable ones are inert.
+
+---
+
+## F2-434 — a row must not be able to opt itself out of the audit seal's check
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P1 — one column write on one row hid an arbitrary-length deletion from the tamper-evidence control over `platform.audit_log`, the ledger every other control in this platform cites as its proof, and the report attributed the anomaly to a benign cause with `tamperDetected: false`. Reachable by exactly the actor F2-31's keyed mode names as its threat model: "SQL injection, a stolen `sa` password, a DBA without filesystem access" |
+| **Source** | a fresh vein — asking what a *seal* hashes, then what its verifier does with a row it cannot hash |
+| **Size** | S — one static predicate, a re-ordered loop, and the wording of two artefacts; no schema change |
+
+### The mechanism
+
+`AuditChainService.verifyTenant` walked the chain and, for each sealed row:
+
+```java
+if (!hasher.algorithm().equals(e.getHashAlg())) {
+    algMismatches.add(String.valueOf(e.getId()));
+    prev = e.getRowHash();   // cannot re-verify under a different algorithm; keep walking
+    continue;
+}
+```
+
+`hasher.algorithm()` is a function of **configuration** — `HMAC-SHA256` when
+`grc.audit.integrity-key` is set, `SHA-256` otherwise. `hash_alg` is a **column in the same
+database as the rows it classifies**. So the condition deciding whether a row gets checked is
+written by the actor the keyed mode exists to detect.
+
+⚠⚠ **AND THE SKIP DISCARDED THE LINK, WHICH NEEDS NO KEY.** `prev.equals(e.getPrevHash())`
+compares two **stored strings** — no recomputation, no key, nothing algorithm-dependent about it.
+Skipping it re-anchored `prev` on the skipped row's own unverified `row_hash`. The attack that buys:
+
+1. delete audit rows *N..M* — say the rows recording a break-glass activation;
+2. set row *M+1*'s `hash_alg` to the other declared constant, or to any junk, or to **NULL**.
+
+Row *M+1*'s `prev_hash` is never compared with anything, `prev` becomes its own stored hash, row
+*M+2* links to that, and the walk completes reporting `status: PARTIALLY_VERIFIED`,
+**`tamperDetected: false`**, `unverifiableRows: 1`.
+
+🔑🔑 **AND THE NOTE TOLD THE OPERATOR TO READ IT AS BENIGN**: *"this is what a key rotation looks
+like, not tampering."* That is the one sentence somebody reads to decide whether to investigate.
+
+### Two things wrong with that sentence, both in the reassuring direction
+
+⚠⚠ **IT NAMED A CAUSE THE BRANCH CANNOT HAVE.** `hash_alg` records the algorithm **family** and
+never *which key*. Rotating from key A to key B leaves every row reading `HMAC-SHA256`, so those
+rows are **not skipped at all** — they are re-hashed with B, fail, and are reported
+`CONTENT_ALTERED`: *"its content was modified after sealing."* **The branch built to make a key
+rotation benign does not fire on one, and a rotation is reported as tampering.** What actually
+reaches the skip is a change of **MODE** between keyed and unkeyed.
+
+⚠⚠ **AND THE TEST GUARDING IT WAS NAMED FOR THE SCENARIO IT DOES NOT EXERCISE.**
+`aKeyRotationReadsAsARotation_notAsTampering` sets `hashAlg = ALG_UNKEYED` — a **mode change** —
+under a comment reading *"sealed before the key"*. So the test's NAME, the note's wording and the
+class javadoc all named a scenario none of them covered, and a reader trusts a test's name before
+its body (F2-418). Nth instance of a test that can only agree with the implementation it was
+written from (F2-159, F2-175, F2-227, F2-234, F2-236, F2-243, F2-244, F2-279, F2-418).
+
+### The fix — the skip now skips exactly what it must, and nothing else
+
+⚙ **(1) A value outside the sealer's own vocabulary is tampering.** `sealTenant` stamps
+`hasher.algorithm()`, one of exactly two constants, so **no code path can produce a third value —
+NULL included**. A sealed row carrying one did not come from a sealing pass; it came from a direct
+write. `AuditChainHasher.isRecognisedAlgorithm` is that vocabulary's **one declaration**, read by
+the sealer (which writes it) and the verifier (which checks membership) — never a second list
+(F2-217). New status `ALG_UNRECOGNISED`, `tamperDetected: true`, row named.
+
+⚙ **(2) The LINK is checked for every sealed row**, including one this key cannot re-hash.
+
+⚠ **That is only safe because sealing writes `prev_hash` algorithm-independently, and it was
+MEASURED rather than reasoned about.** Dev org 1 carries a real
+`SHA-256 → HMAC-SHA256 → SHA-256` mode change (1,000 HMAC rows at ids 44787..45889 inside 11,386
+SHA-256 rows), and **both boundary rows link INTACT**:
+
+```
+boundary id=44787  alg=HMAC-SHA256  prev id=44786  alg=SHA-256      LINK INTACT
+boundary id=45890  alg=SHA-256      prev id=45889  alg=HMAC-SHA256  LINK INTACT
+```
+
+⚙ **(3) The wording of both artefacts.** The note no longer names a key rotation, states that
+tampering is **NOT RULED OUT** (the strongest thing a verifier can say when the skip condition is
+attacker-writable), and the `CONTENT_ALTERED` message under a key now names the rotation
+alternative instead of accusing an operator of tampering for a routine operation.
+
+⚙ **`algorithmRuns` is reported and deliberately NOT adjudicated** (F2-188). A sealing pass stamps
+one algorithm over a contiguous id range, so a mode change leaves a boundary between long runs
+while an isolated interior row is what a forged skip looks like — a shape an operator can read.
+⚠⚠ **It is not a proof, and the live data is why.** My first design was going to treat an
+**interior** mismatch as tampering, on the reasoning that sealing appends only so a legitimate
+mismatch set must be a contiguous **prefix**. The dev ledger refutes it: three runs, the middle one
+interior, produced by an ordinary mode flip-flop. 🔑 **A gate built on that would have failed on the
+live database — the one failure a gate must never have (F2-214) — and only measuring before writing
+it caught that.**
+
+### What was refuted on the way, and why each refutation was worth the measurement
+
+⚠ **The canonicalisation is sound.** The first hypothesis was a non-injective hash input: a
+delimiter-joined canonical form lets content move across a field boundary without changing the
+digest. `AuditChainHasher.canonical` is **length-prefixed** — `<byteLength>:<value>|`, with null as
+`-1:|` because a negative length cannot be produced by a present value — and the class javadoc
+explains why. Refuted, correctly, and the reasoning is already written down.
+
+⚠ **The seal's field coverage is exact.** `platform.audit_log` has **30 columns**; the hasher feeds
+**26** plus `prevHash`. The four omitted are precisely `row_hash`, `prev_hash`, `hash_alg`,
+`sealed_at` — the ones the javadoc declares excluded because sealing writes them, so including them
+would make the hash depend on itself. 🔑 **`prev_hash` IS covered**, as the `prevHash` argument. So
+there is no unhashed content column.
+
+⚠ **Three adjacent veins swept clean, recorded so nobody re-runs them** (F2-216): **0** native
+`@Query` returning a `Page` (so no derived-count hazard), and all **5** explicit `countQuery` pairs
+have a WHERE clause identical to their list query's; **0** sites build `PageRequest.of` from a
+caller-supplied size, with `spring.data.web.pageable.max-page-size: 100` configured and commented;
+and of **19** Jackson parse sites exactly one is unguarded (`AutomationActionExecutor` reading its
+own rule's `action_json`, which is server-authored).
+
+### Verification
+
+⚠⚠ **THE LIVE PROBE IS READ-ONLY, AND THAT IS A DECISION RATHER THAN A GAP.**
+`platform.audit_log` is an append-only hash-chained ledger. Planting rows into it and then removing
+them **is** the damage this control exists to detect, and dev org 1 is already forked at id 32128 by
+the F2-74 multi-instance incident this class's own javadoc describes. The defect is pure Java
+control flow over stored values — a mocked repository represents `hash_alg` faithfully, so there is
+no collation, constraint, index or `row_version` dimension a unit test cannot reach
+(F2-320/F2-325's calibration). **Making a real ledger worse to demonstrate what
+`AuditChainServiceTest` demonstrates exactly is not a trade worth making.**
+
+So the probe verifies the one claim that genuinely depends on the data — **that the fix changes
+neither live verdict** — and it does: **7/7**, `LINK_BROKEN` at id **32128**, the same row the
+offline walk named, `keyed: false`, `algorithm: SHA-256`.
+
+⚙ `AuditChainServiceTest` **24/24 (+7)**. Three pre-fix controls, one per half (F2-289), each
+surgical and keeping every symbol so the tests still compile (F2-287):
+
+| control | fires |
+|---|---|
+| **A** the `ALG_UNRECOGNISED` check disabled | the junk and the NULL legs |
+| **B** the link check back **below** the alg-mismatch skip (the pre-fix order) | `markingARowUnverifiableNoLongerHidesADeletionBeforeIt` |
+| **C** the note reverted to naming a key rotation | both wording legs |
+
+Post-restore GREEN. **5 of 24 legs discriminate** (F2-225) — `aModeChangeBoundaryStillLinks` stays
+green under B and is a **guard**, proving the fix invents no alarm rather than detecting the defect.
+Full build **5066/0/0**, exactly predicted.
+
+### Filed
+
+⚙ **`hash_alg` records the algorithm family and never which key, so a rotation stays
+indistinguishable from tampering.** The fix is a stored **non-secret key fingerprint** (a truncated
+digest of the key) alongside the family, which would make a rotation land in the honest
+*unverifiable* bucket instead of the false *CONTENT_ALTERED* accusation. It is filed rather than
+done: it changes the seal's stored format and makes already-sealed keyed rows **permanently
+unverifiable**, which is a decision about existing evidence rather than a bug fix — and `hash_alg`
+is `varchar(20)` while `HMAC-SHA256/` plus 8 hex characters is exactly 20, so it needs a migration
+too. `aRealKeyRotationIsReportedAsCONTENT_ALTERED_andTheMessageSaysSo` pins today's behaviour, so
+the filing is held by a test rather than by prose.
+
+⚙ **`algorithmRuns` is absent from a `broken()` report**, because the walk returns at the first
+break with the run list incomplete — a partial list would mislead. An operator investigating a break
+does not get the contiguity picture.
+
+⚠⚠ **Dev org 1's chain is forked: 276 link breaks from id 32128** (133 before the HMAC island, 57
+inside, 86 after), which is the recorded F2-74 concurrency incident — two backends sharing this
+working tree's `target/classes` sealing the same tenant. Prod is clean (5,098 rows, one run, 0
+breaks). Repairing an append-only ledger is destructive and needs the user's explicit OK
+(house rule 6), so it is reported rather than touched.
+
+⚠ **Production runs the seal UNKEYED** — all 5,098 sealed rows are `SHA-256`, so
+`AUDIT_INTEGRITY_KEY` has never been set there. The javadoc already warns what that costs ("anyone
+with database write access can recompute this chain"); setting it is an operator action in
+`external.properties`, and an **owner decision** about key custody, not a code change.
+
+⚙ **~19 sites build audit JSON by string concatenation and only 4 files declare an escape helper**,
+so a caller-supplied value carrying a `"` (a role name, a break-glass `incidentRef`) or an
+exception message produces malformed `old_value_json`/`new_value_json`. Measured harmless today:
+**nothing parses those two columns** — `AuditChainHasher` hashes them as bytes and no reader
+deserialises them — so it degrades a forensic artefact rather than breaking a reader (F2-198's
+shape). Filed, not swept.
 
 ---
 
