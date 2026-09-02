@@ -96,7 +96,16 @@ export function MeetingPapersPanel({ meetingId, isAr }: { meetingId: number; isA
     { key: 'titleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)', kind: 'text', required: true, span: 12, maxLength: 255 },
     { key: 'titleAr', label: isAr ? 'العنوان (عربي)' : 'Title (AR)', kind: 'text', span: 12, maxLength: 255 },
     { key: 'authorName', label: isAr ? 'المُعِدّ' : 'Author', kind: 'text', span: 6, maxLength: 128 },
-    { key: 'authorRole', label: isAr ? 'صفة المُعِدّ' : 'Author role', kind: 'text', span: 6, maxLength: 128 },
+    // F2-428 — 120, not 128. `author_role` is NVARCHAR(120) while every other column on this
+    // entity is a round 80/255/500, so the 128 here mirrored `authorName` on the line above
+    // rather than the column underneath. FormModal enforces maxLength client-side, so
+    // 121-128 characters were accepted here and refused by the INSERT: the circulate route
+    // binds the entity with no @Valid, so there is no @Size to turn that into a 400 naming
+    // the field — it surfaced as SQL 8152, an opaque 500. An Arabic role title (house rule 7:
+    // Arabic text is not shorter) is exactly where it bites. A cap mirrors its column, never
+    // its neighbour. `authorName` above stays at 128 over a 255 column on purpose: a cap that
+    // is TIGHTER than its column is protective, and widening it is a product call, not a fix.
+    { key: 'authorRole', label: isAr ? 'صفة المُعِدّ' : 'Author role', kind: 'text', span: 6, maxLength: 120 },
     { key: 'confidentiality', label: isAr ? 'السرية' : 'Confidentiality', kind: 'select', required: true, span: 12,
       options: (['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as ConfidentialityLevel[])
         .map(c => ({ value: c, label: isAr ? CONF_LABEL[c].ar : CONF_LABEL[c].en })) },
