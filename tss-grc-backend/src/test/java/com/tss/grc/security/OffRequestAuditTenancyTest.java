@@ -48,6 +48,16 @@ class OffRequestAuditTenancyTest {
         Paths.get("src", "main", "java", "com", "tss", "grc", "module");
 
     private static final Pattern COMMENTS = Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+
+    /**
+     * A method signature, shared by every leg that has to resolve one. F2-424 hoisted it out of the
+     * F2-323 leg: {@link #transactionalAt} needs the same notion of "a signature" the population
+     * does, and a second copy is how the two come apart ([[F2-217]]).
+     */
+    private static final Pattern METHOD_SIGNATURE = Pattern.compile(
+        "^[ \\t]+(?:public|private|protected)[^;=(){}\\n]{0,140}?\\b(\\w+)"
+        + "\\([^;{}\\n]{0,400}\\)[^;{\\n]{0,90}\\{", Pattern.MULTILINE);
+
     private static final Pattern AUDIT = Pattern.compile(
         "\\b(?:audit|auditLog|auditService|auditLogService)\\.(?:log|logSystem|recordEvent)\\s*\\(");
 
@@ -475,40 +485,17 @@ class OffRequestAuditTenancyTest {
     @Test
     @DisplayName("F2-323: no scheduled sweep catches per item inside a batch-wide transaction")
     void noPerItemCatchSitsInsideABatchWideTransaction() throws IOException {
-        Pattern loop = Pattern.compile("\\bfor\\s*\\(|\\.forEach\\s*\\(");
-        Pattern perItemCatch = Pattern.compile("\\bcatch\\s*\\(");
         Pattern ownTx = Pattern.compile("inNewTransaction\\s*\\(|TransactionTemplate"
                                         + "|PROPAGATION_REQUIRES_NEW");
-        Pattern method = Pattern.compile(
-            "^[ \\t]+(?:public|private|protected)[^;=(){}\\n]{0,140}?\\b(\\w+)"
-            + "\\([^;{}\\n]{0,400}\\)[^;{\\n]{0,90}\\{", Pattern.MULTILINE);
 
+        List<ScheduledLoop> population = scheduledLoopsWithAPerItemCatch();
         List<String> decoys = new ArrayList<>();
-        int examined = 0;
-        try (Stream<Path> walk = Files.walk(MODULE)) {
-            for (Path p : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
-                String src = strip(Files.readString(p, StandardCharsets.UTF_8));
-                if (!src.contains("@Scheduled")) {
-                    continue;
-                }
-                Matcher sched = Pattern.compile("@Scheduled\\s*\\(").matcher(src);
-                while (sched.find()) {
-                    Matcher sig = method.matcher(src);
-                    if (!sig.find(sched.start()) || sig.start() - sched.start() > 1500) {
-                        continue;
-                    }
-                    String annotations = src.substring(Math.max(0, sig.start() - 300), sig.start());
-                    String body = braceBalanced(src, sig.end() - 1);
-                    if (!loop.matcher(body).find() || !perItemCatch.matcher(body).find()) {
-                        continue;
-                    }
-                    examined++;
-                    if (annotations.contains("@Transactional") && !ownTx.matcher(body).find()) {
-                        decoys.add(p.getFileName() + "#" + sig.group(1));
-                    }
-                }
+        for (ScheduledLoop s : population) {
+            if (transactionalAt(s.src(), s.sigStart()) && !ownTx.matcher(s.body()).find()) {
+                decoys.add(s.file() + "#" + s.name());
             }
         }
+        int examined = population.size();
 
         assertThat(examined).as("""
             No looping sweep with a per-item catch was found, so this leg is vacuous — the population             was 21 when F2-323 measured it.""")
@@ -538,6 +525,222 @@ class OffRequestAuditTenancyTest {
                     + "isolation itself cannot be asserted here.")
                 .contains("txManager == null");
         }
+    }
+
+    // ── F2-424: an annotation a javadoc separates from its method ────────────────────────────
+
+    /**
+     * ⚠⚠ F2-424 — Java treats a comment as whitespace, so {@code @Transactional /** … *}{@code /
+     * public void x()} binds the annotation to {@code x} and works. A scanner that resolves the
+     * annotation with a fixed <b>lookback window</b> from the signature cannot see it once the
+     * javadoc is longer than the window — and the method then reads as <b>non-transactional</b>,
+     * which is the quiet direction: F2-322/F2-323's decoy would go unreported.
+     *
+     * <p>The leg above used {@code src.substring(sig.start() - 300, sig.start())} over a stripper
+     * that <b>blanks comments with spaces of the same length</b>, so the offsets survive and a
+     * javadoc of more than 300 characters pushes the annotation clean out of the window. Measured:
+     * the shape exists at <b>10 sites across 8 files</b> in {@code src/main} — and
+     * {@code ChangeManagementService#recordApproval} is one of them, which is how this was found.
+     * A scratch atomicity sweep reported it as a non-transactional multi-write method: a complete,
+     * plausible, <b>false</b> finding that only reading the file refuted.
+     *
+     * <p>⚠ <b>Latent, and say which you have</b> ([[F2-283]]): none of the gate's 21 members is
+     * hidden today. What makes it harmless is <em>where the ten sites happen to be</em> — none is a
+     * {@code @Scheduled} looping sweep — rather than anything the gate checks ([[F2-182]]).
+     *
+     * <p>This leg is the demonstration, and it is what discriminates: with the window resolver the
+     * two verdicts agree everywhere, so the blind set is empty and the leg fires.
+     */
+    @Test
+    @DisplayName("F2-424: a javadoc between the annotation and its method defeats a fixed window")
+    void aJavadocBetweenTheAnnotationAndItsMethodDefeatsAFixedWindow() throws IOException {
+        Pattern shape = Pattern.compile("(?m)^[ \\t]*@Transactional[ \\t]*\\r?\\n[ \\t]*/\\*\\*");
+        List<String> blind = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(MODULE)) {
+            for (Path p : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String raw = Files.readString(p, StandardCharsets.UTF_8);
+                Matcher shaped = shape.matcher(raw);
+                if (!shaped.find()) {
+                    continue;
+                }
+                // strip() blanks a comment with spaces of the SAME length, so an offset taken from
+                // the raw source is valid in the stripped one — which is the whole mechanism here.
+                String src = strip(raw);
+                shaped.reset();
+                while (shaped.find()) {
+                    Matcher sig = METHOD_SIGNATURE.matcher(src);
+                    if (!sig.find(shaped.start())) {
+                        continue;
+                    }
+                    // ⚠ A multi-line signature matches METHOD_SIGNATURE not at all, so the regex
+                    // resolves to a LATER method and reports THAT method's verdict — the shaped
+                    // site is mis-attributed, never reported false. Measured: 1 of the 10, and it
+                    // is ChangeManagementService#recordApproval, the very site that fooled the
+                    // scratch sweep — so that one is invisible to BOTH resolvers, for a second and
+                    // independent reason. Nothing is asserted per site, so this cannot fail on
+                    // correct code ([[F2-214]]) and the floor below clears it 7 wide.
+                    if (transactionalAt(src, sig.start())
+                            && !windowSaysTransactional(src, sig.start())) {
+                        blind.add(p.getFileName() + "#" + sig.group(1));
+                    }
+                }
+            }
+        }
+
+        assertThat(blind).as("""
+            No site in src/main carries @Transactional above a javadoc long enough to fall outside a
+            300-character lookback — so this leg is measuring nothing and the boundary resolver it
+            protects is no longer load-bearing. It was 10 sites across 8 files when F2-424 measured
+            it. Re-derive before deleting the resolver: a hard zero over a population the instrument
+            cannot see is the most reassuring possible artefact ([[F2-205]]).""")
+            .isNotEmpty();
+    }
+
+    /**
+     * ⚠ F2-424 — a tripwire, not a finding: the gate's own conclusion must not depend on how long
+     * a member's javadoc is. Today the two resolvers agree at 21 of 21, so this leg does <b>not</b>
+     * discriminate under the pre-fix control — its subject is in the future, and saying so beats
+     * counting its green as a pass ([[F2-225]]).
+     */
+    @Test
+    @DisplayName("F2-424: no sweep's transactionality depends on how long its javadoc is")
+    void noSweepsTransactionalityDependsOnItsJavadocLength() throws IOException {
+        List<ScheduledLoop> population = scheduledLoopsWithAPerItemCatch();
+        List<String> divergent = new ArrayList<>();
+        for (ScheduledLoop s : population) {
+            if (transactionalAt(s.src(), s.sigStart())
+                    != windowSaysTransactional(s.src(), s.sigStart())) {
+                divergent.add(s.file() + "#" + s.name());
+            }
+        }
+
+        assertThat(population.size()).as("""
+            No looping sweep with a per-item catch was found, so this leg is vacuous — the population
+            was 21 when F2-323 measured it.""")
+            .isGreaterThanOrEqualTo(15);
+
+        assertThat(divergent).as("""
+            A scheduled sweep's transactionality now depends on how far its annotation sits from its
+            signature — a javadoc has pushed @Transactional outside the 300-character window the leg
+            above used to read. The boundary resolver sees it; a window would not. Read the member:
+            if it loops with a per-item catch inside a batch-wide transaction, it is F2-322's decoy
+            and the sibling leg should already have failed.""")
+            .isEmpty();
+    }
+
+    /**
+     * ⚠ F2-424 — the synthetic self-test. A hard zero over a detector that has stopped matching is
+     * indistinguishable from a clean tree ([[F2-235]]), and both directions matter: the resolver
+     * must read <b>across</b> a javadoc of any length, and must <b>not</b> attribute the previous
+     * method's annotation to this one (the previous method's own signature sits in between, which is
+     * exactly what a fixed window has no way to notice).
+     */
+    @Test
+    @DisplayName("F2-424: the resolver reads across a javadoc and stops at the previous method")
+    void theResolverReadsAcrossAJavadocAndStopsAtThePreviousMethod() {
+        String pad = "/** " + "x".repeat(600) + " */";
+        String separated = strip(
+            "class Fixture {\n"
+            + "    @Transactional\n"
+            + "    " + pad + "\n"
+            + "    public void sweep() { for (Long o : orgs) { try { w(o); } catch (Exception e) { } } }\n"
+            + "}\n");
+        int sweep = signatureOf(separated, "sweep");
+
+        assertThat(transactionalAt(separated, sweep)).as("""
+            The resolver stopped reading before the annotation. A javadoc is whitespace to the
+            compiler, so the method IS transactional — resolve the annotation by walking back to the
+            previous member boundary, never by a fixed character count.""")
+            .isTrue();
+        assertThat(windowSaysTransactional(separated, sweep)).as("""
+            The 300-character window can suddenly see across a 600-character javadoc, so this test is
+            no longer contrasting the two resolvers and the leg above proves nothing.""")
+            .isFalse();
+
+        String previousOnly = strip(
+            "class Fixture {\n"
+            + "    @Transactional\n"
+            + "    public void other() { }\n"
+            + "\n"
+            + "    public void sweep() { for (Long o : orgs) { try { w(o); } catch (Exception e) { } } }\n"
+            + "}\n");
+        assertThat(transactionalAt(previousOnly, signatureOf(previousOnly, "sweep"))).as("""
+            The resolver attributed the PREVIOUS method's @Transactional to this one. Walking back
+            must stop at the intervening signature, or every method after a transactional one reads
+            as transactional and the gate reports decoys that are not there ([[F2-214]]).""")
+            .isFalse();
+    }
+
+    /** Offset of the signature of {@code name} in a stripped source — for the fixtures above. */
+    private static int signatureOf(String src, String name) {
+        Matcher m = METHOD_SIGNATURE.matcher(src);
+        while (m.find()) {
+            if (name.equals(m.group(1))) {
+                return m.start();
+            }
+        }
+        throw new AssertionError("no signature for " + name + " — the fixture is not being parsed");
+    }
+
+    /**
+     * Does the method whose signature starts at {@code sigStart} carry {@code @Transactional}?
+     *
+     * <p>F2-424: the last {@code @Transactional} before the signature with <b>no other signature in
+     * between</b>. That is the definition of "this annotation belongs to this method", and unlike a
+     * lookback window it is immune to a javadoc of any length and cannot capture the previous
+     * method's annotation.
+     */
+    private static boolean transactionalAt(String src, int sigStart) {
+        int at = src.lastIndexOf("@Transactional", sigStart);
+        if (at < 0) {
+            return false;
+        }
+        Matcher between = METHOD_SIGNATURE.matcher(src);
+        return !(between.find(at + 1) && between.start() < sigStart);
+    }
+
+    /**
+     * F2-323's original resolver, kept so F2-424's legs can <b>measure</b> the gap rather than
+     * merely avoid it. Never call this to decide anything.
+     */
+    private static boolean windowSaysTransactional(String src, int sigStart) {
+        return src.substring(Math.max(0, sigStart - 300), sigStart).contains("@Transactional");
+    }
+
+    /** One {@code @Scheduled} method that loops with a per-item catch — F2-323's population. */
+    private record ScheduledLoop(String file, String src, int sigStart, String name, String body) { }
+
+    /**
+     * F2-323's population, derived once so both legs provably measure the same set. Re-typing the
+     * walk is how two readers of one population come apart ([[F2-217]]).
+     */
+    private static List<ScheduledLoop> scheduledLoopsWithAPerItemCatch() throws IOException {
+        Pattern loop = Pattern.compile("\\bfor\\s*\\(|\\.forEach\\s*\\(");
+        Pattern perItemCatch = Pattern.compile("\\bcatch\\s*\\(");
+        Pattern scheduled = Pattern.compile("@Scheduled\\s*\\(");
+        List<ScheduledLoop> found = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(MODULE)) {
+            for (Path p : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String src = strip(Files.readString(p, StandardCharsets.UTF_8));
+                if (!src.contains("@Scheduled")) {
+                    continue;
+                }
+                Matcher sched = scheduled.matcher(src);
+                while (sched.find()) {
+                    Matcher sig = METHOD_SIGNATURE.matcher(src);
+                    if (!sig.find(sched.start()) || sig.start() - sched.start() > 1500) {
+                        continue;
+                    }
+                    String body = braceBalanced(src, sig.end() - 1);
+                    if (!loop.matcher(body).find() || !perItemCatch.matcher(body).find()) {
+                        continue;
+                    }
+                    found.add(new ScheduledLoop(p.getFileName().toString(), src, sig.start(),
+                                                sig.group(1), body));
+                }
+            }
+        }
+        return found;
     }
 
     /** Brace-balanced body starting at an opening brace. */
