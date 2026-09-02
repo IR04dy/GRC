@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Leaf, TrendingDown, Target, Calculator, FileText, Truck,
-  Download, Trash2,
+  Trash2,
   CloudLightning, Wrench,
   Paperclip,
 } from 'lucide-react';
@@ -14,13 +14,12 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { ApiError, reportingApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   EMISSION_FACTORS,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
-  subscribeEsg, buildEsgAnnex, buildEsgAnnexSheets,
+  subscribeEsg,
   type CalculatorEntry, type EsgStats,
 } from '../../lib/esg';
 // S-O — Vendor ESG surveillance reads the real backend (was VENDOR_SURVEYS mock).
@@ -35,8 +34,6 @@ import {
   isEsgTab,
   type EsgTab,
 } from '../../lib/esgDashboard';
-import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
-import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 // Green-finance plan §5.4–§5.7 — regulatory-horizon tabs (targets / IFRS / env+CBAM).
 import { EsgTargetsTab, IfrsTab, EnvComplianceTab, AssuranceTab } from './EsgHorizonTabs';
 import { OverviewTab } from './EsgOverviewTab';
@@ -58,7 +55,7 @@ import '../../styles/pages/esg.css';
  * EsgPage — Sprint 6 (C2) + production hardening.
  *
  * Six-tab dashboard:
- *   • Overview   — multi-year scope trend, KPI strip, ESG annex download
+ *   • Overview   — multi-year scope trend, KPI strip (live dashboard aggregate)
  *   • Calculator — GHG-Protocol emission-factor calculator (Saudi grid +
  *                  IPCC fuels + DEFRA travel)
  *   • CMA        — Articles 91-94 disclosure checklist
@@ -67,7 +64,7 @@ import '../../styles/pages/esg.css';
  *   • Survey     — Vendor ESG survey for Scope 3 supplier engagement
  */
 export function EsgPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   // S-P — deep-linkable tabs: initial tab from ?tab=, written back on change.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,44 +91,6 @@ export function EsgPage() {
     setCalcEntries(loadCalcEntries());
   }), []);
 
-  const [brand, setBrand] = useState(() => loadWhiteLabel());
-  useEffect(() => subscribeWhiteLabel(() => setBrand(loadWhiteLabel())), []);
-
-  function downloadAnnex() {
-    const text = buildEsgAnnex(brand.organisationNameEn, brand.organisationNameAr);
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ESG-Annex-${REPORT_YEAR}.txt`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(t('esgAnnexDownloadedToast'));
-  }
-
-  function printEsgAnnexPdf() {
-    const text = buildEsgAnnex(brand.organisationNameEn, brand.organisationNameAr);
-    printPacket({
-      titleEn: 'ESG / Sustainability Annex — Annual Report',
-      titleAr: 'ملحق الاستدامة والحوكمة البيئية — التقرير السنوي',
-      eyebrowEn: 'CMA Art. 91–94 · SGI · TCFD',
-      eyebrowAr: 'المواد 91–94 · مبادرة السعودية الخضراء · TCFD',
-      referenceId: `ESG-Annex-${REPORT_YEAR}`,
-      classificationEn: 'CONFIDENTIAL — SUSTAINABILITY',
-      classificationAr: 'سرّي — الاستدامة',
-      sections: packetTextToSections(text),
-    }, lang);
-  }
-
-  async function exportEsgAnnex(kind: 'xlsx' | 'docx') {
-    const payload = { module: 'ESG', exportType: 'SustainabilityAnnex', lang, sheets: buildEsgAnnexSheets() };
-    try {
-      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
-      toast.success(t('esgAnnexDownloadedToast'));
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
-    }
-  }
 
   // TCFD + CMA grouping were previously static useMemo blocks against
   // TCFD_ITEMS / CMA_ARTICLES; V60 + V61 promoted both tabs to API-
@@ -145,10 +104,12 @@ export function EsgPage() {
         sub={t('esgPageSub')}
         actions={<>
           <RaiseRequestButton sourceModule="ESG" />
-          <Button variant="primary" Icon={Download} onClick={printEsgAnnexPdf}>{lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}</Button>
-          <Button variant="secondary" Icon={Download} onClick={() => exportEsgAnnex('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
-          <Button variant="secondary" Icon={Download} onClick={() => exportEsgAnnex('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
-          <Button variant="ghost" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
+          {/* F2-435 — these four buttons emitted a CMA Art. 91-94 / TCFD annual-report
+              annex built entirely from lib/esg.ts constants. The real annex is generated
+              server-side from the live registers on the Annex tab, with a
+              DRAFT → SUBMITTED → APPROVED → PUBLISHED lifecycle and its own export. A control
+              must land somewhere true (F2-137), so this opens that tab rather than vanishing. */}
+          <Button variant="primary" Icon={FileText} onClick={() => setTab('annex')}>{t('esgOpenAnnexTab')}</Button>
         </>}
       />
 

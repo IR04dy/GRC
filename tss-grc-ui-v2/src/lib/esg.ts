@@ -18,45 +18,37 @@
 //   • Persistence overlay so calculator entries + survey responses survive
 //     across sessions
 
+/**
+ * ⚠⚠ F2-435 — the fabricated CMA Art. 91-94 / TCFD ANNUAL-REPORT ANNEX was RETIRED from here.
+ *
+ * `buildEsgAnnex` and `buildEsgAnnexSheets` built an "ESG / SUSTAINABILITY ANNEX — ANNUAL REPORT"
+ * — GHG Scope 1/2/3 with third-party verification flags, the CMA Articles 91-94 disclosure
+ * statuses and the TCFD four-pillar alignment — from `EMISSIONS_TIMESERIES`, `CMA_ARTICLES` and
+ * `TCFD_ITEMS`, module-level constants in a file that makes ZERO server calls. `/esg` emitted it
+ * FOUR ways from its page header, on every tab: a `.txt` download, a print-to-PDF stamped
+ * CONFIDENTIAL — SUSTAINABILITY, and branded `.xlsx`/`.docx` through `reportingApi.packet*`.
+ *
+ * 🔑🔑 The tell was in this file's own neighbours: `lib/sustainabilityCma.ts` says it "replaces
+ * the static CMA_ARTICLES constant" and `EsgCmaTab`/`EsgTcfdTab` both say "promoted from the
+ * static … constant to a live API-driven" register — V60 and V61. So both TABS were de-mocked and
+ * the constants they were promoted OFF were left in place, still feeding the export. The
+ * de-mocking stopped at the visible surface, which is why the page reads as finished
+ * (F2-193: when you de-mock a store, grep for everything that summarised it — here, EXPORTED it).
+ *
+ * ⚙ Retired rather than rewired, per ADR-017 §D-5 and F2-199/F2-207: the REAL annex is a sibling
+ * tab on the same page. `EsgAnnexTab` drives `lib/sustainabilityAnnex.ts` end to end —
+ * `generateAnnex` → `submitReport` → `approveReport` → `publishReport` → `exportReport` — over
+ * registers measured populated in BOTH databases (cma_disclosure 91, tcfd_item 85,
+ * ghg_emission_record 41/40). A second annex surface for one statutory artefact is F2-196's own
+ * defect, and this was the one with no lifecycle and no server.
+ *
+ * ⚠ What remains here is deliberate: `EMISSION_FACTORS` is the GHG-Protocol factor catalogue the
+ * calculator needs (a reference table, not a register — F2-194's kept class), the `TcfdItem` /
+ * `CmaArticle` TYPES are shared by the live clients, and the label/tone maps are read platform-
+ * wide (`STATUS_TONE` at 84 sites). Do not re-add a corpus behind any of them.
+ */
+
 export type EsgPillar = 'GOVERNANCE' | 'STRATEGY' | 'RISK_MGMT' | 'METRICS_TARGETS';
-
-// ─── Multi-year emissions time-series ──────────────────────────────────────
-
-export interface EmissionYearRecord {
-  year: number;
-  scope1: number;       // tCO2e
-  scope2: number;
-  scope3: number;
-  /** Coverage % of operations measured for Scope 3. */
-  scope3CoveragePct: number;
-  /** Third-party verification status. */
-  verifiedScope1: boolean;
-  verifiedScope2: boolean;
-  verifiedScope3: boolean;
-}
-
-export const EMISSIONS_TIMESERIES: EmissionYearRecord[] = [
-  { year: 2020, scope1: 17_810, scope2: 51_200, scope3: 168_900, scope3CoveragePct: 35, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-  { year: 2021, scope1: 16_950, scope2: 48_410, scope3: 158_220, scope3CoveragePct: 41, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-  { year: 2022, scope1: 16_200, scope2: 46_120, scope3: 152_330, scope3CoveragePct: 48, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-  { year: 2023, scope1: 15_510, scope2: 44_250, scope3: 147_910, scope3CoveragePct: 55, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-  { year: 2024, scope1: 14_980, scope2: 42_310, scope3: 145_010, scope3CoveragePct: 60, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-  { year: 2025, scope1: 14_220, scope2: 38_910, scope3: 142_480, scope3CoveragePct: 67, verifiedScope1: true, verifiedScope2: true, verifiedScope3: false },
-];
-
-/** Most recent measured year — used for KPI surfaces. */
-export const CURRENT_YEAR_RECORD = EMISSIONS_TIMESERIES[EMISSIONS_TIMESERIES.length - 1];
-
-/** Year-over-year % change between latest two recorded years. */
-export function yoyChange(scope: 1 | 2 | 3): number {
-  if (EMISSIONS_TIMESERIES.length < 2) return 0;
-  const prev = EMISSIONS_TIMESERIES[EMISSIONS_TIMESERIES.length - 2];
-  const curr = EMISSIONS_TIMESERIES[EMISSIONS_TIMESERIES.length - 1];
-  const prevVal = scope === 1 ? prev.scope1 : scope === 2 ? prev.scope2 : prev.scope3;
-  const currVal = scope === 1 ? curr.scope1 : scope === 2 ? curr.scope2 : curr.scope3;
-  if (prevVal === 0) return 0;
-  return Math.round(((currVal - prevVal) / prevVal) * 1000) / 10;
-}
 
 // ─── GHG Protocol emission factors (Saudi-context) ──────────────────────────
 
@@ -108,57 +100,6 @@ export interface TcfdItem {
   evidenceRef?: string;
 }
 
-export const TCFD_ITEMS: TcfdItem[] = [
-  // Governance
-  { pillar: 'GOVERNANCE', recommendationCode: 'a',
-    titleEn: 'Board oversight of climate risks',
-    titleAr: 'إشراف المجلس على المخاطر المناخية',
-    status: 'DISCLOSED', evidenceRef: 'Board ESG Committee charter' },
-  { pillar: 'GOVERNANCE', recommendationCode: 'b',
-    titleEn: 'Management role in assessing climate risks',
-    titleAr: 'دور الإدارة في تقييم المخاطر المناخية',
-    status: 'DISCLOSED', evidenceRef: 'CRO mandate v2.0' },
-  // Strategy
-  { pillar: 'STRATEGY', recommendationCode: 'a',
-    titleEn: 'Climate-related risks + opportunities (short / medium / long term)',
-    titleAr: 'المخاطر والفرص المناخية (قصير / متوسط / طويل الأمد)',
-    status: 'DISCLOSED', evidenceRef: '2026 Annual Report §4' },
-  { pillar: 'STRATEGY', recommendationCode: 'b',
-    titleEn: 'Impact on business, strategy, financial planning',
-    titleAr: 'الأثر على الأعمال والاستراتيجية والتخطيط المالي',
-    status: 'PARTIAL', evidenceRef: 'Business plan 2026 (climate add-on)' },
-  { pillar: 'STRATEGY', recommendationCode: 'c',
-    titleEn: 'Resilience under different climate scenarios (incl. 2°C)',
-    titleAr: 'الصمود تحت سيناريوهات مناخية مختلفة (بما في ذلك 2°م)',
-    status: 'PARTIAL', evidenceRef: 'Scenario analysis FY2026' },
-  // Risk management
-  { pillar: 'RISK_MGMT', recommendationCode: 'a',
-    titleEn: 'Process for identifying climate risks',
-    titleAr: 'إجراء تحديد المخاطر المناخية',
-    status: 'DISCLOSED', evidenceRef: 'POL-CLIMATE-RISK-001' },
-  { pillar: 'RISK_MGMT', recommendationCode: 'b',
-    titleEn: 'Process for managing climate risks',
-    titleAr: 'إجراء إدارة المخاطر المناخية',
-    status: 'DISCLOSED', evidenceRef: 'Risk appetite — climate band' },
-  { pillar: 'RISK_MGMT', recommendationCode: 'c',
-    titleEn: 'Integration into overall risk management',
-    titleAr: 'التكامل مع إدارة المخاطر الشاملة',
-    status: 'DISCLOSED' },
-  // Metrics & targets
-  { pillar: 'METRICS_TARGETS', recommendationCode: 'a',
-    titleEn: 'Metrics for climate risks + opportunities',
-    titleAr: 'مقاييس المخاطر والفرص المناخية',
-    status: 'DISCLOSED', evidenceRef: 'GHG inventory 2025' },
-  { pillar: 'METRICS_TARGETS', recommendationCode: 'b',
-    titleEn: 'Scope 1, 2, 3 emissions disclosure',
-    titleAr: 'الإفصاح عن انبعاثات النطاقات 1 و 2 و 3',
-    status: 'PARTIAL', evidenceRef: 'Scope 3 — 67% coverage' },
-  { pillar: 'METRICS_TARGETS', recommendationCode: 'c',
-    titleEn: 'Targets to manage climate risks + performance',
-    titleAr: 'الأهداف لإدارة المخاطر المناخية والأداء',
-    status: 'DISCLOSED', evidenceRef: 'Net-zero 2050 commitment' },
-];
-
 // ─── CMA Articles 91-94 (Saudi listed-company ESG disclosure) ──────────────
 
 export interface CmaArticle {
@@ -174,97 +115,6 @@ export interface CmaArticle {
   status: 'DISCLOSED' | 'PARTIAL' | 'NOT_DISCLOSED' | 'NOT_APPLICABLE';
   evidenceRef?: string;
 }
-
-export const CMA_ARTICLES: CmaArticle[] = [
-  {
-    article: '91', clause: '(a)',
-    titleEn: 'Board oversight of sustainability + ESG',
-    titleAr: 'إشراف المجلس على الاستدامة والحوكمة البيئية والاجتماعية',
-    requirementEn: 'Disclose the board\'s role in setting ESG strategy, approving climate-related targets, and reviewing performance against them.',
-    requirementAr: 'الإفصاح عن دور المجلس في وضع استراتيجية الحوكمة البيئية والاجتماعية، واعتماد الأهداف المتعلّقة بالمناخ، ومراجعة الأداء.',
-    status: 'DISCLOSED', evidenceRef: 'Annual Report 2025 §3.4',
-  },
-  {
-    article: '91', clause: '(b)',
-    titleEn: 'Sustainability committee composition',
-    titleAr: 'تشكيل لجنة الاستدامة',
-    requirementEn: 'Disclose the composition + mandate of the sustainability / ESG committee, with at least one independent director.',
-    requirementAr: 'الإفصاح عن تشكيل ومهام لجنة الاستدامة / الحوكمة البيئية والاجتماعية، بحضور عضو مستقل واحد على الأقل.',
-    status: 'DISCLOSED', evidenceRef: 'Committee Charter v3.0',
-  },
-  {
-    article: '92', clause: '(a)',
-    titleEn: 'Material ESG topics — assessment',
-    titleAr: 'تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية',
-    requirementEn: 'Conduct + disclose a double-materiality assessment of ESG topics, identifying which are most relevant to the business model.',
-    requirementAr: 'إجراء والإفصاح عن تقييم الأهمية النسبية المزدوجة لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال.',
-    status: 'DISCLOSED', evidenceRef: 'Materiality matrix 2025',
-  },
-  {
-    article: '92', clause: '(b)',
-    titleEn: 'Climate-related risks + opportunities',
-    titleAr: 'المخاطر والفرص المتعلّقة بالمناخ',
-    requirementEn: 'Disclose climate-related risks (transition + physical) and opportunities, mapped to short / medium / long-term horizons per TCFD.',
-    requirementAr: 'الإفصاح عن المخاطر المتعلّقة بالمناخ (الانتقال والمادية) والفرص، بحسب الآفاق القصيرة والمتوسطة والطويلة وفق TCFD.',
-    status: 'PARTIAL', evidenceRef: 'Risk register — climate band',
-  },
-  {
-    article: '93', clause: '(a)',
-    titleEn: 'GHG emissions — Scope 1 + 2',
-    titleAr: 'انبعاثات الغازات الدفيئة — النطاقان 1 و 2',
-    requirementEn: 'Disclose Scope 1 and Scope 2 emissions in tCO2e, with year-over-year comparison and target trajectory to 2030.',
-    requirementAr: 'الإفصاح عن انبعاثات النطاقين 1 و 2 بالطن المكافئ ثاني أكسيد الكربون، مع المقارنة السنوية والمسار حتى 2030.',
-    status: 'DISCLOSED', evidenceRef: 'GHG inventory 2025',
-  },
-  {
-    article: '93', clause: '(b)',
-    titleEn: 'GHG emissions — Scope 3',
-    titleAr: 'انبعاثات النطاق 3',
-    requirementEn: 'Disclose Scope 3 emissions for the most material categories. Where coverage is limited, disclose the % of operations covered.',
-    requirementAr: 'الإفصاح عن انبعاثات النطاق 3 للفئات الأكثر جوهرية. إن كانت التغطية محدودة، الإفصاح عن النسبة المُشمَلة.',
-    status: 'PARTIAL', evidenceRef: 'Scope 3 — 67% coverage',
-  },
-  {
-    article: '93', clause: '(c)',
-    titleEn: 'Energy intensity + renewable share',
-    titleAr: 'كثافة الطاقة وحصة المتجدّدة',
-    requirementEn: 'Disclose energy consumption (MWh) and the share of renewable energy in the mix, aligned to SGI 2030 50% target.',
-    requirementAr: 'الإفصاح عن استهلاك الطاقة (ميغاواط ساعة) وحصة الطاقة المتجدّدة، بمحاذاة هدف SGI 2030 (50%).',
-    status: 'DISCLOSED', evidenceRef: 'Energy mix 2025',
-  },
-  {
-    article: '93', clause: '(d)',
-    titleEn: 'Water + waste metrics',
-    titleAr: 'مؤشرات المياه والنفايات',
-    requirementEn: 'Disclose water withdrawal, waste generated, and waste-diversion rate (recycle + reuse) where material.',
-    requirementAr: 'الإفصاح عن سحب المياه والنفايات المُولَّدة ونسبة التحويل (إعادة التدوير + الاستخدام) عند الجوهرية.',
-    status: 'DISCLOSED', evidenceRef: 'Operations report 2025',
-  },
-  {
-    article: '94', clause: '(a)',
-    titleEn: 'Saudization (Nitaqat) compliance',
-    titleAr: 'الالتزام بالسعودة (نطاقات)',
-    requirementEn: 'Disclose Nitaqat tier (Platinum / Green / Yellow), Saudization rate, and improvements vs prior year.',
-    requirementAr: 'الإفصاح عن فئة نطاقات (بلاتيني / أخضر / أصفر) ونسبة السعودة والتحسّن مقارنة بالعام السابق.',
-    status: 'DISCLOSED', evidenceRef: 'HRSD 2025 Q4',
-  },
-  {
-    article: '94', clause: '(b)',
-    titleEn: 'Female workforce participation',
-    titleAr: 'مشاركة المرأة في القوى العاملة',
-    requirementEn: 'Disclose female workforce participation %, leadership representation %, and gender pay-gap analysis.',
-    requirementAr: 'الإفصاح عن نسبة مشاركة المرأة في العاملين، ونسبة التمثيل القيادي، وتحليل فجوة الأجور بين الجنسين.',
-    status: 'DISCLOSED', evidenceRef: 'HR diversity report 2025',
-  },
-  {
-    article: '94', clause: '(c)',
-    titleEn: 'Health, safety + LTIFR',
-    titleAr: 'الصحة والسلامة وLTIFR',
-    requirementEn: 'Disclose lost-time injury frequency rate (LTIFR), fatalities, and total recordable incidents.',
-    requirementAr: 'الإفصاح عن معدّل تكرار الإصابات المُفقِدة للوقت (LTIFR) والوفيات وإجمالي الحوادث.',
-    status: 'PARTIAL', evidenceRef: 'HSSE report 2025',
-  },
-];
 
 // ─── Saudi Green Initiative — sectoral commitments ─────────────────────────
 
@@ -389,79 +239,6 @@ export function subscribeEsg(cb: () => void): () => void {
   };
 }
 
-// ─── ESG annex generator (printable text) ─────────────────────────────────
-
-export function buildEsgAnnex(orgEn: string, orgAr: string): string {
-  const lines: string[] = [];
-  const div = '─'.repeat(64);
-  const curr = CURRENT_YEAR_RECORD;
-  lines.push(div);
-  lines.push('ESG / SUSTAINABILITY ANNEX — ANNUAL REPORT');
-  lines.push('ملحق الاستدامة والحوكمة البيئية — التقرير السنوي');
-  lines.push(div);
-  lines.push('');
-  lines.push(`Reporting entity: ${orgEn}`);
-  lines.push(`الجهة المُعِدّة  : ${orgAr}`);
-  lines.push(`Reporting year: ${curr.year}`);
-  lines.push(`Generated     : ${new Date().toISOString()}`);
-  lines.push('');
-  lines.push('1. GHG EMISSIONS · انبعاثات الغازات الدفيئة');
-  lines.push(`   Scope 1: ${curr.scope1.toLocaleString()} tCO2e (verified: ${curr.verifiedScope1 ? 'YES' : 'no'})`);
-  lines.push(`   Scope 2: ${curr.scope2.toLocaleString()} tCO2e (verified: ${curr.verifiedScope2 ? 'YES' : 'no'})`);
-  lines.push(`   Scope 3: ${curr.scope3.toLocaleString()} tCO2e (coverage ${curr.scope3CoveragePct}%, verified: ${curr.verifiedScope3 ? 'YES' : 'no'})`);
-  lines.push(`   Total  : ${(curr.scope1 + curr.scope2 + curr.scope3).toLocaleString()} tCO2e`);
-  lines.push(`   YoY    : Scope 1 ${yoyChange(1)}%, Scope 2 ${yoyChange(2)}%, Scope 3 ${yoyChange(3)}%`);
-  lines.push('');
-  // SGI-E — SGI commitments live in the backend register (ESG → SGI tab) with
-  // their own bilingual XLSX export; they are no longer rendered from a mock here.
-  lines.push('2. CMA ARTICLES 91-94 DISCLOSURE · إفصاح المواد 91-94 من لائحة الحوكمة');
-  CMA_ARTICLES.forEach(a => {
-    lines.push(`   Art. ${a.article}${a.clause ?? ''} [${a.status.padEnd(14)}] ${a.titleEn} / ${a.titleAr}`);
-    if (a.evidenceRef) lines.push(`     evidence: ${a.evidenceRef}`);
-  });
-  lines.push('');
-  lines.push('3. TCFD ALIGNMENT · المحاذاة مع TCFD');
-  TCFD_ITEMS.forEach(t => {
-    lines.push(`   [${t.pillar.padEnd(15)}] (${t.recommendationCode}) [${t.status.padEnd(14)}] ${t.titleEn}`);
-  });
-  lines.push('');
-  lines.push(div);
-  lines.push(`Generated by TSS GRC Platform`);
-  lines.push(div);
-  return lines.join('\n');
-}
-
-/** Export P5 — the same annex data as tabular sheets for a branded .xlsx
- *  (POST /api/v1/reporting/packet.xlsx). A "Status" header triggers the
- *  workbook's status conditional-formatting. */
-export function buildEsgAnnexSheets(): { name: string; headers: string[]; rows: string[][] }[] {
-  const curr = CURRENT_YEAR_RECORD;
-  return [
-    {
-      name: 'GHG Emissions',
-      headers: ['Scope', 'tCO2e', 'Verified', 'Coverage %', 'YoY %'],
-      rows: [
-        ['Scope 1', String(curr.scope1), curr.verifiedScope1 ? 'Yes' : 'No', '100', String(yoyChange(1))],
-        ['Scope 2', String(curr.scope2), curr.verifiedScope2 ? 'Yes' : 'No', '100', String(yoyChange(2))],
-        ['Scope 3', String(curr.scope3), curr.verifiedScope3 ? 'Yes' : 'No', String(curr.scope3CoveragePct), String(yoyChange(3))],
-        ['Total', String(curr.scope1 + curr.scope2 + curr.scope3), '', '', ''],
-      ],
-    },
-    // SGI-E — the Saudi Green Initiative sheet was dropped from this mock annex;
-    // the live SGI register exports its own bilingual XLSX (SGI tab → Export).
-    {
-      name: 'CMA Articles 91-94',
-      headers: ['Article', 'Title', 'Status', 'Evidence'],
-      rows: CMA_ARTICLES.map(a => [`${a.article}${a.clause ?? ''}`, a.titleEn, a.status, a.evidenceRef ?? '']),
-    },
-    {
-      name: 'TCFD Alignment',
-      headers: ['Pillar', 'Recommendation', 'Status', 'Title'],
-      rows: TCFD_ITEMS.map(t => [t.pillar, t.recommendationCode, t.status, t.titleEn]),
-    },
-  ];
-}
-
 // ─── Aggregation ───────────────────────────────────────────────────────────
 
 export const PILLAR_LABEL: Record<EsgPillar, { en: string; ar: string }> = {
@@ -525,9 +302,3 @@ export interface EsgStats {
 // mapDashboardToStats() in lib/esgDashboard.ts. EsgStats (above) is retained as
 // the shared shape that mapper targets.
 
-// Legacy exports kept for backwards compatibility with existing page code.
-export const EMISSIONS = [
-  { scope: 1 as const, tco2e: CURRENT_YEAR_RECORD.scope1, yoyChange: yoyChange(1), coveragePct: 100, verified: CURRENT_YEAR_RECORD.verifiedScope1 },
-  { scope: 2 as const, tco2e: CURRENT_YEAR_RECORD.scope2, yoyChange: yoyChange(2), coveragePct: 100, verified: CURRENT_YEAR_RECORD.verifiedScope2 },
-  { scope: 3 as const, tco2e: CURRENT_YEAR_RECORD.scope3, yoyChange: yoyChange(3), coveragePct: CURRENT_YEAR_RECORD.scope3CoveragePct, verified: CURRENT_YEAR_RECORD.verifiedScope3 },
-];
