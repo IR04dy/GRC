@@ -155,12 +155,27 @@ public class FindingService {
         if (req.getMgmtResponseEn() != null) f.setMgmtResponseEn(req.getMgmtResponseEn());
         if (req.getMgmtResponseAr() != null) f.setMgmtResponseAr(req.getMgmtResponseAr());
         if (req.getMgmtResponseAuthor() != null) f.setMgmtResponseAuthor(req.getMgmtResponseAuthor());
+        // F2-441: the VERDICT. It was the one of the four management-response fields the request did
+        // not declare, so IIA Standard 2500's "does management accept this finding?" had no writer
+        // anywhere in the platform — measured by ASM per owner type, setMgmtAccepts had zero
+        // cross-class callers, and mgmt_accepts is NULL on all 20 rows in both databases.
+        //
+        // Null-guarded like its siblings, so an omitted value leaves the stored answer alone rather
+        // than erasing it (F2-213: a reset is worse than a null, and here a reset would silently
+        // withdraw a recorded acceptance on the next transition).
+        if (req.getMgmtAccepts() != null) f.setMgmtAccepts(req.getMgmtAccepts());
         Finding saved = repo.save(f);
+        // The trail names the VERDICT, not just who responded. It used to read "· response by X",
+        // which records that somebody answered and not what they said — so the one fact an audit
+        // committee reads the trail for was the one it omitted (F2-188's shape: a duplicated
+        // transition agrees on the row and differs on the part nothing asserts).
         audit.log("TRANSITION", "Finding", saved.getId(),
             "Finding " + saved.getRefNumber()
             + " " + previousStatus + " → " + saved.getStatus()
             + (req.getMgmtResponseAuthor() != null
-                ? " · response by " + req.getMgmtResponseAuthor() : ""));
+                ? " · response by " + req.getMgmtResponseAuthor() : "")
+            + (req.getMgmtAccepts() != null
+                ? " · management " + (req.getMgmtAccepts() ? "ACCEPTS" : "DISAGREES") : ""));
         // Fan out to F8 — separate event from CREATED so rules can target
         // status transitions specifically. Payload carries previousStatus
         // so a rule can match "Finding closed on a CRITICAL engagement"

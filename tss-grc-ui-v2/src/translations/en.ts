@@ -2961,6 +2961,11 @@ export const en = {
   alcMgmtResponse:        'Management response',
   alcAccepted:            'Accepted',
   alcDisagreed:           'Disagreed',
+  // F2-441 — the third state. `mgmt_accepts` is a nullable Boolean and null means nobody has
+  // answered, which is not the same as a recorded disagreement; the badge used to collapse the
+  // two and show every un-answered finding as one management had rejected.
+  alcVerdictUnrecorded:     'No verdict recorded',
+  alcVerdictUnrecordedHint: 'Management has responded but has not recorded whether it accepts the finding.',
   alcCapaTitle:           'CAPA tracker',
   alcCapaSub:             'Corrective + preventive actions linked to findings. Owner, target date, status. Auto-flagged overdue. Closure verified by audit before sign-off.',
   alcCapaEmpty:           'No CAPA tasks yet for this engagement.',
