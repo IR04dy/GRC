@@ -12,6 +12,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Collections;
 import java.util.Date;
@@ -81,14 +82,15 @@ public class JwtTokenProvider {
             ObjectProvider<LicensingService>  licensingProvider,
             ObjectProvider<ThreeLinesService> threeLinesProvider) {
         validateSecret(secret);
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.previousSecretKey = loadPreviousSecret(previousSecret);
         this.accessTokenExpiryMs = accessTokenExpiryMs;
         this.refreshTokenExpiryMs = refreshTokenExpiryMs;
         this.licensingProvider  = licensingProvider;
         this.threeLinesProvider = threeLinesProvider;
         log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={} previousKey={}",
-                accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length,
+                accessTokenExpiryMs, refreshTokenExpiryMs,
+                secret.getBytes(StandardCharsets.UTF_8).length,
                 previousSecretKey == null ? "absent" : "present (rotation grace window active)");
     }
 
@@ -106,7 +108,7 @@ public class JwtTokenProvider {
         // make rotation trivially break, and a *signed by us* token must always be
         // signed by something at least as strong as the primary.
         validateSecret(previousSecret);
-        return Keys.hmacShaKeyFor(previousSecret.getBytes());
+        return Keys.hmacShaKeyFor(previousSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

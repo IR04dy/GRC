@@ -2,6 +2,7 @@ package com.tss.grc.module.platform.calendar.service;
 
 import com.tss.grc.module.platform.calendar.dto.CalendarEventDto;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -140,7 +141,7 @@ public final class IcsBuilder {
         // Fallback for any row that somehow lacks an externalId.
         return UUID.nameUUIDFromBytes(
             (safe(e.getEntityType()) + ":" + e.getEntityId() + ":"
-             + safe(e.getEventType()) + ":" + e.getStartsAt()).getBytes()
+             + safe(e.getEventType()) + ":" + e.getStartsAt()).getBytes(StandardCharsets.UTF_8)
         ).toString();
     }
 

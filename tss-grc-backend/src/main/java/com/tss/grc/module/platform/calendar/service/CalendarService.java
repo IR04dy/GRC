@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -332,7 +333,7 @@ public class CalendarService {
     /** Deterministic UUID per synthetic row so the client can use it
      *  as a React key without collisions across page refreshes. */
     private UUID synthId(String kind, Long entityId) {
-        return UUID.nameUUIDFromBytes((kind + ":" + entityId).getBytes());
+        return UUID.nameUUIDFromBytes((kind + ":" + entityId).getBytes(StandardCharsets.UTF_8));
     }
 
     private CalendarEventDto stamp(CalendarEventDto dto, Long orgId) {

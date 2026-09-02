@@ -17,6 +17,7 @@ import com.lowagie.text.DocumentException;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.awt.Color;
 import org.springframework.data.domain.Pageable;
@@ -177,7 +178,7 @@ public class BcmEvidencePackageService {
                 "gaps_and_capas.xlsx",    gaps_xlsx,
                 "compliance_matrix.xlsx", compliance_xlsx,
                 "audit_log.csv",          audit_csv);
-            addEntry(zip, "MANIFEST.txt", manifest.getBytes());
+            addEntry(zip, "MANIFEST.txt", manifest.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new ExportException("ZIP", "Failed to assemble evidence package: " + e.getMessage(), e);
         }
@@ -366,7 +367,7 @@ public class BcmEvidencePackageService {
             sb.append(csv(e.getCorrelationId())).append(',');
             sb.append(csv(e.getMessage())).append('\n');
         }
-        return sb.toString().getBytes();
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private static String csv(String v) {
