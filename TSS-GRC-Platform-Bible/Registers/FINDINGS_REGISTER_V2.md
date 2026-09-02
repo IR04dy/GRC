@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-439** | **Two ways a mapping can be unusable that a hermetic build cannot see — a path placeholder no `@PathVariable` can satisfy (500 for every caller) and two handlers claiming one (verb, path) (the app refuses to start). Both measured at ZERO and gated; the query-key sibling measured and rejected as undecidable by a scan** | Latent hazard | P3 |
 | **F2-438** | **Two event listeners, neither commit-phased, failing in OPPOSITE directions — the platform's own rule names both modes in one sentence and was applied at one service and at neither listener** | Correctness | P2 |
 | **F2-437** | **Three self-reporting controls with nothing that reads them — and the slice that counted three instances of "a channel with no reader" made its own remedy the fourth** | Assurance | P2 |
 | **F2-436** | **A runtime-composed trigger name cannot be found by ANY static scan, so "which automation rule is inert?" is not statically decidable — measured, filed, and the 8 decisive candidates named** | Measurement | P3 |
@@ -15224,6 +15225,136 @@ question of the register the refutation had walked into is what found the P1.
   upstream-owned, and the nullable ones are inert.
 
 ---
+
+## F2-439 — two ways a mapping can be unusable that a hermetic build cannot see
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 — **no defect found**; both shapes measured at zero and gated |
+| **Severity** | P3 — a latent-hazard closure. Neither shape exists today; one of them would answer **500 for every caller** of a route and the other would stop the application booting, and the build can see neither |
+| **Source** | fresh-vein reconnaissance after F2-438; five questions asked, four clean sweeps and one rejected as undecidable |
+| **Size** | S — one gate, no production code |
+
+### The class, and why a gate rather than a test
+
+F2-247 is the precedent and states it: two Spring beans with the same simple name stop the
+application starting, and **the whole unit suite passes over it** — nothing here boots a context and
+`mvn -o clean package` is deliberately hermetic, so the only instrument that could see it was
+launching the app, and a launch is not part of the build. Two more members:
+
+- **A path placeholder no `@PathVariable` can satisfy.** `@GetMapping("/{runId}")` bound by a
+  parameter named `id` throws at **request** time, so the route answers **500 for every caller** and
+  nothing at build time notices. 🔑 **CLAUDE.md already records the `@PreAuthorize` SpEL version of
+  exactly this mismatch** — *"it is `#id` on `ExerciseRuntimeController` and `#runId` on
+  `ExerciseObserverController`, so a copied constant fails silently … the endpoint answers 500, not
+  403"* — **and the BINDING side is the sibling nobody checked.** F2-158's shape: a route that has
+  answered 500 since it was written, invisible because nothing exercises it.
+- **Two handlers claiming one `(verb, path)`.** Spring refuses to start with *"Ambiguous mapping"*.
+  Same invisibility, same cost.
+
+Measured: **0 of 1,352** placeholder-bearing mappings, **0 of 2,253** distinct keys, across **254
+controllers / 2,253 mappings** — the controller and handler figures match the ones this file already
+records, which is the corroboration that the walk measures the right population.
+
+⚙ **Say which you have** (F2-283): this is a **latent-hazard closure, not a defect discovery**. What
+the gate buys is that the next one fails the build instead of the deployment.
+
+### ⚠ Hard zeros with no exemption map, and that is safe rather than strict
+
+An explicit `@PathVariable("name")` is always available and so is a distinct path, so **there is no
+correct code for either leg to fail on** (F2-214). The `@PathVariable Map<String,String>` catch-all
+form takes every placeholder by name and is excluded **structurally**, never by exemption.
+
+### ⚠⚠ On a clean corpus a working detector and a rotted one both report an empty list
+
+So the two detectors are **extracted and driven over synthetic input in both directions** (F2-235):
+one must-flag case (the recorded `{runId}` / `id` mismatch, read on the binding side) and five
+must-not-flag cases — a match by parameter name, a spare supplied name, the `Map` catch-all, a path
+with no placeholder, one owner listed twice, and the same path under a **different verb**. Flagging
+any of the last five would make the gate fail on working routes.
+
+**The mutation harness is the verification, because there is no pre-fix tree to revert to** (F2-284):
+**6 killed / 0 survived / 0 inconclusive.**
+
+| Mutation | Killed by |
+|---|---|
+| drop the `@PathVariable Map` catch-all skip | the self-test |
+| subtract the wrong side (`needs − needs`) | the self-test |
+| a single owner counts as a collision (`>` → `>=`) | the collision leg **and** the self-test |
+| key the collision on the path alone, dropping the verb | the collision leg **and** the self-test |
+| the placeholder pattern stops matching | **`theCorpusWasActuallyRead` alone** |
+| point the class walk at a subdirectory | the census **and** the parameter-names leg |
+
+🔑 **The fifth is the one worth reading: when the placeholder pattern breaks, BOTH hard zeros go
+vacuous and only the census floor sees it.** That is the whole argument for the floor — and it is
+derived (every top-level class file must resolve) rather than guessed, because F2-438's floor came
+from arithmetic and failed on a correct tree one slice earlier.
+
+### ⚠⚠ What was measured and DELIBERATELY not gated, and this is the reusable half
+
+The natural third member is **a query key the frontend sends that the endpoint declares no
+`@RequestParam` for** — F2-210's body-key question asked of the query string. It is genuinely
+outside `FrontendEndpointContractTest`'s population, and the narrowing is neither a filename nor an
+allow-list: **that resolver's `norm()` strips everything after the `?`**, so the query half is
+excluded by construction (F2-198's shape, at a `substring`).
+
+It was built, measured and **rejected**. Pairing a key to an endpoint needs the *enclosing function*
+resolved, and a regex window over an object-literal API client bleeds keys across members:
+tightening the window one way took the candidates from **8 to 57**, and all 57 were phantoms —
+`[from, to]` attributed to every one of the 36 `/api/v1/changes/**` calls. Both candidates precise
+enough to read were **refuted**: `auditLogApi.historyFor` sends exactly the `entityType` /
+`entityId` the server declares (the `actionType` had bled in from an `AuditLogFilters` interface
+declared above it), and `getDomainAlignment`'s `domain` had bled onto `/posture`. 🔑 **F2-182's
+rule: reachability is a dataflow question and a regex can only tell you where to go and read — so a
+gate built on that pairing would fail on correct code, which is the one thing a gate must never do.**
+
+### Four other veins swept in the same firing, recorded so nobody re-runs them (F2-216)
+
+- **`@Enumerated` with the JPA default ORDINAL**, where reordering an enum silently remaps every
+  stored row: **0 sites — the annotation does not appear in the tree at all.** Consistent with the
+  platform storing every vocabulary as a `String` behind a `CHECK` and `ClosedVocabulary`.
+- **`framework_alignment LIKE '%X%'` over a comma list** — F2-431 asked this of `committee_type` and
+  refuted it; asked of `bcm.exercise_scenarios`, the answer is the same: **11 distinct tokens, 0
+  substring pairs, byte-identical in dev and prod.** ⚠ It is clean in **today's data** and not by
+  construction — the column has no `CHECK`, and `NCA_ECC` (which the frontend catalogues use) is a
+  strict prefix of the stored `NCA_ECC2`, so a future token could over-match. `CommitteeSeatOffice`
+  carries the javadoc explaining why not to write `LIKE '%CHAIR%'` (it matches *Vice Chair*), so the
+  platform knows the shape.
+- **Path-variable satisfaction and ambiguous mappings** — the two gated above.
+
+### ⚠ Errors of mine in the reconnaissance, all caught by running things
+
+- **`python` has no `pyodbc`; the `py` launcher does.** CLAUDE.md says so and I reached for
+  `python` anyway.
+- The probe's `java` invocation carried **`-parameters`**, which is a *compiler* flag — the JVM
+  refuses to start on it (*"Unrecognized option"*), and it read as a probe failure rather than as a
+  harness bug.
+- **Three compile errors in one probe** because `Controller` is in `org.springframework.stereotype`
+  rather than `web.bind.annotation`, `File` was unimported, and a loop variable was referenced
+  outside its scope.
+- **The heredoc ate an escape for the sixth time this session** (`\\n` → a real newline inside a
+  Java string literal). CLAUDE.md states the rule plainly and I keep reaching for heredocs; the
+  remedy is the Write/Edit tools for any content carrying escapes.
+- **`grep -c` exits 1 when it finds nothing**, so an `&&` chain that begins with a "does this id
+  already exist?" check silently stops when the answer is *no* — the answer you wanted.
+
+### Verification
+
+- `RequestMappingBindabilityContractTest` 5/5; mutation harness **6 killed / 0 survived**;
+  post-restore green.
+- Full `mvn -o clean package`: **5086/0/0**, exactly the predicted 5081 + 5.
+- No production code, no migration, no database write. The only database access was the read-only
+  vocabulary measurement above, in both databases.
+
+### Filed
+
+- **The query-key wire question**, with its blocker stated: it needs real dataflow over the API
+  clients (resolve each call's enclosing function properly), not a regex window. Worth doing, worth
+  doing once, and not worth a gate that fails on correct code in the meantime.
+- **`bcm.exercise_scenarios.framework_alignment` has no `CHECK`** and 47 of its 52 rows are NULL, so
+  `recommended(framework)` can reach at most 5 scenarios. Whether the column should be constrained —
+  and whether `NCA_ECC` and `NCA_ECC2` are one framework or two — is an **owner decision**, and
+  constraining it while the writers are open is F2-183's defect.
 
 ## F2-438 — two event listeners, neither commit-phased, failing in opposite directions
 
