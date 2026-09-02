@@ -628,25 +628,34 @@ class RequestSizeCapMirrorTest {
     @Test
     void theFormCapDetectorReadsTheKeyOfItsOwnObjectLiteral() {
         // A synthetic self-test, because both corpus legs pass equally over a clean tree and over a
-        // dead regex (F2-235). The first draft of this detector took the nearest `key:` within 400
-        // characters and so crossed object literals — it paired MeetingPapersPanel's `reason` with
-        // BreakGlassEvent.reason, a table that panel has nothing to do with.
+        // dead regex (F2-235).
+        //
+        // ⚠ The fixture's SECOND field is the one that discriminates, and the first draft of this
+        // test did not have it. Taking the LAST `key:` before a cap is right for a plain sequential
+        // list, so a fixture made only of well-formed fields passes under BOTH resolutions and the
+        // leg's name then claims more than its assertion can see. A cap whose own literal carries
+        // no key is the only shape that separates them: object scoping SKIPS it, a lookback
+        // attributes the previous field's key to it.
+        //
+        // ⚠ And what the scoping buys is narrower than it looks: it refuses to guess a key its
+        // literal does not carry. It is NOT what fixed the mis-pairing that started F2-428 —
+        // `MeetingPapersPanel :: reason` was paired against BreakGlassEvent.reason because the
+        // ENTITY was resolved from the field NAME across 421 entities, which is F2-246's rule and
+        // is why the derived leg above pairs only a name that resolves to exactly one length.
         String fixture = """
             const a: FieldDef[] = [
-              { key: 'first',  kind: 'text', maxLength: 10 },
-              { key: 'second', kind: 'text', maxLength: 20 },
+              { key: 'alpha', kind: 'text', maxLength: 10 },
+              { kind: 'text', maxLength: 20 },
             ];
             // { key: 'commented', kind: 'text', maxLength: 999 }
-            const b = [{ key: 'third', kind: 'text', span: 6, maxLength: 30 }];
+            const b = [{ key: 'beta', kind: 'text', span: 6, maxLength: 30 }];
             """;
         List<FormCap> found = capsIn("fixture.tsx", fixture);
         assertThat(found).extracting(FormCap::key, FormCap::cap)
-            .as("each cap must take the key of ITS OWN object literal, and a commented-out field "
-                + "must not be read as a declaration (F2-193: a scan that reads the epitaph as the "
-                + "corpse fails on a correct tree)")
-            .containsExactly(org.assertj.core.api.Assertions.tuple("first", 10),
-                             org.assertj.core.api.Assertions.tuple("second", 20),
-                             org.assertj.core.api.Assertions.tuple("third", 30));
+            .as("""
+                A cap must take the key of ITS OWN object literal: `alpha` and `beta` resolve, the                 keyless field is skipped rather than attributed to `alpha`, and a commented-out                 field is not read as a declaration (F2-193 — a scan that reads the epitaph as the                 corpse fails on a correct tree).""")
+            .containsExactly(org.assertj.core.api.Assertions.tuple("alpha", 10),
+                             org.assertj.core.api.Assertions.tuple("beta", 30));
     }
 
     // ─── helpers ────────────────────────────────────────────────────────────────
