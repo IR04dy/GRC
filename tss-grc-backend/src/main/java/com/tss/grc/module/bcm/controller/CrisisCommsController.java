@@ -89,10 +89,9 @@ public class CrisisCommsController {
         Long templateId = ((Number) body.get("templateId")).longValue();
         Long audienceId = ((Number) body.get("audienceId")).longValue();
         Long planId = body.get("planId") instanceof Number n ? n.longValue() : null;
-        Long sentById = body.get("sentById") instanceof Number n ? n.longValue() : null;
         @SuppressWarnings("unchecked")
         Map<String, String> placeholders = body.get("placeholders") instanceof Map<?, ?> m
             ? (Map<String, String>) m : Map.of();
-        return service.send(templateId, audienceId, planId, sentById, placeholders);
+        return service.send(templateId, audienceId, planId, placeholders);
     }
 }

@@ -1,6 +1,7 @@
 package com.tss.grc.module.workflow.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.security.GrcUserDetails;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.workflow.entity.*;
 import com.tss.grc.module.workflow.repository.*;
@@ -13,6 +14,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Map;
@@ -61,8 +64,27 @@ class WorkflowEngineServiceTest {
     @Mock private WorkflowActionLogRepository logRepo;
     @InjectMocks private WorkflowEngineService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    /**
+     * F2-431 — the actor is now the authenticated principal, so every test needs one. Its id
+     * is deliberately NOT the {@code 99L} owner id the callers pass: if the two were equal,
+     * an assertion could not tell an attribution taken from the principal from one copied out
+     * of the argument, which is the whole distinction under test.
+     */
+    private static final Long ACTOR_ID = 3L;
+    private static final Long OWNER_ID = 99L;
+
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        GrcUserDetails u = new GrcUserDetails(ACTOR_ID, ORG_ID, "so_officer", "x",
+                                              true, true, List.of());
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(u, "x", u.getAuthorities()));
+    }
+
+    @AfterEach  void tearDown() {
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
 
     private static WorkflowDefinition def(Long orgId) {
         WorkflowDefinition d = new WorkflowDefinition();
@@ -122,11 +144,13 @@ class WorkflowEngineServiceTest {
             return saved;
         });
 
-        WorkflowInstance i = service.startInstance(DEF_ID, "RISK", "Risk", 7L, 99L);
+        WorkflowInstance i = service.startInstance(DEF_ID, "RISK", "Risk", 7L, OWNER_ID);
 
         assertThat(i.getId()).isEqualTo(INST_ID);
         assertThat(i.getCurrentStateId()).isEqualTo(S_DRAFT);
-        assertThat(i.getOwnerId()).isEqualTo(99L);
+        assertThat(i.getOwnerId())
+            .as("the ASSIGNMENT is still the caller's to choose — F2-431 did not take it away")
+            .isEqualTo(OWNER_ID);
         assertThat(i.getStartedAt()).isNotNull();
         assertThat(i.getLastTransitionAt()).isNotNull();
 
@@ -137,7 +161,15 @@ class WorkflowEngineServiceTest {
         assertThat(log.getActionCode()).isEqualTo("__init__");
         assertThat(log.getFromStateId()).isNull();
         assertThat(log.getToStateId()).isEqualTo(S_DRAFT);
-        assertThat(log.getExecutedById()).isEqualTo(99L);
+        // F2-431 — the discriminating leg, and it carries F2-226's whole distinction in one
+        // assertion pair: this used to read isEqualTo(99L), i.e. that the value the CALLER
+        // passed is the value STORED. One value was serving two different facts — who the
+        // instance is ASSIGNED to and who STARTED it — so the log credited the assignee with
+        // an act they had not performed.
+        assertThat(log.getExecutedById())
+            .as("the ATTRIBUTION is the principal, never the owner id the caller sent")
+            .isEqualTo(ACTOR_ID)
+            .isNotEqualTo(OWNER_ID);
     }
 
     @Test
@@ -146,7 +178,7 @@ class WorkflowEngineServiceTest {
         when(instanceRepo.findByOrganisationIdAndTargetModuleAndTargetEntityAndTargetEntityId(
                 ORG_ID, "RISK", "Risk", 7L)).thenReturn(Optional.of(instance(S_DRAFT, ORG_ID)));
 
-        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, 99L))
+        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, OWNER_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("already exists");
 
@@ -161,7 +193,7 @@ class WorkflowEngineServiceTest {
                 ORG_ID, "RISK", "Risk", 7L)).thenReturn(Optional.empty());
         when(stateRepo.findByDefinitionIdAndIsInitialTrue(DEF_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, 99L))
+        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, OWNER_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("initial state");
 
@@ -173,7 +205,7 @@ class WorkflowEngineServiceTest {
         // Cross-tenant definition: must not be reachable
         when(defRepo.findById(DEF_ID)).thenReturn(Optional.of(def(OTHER_ORG)));
 
-        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, 99L))
+        assertThatThrownBy(() -> service.startInstance(DEF_ID, "RISK", "Risk", 7L, OWNER_ID))
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining("Workflow definition not found");
     }
@@ -191,7 +223,7 @@ class WorkflowEngineServiceTest {
             .thenReturn(Optional.of(state(S_REVIEW, "REVIEW", false, false)));
         when(instanceRepo.save(any(WorkflowInstance.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        WorkflowInstance after = service.executeTransition(INST_ID, "submit", 99L, "Looks ready");
+        WorkflowInstance after = service.executeTransition(INST_ID, "submit", "Looks ready");
 
         assertThat(after.getCurrentStateId()).isEqualTo(S_REVIEW);
         assertThat(after.getLastTransitionAt()).isNotNull();
@@ -205,7 +237,11 @@ class WorkflowEngineServiceTest {
         assertThat(log.getActionCode()).isEqualTo("submit");
         assertThat(log.getFromStateId()).isEqualTo(S_DRAFT);
         assertThat(log.getToStateId()).isEqualTo(S_REVIEW);
-        assertThat(log.getExecutedById()).isEqualTo(99L);
+        // F2-431 — was isEqualTo(99L): the caller named the executor of the transition, beside
+        // setExecutedAt(now()) two lines down, on the engine 14 modules adopt.
+        assertThat(log.getExecutedById())
+            .as("workflow.action_log records who actually moved the instance")
+            .isEqualTo(ACTOR_ID);
         assertThat(log.getComments()).isEqualTo("Looks ready");
     }
 
@@ -220,7 +256,7 @@ class WorkflowEngineServiceTest {
             .thenReturn(Optional.of(state(S_DONE, "DONE", false, /*terminal=*/true)));
         when(instanceRepo.save(any(WorkflowInstance.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        WorkflowInstance after = service.executeTransition(INST_ID, "approve", 99L, null);
+        WorkflowInstance after = service.executeTransition(INST_ID, "approve", null);
 
         assertThat(after.getCurrentStateId()).isEqualTo(S_DONE);
         assertThat(after.getCompletedAt()).isNotNull();   // terminal → stamped
@@ -244,7 +280,7 @@ class WorkflowEngineServiceTest {
             .thenReturn(List.of());
         when(stateRepo.findById(S_DRAFT)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.executeTransition(INST_ID, "bogus", 99L, null))
+        assertThatThrownBy(() -> service.executeTransition(INST_ID, "bogus", null))
             .isInstanceOf(IllegalTransitionException.class)
             .hasMessageContaining("bogus");
 
@@ -256,9 +292,35 @@ class WorkflowEngineServiceTest {
     void executeTransition_other_tenant_throws_EntityNotFound() {
         when(instanceRepo.findById(INST_ID)).thenReturn(Optional.of(instance(S_DRAFT, OTHER_ORG)));
 
-        assertThatThrownBy(() -> service.executeTransition(INST_ID, "submit", 99L, null))
+        assertThatThrownBy(() -> service.executeTransition(INST_ID, "submit", null))
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining("Workflow instance not found");
+    }
+
+
+    /**
+     * F2-431 — {@link com.tss.grc.common.security.CurrentActor#requireUserId} REFUSES rather than
+     * recording a blank, so a workflow transition with no identified actor is not a transition
+     * (F2-236's remedy). Both routes are {@code @PreAuthorize}-guarded, so a principal always
+     * exists in production; this pins the refusal so a future off-request caller fails loudly
+     * instead of writing an unattributed row into the trail.
+     */
+    @Test
+    void executeTransition_withNoPrincipal_refusesRatherThanLoggingAnUnattributedRow() {
+        SecurityContextHolder.clearContext();
+        WorkflowInstance i = instance(S_DRAFT, ORG_ID);
+        WorkflowTransition tr = transition(500L, S_DRAFT, S_REVIEW, "submit");
+        when(instanceRepo.findById(INST_ID)).thenReturn(Optional.of(i));
+        when(transitionRepo.findByDefinitionIdAndFromStateIdAndActionCode(DEF_ID, S_DRAFT, "submit"))
+            .thenReturn(Optional.of(tr));
+        when(stateRepo.findById(S_REVIEW))
+            .thenReturn(Optional.of(state(S_REVIEW, "REVIEW", false, false)));
+
+        assertThatThrownBy(() -> service.executeTransition(INST_ID, "submit", "no actor"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("no identified actor");
+
+        verify(logRepo, never()).save(any());
     }
 
     // ─── getInstance / getDefinitionWithGraph ───────────────────────

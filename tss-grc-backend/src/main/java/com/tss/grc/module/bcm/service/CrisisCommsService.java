@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.entity.CrisisCommsAudience;
@@ -187,7 +188,7 @@ public class CrisisCommsService {
      * subject + body before snapshotting.
      */
     @Transactional
-    public CrisisCommsDistribution send(Long templateId, Long audienceId, Long planId, Long sentById, Map<String, String> placeholders) {
+    public CrisisCommsDistribution send(Long templateId, Long audienceId, Long planId, Map<String, String> placeholders) {
         Long org = TenantContext.getCurrentTenant();
         CrisisCommsTemplate t = mustGetTemplate(templateId);
         CrisisCommsAudience a = audienceRepo.findById(audienceId)
@@ -207,7 +208,11 @@ public class CrisisCommsService {
         d.setBodySnapshot(body);
         d.setRecipientCount(a.getRecipientCount());
         d.setSentAt(LocalDateTime.now());
-        d.setSentById(sentById);
+        // F2-431 — the caller used to name the sender, one line below setSentAt(now()).
+        // Who dispatched an emergency notification is the NCEMA record of the act, and the
+        // controller's own @Operation summary never documented `sentById` — an undocumented
+        // field the server nevertheless trusted.
+        d.setSentById(CurrentActor.requireUserId("send a crisis communication"));
 
         // Dispatch via a registered NotificationChannel if one matches the
         // template's channel column. Otherwise fall back to SIMULATED so

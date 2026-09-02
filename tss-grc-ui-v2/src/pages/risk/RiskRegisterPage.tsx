@@ -811,9 +811,13 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }
   async function approveAppetite(s: RiskAppetiteStatementDto) {
-    const who = window.prompt('Approver name?', s.approvedBy ?? '');
-    if (!who) return;
-    try { await ermAdvancedApi.approveAppetite(s.id, who); toast.success('Approved'); void loadAll(); }
+    // F2-431 — this used to prompt for an approver name and send it. The server stamped
+    // approvedAt from its own clock in the same breath, so the record said WHEN with
+    // certainty and WHO on the operator's word. The approver is now the authenticated
+    // principal; the confirmation copies the sibling retireAppetite below rather than
+    // inventing an affordance, so the act is still deliberate.
+    if (!window.confirm(`Approve appetite statement "${s.titleEn}"? It will be recorded as approved by you.`)) return;
+    try { await ermAdvancedApi.approveAppetite(s.id); toast.success('Approved'); void loadAll(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function retireAppetite(s: RiskAppetiteStatementDto) {
