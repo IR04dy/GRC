@@ -15219,6 +15219,108 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-424 — an annotation a javadoc separates from its method is invisible to a fixed lookback window
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P3 — an instrument gap, **latent**: 0 of the gate's 21 members is hidden today, and what makes it harmless is *where* the ten sites happen to be rather than anything the gate checks ([[F2-182]] / [[F2-283]]) |
+| **Source** | found by being fooled by it — a scratch atomicity sweep reported a `@Transactional` method as non-transactional, a complete and plausible **false** finding that only reading the file refuted |
+| **Size** | S — one resolver, one hoisted constant, one shared population derivation, three gate legs; no production code |
+
+⚠⚠ **JAVA TREATS A COMMENT AS WHITESPACE, SO AN ANNOTATION ABOVE A JAVADOC BINDS CORRECTLY — AND A SCANNER THAT RESOLVES IT WITH A FIXED LOOKBACK WINDOW CANNOT SEE IT.** `@Transactional` then a javadoc then `public void x()` is a valid method declaration with modifiers `@Transactional` and `public`; Spring sees it and it works. `OffRequestAuditTenancyTest#noPerItemCatchSitsInsideABatchWideTransaction` — [[F2-323]]'s gate — resolved it as
+
+```java
+String annotations = src.substring(Math.max(0, sig.start() - 300), sig.start());
+...
+if (annotations.contains("@Transactional") && !ownTx.matcher(body).find())
+```
+
+over a stripper that **blanks comments with spaces of the same length** (`COMMENTS.matcher(s).replaceAll(m -> " ".repeat(m.group().length()))`), so the offsets survive and a javadoc of more than 300 characters pushes the annotation clean out of the window. The method then reads as **non-transactional** and the gate **SKIPS it** — the quiet direction. What it would skip is [[F2-322]]/[[F2-323]]'s decoy: a `@Scheduled` sweep that loops with a per-item catch **inside** a batch-wide transaction, where any joined write's failure marks the transaction rollback-only and every organisation's work is discarded at commit while the catch makes the method read as resilient.
+
+🔑 **This is [[F2-411]]'s shape one level over.** There the same placement made the annotation attach to the *wrong* method — a private helper, where `@Transactional` is inert because a proxy cannot intercept it — and F2-411's own rule was *"measure this from reflection, never a source regex"*, which is why the **shipped** proxy-advice gate is immune. This one is a source scanner by necessity (its subject is a `@Scheduled` method's *body*), and it inherited the hazard.
+
+### The population, measured
+
+| | |
+|---|---|
+| sites in `src/main` with `@Transactional` immediately above a javadoc | **10**, across 8 files |
+| ... where the javadoc is long enough that a 300-char window cannot see it | **7** |
+| the gate's own population (`@Scheduled` + loop + per-item catch) | **21** |
+| ... members hidden by the window today | **0** |
+
+The seven are `CrisisCommsService#updateTemplate`, `DataSharingAgreementService#activate`, `#terminate`, `DpiaService#update`, `PrivacyService#createBreach`, `#createDsr`, `FourthPartyExposureService#validate`. None is a `@Scheduled` looping sweep, which is the whole of why the gate's answer is still right today — a fact about where the sites are, not a property of the resolver ([[F2-182]]).
+
+⚠⚠ **THE PROVENANCE IS THE ARGUMENT.** The gap was found by a scratch detector falling for it. A per-method atomicity sweep — *which public `@Service` method performs two or more writes with no transaction?* — reported exactly one candidate, `ChangeManagementService#recordApproval`, as a non-transactional write plus an audit row. Reading the file refuted it: `@Transactional` sits on the line above its javadoc. 🔑 **A complete, plausible, entirely false finding, and the only thing that refuted it was opening the file** — the same ~2-in-10 rate this programme measures for any new instrument's own claims ([[F2-188]] / [[F2-192]] / [[F2-204]] / [[F2-211]]), here at 1 of 1.
+
+⚠ **And that site is invisible to BOTH resolvers, for two independent reasons.** Its signature spans two lines:
+
+```java
+public ChangeApproval recordApproval(Long changeId, CabVoteRequest req,
+                                     Long actorUserId, String actorName) {
+```
+
+so `METHOD_SIGNATURE`'s `[^;{}\n]{0,400}` cannot cross the newline and the pattern matches it **not at all** — the regex resolves to a *later* method and reports that method's verdict instead. **The site is mis-attributed rather than reported false**, which is a weaker failure than a wrong verdict and a quieter one. My own leg's first comment said *"transactionalAt is then correctly false"*; measuring showed otherwise and the comment was corrected in place ([[F2-184]] — a comment that answers the question a reader was about to ask, incorrectly).
+
+### The fix
+
+Resolve the annotation by the **member boundary**: the last `@Transactional` before the signature with **no other signature in between**.
+
+```java
+private static boolean transactionalAt(String src, int sigStart) {
+    int at = src.lastIndexOf("@Transactional", sigStart);
+    if (at < 0) {
+        return false;
+    }
+    Matcher between = METHOD_SIGNATURE.matcher(src);
+    return !(between.find(at + 1) && between.start() < sigStart);
+}
+```
+
+That is the definition of *this annotation belongs to this method*. It is immune to a javadoc of any length, immune to an annotation containing braces, and it cannot capture the previous method's annotation — because that method's own signature sits in between, which is precisely what a fixed window has no way to notice.
+
+⚙ Three supporting moves, each for a stated reason:
+
+- **`METHOD_SIGNATURE` hoisted to a class constant.** The resolver needs the same notion of *a signature* the population does, and a second copy is how two readers of one fact come apart ([[F2-217]]).
+- **F2-323's population derived once**, into `scheduledLoopsWithAPerItemCatch()`, so both legs provably measure the same set rather than re-typing the walk.
+- **`windowSaysTransactional` KEPT on purpose**, so the new legs **measure** the gap rather than merely avoiding it. Its javadoc says never to call it to decide anything.
+
+### Verification
+
+`OffRequestAuditTenancyTest` **8 → 11**, all green; full backend build **5012 → 5015**, 0 failures. Three legs, and which of them discriminate is stated rather than implied ([[F2-225]]):
+
+1. **`aJavadocBetweenTheAnnotationAndItsMethodDefeatsAFixedWindow`** — the census. Walks `src/main` for the shape and asserts the set the boundary resolver sees and a window does not is **non-empty**. A floor of one, so it cannot fail on correct code; if it ever empties, the resolver is no longer load-bearing and the message says to re-derive before deleting it. **Discriminates.**
+2. **`theResolverReadsAcrossAJavadocAndStopsAtThePreviousMethod`** — the synthetic self-test, both directions: the resolver must read across a 600-character javadoc, the window must **not** (or the two are no longer being contrasted), and the previous method's annotation must **not** be attributed to this one. A hard zero over a detector that has stopped matching is indistinguishable from a clean tree ([[F2-235]]). **Discriminates.**
+3. **`noSweepsTransactionalityDependsOnItsJavadocLength`** — a tripwire over the gate's own 21 members: the two verdicts must agree. They agree at 21 of 21 today, so under the pre-fix control it stays **green** and does **not** discriminate. Its subject is in the future, and saying so beats counting its green as a pass.
+
+⚠ **Pre-fix control** ([[F2-274]] / [[F2-287]], fix committed first — [[F2-297]]): revert only `transactionalAt`'s **body** to the window form, keeping the signature so every leg still compiles — a control that cannot compile reads exactly like a gate that passed. Result: `Tests run: 11, Failures: 2`, exactly legs 1 and 2 RED, the tripwire and all eight pre-existing legs green, tree restored clean.
+
+### Swept clean in the same firing, so nobody re-runs them ([[F2-216]])
+
+The atomicity question that started this — *which public `@Service` method performs two or more writes with no boundary?* Spring Data's `SimpleJpaRepository` methods are each `@Transactional`, so with no boundary on the caller every `save()` commits on its own and `save(A); save(B)` leaves A committed when B fails.
+
+| vein | result |
+|---|---|
+| a `@Service` class containing a repository write with no class-level `@Transactional` | **0 of 333** |
+| a public non-transactional method with ≥2 own writes, or 1 write + an audit row | **1 candidate, refuted by reading** (the annotation above the javadoc) |
+| a public non-transactional method with ≥1 own write **and** a call into a `@Transactional` collaborator | **0**, over 494 non-tx public methods examined, 12 with a write, 52 with such a call — against a live index of 327 classes / 2,155 transactional methods ([[F2-235]]'s anti-vacuity, printed) |
+| `==` / `!=` between a boxed id and a getter (reference comparison) | **0** |
+| `Optional.orElse(<call>)` — the argument is always evaluated | **4 sites, all pure and cheap** (`Map.of()`, `LocalDate.now()`, `all.isEmpty()`, `ctx.anonymous()`) |
+| an `@Query` method whose **name** narrows by tenant while the clause never mentions `organisation_id` | **hard 0 of 238** resolved |
+| an `@Query` method whose name narrows by state with no state predicate | 4 hits, **all four my detector's vocabulary** — a `+ CONSTANT` concatenation it could not read, `rowHash IS NULL` as the unsealed predicate, date arithmetic |
+| a concept with one UTC-explicit reader of *now* and one ambient-zone reader | **0** — 1,348 bare `now()` against 13 zone-explicit, and the one internally split class writes only fields nothing compares |
+| [[F2-178]]'s hazard: a test of a UTC-clock service building fixtures with bare `now()` | **complete** — every such test either pins the clock or does no date arithmetic |
+
+⚠ The clock split deserves its own sentence, because it looks like a finding and is not. `CommitteeMemberRegistryService` **declares a UTC `Clock` with a `setClock` test seam and then makes four bare ambient-zone `now()` calls** — [[F2-215]]'s two-of-N with the mechanism visibly present. Measured, all four are inconsequential: `CommitteeMemberTerm.endedAt` is only ever tested for nullness by `CURRENT_SEAT_WINDOW`, `createdAt` is a row stamp, and **`appointedAt` has no reader anywhere** — the entity, a DTO javadoc and an `OrderBy` in a finder's name. `termStartsAt`/`termEndsAt`, the fields the seat guard actually compares against `LocalDate.now(clock)`, are caller-supplied and never clock-derived. 🔑 **A zone split matters only where two readers of one concept disagree; here nothing reads the split fields.**
+
+### Filed, not forced ([[F2-188]])
+
+- **The 10 sites are NOT defects and no census assertion holds them.** The placement is legal and works; an exactly-asserted count would fail the build the day somebody writes an eleventh, which is a gate failing on correct code ([[F2-214]]). What is asserted is the *non-emptiness* of the blind set, which is a claim about the resolver rather than about the formatting.
+- **`RiskLifecycleWriterTest`** slices a method body as *signature → next `@Transactional`*. Checked: `RiskAcceptanceService` has no annotation-above-javadoc site, and even if it gained one the slice would only grow, so the leg stays correct. Recorded so nobody re-derives it.
+- **`METHOD_SIGNATURE` cannot match a multi-line signature at all** — the second, independent narrowing this slice found. Widening it is not free: a pattern that crosses newlines has to stop at the body brace without swallowing a nested generic, and every leg in this class that resolves a signature would change population at once. Its own slice.
+
+---
+
 ## F2-423 — an unordered PICK has no key either, and it chose which SAMA limit an approval overwrote
 
 | | |
