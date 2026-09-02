@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-437** | **Three self-reporting controls with nothing that reads them — and the slice that counted three instances of "a channel with no reader" made its own remedy the fourth** | Assurance | P2 |
 | **F2-436** | **A runtime-composed trigger name cannot be found by ANY static scan, so "which automation rule is inert?" is not statically decidable — measured, filed, and the 8 decisive candidates named** | Measurement | P3 |
 | **F2-435** | **A fabricated CMA Art. 91-94 / TCFD annual-report annex, emitted four ways beside the real one on the same page — the de-mocking stopped at the TABS and left the constants they were promoted off feeding the EXPORT** | Fabricated data | P1 |
 | **F2-434** | **A row must not be able to opt itself out of the audit seal's check — the skip condition was a column in the same database, and it discarded the LINK, which needs no key** | Security / integrity | P1 |
@@ -15220,6 +15221,135 @@ question of the register the refutation had walked into is what found the P1.
 - **The 68-site `externalId` census** stands as measured above, with **no verdicts** and no work
   left that this slice can justify: the finders are scoped, the NOT NULL sites are by design or
   upstream-owned, and the nullable ones are inert.
+
+---
+
+## F2-437 — a control that exists to be read, with nothing that reads it
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 — the claims corrected and the population gated; the consoles are **filed** |
+| **Severity** | P2 — three assurance reports an operator cannot open: which escalations reach nobody, which SoD gate is switched on over a population it has never refused anything in, and whether a tenant's committee routing is configured at all. One of the three **claimed** a reader it did not have |
+| **Source** | executing F2-436's own filing — and the filing was **refuted** on arrival |
+| **Size** | S — three javadoc corrections and one cross-codebase gate; no behaviour change |
+
+### The filing was answered before I made it
+
+F2-436 filed *"whether `/notification-reachability` carries F2-253's zero-holder problem was not
+measured"*. **F2-94 built that service precisely to measure it** — separating `NO_ACTIVE_HOLDER`
+(grant it) from `NOT_A_ROLE` (no grant can fix that), and recording **69 of 84 role names addressed
+by automation rules are not rows in `iam.roles`**. 🔑 **My own filing, one slice old, refuted by
+reading the file it named** (F2-221: re-derive before executing).
+
+### 🔑🔑 What reading it found instead
+
+`NotificationReachabilityService`'s own javadoc:
+
+> *"The engine had been reporting its own inertness for as long as it had been running:
+> `platform.audit_log` held 143 rows in dev, and 164 in production, whose message was `"has no role
+> configured"`. **Nobody read them.** That is the **third time** in this programme a control
+> announced its own failure into a channel with no reader — after F2-87's boot WARN and F2-92's
+> javadoc. **A better-worded WARN would have been the fourth.**"*
+>
+> *"So the state is exposed as **a report an operator can open** …"*
+
+**The frontend contains zero references to it.** No client, no page, no link — and
+`GET /api/v1/automation/rules` has none either, so all **214** automation rules are administered
+only by SQL.
+
+🔑 **The count was right and it stopped one short of itself.** An unread JSON report is a channel
+with no reader exactly as an unread WARN is; what changed was the format, not the readership.
+
+### The population: 4 of 20, three of them real
+
+Report-shaped GET endpoints (`coverage|reachability|integrity|readiness|posture|health|…`) with no
+frontend reader:
+
+| endpoint | what an operator cannot see |
+|---|---|
+| `/api/v1/automation/notification-reachability` | which NOTIFY/ESCALATE rules reach nobody |
+| `/api/v1/changes/sod-coverage` | `enabledButBlind` — a gate switched on over a population it has never refused anything in |
+| `/api/v1/changes/governance-health` | whether this tenant's committee routing is configured at all |
+
+⚙ The fourth, `/api/ndi/gaps/{id}/linked-risk`, is a **detector artefact** — the vocabulary matched
+`gaps` in a collection segment and it is a per-record lookup, not a self-report. Named in
+`NOT_A_REPORT` with a reason, and **asserted to still BE a candidate**, so the noise is recorded
+rather than silently filtered (F2-252: a scan locates, the adjudication is the measurement).
+
+### The three claims differ in KIND, and lumping them would overstate two
+
+⚠ Only **one** was false.
+
+- **`notification-reachability`** — *"a report an operator can **open**"*. No screen opens it. **FALSE**, and corrected.
+- **`governance-health`** — its service named *"the platform-admin / **production-readiness** surface"*, and that page has been **unrouted since Sprint 4 §3.3**. Literally it says a surface *can* poll; in effect it points a reader at a page nobody can open. Corrected to name the endpoint.
+- **`sod-coverage`** — *"`enabledButBlind` is the row **worth alerting on**"*. That is a recommendation, not a claim that anything alerts. Sharpened rather than corrected.
+
+🔑 **What is fixed is the CLAIM, not the console.** A comment asserting a reader is worse than no
+comment — it answers the question the next reader was about to ask (F2-184) — and on an assurance
+control worse again. Building the consoles is product work and is filed.
+
+### ⚠⚠ Re-deriving the production-readiness claim is where I got it wrong
+
+`grep -c production-readiness App.tsx` answers **2**, and I wrote *"it IS routed, so CLAUDE.md's
+culled-folders claim is stale"*. **Both hits are the comments recording the cull.** The route shape
+`path="/production-readiness"` answers **0**, and all eight Sprint 4 §3.3 folders are `routed=0`.
+
+🔑🔑 **A bare token grep over a file that documents its own deletions is the worst possible
+instrument for "is this routed?"** — F2-193's epitaph-as-the-corpse, committed inside the check
+written to re-derive the claim, minutes after I had quoted that rule in F2-435's gate. **The
+CLAUDE.md claim I doubted was correct**, and re-deriving is only as good as the pattern you
+re-derive with. `theProductionReadinessPageIsReallyUnrouted` now pins it in **both** directions —
+the route absent, and the token present so a future bare scan still finds the cull note.
+
+### The gate
+
+`SelfReportingControlReaderContractTest` — hermetic, backend-side, reading the frontend tree the
+way `ConnectorBackingContractTest` (F2-193) and `FullReplaceUpdateContractTest` (F2-213) do,
+because this is one question asked across two codebases and cannot be answered from either alone.
+
+⚠ **An exactly-asserted map, not a hard zero.** Building three consoles is product work, so a zero
+would fail on a tree nobody has had the chance to fix (F2-214). Both directions: wiring one must
+delete its entry in the same commit, and a fourth cannot join a count silently.
+
+🔑 **And it cannot be `FrontendEndpointContractTest`'s platform-wide 417 clientless endpoints: a
+decrease-only count of clientless endpoints cannot tell an unbuilt feature from a control that only
+works if somebody reads it.** That is the reusable half of this finding.
+
+### Verification
+
+⚙ **9 legs**, 5 pre-fix controls (F2-289), **7 of 9 discriminate**:
+
+| control | fires |
+|---|---|
+| **A** F2-94's *"an operator can open"* restored | the claim leg |
+| **B** the production-readiness claim restored | the claim leg |
+| **C** a `NO_READER` entry dropped | the census, reverse and ordering legs |
+| **D** an entry added for an endpoint that IS read | the same three — F2-199's own first-draft defect |
+| **E** the frontend walk pointed at a subdirectory | **5 legs, including the anti-vacuity one** |
+
+⚠ **E is the one worth having.** A map over a population the instrument cannot see is the most
+reassuring possible artefact (F2-205); with the walk broken, every endpoint would read as unread and
+the gate fails **loudly** rather than passing over a dead detector. The two non-discriminating legs
+are guards: the reason-quality check on my own map, and the stripper's synthetic self-test.
+
+⚙ Build **5075/0/0**, exactly predicted. No live probe: the defect is the absence of a frontend
+reader and the wording of three comments — there is no data dimension a unit test cannot reach
+(F2-320/F2-325's calibration).
+
+### Filed
+
+⚙ **An automation console.** `GET /api/v1/automation/rules` and `/rules/{id}` have no client, so
+214 rules — 190 enabled — cannot be seen, enabled or disabled through the platform. That console is
+also the surface `notification-reachability` would live on, and the one F2-436's *"this rule has
+never fired"* disclosure needs.
+
+⚙ **A change-governance surface** for `sod-coverage` and `governance-health`. `enabledButBlind` is
+the row F2-251's own javadoc calls *"worth alerting on"*, and alerting on it is a notification
+route, not a screen — so the two are separable and the report is the cheaper half.
+
+⚙ **The 69 role names addressed by automation rules that are not rows in `iam.roles`** stand exactly
+where F2-94 left them: *"inventing roles to make a report go green would fabricate one."* Unchanged
+by this slice, and now the report saying so is still unreadable.
 
 ---
 
