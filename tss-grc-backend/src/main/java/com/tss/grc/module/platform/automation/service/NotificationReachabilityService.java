@@ -27,8 +27,8 @@ import java.util.TreeSet;
  * programme a control announced its own failure into a channel with no reader — after
  * F2-87's boot WARN and F2-92's javadoc. A better-worded WARN would have been the fourth.
  *
- * <p>So the state is exposed as a report an operator can open, with the two failures
- * separated because their remedies are different and only one of them is a grant:
+ * <p>So the state is exposed at {@code GET /api/v1/automation/notification-reachability}, with the
+ * two failures separated because their remedies are different and only one of them is a grant:
  * <ul>
  *   <li>{@link #NO_ACTIVE_HOLDER} — the role exists here, nobody active holds it. Grant it.</li>
  *   <li>{@link #NOT_A_ROLE} — the name is not a role in this tenant. No grant can fix that;
@@ -39,6 +39,26 @@ import java.util.TreeSet;
  *
  * <p>Deliberately <em>not</em> done here: creating the 69 missing roles. Automation seeds are
  * not an access model, and inventing roles to make a report go green would fabricate one.
+ *
+ * <h3>⚠⚠ F2-437 — this sentence used to read "a report an operator can OPEN", and it was the
+ * fourth instance of the very pattern counted above</h3>
+ *
+ * There is <b>no screen</b>. Measured 2026-09-02: the frontend contains <b>zero</b> references to
+ * this endpoint — no client in {@code lib/`}, no page, no link — and {@code GET
+ * /api/v1/automation/rules} has none either, so all 214 automation rules are administered only by
+ * SQL. An operator cannot open this report, and the paragraph above claimed they could.
+ *
+ * <p>🔑 <b>The count in that paragraph was right and it stopped one short of itself.</b> F2-87's
+ * boot WARN, F2-92's javadoc, this engine's 143-and-164 audit rows — and then a JSON endpoint
+ * nothing fetches. An unread report is a channel with no reader exactly as an unread WARN is; what
+ * changed was the format, not the readership. Building the console is product work and is filed;
+ * what is fixed here is the <em>claim</em>, because a comment asserting a reader is worse than no
+ * comment — it answers the question the next reader was about to ask (F2-184).
+ *
+ * <p>{@code SelfReportingControlReaderContractTest} holds the population: this endpoint, {@code
+ * /api/v1/changes/sod-coverage} and {@code /api/v1/changes/governance-health} are the three
+ * report-shaped surfaces with no frontend reader, asserted exactly and in both directions, so
+ * wiring one must delete its entry and a fourth cannot join a count silently.
  */
 @Service
 @RequiredArgsConstructor

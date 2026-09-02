@@ -26,10 +26,20 @@ import java.util.Map;
  * produces no error until somebody tries to refer a change.
  *
  * <p>This service makes that state loud instead of silent: a WARN per gap at startup,
- * and an endpoint the platform-admin / production-readiness surface can poll. It is
+ * and an endpoint at {@code GET /api/v1/changes/governance-health}. It is
  * read-only and deliberately does <em>not</em> auto-create committees — a body with no
  * charter, chair or members could never reach quorum, so minutes could never be
  * approved and the gate would fail at the last step while appearing configured.
+ *
+ * <p>⚠⚠ <b>F2-437 — that sentence used to name "the platform-admin / production-readiness
+ * surface", and the production-readiness page has been UNROUTED since Sprint 4 §3.3.</b>
+ * {@code pages/production-readiness/ProductionReadinessPage.tsx} is still on disk and
+ * {@code App.tsx} carries no {@code path="/production-readiness"} — only two comments recording
+ * the cull. So the sentence pointed a reader at a page nobody can open, and measured
+ * 2026-09-02 <b>nothing in the frontend references this endpoint at all</b>. The WARN below is
+ * therefore the whole of the reporting half — which this class's own next paragraph says is not
+ * enough: <em>"a WARN is not a control"</em>. The ENFORCEMENT half (A17-D2) is unaffected and is
+ * what makes the gap block work rather than downgrade it; only the reporting half is unread.
  *
  * <p><b>ADR-017 D-2 (A17-D2): this service now also owns the predicate that ENFORCES the
  * rule, not only the one that reports it.</b> F-4 was closed by making the gap loud, and a

@@ -776,6 +776,15 @@ public class ChangeManagementController {
      *
      * <p>{@code enabledButBlind} is the row worth alerting on — a gate switched on over a population it
      * has never been able to refuse anything in.
+     *
+     * <p>⚠ <b>F2-437: nothing alerts on it, and nothing reads this endpoint.</b> Measured
+     * 2026-09-02, the frontend contains zero references to {@code sod-coverage} — so the
+     * instrument F2-112 needed exists as JSON and no operator sees it, which is why F2-251 could
+     * find this report publishing four gates while the module enforced six without anyone
+     * noticing. That is a reporting gap, not an enforcement one: the three refusals themselves are
+     * live and {@code ChangeSodGateCoverageContractTest} derives the population from the refusals
+     * rather than from this report. Held with its two siblings by
+     * {@code SelfReportingControlReaderContractTest}.
      */
     @GetMapping("/sod-coverage")
     @PreAuthorize("hasPermission('CHANGE','READ')")
