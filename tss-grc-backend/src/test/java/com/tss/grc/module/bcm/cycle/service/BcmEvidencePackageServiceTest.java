@@ -133,14 +133,14 @@ class BcmEvidencePackageServiceTest {
         // The cover is now a branded README.pdf (PdfTheme). Text is glyph-encoded in the
         // PDF so we assert it is a valid, non-trivial PDF rather than grepping content.
         BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor.tester");
-        String readme = readZipEntry(pkg.bytes(), "README.pdf");
+        String readme = readZipBinaryHead(pkg.bytes(), "README.pdf");
         assertThat(readme).startsWith("%PDF");
         assertThat(readme.length()).isGreaterThan(1000);
     }
 
     @Test void generate_manifestContainsSha256ForEveryFile() throws Exception {
         BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor");
-        String manifest = readZipEntry(pkg.bytes(), "MANIFEST.txt");
+        String manifest = readZipText(pkg.bytes(), "MANIFEST.txt");
         assertThat(manifest).contains("README.pdf");
         assertThat(manifest).contains("bias.xlsx");
         assertThat(manifest).contains("compliance_matrix.xlsx");
@@ -166,8 +166,106 @@ class BcmEvidencePackageServiceTest {
     @Test void generate_anonymousStillProducesReadme() throws Exception {
         // generatedBy=null must not break the README.pdf cover (it falls back to "system").
         BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, null);
-        String readme = readZipEntry(pkg.bytes(), "README.pdf");
+        String readme = readZipBinaryHead(pkg.bytes(), "README.pdf");
         assertThat(readme).startsWith("%PDF");
+    }
+
+
+    /**
+     * \u26a0\u26a0 F2-430 \u2014 {@code writeAuditCsv} ended {@code sb.toString().getBytes()}: the
+     * <b>platform default</b> charset, measured {@code Cp1252} on this JDK 17 (pre-JEP 400), where
+     * {@code "\u0645\u062e\u0627\u0637\u0631".getBytes()} is five {@code 0x3f} bytes \u2014 <b>five question marks</b>.
+     *
+     * <p>Not latent. Of the <b>1,488</b> BCM-scoped rows this package exports in dev (387 in prod),
+     * <b>137</b> (11 in prod) carry a character Cp1252 cannot represent, and they are of two kinds:
+     * <ul>
+     *   <li>the platform's own transition arrow {@code U+2192} \u2014 136 occurrences \u2014 so
+     *       {@code "BIA BIA-2026-000007 DRAFT \u2192 UNDER_REVIEW"} reaches the regulator as
+     *       {@code "DRAFT ? UNDER_REVIEW"}, which <b>no longer says which state it came from</b>; and</li>
+     *   <li>an Arabic personal name \u2014 the crisis <b>communication contact</b>, the person a BCM
+     *       plan calls during an incident \u2014 rendered {@code "????? ?????????"}.</li>
+     * </ul>
+     *
+     * <p>\U0001f511 The fix is the platform's own convention, one module away: {@code CalendarController}
+     * declares {@code charset=UTF-8} on its ICS download <em>and</em> encodes with
+     * {@code StandardCharsets.UTF_8}. No BOM is written anywhere in this codebase, so "plain UTF-8"
+     * is settled by measurement rather than taste.
+     */
+    @Test void auditCsvIsUtf8SoTheArrowAndArabicSurviveTheRegulatorHandoff() throws Exception {
+        var transition = new com.tss.grc.module.platform.auditlog.entity.AuditLogEntry();
+        transition.setId(41L);
+        transition.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 24, 9, 15, 0));
+        transition.setUserUsername("so_officer");
+        transition.setActionType("TRANSITION");
+        transition.setEntityType("BcmBiaAssessment");
+        transition.setSourceModule("bcm");
+        // verbatim from platform.audit_log in both databases
+        transition.setMessage("BIA BIA-2026-000007 DRAFT \u2192 UNDER_REVIEW");
+
+        var arabic = new com.tss.grc.module.platform.auditlog.entity.AuditLogEntry();
+        arabic.setId(42L);
+        arabic.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 24, 9, 16, 0));
+        arabic.setUserUsername("compliance");
+        arabic.setActionType("CREATE");
+        arabic.setEntityType("BcmCommunicationContact");
+        arabic.setSourceModule("bcm");
+        arabic.setMessage("Created communication contact: \u0646\u0648\u0631\u0629 \u0627\u0644\u0642\u062d\u0637\u0627\u0646\u064a");
+
+        when(auditLog.findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
+                eq(ORG_ID), eq("bcm"), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(transition, arabic)));
+
+        BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor.tester");
+
+        // Decoded as the consumer will decode it, NOT as the writer encoded it.
+        String csv = readZipText(pkg.bytes(), "audit_log.csv");
+        assertThat(csv)
+            .as("the transition arrow must survive \u2014 'DRAFT ? UNDER_REVIEW' does not say which "
+                + "state the record came from")
+            .contains("DRAFT \u2192 UNDER_REVIEW");
+        assertThat(csv)
+            .as("an Arabic contact name must survive on an Arabic-primary platform (house rule 7)")
+            .contains("\u0646\u0648\u0631\u0629 \u0627\u0644\u0642\u062d\u0637\u0627\u0646\u064a");
+        assertThat(csv)
+            .as("nothing may have been replaced by '?' \u2014 the irreversible Cp1252 outcome")
+            .doesNotContain("?");
+
+        // And the bytes really are UTF-8: the arrow is the 3-byte sequence E2 86 92.
+        byte[] raw = readZipBytes(pkg.bytes(), "audit_log.csv");
+        assertThat(new String(raw, java.nio.charset.StandardCharsets.UTF_8))
+            .as("round-tripping the emitted bytes through UTF-8 must be lossless")
+            .isEqualTo(csv);
+        assertThat(indexOfSeq(raw, new byte[] {(byte) 0xE2, (byte) 0x86, (byte) 0x92}))
+            .as("U+2192 must be emitted as its UTF-8 encoding E2 86 92")
+            .isGreaterThan(0);
+    }
+
+    /**
+     * \u26a0 F2-430 \u2014 the MANIFEST is the same shape in the same file: hex digests plus one
+     * em-dash. {@code U+2014} <em>is</em> representable in Cp1252 (0x97), so this half was benign on
+     * <em>this</em> platform and not on ISO-8859-1 or ASCII. Closed as the sibling of a live site
+     * ([[F2-215]]: fixing the field you noticed leaves the remainder looking covered).
+     */
+    @Test void manifestIsUtf8() throws Exception {
+        BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor");
+        byte[] raw = readZipBytes(pkg.bytes(), "MANIFEST.txt");
+        assertThat(new String(raw, java.nio.charset.StandardCharsets.UTF_8))
+            .as("the manifest header carries an em-dash; UTF-8 must encode it as E2 80 94")
+            .contains("\u2014");
+        assertThat(indexOfSeq(raw, new byte[] {(byte) 0xE2, (byte) 0x80, (byte) 0x94}))
+            .as("U+2014 must be emitted as its UTF-8 encoding, not Cp1252's single 0x97")
+            .isGreaterThan(0);
+    }
+
+    private static int indexOfSeq(byte[] haystack, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= haystack.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) continue outer;
+            }
+            return i;
+        }
+        return -1;
     }
 
     // ─── ZIP helpers ──────────────────────────────────────────────
@@ -184,17 +282,39 @@ class BcmEvidencePackageServiceTest {
         return names;
     }
 
-    private static String readZipEntry(byte[] zipBytes, String name) throws Exception {
+    private static byte[] readZipBytes(byte[] zipBytes, String name) throws Exception {
         try (ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry e;
             while ((e = zin.getNextEntry()) != null) {
                 if (e.getName().equals(name)) {
-                    return new String(zin.readAllBytes());
+                    return zin.readAllBytes();
                 }
                 zin.closeEntry();
             }
         }
         throw new IllegalStateException("Entry not found: " + name);
+    }
+
+    /**
+     * Read a <b>text</b> entry the way its consumer will: <b>UTF-8</b>.
+     *
+     * <p>\u26a0\u26a0 F2-430 \u2014 this used to be {@code new String(zin.readAllBytes())}, the platform
+     * default, which is the <em>same</em> defect the writer had. Encoding and decoding with one
+     * charset round-trips losslessly whatever that charset is, so every assertion below passed
+     * identically over Cp1252 bytes \u2014 <b>a round-trip test is structurally blind to a charset
+     * defect, because the defect is symmetric.</b> Decode as the regulator's SIEM will, or the
+     * leg proves only that the test agrees with the code ([[F2-159]]).
+     */
+    private static String readZipText(byte[] zipBytes, String name) throws Exception {
+        return new String(readZipBytes(zipBytes, name), java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Read an entry <b>byte-transparently</b> (ISO-8859-1 maps every byte to exactly one code
+     * point), for probing a binary entry's header without a decoder mangling it.
+     */
+    private static String readZipBinaryHead(byte[] zipBytes, String name) throws Exception {
+        return new String(readZipBytes(zipBytes, name), java.nio.charset.StandardCharsets.ISO_8859_1);
     }
 
     // ── F2-324: the audit CSV's selection ────────────────────────────────────────────────────────
@@ -294,7 +414,7 @@ class BcmEvidencePackageServiceTest {
             .thenReturn(new PageImpl<>(List.of(acted, offRequest)));
 
         BcmEvidencePackageService.EvidencePackage pkg = service.generate(CYCLE_ID, "auditor.tester");
-        String csv = readZipEntry(pkg.bytes(), "audit_log.csv");
+        String csv = readZipText(pkg.bytes(), "audit_log.csv");
         java.util.List<String> lines = csv.lines().toList();
 
         assertThat(lines.get(0)).as("the CSV must name the actor, in when\u2192who\u2192what order")

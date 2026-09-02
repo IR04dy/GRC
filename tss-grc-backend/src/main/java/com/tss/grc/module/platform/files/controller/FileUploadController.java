@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -227,7 +228,7 @@ public class FileUploadController {
         // Look for the EICAR test signature in the first 4KB.
         String eicar = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
         int probeLen = Math.min(bytes.length, 4096);
-        String probe = new String(bytes, 0, probeLen);
+        String probe = new String(bytes, 0, probeLen, StandardCharsets.ISO_8859_1);
         if (probe.contains(eicar)) {
             return new ScanResult("INFECTED", "EICAR test signature detected");
         }

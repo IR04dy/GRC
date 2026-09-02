@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,7 +57,8 @@ public class StubServiceNowClient implements ServiceNowClient {
     public synchronized ServiceNowIncidentResponse createIncident(ServiceNowIncidentRequest req) {
         long seq = sequence.incrementAndGet();
         String number = String.format(Locale.ROOT, "INC%07d", seq);
-        String sysId = UUID.nameUUIDFromBytes(("snow-stub-" + number).getBytes()).toString().replace("-", "");
+        String sysId = UUID.nameUUIDFromBytes(("snow-stub-" + number)
+                .getBytes(StandardCharsets.UTF_8)).toString().replace("-", "");
         String url = props.getBaseUrl() + "/nav_to.do?uri=incident.do?sys_id=" + sysId;
         String createdAt = Instant.now().toString();
 
