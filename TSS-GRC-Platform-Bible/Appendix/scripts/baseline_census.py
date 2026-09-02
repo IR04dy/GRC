@@ -111,7 +111,7 @@ PUBLISHED = {
     "zero_test_packages": 3,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 384,          # +V396 (F2-309, nine tenant-scoped unique indexes over the
+    "migration_files": 385,          # +V396 (F2-309, nine tenant-scoped unique indexes over the
                                      # references F2-306..F2-308 froze: immutable + not unique
                                      # means a duplicate is PERMANENT, because the guard that
                                      # protects the reference prevents the repair.
@@ -131,7 +131,7 @@ PUBLISHED = {
                                      #   code-less alert. Ships with the writer that makes it safe
                                      #   (F2-183): AmlAlertService now mints the code.
                                      #   Previously +V380 (F2-255, AUDIT_LOG:WRITE).
-    "migration_head": 396,
+    "migration_head": 397,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against
