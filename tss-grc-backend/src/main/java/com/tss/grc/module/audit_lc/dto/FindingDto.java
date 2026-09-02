@@ -60,5 +60,23 @@ public class FindingDto {
         private String mgmtResponseEn;
         private String mgmtResponseAr;
         private String mgmtResponseAuthor;
+        /**
+         * ⚠⚠ F2-441 — this was the ONE of the four management-response fields the request did not
+         * declare, while its three siblings sat on the lines directly above it and
+         * {@link FindingDto#mgmtAccepts} returned it on the READ wire. So a management response
+         * could be recorded — the text, in both languages, and the author — and <b>whether
+         * management accepts the finding could not be recorded at all</b>, on the IIA Standard 2500
+         * step whose entire purpose is that verdict.
+         *
+         * <p>🔑 F2-215's two-of-N at 3 of 4, in one adjacent block: a reader who finds three
+         * management-response fields on the request has no reason to ask about a fourth.
+         *
+         * <p>⚠ {@code Boolean}, not {@code boolean}, and that is load-bearing: <b>null means "no
+         * answer recorded"</b> and is a third state, not a synonym for "disagreed". The frontend
+         * badge used to collapse them ({@code f.mgmtAccepts ? success : warning}) so a finding with
+         * no recorded answer displayed as one management had REJECTED — F2-209's three-states rule,
+         * and F2-197's invented all-clear inverted into an invented dispute.
+         */
+        private Boolean mgmtAccepts;
     }
 }

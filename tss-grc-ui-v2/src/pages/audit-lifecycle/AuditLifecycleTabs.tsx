@@ -140,14 +140,28 @@ export function FindingsTab({ findings, engagementCode: _ec, onTransition, onCre
                 </div>
 
                 {/* Mgmt response */}
+                {/* F2-441 — THREE states, not two. This was
+                      `tone={f.mgmtAccepts ? 'success' : 'warning'}` over a Boolean that is NULL on
+                    all 20 findings in both databases and had no writer anywhere, so every finding
+                    with a response would have displayed as one management had REJECTED. The verdict
+                    is now recordable (the server's TransitionRequest declared the response text and
+                    author and not the verdict), and the day one is recorded this badge must not
+                    assert a dispute for the findings that still have none.
+                      ⚠ `== null`, never `!f.mgmtAccepts` — a RECORDED disagreement is `false`, and
+                    a truthiness test would show it as "not yet answered", which is F2-195's rule
+                    and the exact mistake that would hide the fix inside the fix. */}
                 {f.mgmtResponseEn && (
-                  <div className="alc-mgmt-response" data-accepted={String(!!f.mgmtAccepts)}>
+                  <div className="alc-mgmt-response"
+                       data-accepted={f.mgmtAccepts == null ? 'unset' : String(f.mgmtAccepts)}>
                     <div className="alc-mgmt-head">
                       <span className="alc-mgmt-head-label">
                         {t('alcMgmtResponse')}
                       </span>
-                      <Badge tone={f.mgmtAccepts ? 'success' : 'warning'}>
-                        {f.mgmtAccepts ? t('alcAccepted') : t('alcDisagreed')}
+                      <Badge tone={f.mgmtAccepts == null ? 'neutral' : f.mgmtAccepts ? 'success' : 'warning'}
+                             title={f.mgmtAccepts == null ? t('alcVerdictUnrecordedHint') : undefined}
+                             ariaLabel={f.mgmtAccepts == null ? t('alcVerdictUnrecordedHint') : undefined}>
+                        {f.mgmtAccepts == null ? t('alcVerdictUnrecorded')
+                          : f.mgmtAccepts ? t('alcAccepted') : t('alcDisagreed')}
                       </Badge>
                       {f.mgmtResponseAuthor && <span className="alc-mgmt-head-author">· <b>{f.mgmtResponseAuthor}</b></span>}
                     </div>

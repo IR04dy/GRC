@@ -913,14 +913,34 @@ export async function createFinding(
  *
  * `mgmtResponse*` ride on the transition because that is where the server accepts them
  * — there is no PUT on findings at all (filed).
+ *
+ * ── F2-441 ───────────────────────────────────────────────────────────────────
+ * `accepts` is the IIA Standard 2500 VERDICT and it was missing from both ends: the
+ * server's `TransitionRequest` declared the response text and author and not the
+ * verdict, and this signature took two of the four. So a management response could be
+ * recorded and whether management ACCEPTED the finding could not — while the page
+ * rendered `mgmtAccepts` as a two-state badge, so null showed as "Disagreed".
+ *
+ * ⚠ It is `boolean | undefined`, and the distinction is the whole point: `undefined`
+ * means "no answer given, leave whatever is stored" (the server null-guards it), and
+ * `false` is a RECORDED disagreement. Passing `!!x` here would erase the third state
+ * again one layer up.
+ *
+ * ⚠ Both call sites still pass NO mgmt argument, because there is no form to enter a
+ * management response anywhere in the UI — so advancing a finding through
+ * MGMT_RESPONSE records nothing. That is a product gap, filed rather than invented
+ * here: who may respond, whether the author is the authenticated principal (F2-236 —
+ * the server currently takes it from the BODY, which is the wrong direction), and
+ * whether a verdict is mandatory at that transition are all decisions.
  */
 export async function transitionFinding(
   id: string, status: ManagedFindingStatus,
-  mgmt?: { responseEn?: string; responseAr?: string },
+  mgmt?: { responseEn?: string; responseAr?: string; accepts?: boolean },
 ): Promise<Finding> {
   const saved = fromBackendFinding(await api.post<BackendFinding>(
     `/api/audit-lc/findings/${encodeURIComponent(id)}/transition`,
-    { status, mgmtResponseEn: mgmt?.responseEn, mgmtResponseAr: mgmt?.responseAr }));
+    { status, mgmtResponseEn: mgmt?.responseEn, mgmtResponseAr: mgmt?.responseAr,
+      mgmtAccepts: mgmt?.accepts }));
   _findings = _findings.map(x => x.id === id ? saved : x);
   emit();
   return saved;
