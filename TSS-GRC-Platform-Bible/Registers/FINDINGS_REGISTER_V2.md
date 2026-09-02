@@ -15219,6 +15219,61 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-432 — eight findings recorded "an opaque 500" and the handler that maps the whole class was one `case` label away
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — a caller string longer than its column answered **HTTP 500**, and a missing required field answered a 400 that **named no field**, on every write endpoint in the platform. Population, in F2-88's own framing for this very switch: **3,256 bounded text columns** and **2,212 NOT NULL columns with no default** (dev; 3,217 / 2,190 prod), each one a future 2628 or 515 of exactly this shape |
+| **Source** | a fresh vein — asking which SQL Server error numbers the platform decodes, after F2-180 and F2-418 had each corrected one arm of the same switch |
+| **Size** | S — one switch arm added, one existing arm given an extractor already in the class, one helper corrected; no migration |
+
+⚠⚠ **EIGHT FINDINGS EACH RECORDED THE CONSEQUENCE AND NONE TOUCHED THE HANDLER.** [[F2-185b]], [[F2-338]], [[F2-346]], [[F2-347]], [[F2-349]], [[F2-350]], [[F2-381]] and [[F2-428]] each observed *"→ an opaque 500, where a 400 naming the field is due"* as the cost of a length defect — F2-350's headline says it in those words — fixed its own cap or truncation, and left the diagnostic alone. `CLAUDE.md` names the error **twelve times**.
+
+🔑 **[[F2-266]]'s headline: filings one at a time is what a population looks like when nothing counts it.** And the argument for doing it centrally was already written, in the javadoc of the arm one `case` label away — [[F2-88]]'s: *"a pre-flight fixes one; this maps the whole class onto the right status so the next unique index cannot repeat it."* **The class was mapped for UNIQUE and never for TRUNCATION.**
+
+### Why it was a 500 and not even the `default` 409
+
+Measured on both databases: SQL Server reports a truncation with SQLSTATE **`42000`** — the syntax/access-rule class — where 515 and 547 use `23000` (integrity constraint).
+
+| condition | errno | SQLSTATE | Hibernate | Spring | answered |
+|---|---|---|---|---|---|
+| value too long | **2628** | `42000` | `SQLGrammarException` | `InvalidDataAccessResourceUsageException` | **500** |
+| NULL into NOT NULL | 515 | `23000` | `ConstraintViolationException` | `DataIntegrityViolationException` | 400, naming nothing |
+| CHECK / FK | 547 | `23000` | `ConstraintViolationException` | `DataIntegrityViolationException` | 409, naming its column |
+
+🔑 **So a caller's over-long string is filed by every generic translator in the stack as a broken query** — it is not a `DataIntegrityViolationException` at all, which is why adding a `case` to that switch alone would have changed nothing. The decode therefore keys on the **error number**, never on the exception class and never on the SQLSTATE, and `handleMissingDbObject` re-files it: **one decode, two entry points**, asserted by a leg comparing the two.
+
+⚠⚠ **AND THE NUMBER IN THE REGISTER IS NOT THE NUMBER THIS SERVER REPORTS.** Measured (SQL Server 2019, compatibility 150, both databases): **2628**, the enhanced message. `8152` is the legacy number for the identical condition on older servers or lower compatibility levels — and it is what `CLAUDE.md` quotes twelve times. **An arm written from the register's own prose would have been dead code**, while looking exactly like a fix. Both are handled, and the pre-fix control's second half is precisely that: with 2628 dropped, the 2628 leg fires and the 8152 leg stays green.
+
+### The second half, same switch, adjacent arms
+
+`case 515` read *"A required field was not supplied. Check the request body against the endpoint's schema."* — naming no field. The driver's message is *"Cannot insert the value NULL into **column 'paper_code'**, table …"*, and `column(ex)`, the extractor for exactly that, **sits in this class and was called by the arm one `case` label up**. 🔑 [[F2-215]]'s two-of-N at the tightest range this register has recorded it: not a sibling file, not a sibling method — **adjacent arms of one `switch`**. [[F2-214]] wrote the consequence down and never connected it to the handler: the PDPL Article 20 breach wizard's one unsent NOT NULL field produced that sentence *"naming nothing, on a form where nothing looks missing."*
+
+### The third, found by the probe rather than by reading
+
+`constraintName` ends by scanning for `constraint [` in Hibernate's message — and Hibernate writes **`constraint [null]`** when the failure had no constraint at all, so it returned the four-character string `"null"` and the response carried `"constraint": "null"`. Probed live: **every 515 and every 547 shipped it.** A property naming a constraint called `null` is an invented identifier reading as measured data ([[F2-197]]'s shape on a response body) and it points a support engineer at something that does not exist, which is worse than saying nothing ([[F2-180]]).
+
+### SEC-CFG-001 — the one thing that separates this from a leak
+
+The 2628 message carries the **truncated value**, unlike 547's, which carries no value at all. `column(ex)` extracts the identifier by regex, so the value cannot ride along; the raw message stays in the `warn` log, which is the whole point of the hardening rule. The **limit** is not in the message, so it is not claimed — a number there would be the invented figure this programme keeps finding.
+
+⚠ **The pre-fix verbose path really did echo it**, and that is measured rather than supposed: the control's `truncation_neverEchoesTheTruncatedValue_evenVerbose` leg **fires** on the reverted tree. Dev-only (prod strips root messages), so the shipped defect is the status and the silence, not the leak.
+
+### Verification
+
+- **Live probe** as `compliance` — the only live holder of `ADMIN:WRITE`, measured from `iam.role_permissions`, never chosen from prose ([[F2-314]]) — against rows it plants itself and removes with `CHARINDEX` in a `finally`. Pre-fix: 515 → 400 naming nothing, 2628 → **500**. Post-fix **10/10**: `(column 'paper_code')`, `(column 'author_role')` with `conflictKind=VALUE_TOO_LONG`, the 547 arm untouched, `constraint` absent everywhere, and exactly one probe row surviving so the three refusals are proved to have stored nothing.
+- ⚠⚠ **Four of the first run's legs passed for the wrong reason.** Every request answered `400 titleAr must not be blank` — a bean-validation refusal from Hibernate's `BeanValidationEventListener`, since a constraint on an `@Entity` field is enforced on pre-insert — so the DB was never reached and four legs were satisfied by an unrelated 400. 🔑 **A leg can pass for the wrong reason whenever an earlier error yields the status it expects** ([[F2-244]]). Every leg now proves it reached the database first, by asserting the response carries no bean-validation `errors` map.
+- **Gate**: `GlobalExceptionHandlerTest` **24 → 33** legs (that handler's integrity arm had **no test at all** before this — [[F2-248]]), fixtures carrying the **verbatim** driver messages the probe captured, truncated value included, because the SEC-CFG-001 leg is worth nothing unless the value is really in the input ([[F2-430]]).
+- **Paired control** ([[F2-289]]), restoring with `git checkout HEAD --` and ending on a must-be-green leg ([[F2-431]]): **A** (whole fix reverted) fires **6 of 9**; **B** (only 2628 dropped) fires **3** and leaves the 8152 leg green; **C** green.
+- **Harness 9/9 killed**, including the widening of `isTruncationError` to any SQL error — which the missing-table and syntax-error leg catches, and which is the narrowing that keeps this from failing on correct code, since all three arrive as the same Spring class.
+- ⚠⚠ **The harness found a real hole in my own gate.** `truncation_doesNotClaimALimitTheDatabaseNeverGave` asserted `doesNotContain("120")` — the width of the column the probe happened to overflow — and the mutation invented a **different** plausible number (*"limited to 255 characters"*) and survived. **The leg's name claimed more than its assertion could see.** The claim is *no number*, so that is what it asserts now.
+
+### Filed
+
+- The **2,212 NOT NULL columns with no default** and **3,256 bounded text columns** are now diagnosed rather than fixed: a 400 naming the column is the floor, and a `@Size`/`@NotNull` at the boundary is still strictly better where a request DTO exists ([[F2-184]]'s cap == column rule). This slice makes the *next* one legible; it does not retire the cap work.
+- `POST /api/v1/committees/papers/circulate` binds the **entity** with no `@Valid`, which is why both errors are reachable there at all — [[F2-428]] measured that and left it; unchanged here.
+- **The twelve `8152` mentions in `CLAUDE.md` are not corrected in place.** Rewriting them would erase the evidence for this finding; the landmine records that this server reports 2628 and that both are handled.
 ## F2-431 — the call-site resolver stopped at the argument, and four split attributions sat behind it
 
 | | |
