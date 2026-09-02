@@ -15219,6 +15219,67 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-426 — a check-then-insert with no unique index is a guard that breaks itself
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — a concurrency race on the engine 14 modules adopt, whose outcome is a PERMANENT 500 on both the guard and the read with no repair route; **latent in data** (0 duplicate groups in both databases — [[F2-283]]) |
+| **Source** | a fresh vein — the third mechanism in the [[F2-418]] / [[F2-423]] lineage: a READ that assumes at most one row |
+| **Size** | S — one migration with seven self-checks, three gate legs; no production Java change |
+
+⚠⚠ **AN `Optional<T>` DERIVED FINDER IS A READ THAT ASSUMES AT MOST ONE ROW MATCHES, AND SPRING DATA THROWS THE MOMENT TWO DO.** `SimpleJpaRepository` raises `IncorrectResultSizeDataAccessException` — a **500** — from a *read*, caused by data alone with no code change. [[F2-418]] asked whether a uniqueness **guard** matches what its index enforces and [[F2-423]] whether a single-row **pick** has a key; this is the next mechanism along: a finder whose **cardinality nothing guarantees**.
+
+🔑🔑 **THE CONSEQUENCE IS NOT A DUPLICATE ROW — IT IS THAT THE GUARD ITSELF THEN FAILS.** `WorkflowEngineService.startInstance` refuses a second instance for one target with
+
+```java
+if (instanceRepo.findByOrganisationIdAndTargetModuleAndTargetEntityAndTargetEntityId(
+        org, targetModule, targetEntity, targetEntityId).isPresent()) {
+    throw new IllegalArgumentException("Workflow instance already exists for this target entity");
+}
+```
+
+— a check-then-insert, and `workflow.instances` carried **no unique index** on those columns. Two concurrent starts both see `isPresent() == false` and both insert. From that moment the finder throws, so `startInstance` can **neither succeed nor correctly refuse** for that target, and `findInstanceForTarget` — what every screen asking *"what is the workflow state of this record?"* calls — 500s too. `WorkflowInstance` has **no `is_deleted` column and there is no delete route for an instance anywhere in the platform**, so the corruption is **permanent and unrepairable through the API**. This is the engine **14 modules adopt**.
+
+🔑 **The tell was already in the schema.** `V1__core_schemas.sql:2358` creates `IX_wf_inst_target` on `(target_module, target_entity, target_entity_id)` — **non-unique, and omitting the tenant.** Somebody built the index for precisely this lookup and left it non-unique. And this platform's own recorded idiom says what was missing: [[F2-267]] noted that `SubprocessorService`'s check-then-insert is safe *because* `UQ_subp_code` backstops it.
+
+⚙ **Fix = V397, `uq_wf_instance_target` on `(organisation_id, target_module, target_entity, target_entity_id)`.** No production Java change: the guard is already correct, and what was missing is its **backstop**.
+
+- ⚠ **UNFILTERED, and unlike [[F2-309]]'s V385 that is not a choice.** All four columns are `nullable = false` (`sys.columns`, both databases), so there is no NULL-equality trap for a filter to work around — SQL Server treats NULLs as *equal* for uniqueness, which is exactly why a **nullable** key needs `WHERE … IS NOT NULL` and a **NOT NULL** key must not have one. Check 2 asserts `has_filter = 0` for that reason.
+- ⚠ **Tenant-scoped**, because the guard is: a global index would let one tenant's instance stop another tenant starting a workflow on the same target ids — a multi-tenancy defect dressed as strictness ([[F2-309]]).
+- ⚠ **`is_disabled = 0` is asserted, not assumed.** A disabled unique index enforces nothing and looks identical to a live one in any listing that only checks the name ([[F2-299]]).
+- ⚠ **ADDITIVE**: `IX_wf_inst_target` is deliberately left in place and check 5 asserts it survived, so nobody can read V397 as having replaced the seek index.
+- ⚠ **Measured in BOTH databases first** ([[F2-183]]): 12 rows each, **0 duplicate groups**, so no `WITH NOCHECK` and nothing to reconcile. Applied twice to dev (Flyway is off there), both runs clean.
+- ⚠ **Check 6 PROVES the refusal rather than describing it** — an acceptance probe that inserts a duplicate of an existing row inside a rolled-back transaction and THROWs if it is accepted. **Conditional on a row existing**, because a fresh install runs it against an empty table where it would verify nothing, and a migration branch that is a no-op everywhere you can measure is untested code ([[F2-183]]).
+- ⚠ **The index can only refuse a request that TODAY produces permanent corruption**: the sequential caller is already refused by the guard with a clean message, and the only new refusal is the loser of a concurrent double-start ([[F2-214]]).
+
+⚙ **Considered and rejected: catching the violation to re-throw the guard's own message.** The concurrent loser now gets the **409** `GlobalExceptionHandler` maps a 2601/2627 to. Converting that to the guard's `IllegalArgumentException` would trade a correct 409 for a **400** on what is genuinely a conflict with the record's state ([[F2-303]]'s convention), so the generic-but-honest 409 is the better answer.
+
+⚠⚠ **THE LIVE HALF OF THIS VEIN IS A CLEAN SWEEP, AND EVERY ONE OF THE FIRST PASS'S SEVEN HITS WAS A DETECTOR ARTEFACT — 7 OF 7, THE WORST [[F2-252]] RATE RECORDED HERE.** Measured: **289 `Optional` derived finders** whose predicate could match more than one row (312 total, 18 `findFirst`/`findTop` which are `SELECT TOP 1` and safe by construction, **161 unresolved** — and unresolved reads identically to clean, [[F2-206]]). Pass 1 reported 7 live members in dev and 6 in prod. **All were mine**, for three distinct reasons, each of which makes a duplicate group the finder cannot reach:
+
+| correction | why the group is unreachable |
+|---|---|
+| a derived finder runs against the **entity**, so it inherits `@Where(is_deleted = 0)` | a pair whose second row is soft-deleted is invisible to it — [[F2-418]]'s rule from the other side |
+| `x = NULL` matches **nothing** in SQL | the NULL group a bare `GROUP BY` produces is not a duplicate any finder can hit |
+| a boolean-literal predicate (`…IsInitialTrue`) **constrains** the column | grouping without that constraint counts the `= 0` groups too |
+
+Plus a fourth on the index side: a **filtered** unique index guarantees nothing about rows outside its filter, so it covers only when its filter is the soft-delete predicate already being excluded. With all four applied: **0 live in both databases.**
+
+⚙ **Filed, not forced** ([[F2-188]]) — the **24 latent members in dev / 27 in prod**, as a work list with **no verdicts**. What distinguishes this slice's member from the rest is the *pairing*: a live reader **and** a reachable duplicate **and** no repair route. Notes worth keeping for whoever reads them:
+
+- ⚠ **`policy.attestations (organisation_id, policy_id, user_username)`** — `findByOrganisationIdAndPolicyIdAndUserUsername` has **0 callers**. So the invariant it states is enforced by nothing and read by nothing: [[F2-184]]'s shape at a repository declaration, where *"a reader who finds an `Optional` finder keyed on (org, policy, user) reads that as the register's uniqueness invariant."* `createAttestation` does not check for an existing pair either, and [[F2-219]] measured that create as reachable by any of **32 roles**.
+- ⚠ `workflow.approval_chain_template (org, module, is_default = 1)` is protected **by code, not by an index** — `ApprovalChainTemplateService#clearOtherDefaults` queries `…AndIdNot(` and clears the others ([[F2-231]]). That is the same check-then-write shape as this finding, one register over.
+- ⚠ `workflow.request_recipients (access_token)` is latent because the token is random entropy, not because anything enforces it.
+- ⚠ `audit_lc.annual_plans (org, year)` and `admin.committee_meeting_papers (org, paper_code)` have **0 callers** each — dark finders stating invariants nothing enforces.
+
+⚙ **Also swept clean this firing and recorded so nobody re-runs them** ([[F2-216]]): an `@Query` with `JOIN FETCH` **and** a `Pageable` — Hibernate's HHH000104, where the limit is applied in memory so the page contents are wrong — **0** (one repository uses `join fetch` at all, three queries, none paged); and `@Scheduled(fixedRate)`, where a sweep slower than its period overlaps and double-processes — **0 of 22**, every scheduled method uses `fixedDelay`.
+
+⚙ **Verification.** `UniquenessGuardScopeContractTest` 4 → 7 legs, green; hermetic ([[F2-320]] / [[F2-325]] — a migration read plus a source read, no database and no Spring context). Gate extends [[F2-418]]'s class rather than starting one ([[F2-190]]): one question, the other direction. ⚠ **Its self-test is load-bearing rather than decorative** — the detector is run against `V1`'s non-unique `IX_wf_inst_target`, which sits in the very corpus the gate reads, and must **not** accept it: a pattern loose enough to match it would report the backstop as present over a table enforcing nothing. **Two surgical pre-fix controls** ([[F2-274]] / [[F2-287]] / [[F2-289]] — revert each half separately, fix committed first per [[F2-297]]): reverting `CREATE UNIQUE INDEX` to `CREATE INDEX` — exactly the pre-fix world — fired legs 1 and 3 with leg 2 green; removing the guard from the service fired leg 2 alone. So each leg discriminates on its own half of the pair, which is the only thing that makes a pair-gate worth having.
+
+🔑 **When you find a check-then-insert, ask what backstops it. Without a unique index the race is not merely possible — its outcome is that the guard's own query starts throwing, so the check can never run again, and if the table has no soft-delete column there is nothing left that can repair it.**
+
+---
+
 ## F2-425 — a derived value whose inputs are unbounded can leave its own column
 
 | | |
