@@ -15229,6 +15229,179 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-443 — the fourth member of F2-442's class, gated: three startup-fatal resolutions, all measured clean
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — two hazards gated at a hard zero, a third measured and filed |
+| **Severity** | **P3 — a latent-hazard closure, not a defect discovery.** All three populations are clean today; what changes is that a fourth member of a class that has already cost a P1 can no longer reach `master` |
+| **Source** | asked of F2-442's class deliberately: CLAUDE.md names one member as explicitly ungated |
+| **Size** | M — one gate class, five legs, no production change |
+
+### The class, and why it keeps producing findings
+
+`UniqueBeanNameContractTest` (F2-247, a duplicate bean name), `RequestMappingBindabilityContractTest`
+(F2-439, an unsatisfiable path placeholder and an ambiguous mapping) and
+`CommitPhasedEventListenerContractTest` (F2-442, a propagation Spring's
+`RestrictedTransactionalEventListenerFactory` refuses) are three members of one class: **fatal when
+the context refreshes, and invisible to `mvn -o clean package`** — because nothing in the suite boots
+a Spring context and, deliberately, nothing should (`CLAUDE.md`: *"hermetic: needs no database and no
+secrets — keep it that way"*).
+
+F2-442 is the measured cost: **`BUILD SUCCESS` printed over a tree the application could not start
+from, twice**, and the only instrument that saw it was launching the app by hand.
+
+🔑 **CLAUDE.md names a further member in these words:** *"a new `@Query` fails at STARTUP if the
+entity name/property is wrong, and the hermetic suite boots no context to catch it"* — F2-376
+verified its own JPQL **by hand** against that hazard. So the platform carried a documented
+startup-fatal hazard with a documented *manual* mitigation. That is what this closes.
+
+### What was measured
+
+| hazard | population | findings |
+|---|---|---|
+| a JPQL `@Query` whose `FROM` names no `@Entity` | 206 JPQL queries (of 253 `@Query`, 47 native) | **0** |
+| a first-hop property path no entity declares | 883 paths checked across those queries | **0** |
+| `@Value("${key}")` with no default and no declared property | 71 placeholder occurrences over 38 annotations | **0** |
+| a cycle in constructor injection | 594 `@RequiredArgsConstructor` classes | **0** — filed, not gated |
+
+Say which you have (F2-283): **three clean sweeps and a gate**, never a defect discovery.
+
+### Why a hard zero is safe here, with no exemption map
+
+F2-214's test: a `FROM` naming a type no `@Entity` declares, a property no entity declares, and a
+defaultless placeholder nothing binds are **never correct code**. There is nothing for the gate to
+fail on, so an allow-list would only ever tolerate a startup failure.
+
+⚠ The `@Value` claim needs no profile model, and that is the reason it is worth stating: a key
+declared in **no** packaged document fails in **every** profile. Declaring it only in
+`external.properties.template` is not enough — that file is not on the classpath, so dev would still
+refuse to start.
+
+### ⚠⚠ Reflection, never a source regex — and the slice measured the cost of getting it wrong
+
+`@Query` is `@Retention(RUNTIME)`, so reflection yields the exact value **and** the `nativeQuery`
+flag. A source scan gets both wrong, and did — it reported **31** unresolvable `FROM` clauses where
+the honest answer is **0**:
+
+- a lazily-captured annotation body truncates at the first `)` in `COUNT(*)`, so `nativeQuery = true`
+  falls **outside** it and schema-qualified native SQL (`FROM iam.…`, `FROM sust.…`, `FROM platform.…`)
+  reads as JPQL;
+- taking the first class declared after `@Entity` misses the **fourteen** nested `@Entity` classes in
+  `data_officer/Entities.java`, so `FROM DoBreach` and `FROM DoDsrRequest` read as unknown types
+  (F2-256: **a source file is not a type**).
+
+🔑 Both errors **over**-report, which fails loudly. The dangerous direction is the other one, and this
+slice met it too — see the placeholder floor below.
+
+### ⚠⚠ Four legal JPQL shapes a first draft could not resolve, every one found by the untyped-alias assertion
+
+The gate reports the aliases it **could not type** and asserts that list **exactly empty** rather than
+dropping them — because a hard zero over a population the instrument cannot see is the most reassuring
+possible artefact (F2-205). That assertion, not reading, is what surfaced all four:
+
+1. **`UPDATE BcpPlanAcknowledgement a SET …`** binds its alias with no `FROM` at all → five property
+   reads unresolvable.
+2. **`JOIN com.tss.grc.…entity.AuthorityDocumentCitation c`** is a legal **fully-qualified** entity
+   reference; refusing it left `c` unbound and then split the package into `com.tss`, `grc.module`,
+   `platform.regulatory`, reading each as a property path.
+3. **`JOIN e.children c`** is a *path* join, binding an alias whose type this gate deliberately does
+   not resolve — recorded, so its property reads are not mistaken for unresolvable ones.
+4. **`from ChangeLink l, ChangeRequest c`** is a comma-continued implicit join, and the second root is
+   preceded by no keyword at all.
+
+⚠ The comma branch **reports nothing** when a name fails to resolve, deliberately: a bare comma also
+introduces a select item (`SELECT a.x, a.y`) and a function argument (`COALESCE(a, b)`), so reporting
+would fail the hard zero on correct code — the one failure a gate must never have (F2-214). Only the
+`FROM`/`UPDATE`/`JOIN` branch may report, because there an unresolved *unqualified* name really is one.
+
+⚠ Only the **first hop** of a path is checked (`a.b` in `a.b.c`) — the subset a field walk can settle
+without a metamodel. Stated rather than implied.
+
+### ⚠⚠ The mutation harness found a real hole: the gate could degrade in SILENCE
+
+**M5 — revert fully-qualified entity resolution — SURVIVED**, and the mutated code was genuinely
+wrong (F2-206's test). A qualified name that stops resolving falls through to the **path-join** branch,
+which records the alias as untyped and **skips** its property reads. So every negative assertion still
+passed while one query silently stopped being checked: **an empty report is what a working resolution
+and a dead one both produce** (F2-235), inside the gate built to answer this question.
+
+Closed by asserting the **positive, per shape**, in the self-test: the `UPDATE` case must CHECK 2
+paths, the fully-qualified case 3, and the path-join case **exactly 0** — that last is the one shape
+where zero is right, asserted so the other two cannot be satisfied by the same fall-through. Verified
+by hand: with the revert applied `checkedPaths` drops **3 → 1** and the leg fires.
+
+⚠ A corpus-wide coverage floor (883 checked, floored at 800) rides alongside and is **gross by
+construction**: M5 costs one query's two paths, 883 → 881, which no floor can distinguish from a new
+query being added. Recorded in place so the next reader does not mistake the floor for the assertion
+that catches a narrow degradation.
+
+### ⚠⚠ Three of my own instrument errors, each caught by running something
+
+**(a) A raw NUL byte in the new gate file — twice.** `site + " "` became `site + "\x00"` at two sites.
+Legal inside a Java string literal, so it compiled and ran, and ripgrep then read the file as
+**BINARY** — F2-235's defect, self-inflicted, in the gate about startup resolution.
+`ScannableSourceContractTest` caught it, naming file, line, offset and consequence; **that gate was run
+against the unrepaired tree to prove it fires** rather than assuming it would. 🔑 Its `ROOTS` include
+`src/test`, so the gate covers the tree where the scanners themselves live — no narrowing there, and
+worth recording as a corroboration.
+
+**(b) The placeholder floor asserted the DEFECT rather than the DETECTOR.** It floored the
+*defaultless* subset at `> 20` and failed on a correct tree: **every `@Value` in the platform carries a
+default**, so 0 is honest. F2-219's rule from the inside — *a floor asserts the instrument, never the
+finding.* It floors all 71 occurrences instead, and a synthetic fixture in `target/test-classes`
+(excluded **structurally**, never by a name ending in `Test` — F2-301) is the only leg that proves the
+detector fires.
+
+**(c) The coverage floor came from arithmetic, not measurement.** Predicted 1050, floored at 900,
+measured **883** — F2-438's lesson in the slice that quotes it, second time. The largest *wrong* answer
+is 0 (a broken walk), so 800 separates them (F2-215).
+
+### ⚠⚠ And the harness itself was why M5 read as surviving
+
+Its `finally` restores with `git checkout HEAD -- <file>`, and the coverage + positive edits were
+**uncommitted** — so the first gate mutation's restore **discarded them**, and every later gate mutation
+ran against the weaker committed gate. The `git diff --quiet HEAD` restore check **passed every time**,
+because restoring to HEAD is exactly what it asserts.
+
+🔑🔑 **F2-297's corollary sharpened: commit before running controls not merely so a crashed harness is
+recoverable, but because `git checkout HEAD --` makes HEAD the state under test. A harness that mutates
+a file carrying uncommitted work silently downgrades the gate mid-run and then verifies the downgrade as
+a successful restore.** F2-442 recorded the recoverability half one slice earlier; this is the half that
+produces a wrong *result* rather than a lost fix.
+
+⚙ **`for (…; false; )` does not compile** — javac rejects the unreachable body (JLS 14.21) — and a
+mutation that cannot compile is neither a kill nor a hole. Disable a branch through reachable code.
+
+### ⚙ Two sibling hazards measured and NOT gated
+
+**A cycle in constructor injection** (`BeanCurrentlyInCreationException`) is **0 over 594**
+`@RequiredArgsConstructor` classes. F2-385 hit one (`ObligationCampaignService` ↔
+`ObligationAttestationService`) and closed it by extracting a component, so it demonstrably happens
+here. Filed rather than gated because a correct detector must first subtract every legal cycle-breaker
+— `@Lazy` on a parameter, `ObjectProvider`/`ObjectFactory` injection, setter injection — and a gate that
+fails on correct code trains the next reader to edit the assertion rather than the code (F2-214).
+**Filing the measurement is the honest half** (F2-188).
+
+**`ExternalConfigOverrideContractTest`** (F2-149) was read before this gap was claimed. It asks the
+*opposite* question — whether an operator can **override** a value — and reads the yml's
+`${SCREAMING_SNAKE}` placeholders against `external.properties.template`. It says nothing about a
+`@Value` resolving **at all**, so the hazard was genuinely ungated.
+
+### Verification
+
+- `StartupResolutionContractTest` **5/5**, all three hard zeros clean.
+- Mutation harness **8 killed / 0 survived / 0 anchor-miss / 0 did-not-compile**, post-restore GREEN.
+  M1/M2 inject the defects the gate exists to catch; M3–M6 revert each of the four legal-JPQL
+  resolutions and are caught by the untyped-alias assertion, which is what proves those resolutions
+  load-bearing; M7 stops honouring `nativeQuery` (native SQL then reads as JPQL — caught by the
+  *property* leg and the JPQL-count ceiling, not the entity leg, because a schema-qualified name is
+  tolerated as a path join); M8 breaks the classpath walk root.
+- No production code changed, so the verification **is** the harness (F2-284/F2-301) — and no live
+  probe, because the defect has no data dimension a unit test cannot reach (F2-320/F2-325).
+
+---
+
 ## F2-442 — F2-438 shipped a change that stops the application starting, with 5,081 tests green
 
 | | |
