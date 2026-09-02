@@ -336,11 +336,19 @@ class PlatformDefaultCharsetContractTest {
 
         String cal = read("com/tss/grc/module/platform/calendar/controller/CalendarController.java");
         assertThat(cal)
-            .as("the exemplar: the platform's other text download encodes with UTF-8 AND declares "
-                + "charset=UTF-8 on the response. If this changes, the convention this fix "
-                + "followed no longer exists and F2-430's reasoning must be re-read.")
+            .as("""
+                the exemplar: the platform's other text download encodes with UTF-8 AND declares
+                the charset on the response — at BOTH sites, the content-negotiation attribute and
+                the header it writes. If this changes, the convention this fix followed no longer
+                exists and F2-430's reasoning must be re-read.
+
+                ⚠ This was `contains("charset=UTF-8")` and the mutation removing it from `produces`
+                SURVIVED, because the controller declares the charset TWICE and the other
+                occurrence satisfied the check — F2-194's substring-satisfied-by-something-else, in
+                a leg written after quoting it. Assert each site by its own shape.""")
             .contains("body.getBytes(StandardCharsets.UTF_8)")
-            .contains("charset=UTF-8");
+            .contains("produces = \"text/calendar; charset=UTF-8\"")
+            .contains("parseMediaType(\"text/calendar; charset=UTF-8\")");
 
         String upload = read("com/tss/grc/module/platform/files/controller/FileUploadController.java");
         assertThat(upload)
