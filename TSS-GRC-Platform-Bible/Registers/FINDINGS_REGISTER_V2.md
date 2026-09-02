@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-438** | **Two event listeners, neither commit-phased, failing in OPPOSITE directions — the platform's own rule names both modes in one sentence and was applied at one service and at neither listener** | Correctness | P2 |
 | **F2-437** | **Three self-reporting controls with nothing that reads them — and the slice that counted three instances of "a channel with no reader" made its own remedy the fourth** | Assurance | P2 |
 | **F2-436** | **A runtime-composed trigger name cannot be found by ANY static scan, so "which automation rule is inert?" is not statically decidable — measured, filed, and the 8 decisive candidates named** | Measurement | P3 |
 | **F2-435** | **A fabricated CMA Art. 91-94 / TCFD annual-report annex, emitted four ways beside the real one on the same page — the de-mocking stopped at the TABS and left the constants they were promoted off feeding the EXPORT** | Fabricated data | P1 |
@@ -15223,6 +15224,157 @@ question of the register the refutation had walked into is what found the P1.
   upstream-owned, and the nullable ones are inert.
 
 ---
+
+## F2-438 — two event listeners, neither commit-phased, failing in opposite directions
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 — both listeners moved to `AFTER_COMMIT`, the shape gated at a hard zero |
+| **Severity** | P2 — one listener acted on changes that could still roll back (a notification sent, a record created, a run row written, all over a change that never happened); the other could **poison the commit** of the evidence decision that triggered it |
+| **Source** | asking a fresh vein: the platform's own rule for engine wiring is written at one service and applied nowhere else |
+| **Size** | S — two annotations, two javadocs, one reflective gate; no behaviour change on the happy path |
+
+### The rule was already written down, in the one place that follows it
+
+`AccessRequestService` wires its engine by hand with
+`TransactionSynchronizationManager.registerSynchronization` and states the rule in a single
+sentence:
+
+> *"Engine wiring runs AFTER COMMIT: outside the governance TX it can neither poison it nor race the
+> row's ROWVERSION."*
+
+**Both failure modes, named together.** And measured: the tree held **zero**
+`@TransactionalEventListener`, **3** `@EventListener` (one is `ApplicationReadyEvent`, correctly
+excluded) and **10** `@Async` — so the rule was followed at that one service and at **neither** of
+the two listeners that consume a `DomainEvent`, while **136 of 242** `publishEvent` call sites sit
+inside a transaction.
+
+🔑 **CLAUDE.md's landmine list has carried the first half of this since the engine was written**
+(*"Engine-wiring TX rules: `afterCommit` + per-call `REQUIRES_NEW` `TransactionTemplate` + native
+stamp updates (joined-TX failures poison commits)"*). What nothing recorded is that the rule had a
+**population**, and that the population was the two annotated listeners rather than the hand-rolled
+sites.
+
+### 🔑🔑 The two listeners failed in OPPOSITE directions
+
+Which is why neither fix could have been reasoned from the other, and why the fix is two different
+annotations rather than one.
+
+**`AutomationRuleEngine#onDomainEvent` — `@Async`, so it could never poison a publisher, and it
+acted before the commit.** `dispatch` evaluates its conditions from `event.payload()` and never
+re-reads the subject row, so what was wrong was not the READ but the **ACTIONS**: `NOTIFY` sends,
+`CREATE_RECORD` delegates to a real `RecordCreator`, and `recordRun` writes an
+`automation_rule_runs` row naming `entity_id`. If the publisher then rolled back, all of that stood
+over a change that never happened — because the engine's own transaction commits independently of
+the one that told it. ⚙ `handleFlag` was **checked rather than assumed**: it writes an audit row
+only, not the subject's table, so the claim is stated at the size it can be supported at.
+
+**`WorkflowEvidenceBridge#onEvidenceOutcome` — synchronous, so it JOINED the publisher's
+transaction.** It therefore read uncommitted state *correctly* — and could **poison the commit**: it
+writes a request event, notifies the initiator, audits, and hops the request's status, so a failure
+in any of that rolled back the evidence approval or rejection that triggered it. Saving the request
+there while the publisher also saves it is additionally the double-flush shape CLAUDE.md records for
+a `@Version` entity.
+
+### ⚠⚠ Two flags that are load-bearing rather than decorative, and the second is a defect a phase-only fix would have INTRODUCED
+
+**`fallbackExecution = true`** — a `@TransactionalEventListener` does **not** receive an event
+published outside a transaction. The schedulers publish outside one: `SocOpsScheduledSweep` alone
+has **12** such sites and is a `@Component` with no class-level `@Transactional`. 🔑 **Without the
+flag this fix would have silently stopped delivering every swept event — a worse defect than the one
+it closes**, and it would have failed in the quietest possible way, since a rule that never fires
+looks exactly like a rule with nothing to match. With it the change is strictly an improvement in
+both cases: deferred where there is a transaction, unchanged where there is not.
+
+**`REQUIRES_NEW` on the synchronous one** — `AFTER_COMMIT` runs with the **completed** transaction
+still bound, so a plain `@Transactional` (REQUIRED) would join it and write without a live
+transaction. `AccessRequestService` records the live symptom from its own probe: *"a plain
+@Transactional(REQUIRED) engine call would join it and write without a live transaction (live-found:
+the created request came back with a null id)"*. 🔑 **So the phase change alone would have been
+worse than no change at all** — and it is asserted only for the synchronous listener, because an
+`@Async` one is on another thread and creates its own transaction regardless; demanding it there
+would be a gate asking for something pointless.
+
+⚙ **The semantics change deliberately, in the direction this programme has already ratified**: the
+bridge's work is no longer atomic with the evidence decision. A bridge failure used to 500 the
+approval; now the approval stands and the bridge's failure is its own — the same judgement F2-322 /
+F2-323 made for the schedulers (*a batch control that is all-or-nothing fails closed on the whole
+tenant the first time one row misbehaves*).
+
+### ⚠⚠ No behaviour test in this tree can see this, and that is structural rather than a gap
+
+Both listeners' own suites call the method **directly** (`engine.onDomainEvent(...)`), so they
+bypass the proxy entirely and are **unchanged at 13 + 5**. The annotation is proxy-applied, so a
+unit test cannot observe it — F2-412's rule: *when the defect is "the framework was never invited",
+only a structural gate can see it.*
+
+`CommitPhasedEventListenerContractTest` — six legs, population derived by **reflection over the
+shipped bytecode** (F2-411 measured what a source regex costs on exactly this question: 6 sites of
+which 3 were wrong, attributing an annotation to the next parseable signature and missing a
+`protected` one, against reflection's 5 of 2,014; and F2-424: a javadoc between an annotation and
+its method defeats a fixed lookback window, in the quiet direction).
+
+### ⚠ My own anti-vacuity floor failed on a correct tree
+
+The corpus leg first asserted `> 3_000` **from arithmetic rather than from a measurement**, and the
+tree holds **1,895** top-level classes of 2,971 class files — so it failed on the fix it was written
+to protect, which is the one failure a gate must never have (F2-214), caught only by running it
+(F2-430's rule, verbatim, one slice later). Replaced by a **derived denominator**: every top-level
+`.class` file on disk must have loaded, so a `forName` that starts throwing fails the leg instead of
+quietly shrinking the population every other leg is measured over. The floor that remains sits above
+the largest **wrong** answer (F2-215) — the inverted nested-class skip, which yields the 1,076 inner
+classes — rather than above zero.
+
+### ⚠ And my own restore assertion failed on a correct restore
+
+Control C mutates `@Transactional(propagation = Propagation.REQUIRES_NEW)` to `@Transactional`, and
+the harness then asserted the mutation's replacement text was absent after restoring — but
+`@Transactional` legitimately appears elsewhere in that file (the import and four javadoc mentions),
+so the check reported `RESTORE FAILED` over a tree `git diff --quiet` confirms matches HEAD. 🔑
+**F2-206's rule applied to an assertion rather than to a mutation: a red leg is a finding only if
+the code is actually wrong.** Ask git whether the file differs from HEAD — that is the claim.
+
+### Controls
+
+Four surgical mutations, **one per half** (F2-289), every symbol kept so the tests still compile
+(F2-287), the reverted annotation written fully qualified so no import has to be re-added — a
+control that fails to COMPILE reads exactly like a gate that passed:
+
+| Control | Mutation | RED legs |
+|---|---|---|
+| A | engine → plain `@EventListener` | the phase leg + the not-null leg |
+| B | bridge → plain `@EventListener` | the phase leg + the not-null leg |
+| C | bridge keeps `AFTER_COMMIT`, joins with REQUIRED | **`aSynchronousAfterCommitListenerUsesRequiresNew` alone** |
+| D | engine keeps `AFTER_COMMIT`, loses `fallbackExecution` | **the fallback leg alone** |
+
+C and D are the ones worth having: each isolates a claim that the phase change does not imply, and
+reverting both listeners at once could not have told which leg sees which half. Post-restore green.
+**4 of 6 legs discriminate**; the other two are pins whose tripwire is in the future — the rule
+still being stated where it was first applied, and the non-transactional publishers the fallback
+flag protects still existing (F2-225: a green pin is not a discriminating pass).
+
+### Verification
+
+- `CommitPhasedEventListenerContractTest` 6/6; `AutomationRuleEngineTest` 13/13 and
+  `WorkflowEvidenceBridgeTest` 5/5 **unchanged**, which is the corroboration that the change is
+  invisible to a direct call and therefore needed the gate.
+- Full `mvn -o clean package`: **5081/0/0**, exactly the predicted 5075 + 6.
+- No migration, no schema change, no database write. No live probe: the defect is a proxy-applied
+  annotation with no data dimension, so a probe could only have re-observed what the annotation
+  says (F2-320 / F2-325's calibration).
+
+### Filed
+
+- **The hand-rolled `afterCommit` sites are NOT converted.** Six `TransactionSynchronizationManager`
+  hits across the tree do this by hand, correctly, and `AccessRequestService`'s is the exemplar this
+  finding quotes. Converting them is a refactor of working code with no defect behind it (F2-188),
+  and it would delete the one place the rule is written in prose.
+- **The `@Async` engine still has no ordering guarantee relative to other listeners of the same
+  event**, which is correct for an automation engine and worth knowing before anything is built that
+  assumes it.
+- **`spring.task.scheduling.pool.size` is still Spring's default of ONE** (F2-433's filing,
+  unchanged) — and `@Async`'s executor is likewise unconfigured, so the engine shares whatever
+  Spring provides. A tuning decision rather than a wrong answer.
 
 ## F2-437 — a control that exists to be read, with nothing that reads it
 
