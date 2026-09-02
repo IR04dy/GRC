@@ -25,6 +25,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 | ID | Title | Cat | Sev |
 |---|---|---|---|
+| **F2-433** | **A unique key over a nullable column must be filtered — V396 fixed nine registers of this shape and missed the tenth, because the tenth is the TWIN of one it fixed** | Data integrity | P2 |
 | **F2-21** | **Committee votes are recorded under a caller-supplied name** — recusal, quorum and SoD all bypassable | **Security** | **P0** |
 | **F2-24** | **CAB approvals carry a caller-supplied approver name** — a requester can approve their own change | **Security** | **P0** |
 | F2-01 | An accurate 58-module inventory exists and no control reads it; 24 is still the operative figure | Product | **P0** |
@@ -15218,6 +15219,192 @@ question of the register the refutation had walked into is what found the P1.
   upstream-owned, and the nullable ones are inert.
 
 ---
+
+## F2-433 — a unique key over a nullable column must be filtered, and V396 fixed nine registers and missed the tenth
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-02 |
+| **Severity** | P2 — `POST /api/audit-eng/engagements` omitting the engagement code was refused on the **FIRST** attempt, in both databases, with a 409 saying *"One of the fields you supplied must be unique"* about a field the caller never supplied. API-reachable only: **no frontend client calls that route at all** (F2-283 — say which you have), so it is live for a machine caller and would become live for the screen the moment somebody built it (F2-214's invitation shape) |
+| **Source** | a fresh vein — asking F2-309's own rule as a POPULATION: which unique keys over a nullable column carry no filter? |
+| **Size** | S — one migration; no production Java change |
+
+⚠⚠ **SQL SERVER TREATS NULLs AS *EQUAL* FOR UNIQUENESS.** So `V25`'s plain
+`CONSTRAINT uk_eng_code UNIQUE (organisation_id, engagement_code)` over a **nullable** column
+permits at most **ONE** engagement per organisation with no code — and both databases already hold
+exactly that row (`id=1, org=1, code=NULL`). Probed live as `compliance` (GRC_ADMINISTRATOR, holds
+`AUDIT:WRITE`; never `admin`, which bypasses in code):
+
+```
+POST /api/audit-eng/engagements   {titleEn, titleAr, auditType, leadAuditor}     -- no code
+409  "A record with these values already exists. One of the fields you supplied
+      must be unique — change it and try again."      constraint: uk_eng_code
+```
+
+🔑 **"One of the fields you supplied must be unique" — for a field the caller did not supply.**
+That is the sentence [[F2-418]] rewrote to stop asserting a scope it could not know, and it is
+still wrong here in a different way. A code-less engagement is representable **by design**: the
+column is nullable, `AuditEngagementDto.engagementCode` carries **no validation annotation** while
+its siblings carry `@NotBlank`, and a row already exists.
+
+### Why it survived — the fix was applied to nine registers and the tenth is a twin
+
+⚠⚠ **`V396` (F2-309) did exactly this, nine times, for exactly this reason.** It creates nine
+filtered unique indexes, each `WHERE <code> IS NOT NULL`, and its own header explains the NULL
+equality. **One of the nine is `compliance.audit_engagements`** — the *twin* of this table, same
+column name, different schema. So a reader grepping `engagement_code` across the migrations finds
+V396's filtered index and concludes the register is covered; and V396 carries a `@missing`
+self-check that **verifies its own coverage over a population of nine that does not include the
+tenth**.
+
+🔑 **`ReferenceRenameContractTest#everyImmutableReferenceIsAlsoUniquePerTenant` states the rule
+correctly, in these words** — *"filtered on `WHERE <code> IS NOT NULL` if the column is nullable,
+because SQL Server treats NULLs as equal for uniqueness"* — **and its population is the registers
+F2-306..F2-308 froze IMMUTABLE.** `audit_eng.engagements` has a nullable code, a plain unfiltered
+constraint and no immutability guard, so it is in neither the fix nor the gate. That is
+[[F2-195]]'s shape at its sharpest — the correct rule, in prose, in the gate built to enforce it,
+beside the one place it was not applied — and [[F2-198]]'s where the narrowing is *the set of
+references an earlier slice chose to freeze*.
+
+⚙ It is also [[F2-278]]/[[F2-311]]'s twin trap on the schema side: there are two
+`AuditEngagementService` classes and two engagement registers, and the *other* one was fixed.
+
+### The census: 6 live, 5 in the corpus, 5 correct by design, 1 defect
+
+⚠⚠ **A BLANKET "FILTER EVERY NULLABLE UNIQUE KEY" WOULD FAIL ON CORRECT CODE**, the one failure a
+gate must never have ([[F2-214]]). On four of the six a NULL `organisation_id` **means every
+tenant** — [[F2-216]] measured six repositories reading `organisation_id IS NULL OR organisation_id
+= :orgId` — so uniqueness over `(NULL, code)` is exactly right, and **filtering them would let two
+global roles share a name**, which is strictly worse than the defect being copied from. `V334`'s
+own THROW says so: *"do not widen the constraint."*
+
+| key | table | nullable member | verdict |
+|---|---|---|---|
+| `uk_eng_code` | `audit_eng.engagements` | `engagement_code` | **DEFECT** — fixed by V398 |
+| `uq_fraud_typ_code` | `fraud.fraud_typology` | `organisation_id` | BY DESIGN — shared catalogue, NULL = every tenant |
+| `UQ_role_name` | `iam.roles` | `organisation_id` | BY DESIGN — the system role catalogue; V334 refuses to widen it |
+| `uq_opres_pillar_code` | `opres.opres_pillar` | `organisation_id` | BY DESIGN — the SAMA op-res pillar catalogue |
+| `UQ_pfm_combo` | `compliance.policy_framework_mappings` | `clause_ref` | BY DESIGN — a NULL clause is the GENERAL mapping, and one per (policy, framework) is what the register wants. 15 rows, **0** with a NULL clause, both databases |
+| `UQ_lookup_type_code` | `platform.lookup_tables` | `organisation_id` | BY DESIGN by the same reading — and **in no migration at all**, see below |
+
+### The blind spot, named rather than implied
+
+⚠⚠ **The live catalogue holds 6 and the migration corpus 5, and the difference is not drift — it
+is the Python bootstrap.** `UQ_lookup_type_code` appears in **no migration**: `grep -rn` over the
+whole corpus returns nothing. That is [[F2-255]]'s measured class (a fresh Flyway install from V1
+builds **93** catalogue pairs where both live databases hold ~140, because the bootstrap made the
+rest). A hard assertion over a population the instrument cannot see is the most reassuring possible
+artefact ([[F2-205]]), so the gate names it in `BOOTSTRAP_ONLY` and asserts that set is **non-empty**
+— if it is ever empty, somebody has decided the corpus and the catalogue agree, and that was
+measured false.
+
+### Scope — the NULL axis only, and the reason is a convention rather than reticence
+
+⚠ The filter is `WHERE engagement_code IS NOT NULL`, matching V396's nine siblings **exactly**. It
+is deliberately **not** also filtered on `is_deleted = 0`: whether a code becomes reissuable after
+an engagement is deleted applies to all ten registers uniformly, the platform demonstrably does it
+both ways (`V249`'s `uq_esg_m_org_metric_code` filters on `is_deleted = 0 AND metric_code IS NOT
+NULL`), and answering it in one register would invent a tenth convention — [[F2-177]]'s two copies
+of one rule with nobody maintaining the agreement. **Filed as an owner decision.**
+
+⚙ **Safety is structural rather than argued**: a filtered unique index is *strictly more permissive*
+than the plain constraint it replaces — it can only ever reject FEWER rows — so it cannot refuse a
+row that is storable today. Measured in **both** databases first ([[F2-183]]): 1 row each, 0
+duplicate `(org, code)` groups under the proposed key, 0 soft-deleted rows, and **no foreign key
+references the table**. V398 applied **twice** to dev — idempotent.
+
+### V398's self-checks
+
+Six, all THROWing: a pre-flight that **names** the offending rows (a bare *"duplicate key"* sends
+the reader nowhere, and a failing migration blocks every migration after it); the plain constraint
+is gone; the replacement exists, is unique, **is filtered**, and **is not disabled** (a disabled
+unique index enforces nothing and looks identical in a name-only listing — [[F2-299]]); and the key
+is **tenant-first**, because a key leading with the code would make one tenant's reference block
+another's.
+
+⚙ The self-checks are **structural**, which is what `V385` and `V396` do, because `has_filter = 1`
+is exactly the fact that distinguishes the fixed state from the broken one. The **behavioural**
+proof is the live probe, which is stronger because it goes through the controller rather than
+describing the index.
+
+### The gate, and why it lives on the shared parser
+
+`NullableUniqueKeyFilterContractTest` — 8 legs: the census asserted **exactly** (never a ceiling; a
+ceiling would let a new one in behind a fixed one), a reverse leg so no verdict names a key the
+scan no longer finds ([[F2-199]]), the specific claim, **the boundary in both directions** (a
+global-catalogue key must NOT gain a filter, *and* must still be in the population or that leg is
+vacuous), the bootstrap blind spot, two self-tests, and anti-vacuity floors.
+
+⚠⚠ **`MigrationVocabularies` gains `columns()` and `uniqueKeys()` rather than a private parser,
+because that class's own recorded trap 3 — *later versions win* — is LOAD-BEARING here.** V25
+declares `uk_eng_code` and V398 drops it, so a parser reading only first declarations would report
+the defect as live on a tree that has already been fixed: **a gate failing on correct code.** That
+is precisely the argument the class was created for, and a private copy predating the discovery
+would not have known it. Control **B** proves it: with V398 present, a parser that ignores drops
+goes RED.
+
+### Two instrument bugs of mine, both caught by running things
+
+⚠⚠ **The filter detector was bounded by a NEWLINE, and the house style puts `WHERE` on its own
+line.** `CREATE UNIQUE INDEX x ON t (a, b)` then `WHERE b IS NOT NULL` below it — so the first
+census run reported **17** unfiltered nullable keys where **6** exist. 🔑 It **OVER**-reports, which
+fails loudly, and that is the only reason it was caught; [[F2-198]]'s stripper bug ran the other way
+and under-reported, which reads exactly like a clean tree. Control **C** reverts it: the self-test
+and the census both go RED.
+
+⚠⚠ **AND A THIRD DECLARATION FORM — `ALTER TABLE ... ADD CONSTRAINT <n> UNIQUE (...)`.** Missing it
+put the corpus census at **4** against the live catalogue's 6, and the key it lost was `UQ_role_name`
+— **the very member that is the BOUNDARY a reader must not "fix"**. 🔑 **Reconciling a corpus census
+against the live catalogue is what finds a missing declaration form**; without that comparison the 4
+would have read as a complete answer.
+
+⚠ Both self-tests exist because a census that can only be run against the real tree cannot be shown
+to fire, and a detector that has stopped matching reads exactly like a clean tree ([[F2-235]]). One
+drives the WHERE-on-the-next-line case, a NOT NULL key that must **not** be flagged, and a key
+quoted **inside a comment** that must not be parsed — because V398's own header quotes the
+constraint it retires, so a raw scan reads the epitaph as the corpse ([[F2-193]]).
+
+### And my own measurement was wrong about the entity, in the direction that would have broken a gate
+
+⚠⚠ **`sys.columns.max_length` is in BYTES, so for an `nvarchar` it is TWICE the character count.**
+I read `engagement_code`'s `max_length = 64` as 64 characters and concluded the entity's
+`@Column(length = 32)` was a stale narrower declaration ([[F2-276]]'s inert-declaration family). The
+column is `NVARCHAR(32)` and **the entity is correct**. 🔑 **Had I "fixed" it to 64 I would have
+made a right declaration wrong by exactly the factor [[F2-428]]'s cap-mirror gate reads.** The live
+probe is what refuted it: a 33-char code is **refused**, not stored.
+
+⚙ And that refusal is a **400 naming `engagement_code`** with *"too long"* — [[F2-432]]'s fix from
+the previous slice, working live in a module it was never written against, where until yesterday it
+was an opaque 500.
+
+### Verification
+
+| | |
+|---|---|
+| Live probe | **8/8 post-fix** · **6/8 pre-fix**, exactly the two defect legs flipping. Guards in both directions: a duplicate non-null code is **still** refused, a case-variant is **still** refused (the column collates CI), a coded create still works, the register still lists |
+| Controls | three halves, one each ([[F2-289]]). **A** V398 absent → the census + the specific claim fire. **B** drops ignored → the same two fire **on a fixed tree**, which is what makes the drop-honouring load-bearing rather than decorative. **C** newline-bounded filter → **four** legs including **both** self-tests. Post-restore GREEN |
+| Migration | applied **twice** to dev; `uk_eng_code` (unique, unfiltered, a constraint) → `UX_audit_eng_engagement_code_org` (unique, **filtered**, enabled) |
+| Build | 5059/0/0, exactly predicted (5051 + 8) |
+| Docs gates | `MeasuredBaselineFreshnessTest` named **all five** stale copies of the migration head, plus `baseline_census.py`'s `PUBLISHED` — [[F2-265]]/[[F2-266]]/[[F2-273]]'s family working. Census `--check` clean |
+
+⚙ **`module/audit_eng` has ZERO tests** (the census names it among three such packages), so the
+gate and the probe carry the whole weight here — and that is the right split rather than a gap: **a
+mocked repository has no unique index**, so no unit test in this suite could ever have seen this
+defect. [[F2-248]] all the same — a path with no test is not a path somebody decided was safe.
+
+### Filed
+
+- **The `is_deleted` axis**, across all ten registers uniformly — an owner decision, not a side
+  effect of a NULL-axis fix.
+- **`module/audit_eng` has no test at all**; `POST /api/audit-eng/engagements` has **no frontend
+  client**, so the register is API-only today.
+- **`UQ_lookup_type_code`** and the wider bootstrap-only object population ([[F2-255]]).
+- **The scheduler pool**: 39 `@Scheduled` methods, `@EnableScheduling`, and **no
+  `spring.task.scheduling.pool.size` and no `TaskScheduler` bean anywhere** — so Spring Boot's
+  default of **1** thread serialises every sweep on the platform, and one that blocks delays the
+  PDPL DSR clock, the committee overdue sweep and the vulnerability SLA sweep alike. Measured, not
+  fixed: it is a tuning decision rather than a wrong answer, which is why it was not forced into
+  this slice ([[F2-188]]).
 
 ## F2-432 — eight findings recorded "an opaque 500" and the handler that maps the whole class was one `case` label away
 
