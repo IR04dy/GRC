@@ -15229,6 +15229,127 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-448 — `?sort=<anything>` answered an opaque 500 on every paged endpoint, and the class is not an `IllegalArgumentException`
+
+| Field | Value |
+|---|---|
+| **Id** | F2-448 |
+| **Title** | A caller-supplied sort property raised `PropertyReferenceException`, which no handler claimed |
+| **Severity** | P2 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, asking the opaque-500 family's question of the one caller input every paged route accepts and nothing validates |
+| **Fixed** | `b3789fe8` (fix), `c0c76676` (a corrected assertion), merged `fix/f2-448-sort-property-500` |
+| **Module** | `common/exception` — platform-wide |
+| **Migration** | none |
+
+### What was wrong
+
+Spring Data binds the `sort` query parameter onto a controller's `Pageable` and resolves it against
+the entity's metamodel **at query time**. A property the entity does not have raises
+`PropertyReferenceException` — which lives in `org.springframework.data.mapping` and is **not** an
+`IllegalArgumentException`, so `@ExceptionHandler(IllegalArgumentException.class)` never caught it
+and it fell through to `@ExceptionHandler(Exception.class)` → `handleGeneral` → **500**.
+
+Measured: **24 controllers bind a `Pageable` from the request** across **34 `@PageableDefault`
+sites**, so `?sort=oops` 500s any of them — reachable by a single query parameter for **any
+authenticated reader**, with no body, no write and no permission beyond the module's own READ.
+Probed live pre-fix as `rmanager`:
+
+```
+GET /api/v1/risk/appetite?sort=nonexistentProperty
+  -> 500  PropertyReferenceException: No property 'nonexistentProperty' found for type
+          'RiskAppetiteStatement'
+```
+
+⚠ That message is legible only because dev sets `grc.errors.verbose=true`. **In production
+SEC-CFG-001 strips the class and the root cause**, so the same request reads as *"An unexpected
+error occurred"* — an outage rather than a mistyped parameter.
+
+Fifth member of the opaque-500 family: F2-227 (optimistic lock), F2-339 (`NoResultException`),
+F2-348 (`DateTimeParseException`), F2-349 (`MaxUploadSizeExceededException`), now this.
+
+### 🔑 400 is unambiguous here, and that was MEASURED rather than assumed
+
+A `PropertyReferenceException` at request time could in principle come from a **server-built**
+`Sort` naming a wrong property, and a 400 would then mislabel a server bug as bad input — which is
+exactly the objection that has to be answered before remapping a status. Both server-side sources
+were measured:
+
+* **`Sort.by(...)` in Java** — the whole tree holds **three** calls, and all three take string
+  literals (no caller-derived property reaches any of them).
+* **`@PageableDefault(sort = ...)`** — **13 distinct literals**, every one of which resolves.
+  Verified by *calling each route with no `sort` parameter at all*, so the server's own default is
+  the only thing being resolved: **13/13 answered 200, 0 broken.**
+
+🔑 **That second measurement is the load-bearing one, and it is worth stating why it was made at
+all: a `@PageableDefault(sort = ...)` naming a property its entity lacks would 500 on EVERY request
+to the route with no caller input whatsoever — a strictly worse version of this defect, because
+nobody has to do anything wrong.** The population is clean, so at request time the only source of a
+bad sort property is the caller's own input, and 400 is the honest status.
+
+### ⚠⚠ The detail names the PROPERTY and deliberately NOT the entity type
+
+The exception's own message is `No property 'oops' found for type 'RiskAppetiteStatement'`. The
+property is the caller's own input and telling them is the entire point of the fix; the entity class
+is an internal detail SEC-CFG-001 keeps out of a production response. So the handler composes its
+own sentence rather than echoing `ex.getMessage()`, publishes `property` as a machine-readable
+field, and leaves the class and root cause behind `verboseErrors` — the same gate as the catch-all.
+
+```
+GET /api/v1/risk/appetite?sort=nonexistentProperty
+  -> 400  {"title":"Invalid Sort Property",
+           "detail":"Cannot sort by 'nonexistentProperty' — no such field on this record.",
+           "property":"nonexistentProperty",
+           "type":"https://grc.tss.com/errors/invalid-sort"}
+```
+
+### 🔑🔑 The defect is one of ROUTING, so the load-bearing leg asserts Spring's own resolution
+
+A direct call to `handleBadSortProperty(...)` proves what the method **returns** and cannot see
+which handler Spring **picks** — and picking `handleGeneral` was the whole defect. The leg that
+carries the finding is therefore
+
+```java
+new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class)
+    .resolveMethod(badSort()).getName()   // "handleBadSortProperty", was "handleGeneral"
+```
+
+F2-339 and F2-348 each recorded this for the same handler class, and it is the only leg the pre-fix
+control can fire on — which is precisely why the control disables **only the annotation** and keeps
+the method (a control that fails to COMPILE reads exactly like a gate that passed — F2-287/F2-414).
+
+### ⚠⚠ A negative assertion naming something the fixture cannot produce passes for an unrelated reason
+
+The SEC-CFG-001 half of the second leg first read `doesNotContain("RiskAppetiteStatement")` — the
+type name the exception carries **against the live register**. The unit fixture builds its exception
+over a local `SortProbe`, so that string could never appear, and the control replacing the detail
+with `ex.getMessage()` — **which does leak the type name** — **SURVIVED the whole build**.
+
+🔑 **F2-192 verbatim, and the mutation was genuinely wrong rather than equivalent (F2-206), which is
+what made it a hole in my own leg rather than noise.** Corrected to ban `SortProbe`, the name this
+exception actually carries: 3/3 controls now fire.
+
+### Verification
+
+| | |
+|---|---|
+| Unit | `GlobalExceptionHandlerTest` **35/35** (+2 legs: the resolver, and the property-named/type-withheld detail) |
+| Live probe | **15/15** post-fix as `rmanager` + `compliance`, never `admin` — the 400, the named property, the withheld class, the wire field, the problem type, a second register, a bad sort **with a direction**, five still-200 legs (no sort / a real property / a real property with a direction / an empty sort / another module's own default) and a 401 for an unauthenticated caller, proving the guard still runs first |
+| Pre-fix | the 500 was measured on the unmodified tree by the recon probe, before any change |
+| Controls | **3/3 fire**, 0 survived, 0 anchor-miss, 0 did-not-compile, post-restore GREEN — A disables only the annotation (fires the resolver leg alone), B echoes `ex.getMessage()` and C stops naming the property (each fires the detail leg) |
+| Build | `mvn -o clean package` **5126/0/0**, predicted exactly |
+| Probe hygiene | every leg is a **GET**; nothing was planted, so nothing needed cleaning |
+
+### Filed, not fixed (F2-188)
+
+* **`Sort.unsorted()` is not in this population and neither is a `size` cap.** `spring.data.web
+  .pageable.max-page-size: 100` is configured, so `?size=99999` is clamped rather than refused —
+  measured, not assumed, and a clamp is the right answer for a read.
+* **`NonUniqueResultException`** (the by-id-returned-many sibling of F2-339's `NoResultException`)
+  is still unhandled and still a 500 — arguably correctly, since it is a genuine server bug rather
+  than caller input, which is why F2-339 deliberately left it out of scope. Recorded so the next
+  reader does not re-derive it.
+
 ## F2-447 — `instanceof` is a null check for the THEN branch, and that is what made the ELSE branch look guarded
 
 | | |

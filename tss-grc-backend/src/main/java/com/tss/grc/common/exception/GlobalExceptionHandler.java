@@ -5,6 +5,7 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.NoResultException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionSystemException;
@@ -355,6 +356,49 @@ public class GlobalExceptionHandler {
             "A date value could not be parsed. Expected an ISO date (e.g. 2026-08-25) or date-time.");
         pd.setTitle("Invalid Date");
         pd.setType(URI.create("https://grc.tss.com/errors/invalid-date"));
+        if (verboseErrors) {
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * F2-448 — {@code ?sort=<anything>} on a paged endpoint answered an opaque 500.
+     *
+     * <p>Spring Data binds the {@code sort} query parameter onto the {@link
+     * org.springframework.data.domain.Pageable} and resolves it against the entity's metamodel at
+     * query time. A property the entity does not have raises {@link PropertyReferenceException},
+     * which lives in {@code org.springframework.data.mapping} and is <b>not</b> an
+     * {@link IllegalArgumentException} — so {@link #handleIllegal} never caught it and it fell
+     * through to {@link #handleGeneral}. Measured: <b>24 controllers bind a {@code Pageable} from
+     * the request</b> across 34 {@code @PageableDefault} sites, so a single query parameter 500s
+     * any of them, for any authenticated reader. Same opaque-500 family as F2-227 (optimistic
+     * lock), F2-339 ({@code NoResultException}), F2-348 ({@code DateTimeParseException}) and
+     * F2-349 (oversized upload).
+     *
+     * <p>⚠ <b>400 is unambiguous here, and that was measured rather than assumed.</b> A
+     * {@code PropertyReferenceException} at request time could in principle come from a
+     * <i>server-built</i> {@code Sort} naming a wrong property, which would be a server bug a 400
+     * would mislabel. Measured 2026-09-03: the tree holds <b>three</b> {@code Sort.by(...)} calls
+     * and all three use string literals, and <b>all 13 {@code @PageableDefault(sort = ...)}
+     * literals resolve</b> — probed live, every one of those routes answers 200 with no
+     * {@code sort} parameter. So at request time the only source is the caller's own input.
+     *
+     * <p>⚠⚠ <b>The detail names the PROPERTY and not the entity type.</b> The exception's
+     * own message is {@code No property 'oops' found for type 'RiskAppetiteStatement'} — the
+     * property is the caller's own input and telling them is the point, while the entity class is
+     * an internal detail that SEC-CFG-001 keeps out of a production response. The class and the
+     * root message stay dev-only behind {@code verboseErrors}, the same gate as the catch-all.
+     */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ProblemDetail handleBadSortProperty(PropertyReferenceException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+            "Cannot sort by '" + ex.getPropertyName() + "' — no such field on this record.");
+        pd.setTitle("Invalid Sort Property");
+        pd.setType(URI.create("https://grc.tss.com/errors/invalid-sort"));
+        pd.setProperty("property", ex.getPropertyName());
         if (verboseErrors) {
             pd.setProperty("exception", ex.getClass().getName());
             pd.setProperty("rootCause", rootMessage(ex));
