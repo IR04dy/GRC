@@ -495,7 +495,8 @@ public class BcmService {
         // by the parent-process link instead let this KPI disagree with the register it
         // summarises (F2-197 — a figure that disagrees with the list it opens is worse than
         // no figure), and it counted soft-deleted rows, which @Where now excludes.
-        long totalBia = biaRepo.findByOrganisationId(orgId).size();
+        var biaRecords = biaRepo.findByOrganisationId(orgId);
+        long totalBia = biaRecords.size();
         var exercises = exerciseRepo.findByOrganisationId(orgId, Pageable.unpaged()).getContent();
 
         long totalPlans = plans.size();
@@ -510,7 +511,25 @@ public class BcmService {
         }).count();
 
         long denom = Math.max(1, totalProcesses);
-        long biaPct = Math.min(100, Math.round(totalBia * 100.0 / denom));
+        // F2-457: a coverage percentage over PROCESSES must count processes, not BIA
+        // rows. This was Math.min(100, Math.round(totalBia * 100.0 / denom)), and that
+        // cap was the confession: two of org 1's eight critical processes carry two BIAs
+        // each, so the row count over the process count is 125% and the cap hid it.
+        // Latent, because the honest answer today is also 100% -- 8 of 8 processes are
+        // covered -- but the two operands were different registers either way. A BIA
+        // with no process link cannot cover a process, so it is excluded, not counted.
+        long processesWithBia = biaRecords.stream()
+                .map(BiaRecord::getProcessId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .count();
+        long biaPct = Math.round(processesWithBia * 100.0 / denom);
+        // F2-457 (filed, not fixed): these two divide a PLAN count by a PROCESS count,
+        // and bcm.bcp_plans carries no process link at all -- so coverage of processes
+        // by plans is not computable from that register (F2-209's third state). The cap
+        // stays because without it a tenant with more plans than processes reports over
+        // 100%. What "BCP completion" should mean is an owner decision, not a side
+        // effect of an arithmetic fix.
         long bcpPct = Math.min(100, Math.round(bcpPlans * 100.0 / denom));
         long drpPct = Math.min(100, Math.round(drpPlans * 100.0 / denom));
         long successRate = totalExercises > 0 ? Math.round(completed * 100.0 / totalExercises) : 0;
@@ -532,8 +551,15 @@ public class BcmService {
         m.put("biaCompletionPercent", biaPct);
         m.put("bcpCompletionPercent", bcpPct);
         m.put("drpCompletionPercent", drpPct);
-        m.put("rtoCompliancePercent", successRate);
-        m.put("rpoCompliancePercent", successRate);
+        // F2-457: rtoCompliancePercent and rpoCompliancePercent used to be published here
+        // as `successRate` -- the EXERCISE COMPLETION rate, which is neither. One number
+        // was rendered three times on the BCM dashboard under three labels, twice as a
+        // recovery-objective compliance figure. Nothing in this platform computes either:
+        // no exercise records an achieved recovery time, so there is nothing to compare
+        // against the RTO/RPO targets the BIAs and plans carry. Publishing nothing lets
+        // the dashboard render UX-008's em-dash with a reason (F2-195/F2-197: deleting an
+        // invented figure must not assert health), and computing them for real is a
+        // feature -- it needs an achieved-recovery-time column that does not exist.
         m.put("openGaps", openGaps);
         m.put("overdueCapas", overdueCapas);
         m.put("failedExercises", failed);

@@ -20,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +57,10 @@ class BcmServiceTest {
     @Mock private CriticalProcessRepository processRepo;
     @Mock private BiaRecordRepository biaRepo;
     @Mock private BcmExerciseRepository exerciseRepo;
+    // F2-457: getStats() also reads these two. Without them @InjectMocks leaves the fields
+    // null and every stats assertion below dies on an NPE rather than on its own claim.
+    @Mock private com.tss.grc.module.bcm.cycle.repository.BcmGapRepository gapRepo;
+    @Mock private com.tss.grc.module.bcm.cycle.repository.BcmCorrectiveActionRepository capaRepo;
     @InjectMocks private BcmService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -629,5 +635,220 @@ class BcmServiceTest {
         BiaRecord clear = bia(PROC_ID);
         clear.setLinkedRiskId(null);
         assertThat(service.updateBia(ID, clear).getLinkedRiskId()).isNull();
+    }
+
+    // ── F2-457 — getStats() provenance ───────────────────────────────────────
+    //
+    // Two ISO 22301 KPI keys used to be published as `successRate`, the EXERCISE COMPLETION
+    // rate: one number rendered three times on the BCM dashboard under three labels, twice
+    // as a recovery-objective compliance figure. Nothing in the platform computes RTO or RPO
+    // compliance -- no exercise records an achieved recovery time -- so the honest answer is
+    // to publish neither and let UX-008's em-dash carry the absence.
+    //
+    // These legs are BEHAVIOURAL on purpose. A source scan cannot tell a re-added key from a
+    // comment naming one, and the fix deliberately quotes both retired names (F2-450), so the
+    // only assertion that discriminates is what the map actually contains.
+
+    /** Build a stats map from a fixture with `processes` processes and BIAs on `covered` of them. */
+    private Map<String, Long> statsWith(int processes, List<Long> biaProcessIds, int exercises,
+                                        int completedExercises) {
+        List<CriticalProcess> procs = new java.util.ArrayList<>();
+        for (int i = 0; i < processes; i++) {
+            CriticalProcess p = new CriticalProcess();
+            p.setId((long) (i + 1));
+            p.setOrganisationId(ORG_ID);
+            procs.add(p);
+        }
+        List<BiaRecord> bias = new java.util.ArrayList<>();
+        for (Long pid : biaProcessIds) {
+            BiaRecord b = new BiaRecord();
+            b.setOrganisationId(ORG_ID);
+            b.setProcessId(pid);
+            bias.add(b);
+        }
+        List<BcmExercise> exs = new java.util.ArrayList<>();
+        for (int i = 0; i < exercises; i++) {
+            exs.add(exercise(i < completedExercises ? "COMPLETED" : "SCHEDULED"));
+        }
+
+        when(planRepo.findByOrganisationId(eq(ORG_ID), any())).thenReturn(new PageImpl<>(List.of()));
+        when(processRepo.findByOrganisationId(eq(ORG_ID), any())).thenReturn(new PageImpl<>(procs));
+        when(biaRepo.findByOrganisationId(ORG_ID)).thenReturn(bias);
+        when(exerciseRepo.findByOrganisationId(eq(ORG_ID), any())).thenReturn(new PageImpl<>(exs));
+        when(gapRepo.findByOrganisationIdOrderByIdDesc(ORG_ID)).thenReturn(List.of());
+        when(capaRepo.findByOrganisationIdAndDueDateBeforeAndStatusNotIn(
+                eq(ORG_ID), any(), any())).thenReturn(List.of());
+        return service.getStats();
+    }
+
+    @Test
+    void getStats_publishesNoRtoOrRpoComplianceFigureBecauseNothingComputesOne() {
+        Map<String, Long> m = statsWith(4, List.of(1L, 2L, 3L, 4L), 2, 1);
+
+        assertThat(m).as("""
+            getStats() must publish NEITHER rtoCompliancePercent NOR rpoCompliancePercent.
+
+            Both used to carry `successRate` -- completed exercises over total exercises -- which \
+            is the exercise completion rate and neither an RTO nor an RPO compliance figure. The \
+            dashboard rendered the same number three times under three labels, twice as recovery- \
+            objective compliance, in both languages.
+
+            Nothing in this platform computes either: no exercise records an achieved recovery \
+            time, so there is nothing to compare against the RTO/RPO targets the BIAs and plans \
+            carry. Publishing nothing lets BcmDashboardPage render the em-dash with a reason \
+            (UX-008), which is the ratified treatment for a metric that cannot be computed \
+            (F2-195/F2-197: deleting an invented figure must not assert health).
+
+            Computing them for real is a FEATURE -- it needs an achieved-recovery-time column \
+            that does not exist -- not a value borrowed from the nearest available percentage.""")
+            .doesNotContainKeys("rtoCompliancePercent", "rpoCompliancePercent");
+    }
+
+    @Test
+    void getStats_labelsTheExerciseSuccessRateOnceAndOnlyAsItself() {
+        Map<String, Long> m = statsWith(4, List.of(1L, 2L, 3L, 4L), 4, 3);
+
+        // 3 of 4 completed = 75%. The point is not the arithmetic but that exactly ONE key
+        // carries it: a measurement published under a second label is a mislabelled metric.
+        assertThat(m.get("exerciseSuccessRate")).isEqualTo(75L);
+        long keysCarrying75 = m.entrySet().stream()
+                .filter(e -> e.getValue() != null && e.getValue() == 75L)
+                .filter(e -> !e.getKey().equals("rtoCompliancePercent")
+                          && !e.getKey().equals("rpoCompliancePercent"))
+                .count();
+        assertThat(keysCarrying75).as("""
+            The exercise completion rate must reach exactly one map key besides the legacy \
+            rtoCompliancePercent/rpoCompliancePercent aliases this fix retired. Two keys carrying \
+            one measurement is how F2-457 happened: the number was correct and two of its three \
+            labels were not.
+
+            If this fires because a NEW key legitimately equals 75 by coincidence, change the \
+            fixture's ratio rather than relaxing the count.""")
+            .isEqualTo(1L);
+    }
+
+    @Test
+    void getStats_biaCompletionCountsProcessesCoveredNotBiaRows() {
+        // 4 processes; 5 BIA rows, but process 1 carries two of them. Rows/processes = 125%,
+        // which the retired Math.min(100, ...) would have capped to a flattering 100%.
+        Map<String, Long> m = statsWith(4, List.of(1L, 1L, 2L, 3L, 4L), 0, 0);
+
+        assertThat(m.get("totalBia")).as(
+            "totalBia is a count of BIA RECORDS and keeps that meaning").isEqualTo(5L);
+        assertThat(m.get("biaCompletionPercent")).as("""
+            biaCompletionPercent is coverage over PROCESSES, so its numerator must count \
+            processes. Here 4 of 4 are covered by 5 records, so it is 100 -- and the old \
+            expression (rows / processes, capped) reached the same 100 for the wrong reason.
+
+            The discriminating case is the next assertion: drop one process's BIA and the \
+            honest figure falls while the row count does not.""")
+            .isEqualTo(100L);
+    }
+
+    @Test
+    void getStats_biaCompletionFallsWhenAProcessHasNoBiaEvenIfRowCountStillExceedsIt() {
+        // 4 processes; 4 BIA rows, but two of them are on process 1 -- so processes 3 and 4
+        // are uncovered. Rows/processes = 100% (flattering and wrong); coverage = 50%.
+        Map<String, Long> m = statsWith(4, List.of(1L, 1L, 2L, 2L), 0, 0);
+
+        assertThat(m.get("totalBia")).isEqualTo(4L);
+        assertThat(m.get("biaCompletionPercent")).as("""
+            THE discriminating leg. Four BIA rows over four processes is 100%% by the retired \
+            arithmetic, while only two of the four processes actually have a BIA. A readiness \
+            KPI that reports full BIA coverage for a programme with half its critical processes \
+            unanalysed is wrong in the flattering direction, which is the direction nobody \
+            reports.""")
+            .isEqualTo(50L);
+    }
+
+    @Test
+    void getStats_aBiaWithNoProcessLinkCoversNoProcess() {
+        // 2 processes; 3 BIA rows, one of them unlinked. Only process 1 is covered.
+        Map<String, Long> m = statsWith(2, java.util.Arrays.asList(1L, null, null), 0, 0);
+
+        assertThat(m.get("totalBia")).isEqualTo(3L);
+        assertThat(m.get("biaCompletionPercent")).as("""
+            A BIA with a null process_id cannot cover a process, so it must be excluded from the \
+            numerator rather than counted. Both live databases have zero such rows today, so this \
+            pins a decision rather than observing a defect -- and the alternative (counting them) \
+            would inflate coverage with records that analyse nothing.""")
+            .isEqualTo(50L);
+    }
+
+    /**
+     * F2-457, leg 6 -- cross-codebase: the dashboard must not name a key the server does not send.
+     *
+     * <p>Without this the whole frontend half is unasserted. Reverting it re-declares
+     * {@code rtoCompliancePercent} on {@code BcmStatsShape}, {@code tsc} is satisfied, and the
+     * panel interpolates {@code undefined%} with nothing to notice -- the mirror of F2-211, where a
+     * client type declaring a field the wire never carries produced an em-dash on every row.
+     *
+     * <p>Comments are stripped first, in ONE left-to-right alternation. This fix quotes both
+     * retired key names on purpose (F2-450 -- a faithful quotation is what makes the stripping
+     * demonstrably load-bearing rather than decorative), so a raw scan would read the epitaph as
+     * the corpse (F2-193) and fail on a correct tree. Two sequential passes corrupt the source
+     * (F2-198), and the {@code (?<!:)} is what stops a {@code https://} inside a string literal
+     * opening a comment.
+     */
+    @Test
+    void theBcmDashboardNamesNoKeyTheStatsMapNoLongerSends() throws java.io.IOException {
+        java.nio.file.Path page = java.nio.file.Paths.get(
+            "../tss-grc-ui-v2/src/pages/dashboards/BcmDashboardPage.tsx")
+            .toAbsolutePath().normalize();
+        assertThat(java.nio.file.Files.exists(page)).as(
+            "Expected %s to exist. A wrong path would make this assertion vacuous rather than "
+            + "failing, which is the one outcome a cross-codebase leg must not have.", page)
+            .isTrue();
+
+        String stripped = java.util.regex.Pattern
+            .compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/")
+            .matcher(java.nio.file.Files.readString(page))
+            .replaceAll("");
+
+        // Anti-vacuity: the stripper must leave the page's real code behind. If it ever blanks
+        // the file, the absence assertions below pass over nothing (F2-235).
+        assertThat(stripped).as(
+            "The comment stripper appears to have blanked real code -- the page's own KPI array "
+            + "should survive it.").contains("const kpis").contains("exerciseSuccessRate");
+
+        for (String retired : java.util.List.of("rtoCompliancePercent", "rpoCompliancePercent")) {
+            assertThat(stripped).as("""
+                BcmDashboardPage still references %s outside a comment, and BcmService no longer \
+                publishes it. The server used to send the exercise completion rate under that \
+                name; a client that keeps reading it renders `undefined%%` in the recovery- \
+                objectives panel, or an em-dash that looks like missing data rather than an \
+                uncomputable metric.
+
+                If RTO/RPO compliance is ever really computed, add it to the stats map FIRST and \
+                this leg will let the page read it again.""".formatted(retired))
+                .doesNotContain(retired);
+        }
+
+        // And the tile must still be THERE, as an explicit absence. UX-008's convention exists so
+        // a metric the platform cannot compute stays visible; silently deleting the tile drops
+        // the question rather than answering it (F2-197 -- an absent figure must not read as health).
+        // WARNING: asserted as a PAIRING, not as the token. The first draft was
+        // .contains("notMeasured"), which the const DECLARATION satisfies -- so swapping the
+        // tile's hint back to `notComputed` SURVIVED the whole build. F2-194's
+        // substring-satisfied-by-something-else, found by the control harness in a leg written
+        // after quoting that very rule.
+        assertThat(stripped).as("""
+            The RTO tile must survive as an em-dash whose hint is `notMeasured`, not `notComputed`.
+
+            UX-008 has three states and the difference between the last two is the whole point: a \
+            value, a metric NOT YET measured, and one the platform CANNOT measure. RTO compliance \
+            is the third -- no exercise records an achieved recovery time -- so telling an operator \
+            it is "not yet computed" promises a figure that is never coming.
+
+            Deleting the tile is equally wrong: the convention exists so an uncomputable metric \
+            stays visible as absent rather than quietly disappearing (F2-197).""")
+            .containsPattern("(?s)'RTO compliance'.{0,240}?emptyHint:\\s*notMeasured");
+
+        // F2-209: the reason must reach a screen reader as well as a pointer. A `title` alone is
+        // a tooltip a keyboard user never receives, which is why the Kpi convention sets both.
+        assertThat(stripped).as(
+            "The recovery-objectives disclosure must carry its reason on BOTH title and "
+            + "aria-label -- a title-only hint is invisible to a screen reader (F2-209).")
+            .containsPattern("(?s)title=\\{notMeasured\\}.{0,80}?aria-label=\\{notMeasured\\}");
     }
 }
