@@ -15229,6 +15229,169 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-456 — a `@Value` on a bare env key reads the pre-profile name, so it is invisible to every profile override
+
+| Field | Value |
+|---|---|
+| **Id** | F2-456 |
+| **Title** | A `@Value` on a bare env-var name bypasses the yml's profile override, and the two file-storage backends did it — so in prod attachments and evidence went to `./uploads` while binder exports went to the operator's configured root |
+| **Severity** | P2 (live in code for the documented prod configuration; 8 evidence items + 3 binder exports carry stored paths) |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, while reading `application-prod.yml` for an unrelated deployment question |
+| **Fixed** | `403ad2d6`, merged `fix/f2-456-storage-path-bypasses-profile` |
+| **Module** | `attachment`, `evidence` + config |
+| **Migration** | none |
+
+### The mechanism
+
+`AttachmentStorageService` and `EvidenceStorageService` both read
+`@Value("${STORAGE_BASE_PATH:./uploads}")`. The yml exposes the same concept as the **property**
+`grc.storage.base-path`, and `application-prod.yml` re-points that property at
+`${FILE_STORAGE_PATH}`.
+
+🔑 **A `@Value` on a bare env-var name resolves the *pre-profile* key, so it is invisible to every
+override the yml expresses.** `BcpBinderService` reads the property
+(`@Value("${grc.storage.base-path:./uploads}")`) and therefore followed the operator's setting; the
+two storage backends did not.
+
+🔑🔑 **The two spellings AGREE in dev and DIVERGE in prod**, because the base profile sets
+`grc.storage.base-path: ${STORAGE_BASE_PATH:./uploads}` — the same key the `@Value` reads. So in dev
+all three readers resolve to `./uploads` and no amount of local testing can see it. It is reachable
+only in the one profile nobody runs locally.
+
+### What it cost
+
+The runbook creates `C:\tss-grc\data\uploads` as one of five directories and the template ships
+`FILE_STORAGE_PATH=C:/tss-grc/data/uploads`, so the intended storage root is unambiguous. In prod:
+
+| Reader | Root it used |
+|---|---|
+| `BcpBinderService` (binder PDFs) | the operator's `FILE_STORAGE_PATH` ✓ |
+| `AttachmentStorageService` | `./uploads`, relative to the service working directory |
+| `EvidenceStorageService` | `./uploads`, relative to the service working directory |
+
+`LocalFileStorageSupport` owns both `store` and `load`, so restored evidence is **unreadable** (the
+app looks somewhere else) and new uploads land in `<workingdirectory>\uploads` — the application
+directory the runbook's release loop replaces on upgrade, and outside whatever `data\` backup the
+operator takes. On the evidence subsystem that is a chain-of-custody artefact.
+
+⚠ Measured, identical in dev and prod: **`evidence.evidence_items` 103 rows, 8 with a stored
+`file_path`; `bcm.bcp_binder_export` 4 rows, 3 with one.** ⚠ [[F2-451]]'s filed *"0 of 78 rows"* was
+its own **org-scoped** fetch, not the register — a figure worth correcting rather than inheriting.
+
+⚠ Say which you have ([[F2-283]]): **live in code for the documented configuration**, since the
+template leaves `STORAGE_BASE_PATH` commented and tells the operator to set `FILE_STORAGE_PATH`.
+Whether the existing deployed box happens to export `STORAGE_BASE_PATH` as an OS env var is
+unmeasurable from here.
+
+### The third artefact instructed the operator into it
+
+The template's only documentation of the duality read:
+
+> `STORAGE_BASE_PATH` is the base-profile default; prod reads `FILE_STORAGE_PATH` above. Both exist,
+> and they are different keys — **set the one your profile uses.**
+
+Every clause is true of the **yml** and wrong about the **code**. Following it in prod — set
+`FILE_STORAGE_PATH`, leave `STORAGE_BASE_PATH` commented — is *exactly* the configuration that
+misplaces evidence. [[F2-184]]'s shape at its sharpest: a comment that answers the question the
+reader was about to ask, in the only place the duality is documented, so it is what a careful
+operator relies on.
+
+🔑 And the register records that the slice which built `ExternalConfigOverrideContractTest`
+**added `STORAGE_BASE_PATH` to the template** to complete the operator surface — so documenting a
+key whose only readers bypass the profile is what made the duality look deliberate.
+
+### Why the existing gate could not see it
+
+`ExternalConfigOverrideContractTest` ([[F2-149]]) exists for precisely this question and states it
+plainly: `external.properties` overrides **placeholders**, not properties, and its javadoc explains
+why — *"`${SERVER_PORT:8443}` is a reference, resolved against the whole `Environment` … which is
+why the other eighteen keys always worked, and why the one written as a real property path did
+not."* A production P0 is behind it (a tenant-write-guard flag recorded OFF for four days).
+
+⚠⚠ **It asked that question of the TEMPLATE — which keys the operator may write — and never of the
+JAVA SIDE, which keys the code reads.** [[F2-198]]'s shape at a language boundary: the population is
+`${PLACEHOLDER}` occurrences in yml, so a property key spelled in Java is outside it by
+construction.
+
+### The fix
+
+- Both `@Value` sites read `${grc.storage.base-path:./uploads}` — the property, so a profile
+  override reaches them. All three readers now name one property.
+- **Both profiles accept either env key**, each preferring its own documented one and falling back
+  to the other (`${FILE_STORAGE_PATH:${STORAGE_BASE_PATH:…}}` in prod, mirrored in the base). That
+  makes the template's *"both exist"* wording **true** instead of a trap, and it cannot break a
+  working configuration: a nested default only fires when the primary is unset.
+- The template comment is corrected **and quotes what it replaced**, because a stale claim about
+  where files go is the input to the next operator's restore.
+
+⚠ Two legs, added to the class that already owns the question rather than as a second gate
+([[F2-190]]): **(1)** a hard zero — no `@Value` may name a bare `SCREAMING_SNAKE` key — with **no
+exemption map**, safe by [[F2-214]]'s test because a property path is always available and the yml is
+where profile precedence lives, so reading the raw env key is never correct code; **(2)** a
+behavioural leg that resolves the **real expressions read off the yml** through a real Spring
+`Environment`, so it cannot drift from the files and it tests Spring's nested-default resolution
+rather than my reading of it.
+
+🔑 **The load-bearing assertion in leg 2 is the counter-factual**: with only `FILE_STORAGE_PATH`
+set — the shape the template ships — the *retired* expression still resolves to `./uploads`. That
+states the divergence as a measurement rather than as a claim, and it fails the moment the
+counter-factual stops proving anything.
+
+### Verification
+
+No live probe, deliberately: the defect is Spring property resolution over config files, and the
+one profile where it manifests is the one dev does not run — a dev probe would show the two
+spellings *agreeing*, which is the whole point ([[F2-320]]/[[F2-325]]'s calibration). The
+verification is the harness plus the behavioural leg.
+
+**7 killed · 0 survived · 0 anchor-miss · 0 did-not-compile**, baseline and post-restore green.
+Which leg each control fires is the useful half:
+
+| # | Control | Fires |
+|---|---|---|
+| A | attachment `@Value` back to the raw env key | the **hard zero** alone |
+| B | evidence `@Value` back to the raw env key | the **hard zero** alone |
+| C | prod yml drops the `STORAGE_BASE_PATH` fallback | the **behavioural leg** alone |
+| D | base yml drops the `FILE_STORAGE_PATH` fallback | the **behavioural leg** alone |
+| E | comment stripper disabled | the **hard zero** |
+| F | the Java source walk returns nothing | that leg's **anti-vacuity floor** |
+| G | the base-path line no longer requires a placeholder | the behavioural leg's `hasSize(1)` |
+
+⚠⚠ **Control E is the one worth having, and it only fires because of [[F2-450]]'s rule.** The fix's
+comment quotes the retired expression **in full, closing paren included**
+(`@Value("${STORAGE_BASE_PATH:./uploads}")`), which makes the documentation faithful *and* the
+comment-stripping demonstrably load-bearing. With the loose paraphrase drafted first, E **survived**.
+
+⚠ **Control F fires the floor, never the offender list** — a negative assertion over a clean corpus
+reports the same empty list whether the walk works or is dead ([[F2-235]]), which is the argument for
+the floor rather than for trusting the zero. The floor sits at **30** against a measured **38**
+sites, above the largest *wrong* answer of zero ([[F2-215]]).
+
+Full build **5178/0/0**, predicted exactly (5176 + 2).
+
+### Filed
+
+⚙ **Four `@Value` keys no packaged yml declares**, so they cannot be documented in the template
+under that class's leg 1 convention and an operator cannot discover them:
+`grc.change.cab-min-approvals` (the CAB quorum — and [[F2-441]] filed that the
+`ChangeAuthorisationMatrix` meant to supersede it has **no write route**, so the flat global is what
+runs), `grc.risk.review-scheduler-enabled` (the ERM stale-review sweep, off by default — [[F2-322]]'s
+observation), and `grc.security.public-rate-limit.max-requests` / `.window-seconds` (the fixed-window
+limiter in front of the **anonymous** whistleblower and breach-report portals).
+
+⚠ **Deliberately NOT shipped as a census leg, and the reason matters.** That class's leg 1 says a
+dotted path in the template is *"silently inert"* — but its own rationale is narrower: a path is
+outranked **only when a profile sets that property literally**. For a property no yml sets at all, a
+dotted key in `external.properties` would plausibly bind. Asserting a population on the broad
+reading would be a claim I have not verified, and the remedy leg 3 already ratified for the five
+kill-switches (*"each was a literal `true`, so none could be thrown in an incident without a
+rebuild"*) is to add the placeholder — a small change, but one that needs the precedence question
+settled first.
+
+⚠ Counted honestly: scoped to base + prod the undeclared set is **8**, because `grc.errors.verbose`
+and three mail keys are declared in **`application-dev.yml`**. Scoped to *any* packaged yml it is
+**4**. State which scope a figure like that came from.
 ## F2-455 — five true legs all named one annotation, and the unasked question was its absence
 
 | Field | Value |

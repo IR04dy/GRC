@@ -2,6 +2,9 @@ package com.tss.grc.config;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.StandardEnvironment;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -224,6 +228,171 @@ class ExternalConfigOverrideContractTest {
             %s""".formatted(String.join("\n            ", missing)))
             .isEmpty();
     }
+
+    /**
+     * F2-456 \u2014 a {@code @Value} on a bare env-var name reads the <em>pre-profile</em> key, so it
+     * is invisible to every override the yml expresses.
+     *
+     * <p>{@code AttachmentStorageService} and {@code EvidenceStorageService} both read
+     * {@code @Value("${STORAGE_BASE_PATH:./uploads}")} while the yml exposes the same concept as the
+     * property {@code grc.storage.base-path} \u2014 and {@code application-prod.yml} re-points that
+     * property at {@code ${FILE_STORAGE_PATH}}. The two spellings therefore <b>agree in dev and
+     * diverge in prod</b>: binder PDFs went to the operator's configured root while attachments and
+     * evidence went to {@code ./uploads}, relative to the service working directory. No amount of
+     * local testing could see it, because dev is the profile where the two agree.
+     *
+     * <p>Hard zero, no exemption map, and the argument is F2-214's: a property path is always
+     * available, and the yml is where profile precedence lives, so reading the raw env key is never
+     * correct code. This is the same question the rest of this class asks \u2014 <em>can the operator's
+     * key reach the code?</em> \u2014 put to the Java side instead of the template, which is why it is
+     * a leg here rather than a second gate (F2-190).
+     */
+    @Test
+    void noValuePlaceholderNamesABareEnvKeyInsteadOfTheProperty() throws IOException {
+        List<String> offenders = new ArrayList<>();
+        int sites = 0;
+
+        for (Path p : javaSources()) {
+            // Strip comments first. This register's convention is that a fix QUOTES the expression
+            // it retired (F2-450), and both fixed sites do exactly that \u2014 so a raw scan would read
+            // the epitaph as the corpse (F2-193) and fail on a correct tree.
+            String body = COMMENT.matcher(Files.readString(p)).replaceAll("");
+            Matcher m = VALUE_PLACEHOLDER.matcher(body);
+            while (m.find()) {
+                sites++;
+                String key = m.group(1).trim();
+                if (BARE_ENV_KEY.matcher(key).matches()) {
+                    offenders.add("%s reads ${%s} \u2014 the raw env key, not a property"
+                                  .formatted(p.getFileName(), key));
+                }
+            }
+        }
+
+        // Anti-vacuity, and the floor sits above the largest WRONG answer rather than above zero
+        // (F2-215): if the comment stripper ever blanks real code, this collapses to 0 and fires,
+        // where the offender list below would simply read as a clean tree.
+        assertThat(sites).as(
+            "Only %d @Value placeholder sites found across src/main/java. That is far below the %d "
+            + "measured, which means the walk or the comment stripper stopped matching and the "
+            + "assertion below is passing over an unread tree.", sites, MIN_VALUE_SITES)
+            .isGreaterThanOrEqualTo(MIN_VALUE_SITES);
+
+        assertThat(offenders).as("""
+            A @Value names a bare SCREAMING_SNAKE env key instead of the Spring property.
+
+            That reads the key BEFORE any profile has a chance to re-point it, so every override \
+            application-prod.yml expresses is invisible to it. F2-456: two file-storage backends \
+            read ${STORAGE_BASE_PATH} while prod maps grc.storage.base-path onto ${FILE_STORAGE_PATH}, \
+            so attachments and evidence went to ./uploads while binder exports went to the \
+            operator's configured root. The spellings agree in dev, which is why it survived.
+
+            Read the property (${grc.some.thing}) and let the yml decide which env key feeds it.
+
+            %s""".formatted(String.join("\n            ", offenders)))
+            .isEmpty();
+    }
+
+    /**
+     * F2-456 \u2014 both env keys must reach the one storage property, in both profiles.
+     *
+     * <p>The fix above is only half of it: the property has to actually follow the key the operator
+     * set. This resolves the <b>real expressions from the yml</b> through a real Spring
+     * {@code Environment}, so it cannot drift from the files and it tests Spring's nested-default
+     * resolution rather than my reading of it.
+     *
+     * <p>The counter-factual leg is the one that matters: with only {@code FILE_STORAGE_PATH} set
+     * \u2014 the shape the template ships \u2014 the retired expression still resolves to {@code ./uploads}.
+     * That is the divergence stated as a measurement rather than as a claim.
+     */
+    @Test
+    void bothStorageEnvKeysReachTheOneStoragePropertyInBothProfiles() throws IOException {
+        String base = storageExpression("src/main/resources/application.yml");
+        String prod = storageExpression("src/main/resources/application-prod.yml");
+
+        String configured = "C:/tss-grc/data/uploads";
+
+        // prod: the operator sets FILE_STORAGE_PATH (what the runbook does) \u2014 property follows it.
+        assertThat(resolve(prod, Map.of("FILE_STORAGE_PATH", configured))).as(
+            "application-prod.yml must map FILE_STORAGE_PATH onto grc.storage.base-path")
+            .isEqualTo(configured);
+
+        // prod: the operator sets the OTHER key instead \u2014 still reaches the same property, which is
+        // what makes the template's "either one works" wording true.
+        assertThat(resolve(prod, Map.of("STORAGE_BASE_PATH", configured))).as(
+            "prod must accept STORAGE_BASE_PATH as a fallback, or the template's wording is false "
+            + "and an operator who set the base-profile key silently gets the yml default")
+            .isEqualTo(configured);
+
+        // base profile: mirror image, so neither key is profile-specific in effect.
+        assertThat(resolve(base, Map.of("STORAGE_BASE_PATH", configured))).isEqualTo(configured);
+        assertThat(resolve(base, Map.of("FILE_STORAGE_PATH", configured))).isEqualTo(configured);
+
+        // Neither set: each profile keeps its own documented default.
+        assertThat(resolve(prod, Map.of())).isEqualTo("/var/data/tss-grc/uploads");
+        assertThat(resolve(base, Map.of())).isEqualTo("./uploads");
+
+        // The counter-factual. This is the defect, measured: the expression the two storage
+        // backends used to carry does NOT follow FILE_STORAGE_PATH, so it lands somewhere else
+        // entirely while the property beside it is correct.
+        assertThat(resolve("${STORAGE_BASE_PATH:./uploads}", Map.of("FILE_STORAGE_PATH", configured)))
+            .as("the retired @Value expression must still demonstrate the divergence \u2014 if this ever "
+                + "equals the configured root, the counter-factual has stopped proving anything")
+            .isEqualTo("./uploads")
+            .isNotEqualTo(configured);
+    }
+
+    /** F2-456: the {@code grc.storage.base-path} expression as the yml really writes it. */
+    private static String storageExpression(String relative) throws IOException {
+        Matcher m = STORAGE_BASE_PATH_LINE.matcher(read(relative));
+        List<String> found = new ArrayList<>();
+        while (m.find()) {
+            found.add(m.group(1).trim());
+        }
+        assertThat(found).as(
+            "Expected exactly one placeholder-valued base-path line in %s. The actuator's "
+            + "management.endpoints.web.base-path is a literal, so it must not match; zero matches "
+            + "means the storage block moved and every assertion built on it is vacuous.", relative)
+            .hasSize(1);
+        return found.get(0);
+    }
+
+    /** Resolve an expression through a real Spring Environment, with {@code env} on top. */
+    private static String resolve(String expression, Map<String, Object> env) {
+        StandardEnvironment e = new StandardEnvironment();
+        e.getPropertySources().addFirst(new MapPropertySource("f2-456-external", env));
+        return e.resolveRequiredPlaceholders(expression);
+    }
+
+    private static List<Path> javaSources() throws IOException {
+        Path root = Paths.get("src/main/java").toAbsolutePath().normalize();
+        assertThat(Files.isDirectory(root)).as(
+            "Expected %s to be a directory. A wrong root would make the scan vacuous.", root)
+            .isTrue();
+        try (var walk = Files.walk(root)) {
+            return walk.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+    }
+
+    /** F2-456: {@code @Value("${...}")}, capturing the key up to a default or the closing brace. */
+    private static final Pattern VALUE_PLACEHOLDER =
+        Pattern.compile("@Value\\(\\s*\"\\$\\{([^:}\"]+)");
+
+    /** A bare env-var name \u2014 no dots, so no profile can re-point it. */
+    private static final Pattern BARE_ENV_KEY = Pattern.compile("[A-Z][A-Z0-9_]*");
+
+    /**
+     * Line comments and block comments in ONE left-to-right alternation. Two sequential passes
+     * corrupt the source (F2-198), and the {@code (?<!:)} is what stops a {@code http://} inside a
+     * string literal opening a comment.
+     */
+    private static final Pattern COMMENT = Pattern.compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+
+    /** Only the storage block writes base-path as a placeholder; the actuator one is a literal. */
+    private static final Pattern STORAGE_BASE_PATH_LINE =
+        Pattern.compile("(?m)^\\s*base-path:\\s*(\\$\\{.*?)\\s*$");
+
+    /** 38 @Value placeholder sites in src/main/java today. */
+    private static final int MIN_VALUE_SITES = 30;
 
     // ── evidence ─────────────────────────────────────────────────────────────
 

@@ -217,7 +217,9 @@ grc:
 
   # File storage (evidence attachments, report exports)
   storage:
-    base-path: ${STORAGE_BASE_PATH:./uploads}
+    # Both env keys map onto this ONE property, and every reader reads the property
+    # (F2-456). This profile prefers its own documented key and accepts the other.
+    base-path: ${STORAGE_BASE_PATH:${FILE_STORAGE_PATH:./uploads}}
     max-file-size-mb: 50
     allowed-extensions: pdf,doc,docx,xls,xlsx,png,jpg,jpeg,zip,txt
 

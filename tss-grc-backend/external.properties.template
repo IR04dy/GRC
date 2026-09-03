@@ -166,8 +166,15 @@ NOTIFY_FROM_EMAIL=noreply@tss-grc.com
 #WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED=true
 
 # ── Storage, schema and API surface ─────────────────────────────
-# STORAGE_BASE_PATH is the base-profile default; prod reads FILE_STORAGE_PATH
-# above. Both exist, and they are different keys — set the one your profile uses.
+# Both keys set the SAME property (grc.storage.base-path) and either one works in
+# either profile: prod prefers FILE_STORAGE_PATH, the base profile prefers
+# STORAGE_BASE_PATH, and each falls back to the other. Setting FILE_STORAGE_PATH
+# alone is enough, and it is what the runbook does.
+#
+# This comment used to read "they are different keys — set the one your profile
+# uses", which was true of the yml and wrong about the code: two @Value sites read
+# ${STORAGE_BASE_PATH} directly, so following it in prod put attachments and
+# evidence under ./uploads while binder exports went to FILE_STORAGE_PATH (F2-456).
 #STORAGE_BASE_PATH=./uploads
 # Flyway's history-table schema. Changing it on a live deployment orphans the
 # existing history and re-runs everything: do not.
