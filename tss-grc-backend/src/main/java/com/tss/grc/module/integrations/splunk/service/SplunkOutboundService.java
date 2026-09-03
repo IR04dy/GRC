@@ -1,5 +1,6 @@
 package com.tss.grc.module.integrations.splunk.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
@@ -249,7 +250,7 @@ public class SplunkOutboundService {
             snapshot.put("event", req.event());
             return objectMapper.writeValueAsString(snapshot);
         } catch (JsonProcessingException ex) {
-            return "{\"_serialise_error\":\"" + ex.getMessage() + "\"}";
+            return "{\"_serialise_error\":\"" + JsonText.escape(ex.getMessage()) + "\"}";
         }
     }
 

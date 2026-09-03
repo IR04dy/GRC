@@ -1,5 +1,6 @@
 package com.tss.grc.config;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService.AuditEventBuilder;
 import com.tss.grc.module.platform.export.ExportAuditContext;
@@ -191,8 +192,11 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
         return last;
     }
 
+    /**
+     * F2-446 — delegates. This escaped {@code \\} and {@code "} and left a raw newline,
+     * which is invalid JSON (RFC 8259 forbids an unescaped control character in a string).
+     */
     private static String esc(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        return JsonText.escape(s);
     }
 }

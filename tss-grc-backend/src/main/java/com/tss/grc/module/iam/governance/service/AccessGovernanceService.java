@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.entity.Permission;
@@ -171,8 +172,8 @@ public class AccessGovernanceService {
             .entityType("Role")
             .entityId(saved.getId())
             .entityCode(saved.getRoleName())
-            .newValueJson("{\"clonedFrom\":\"" + source.getRoleName() + "\",\"grants\":\""
-                + grantCsv(saved.getPermissions()) + "\"}")
+            .newValueJson("{\"clonedFrom\":\"" + JsonText.escape(source.getRoleName())
+                + "\",\"grants\":\"" + JsonText.escape(grantCsv(saved.getPermissions())) + "\"}")
             .message("Role " + saved.getRoleName() + " cloned from "
                 + source.getRoleName() + " (" + saved.getPermissions().size() + " grants)"));
         return toSummary(saved);
@@ -287,8 +288,8 @@ public class AccessGovernanceService {
             .entityType("RolePermissionMatrix")
             .entityId(saved.getId())
             .entityCode(saved.getRoleName())
-            .oldValueJson("{\"grants\":\"" + before + "\"}")
-            .newValueJson("{\"grants\":\"" + after + "\"}")
+            .oldValueJson("{\"grants\":\"" + JsonText.escape(before) + "\"}")
+            .newValueJson("{\"grants\":\"" + JsonText.escape(after) + "\"}")
             .message("Permission matrix updated for role " + saved.getRoleName()
                 + " (" + saved.getPermissions().size() + " grants)"));
         return getMatrix(saved.getId());

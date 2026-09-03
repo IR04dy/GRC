@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.PageSize;
@@ -308,7 +309,8 @@ public class AccessEvidencePackageService {
         for (int i = 0; i < names.length; i++) {
             sb.append("    { \"name\": \"").append(esc(names[i]))
               .append("\", \"bytes\": ").append(blobs[i].length)
-              .append(", \"sha256\": \"").append(sha256(blobs[i])).append("\" }");
+              .append(", \"sha256\": \"").append(JsonText.escape(sha256(blobs[i])))
+              .append("\" }");
             sb.append(i < names.length - 1 ? ",\n" : "\n");
         }
         sb.append("  ]\n");
@@ -368,8 +370,11 @@ public class AccessEvidencePackageService {
         };
     }
 
+    /**
+     * F2-446 — delegates. This replaced newlines with spaces and handled no other C0
+     * control character, so a tab in an evidence-pack file name still produced invalid JSON.
+     */
     private static String esc(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
+        return JsonText.escape(s);
     }
 }

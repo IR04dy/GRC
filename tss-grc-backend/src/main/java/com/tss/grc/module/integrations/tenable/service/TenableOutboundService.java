@@ -1,5 +1,6 @@
 package com.tss.grc.module.integrations.tenable.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
@@ -248,7 +249,7 @@ public class TenableOutboundService {
         try {
             return objectMapper.writeValueAsString(resp);
         } catch (JsonProcessingException ex) {
-            return "{\"_serialise_error\":\"" + ex.getMessage() + "\"}";
+            return "{\"_serialise_error\":\"" + JsonText.escape(ex.getMessage()) + "\"}";
         }
     }
 

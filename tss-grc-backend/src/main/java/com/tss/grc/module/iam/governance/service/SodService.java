@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.governance.entity.SodRule;
 import com.tss.grc.module.iam.governance.entity.SodViolation;
@@ -262,7 +263,8 @@ public class SodService {
         audit.recordEvent(new AuditEventBuilder()
             .actionType("CREATE").sourceModule("IAM").entityType("SodViolation")
             .newValueJson("{\"userId\":" + userId + ",\"rules\":\""
-                + conflicted.stream().map(SodRule::getRuleCode).reduce((x, y) -> x + "," + y).orElse("")
+                + JsonText.escape(conflicted.stream().map(SodRule::getRuleCode)
+                    .reduce((x, y) -> x + "," + y).orElse(""))
                 + "\",\"approvedBy\":" + approver + "}")
             .message("SoD override recorded for " + username + " (" + conflicted.size() + " rule(s))"));
     }

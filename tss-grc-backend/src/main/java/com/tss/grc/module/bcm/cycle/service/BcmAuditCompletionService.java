@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -137,7 +138,8 @@ public class BcmAuditCompletionService {
             row.setRawPayloadJson(payload.rawPayload() == null ? "{}"
                 : new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload.rawPayload()));
         } catch (Exception e) {
-            row.setRawPayloadJson("{\"_serialisation_error\":\"" + e.getMessage() + "\"}");
+            row.setRawPayloadJson(
+                "{\"_serialisation_error\":\"" + JsonText.escape(e.getMessage()) + "\"}");
         }
 
         if (sev >= 3) {

@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.entity.Role;
 import com.tss.grc.module.iam.governance.entity.BreakGlassEvent;
@@ -103,7 +104,8 @@ public class BreakGlassService {
             .entityCode(incidentRef)
             .severity("ERROR")
             .newValueJson("{\"userId\":" + activator + ",\"role\":\"EMERGENCY_RESPONDER\""
-                + ",\"expiresAt\":\"" + expires + "\",\"incidentRef\":\"" + incidentRef + "\"}")
+                + ",\"expiresAt\":\"" + JsonText.escape(String.valueOf(expires))
+                + "\",\"incidentRef\":\"" + JsonText.escape(incidentRef) + "\"}")
             .message("CRITICAL: break-glass activated by " + activatorUsername
                 + " for incident " + incidentRef + " (expires " + expires + ", post-hoc review required)"));
         // V294 (plan §6.6) — in-app notification to the CISO + IAM_LEAD populations.
