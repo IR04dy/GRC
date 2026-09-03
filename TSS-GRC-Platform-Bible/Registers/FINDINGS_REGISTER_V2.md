@@ -15229,6 +15229,229 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-458 — four PDPL dashboard figures asserted a statutory condition they did not measure
+
+| Field | Value |
+|---|---|
+| **Id** | F2-458 |
+| **Title** | `PrivacyService.getStats()` answered "SLA breaches" with an escalation count and "Regulator-notified" with a lifecycle status, and published a literal `0L` for two controls the module does not track — so the PDPL dashboard reported 83% of DSRs within SLA where 0% are, four SDAIA submissions where there are none, and two green all-clears |
+| **Severity** | P1 (live and rendered, both databases, on three PDPL statutory controls) |
+| **Status** | ✅ CLOSED 2026-09-04 |
+| **Found** | 2026-09-04, asking F2-457's closing question of the sibling dashboard: *does each figure's NAME describe the arithmetic behind it?* |
+| **Fixed** | `6d218f30`, merged `fix/f2-458-pdpl-statutory-figures` |
+| **Module** | `privacy` + `tss-grc-ui-v2` |
+| **Migration** | none |
+
+### The mechanism
+
+One method published four keys whose names are right and whose arithmetic answered a
+different question:
+
+```java
+long dsrSla = dsrRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED");   // retired
+long notified = breachRepo.countByOrganisationIdAndStatus(orgId, "NOTIFIED"); // retired
+...
+m.put("dsrSlaBreaches", dsrSla);
+m.put("breachNotifications", notified);
+// Not tracked in this module yet — surfaced as 0 rather than absent.
+m.put("processorsWithoutDpa", 0L);   // retired
+m.put("retentionViolations", 0L);    // retired
+```
+
+🔑 **F2-457's mechanism, and the mirror of it.** There a figure was published under a name
+nothing computed. Here the names are the *correct* names — "SLA breaches" really is "past
+the statutory deadline", "Regulator-notified" really is "we told SDAIA" — and each was
+answered by a **proxy that is measurable against the real thing**. That is what makes this
+one sharper: F2-457's two keys had no true value to compare against, and these do.
+
+**Measured 2026-09-04, byte-identical in dev and the deployed database:**
+
+| the figure | published | the truth | column that answers it |
+|---|---|---|---|
+| `dsrSlaBreaches` | **2** (`status = ESCALATED`) | **12 of 12 open requests past deadline**, 74 to 504 days over | `due_date` |
+| `breachNotifications` | **4** (`status = NOTIFIED`) | **0**; all 17 are `NOT_REPORTED`, `sdaia_submitted_at` NULL on every one | `sdaia_notification_status` |
+| `processorsWithoutDpa` | **0** | not measured at all | none |
+| `retentionViolations` | **0** | not measured at all | none |
+
+### What the operator saw
+
+- A **radial gauge** captioned *"within SLA"* / *"ضمن SLA"*, computed
+  `Math.round(((12 − 2) / 12) × 100)` = **83%**, rendered against `ragBands()` so it read
+  green-to-amber. The honest answer is **0%**. Every one of that tenant's twelve live
+  data-subject requests is past the deadline PDPL Article 23 gives it, one by **504 days**.
+- *"Regulator-notified: 4"* / *"تم إشعار الجهة التنظيمية: 4"* on a register where nothing
+  has been submitted to SDAIA. ⚠ **F2-209 measured that exact divergence and corrected the
+  reader in `PdplBreachConsole`** — its landmine reads *"a statutory gate read the breach
+  LIFECYCLE status, not the column the server owns"* and it built `isSdaiaSubmitted` as the
+  shared predicate. This is the reader it did not touch. F2-215's two-of-N across two
+  surfaces of one question, and the surface it left is the dashboard.
+- Two **green success tiles** — `> 0 ? 'danger' : 'success'` over a server-side literal —
+  asserting zero processors without a DPA and zero retention violations for controls this
+  module does not track. 🔑 **The server's own comment chose that, in writing:** *"Not
+  tracked in this module yet — surfaced as 0 rather than absent"*, as though `0` were the
+  safer of the two. It is the opposite. Absent renders UX-008's em-dash and a reason; `0`
+  renders a green tile asserting compliance. **An invented figure invites a question; an
+  invented all-clear closes one** (F2-197).
+
+### Why the proxies looked reasonable
+
+Both are things that *correlate* with the condition they stood in for, which is why nobody
+re-read them:
+
+- **Escalation is what an operator does when somebody notices a request is late.** So the
+  ESCALATED count is a plausible stand-in for "breached" — until you notice that the
+  register carries the deadline itself, and that the proxy therefore has a measurable error.
+  It had a 6× one.
+- **`NOTIFIED` is a lifecycle state meaning "we consider this notified".** It is a state an
+  operator sets *on the record*; the SDAIA column records what was actually said to the
+  regulator. Those are different facts and this platform keeps both.
+
+⚠ And the `Math.min` on the client was the tell, exactly as in F2-457:
+
+```tsx
+const breaches = Math.min(stats.dsrSlaBreaches ?? 0, open);   // retired
+```
+
+🔑 **A clamp on a ratio's numerator is a bug report about the numerator.** It was a defence
+against two figures describing different populations — and the wrong defence, because it
+*hid* the divergence rather than surfacing it. The server's count now ANDs the open
+predicate, so the breached set is a subset of `dsrOpen` by construction and there is nothing
+left to clamp.
+
+### Why no instrument saw it
+
+The same four gates F2-457 measured, blind for the same four structural reasons — a
+mislabelled figure arrives from the server as a plausible number, so no gate keyed on
+*where the number came from* can see one whose problem is *what it is called*. And a fifth:
+
+- **`kpiProvenance`** ([[F2-195]]) keys on a literal or `|| N` inside the `<Kpi>` tag; these
+  arrive as props from a server field.
+- **`pageDataProvenance`** ([[F2-198]]) asks whether the page calls a server. It does.
+- **`exportProvenance`** ([[F2-199]]) is about emitted documents. This is a screen.
+- **`PrivacyWireContractTest`** ([[F2-211]]) adjudicates *a DTO field the table does not
+  have*. All four keys were on the wire carrying a real non-null number.
+- 🔑 **And [[F2-209]]'s own fix could not see it**, because that slice's population was the
+  breach console's readers. A predicate extracted for one surface does not find the other
+  surfaces that ask the same question — it just makes them look covered.
+
+### The fix
+
+**Repoint the two that have a true value; stop publishing the two that do not.**
+
+```java
+long dsrPastDue = dsrRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
+        orgId, DsrRequestLifecycle.TERMINAL_LIST, java.time.LocalDate.now());
+long sdaiaSubmitted = breachRepo.countByOrganisationIdAndSdaiaNotificationStatusIn(
+        orgId, SDAIA_DISCHARGED);
+```
+
+⚠ **The past-due finder ANDs the open predicate deliberately**, so the breached set is a
+subset of the open count by construction — that is the relation the client's clamp was
+guessing at, moved into the query where it is a fact rather than a hope.
+
+⚠ **`SDAIA_DISCHARGED` is `{ACKNOWLEDGED, SUBMITTED}` and not `IN_PREPARATION`.** F2-209
+drew that distinction on the frontend (`isSdaiaSubmitted` vs `isSdaiaReported`) and this is
+its server-side twin: progress is not discharge, and admitting `IN_PREPARATION` would count
+a notification somebody began six months ago and never sent. It carries a **static block**
+refusing a member that is not in `SDAIA_STATES`, because a token one letter out would match
+no stored row and read exactly like a tenant that has reported no breaches (F2-177).
+
+⚠ **`incidents12m` still counts the lifecycle `NOTIFIED` rows**, and that boundary is
+asserted in both directions. "How many breaches exist" is a legitimate use of the lifecycle
+status; "was the regulator told" is not. Dropping it from the total would have traded a
+false assurance for an under-count.
+
+⚠ **The two untracked keys leave the wire and both surfaces stay visible as an absence** —
+UX-008's em-dash with a bilingual reason on `title` **and** `aria-label` (F2-209: a `title`
+alone is a tooltip a keyboard user never receives). The hint says *cannot be measured*, not
+*not yet computed*: F2-457's three-state distinction, where the second promises a figure
+that never arrives.
+
+⚠ **The label moved with the predicate.** *"SLA breaches"* → *"Past deadline"* /
+*"متجاوزة المهلة"* and *"Regulator-notified"* → *"Reported to SDAIA"* / *"أُبلغت سدايا"*,
+in both languages, because the slice that fixes a predicate is the slice that must fix the
+label that accurately described the old one (F2-212) — and F2-208 found that drift in the
+Arabic half alone, so it is checked per language (house rule 7).
+
+### The gate
+
+Six legs on `PrivacyServiceTest`, the class that already owns this service (F2-190) — which
+had **23 tests and none of them touched `getStats()`** (F2-248: a path with no test is not a
+path somebody decided was safe). 23 → 29.
+
+**Behavioural, not structural, and that is forced by this register's own conventions.** A
+source scan cannot tell a re-added `m.put("dsrSlaBreaches", dsrEscalated)` from the comment
+that quotes it, and this fix quotes every retired expression on purpose (F2-450).
+
+⚠⚠ **Leg 6 is cross-codebase** (the `ConnectorBackingContractTest` precedent — F2-193,
+F2-213, F2-437, F2-457), and without it the whole frontend half is unasserted: reverting it
+re-declares both fields on `PrivacyStatsShape`, `tsc` is satisfied because the wire is
+untyped, and the panels interpolate `undefined` into a green Badge with nothing in either
+suite to notice.
+
+⚠ Two fixture corrections, both from running it: `getStats()` reads **all five**
+repositories, so the two the lifecycle legs never needed had to be mocked before it would
+run at all; and the single-status breach count is called with **seven** different statuses to
+build `incidents12m`, so a per-status stub trips strict stubbing. Answering on the argument
+fixes both and makes the `incidents12m` assertion exact — only `NOTIFIED` contributes, so
+the figure can only have come from the lifecycle count.
+
+### Errors of mine, all caught by running something
+
+- ⚠⚠ **`awk … | cat -A` reported LF on a CRLF file.** I checked `PrivacyService.java`'s line
+  endings through a pipeline, and awk's Windows text-mode read strips the `\r` before
+  `cat -A` ever sees it — so the patch script asserted LF and refused to run. 🔑 **The byte
+  count is the only authority** (F2-456 recorded the shell-`grep` version of this; a
+  *pipeline* is worse, because the tool doing the normalising is not the one you are
+  reading). Fail-before-write held: nothing was written, and every script after that detects
+  its target's own endings and preserves them.
+- ⚠ **A post-condition of my own patch script read the epitaph as the corpse.** It asserted
+  `"processorsWithoutDpa" not in final`, and the token survives in the comment explaining
+  its removal — F2-193, and the second time in this programme (F2-430 was the first).
+  🔑 **This register's convention is that a fix quotes what it replaced, which makes every
+  raw-text post-condition a false positive waiting to happen.** Assert over comment-stripped
+  code, or assert the claim.
+- ⚠ The two repository files were written LF into a CRLF tree, so git warned it would convert
+  them — **the bytes a green build verified would not have been the bytes that ship**
+  (F2-294). Normalised and re-verified before committing.
+- ⚠ The harness printed nothing for minutes because `print` to a pipe is block-buffered.
+  🔑 **A harness whose output is buffered reads exactly like a harness that has hung** — the
+  F2-273 flush lesson, one mechanism over.
+
+### Filed
+
+- **`privacyIncidents12m` reads no date at all.** The key and both labels say *"(12m)"* /
+  *"(12 شهر)"* and the arithmetic sums seven breach statuses with no window — it is the
+  whole register, for ever. F2-368's shape (a quarterly report whose aggregation never reads
+  the period). Measured: **17 of 17 breaches were discovered within the last 12 months**, so
+  it is a no-op today and errs *pessimistically* when it is not (F2-210's less-reported
+  direction). Bounding it needs a decision about which column dates a breach — F2-209
+  established `discoveredAt` is the awareness instant while `occurredAt` and `reportedAt`
+  have no column at all — so it is a product question, not a side effect of this fix.
+- **`piaCompleted` counts `APPROVED` only.** [[F2-402]] established that
+  `APPROVED_WITH_CONDITIONS` is a **decided** state — the DPIA machine stamps `decidedAt`
+  for it exactly as for `APPROVED` — and corrected the sibling reader `dpiaOpen` in
+  `DataOfficerQueryService`. This reader kept the narrower list. Latent: **0 rows hold that
+  status** in either database, so the count is right today and wrong the first time a DPIA
+  is approved with conditions. F2-215's two-of-N across two modules.
+- **An open DSR with no `due_date` is in neither bucket.** `DueDateBefore` excludes a NULL,
+  correctly — a request with no recorded deadline is not *provably* past one — so the
+  breached count is not the complement of "within SLA". Measured **0 such rows** in both
+  databases; a third figure nothing renders would be an inert key (F2-184).
+- ⚠⚠ **A third citation for the DSR 30-day clock.** This page's own sub-note says
+  *"30-day SLA (PDPL Art. 18)"*, `DsrRequestLifecycle`'s javadoc says **Article 23**, and
+  [[F2-202]] says **Article 4**. [[F2-344]] fixed the *breach*-context mis-citations and
+  explicitly **filed** the DSR-clock question as an owner decision; Article 18 is a third
+  variant to add to that filing, and picking a winner changes what the platform tells a DPO
+  which article governs.
+- **The 12 past-due requests and the 4 NOTIFIED-but-unreported breaches** are live rows in
+  both databases. They are now reported honestly, which is the whole point; whether the
+  organisation's real position is "12 genuinely breached" or "12 rows with stale seed
+  deadlines" is a data question for the owner, and repairing it rewrites live statutory
+  records in two databases (F2-183/F2-196).
+
+---
+
 ## F2-457 — two ISO 22301 KPI keys carried the exercise completion rate, so one number reached the dashboard three times
 
 | Field | Value |
