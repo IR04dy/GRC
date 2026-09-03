@@ -15229,6 +15229,144 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-450 — a set built from `getAuthorities()` is not a set of roles, and this one decided who may sign an approval step
+
+| Field | Value |
+|---|---|
+| **Id** | F2-450 |
+| **Title** | The acting "role" set carried every permission string, and only one of its two readers upper-cased it |
+| **Severity** | P2 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, following a `substring` classifier's false positive to what the stripped set decides |
+| **Fixed** | `14384b2d`, merged `fix/f2-450-acting-role-set` |
+| **Module** | `module/workflow/approval_chains` |
+| **Migration** | none |
+
+### What was wrong
+
+`CustomUserDetailsService` grants **two kinds** of authority: `ROLE_<roleName>` for each role, and
+each **permission name verbatim** (`ADMIN_APPROVE`, `AI_WRITE`, `BCM_EXPORT` …). Measured
+2026-09-03: **144 permission strings in dev, 114 in prod.**
+
+`ApprovalChainController#acting()` built its "roles" set as
+
+```java
+roles.add(name.startsWith("ROLE_") ? name.substring(5) : name);
+```
+
+— which **keeps every non-prefixed authority**. So the set carried every permission the principal
+held, and that set is the input to `ApprovalChainInstanceService#matchesActor`:
+
+```java
+if (s.getRequiredRole() != null && rolesUpper.contains(s.getRequiredRole().toUpperCase(...)))
+    return true;   // this actor may sign this approval step
+```
+
+A step's `required_role` is **free text a tenant admin types**, and permission names look exactly
+like the role names this platform already ships (`DLP_INGEST`, `SANCTIONS_CHECK`) — so a step
+configured to require one was satisfied by every holder of that permission rather than by the
+intended job family.
+
+Proved live against a planted template/step/instance, as `rmanager` (RISK_MANAGER, holding the
+`BCM_EXPORT` permission and no role of that name), never `admin`:
+
+```
+pre-fix   POST /api/v1/workflow/chains/{id}/actions  {stepOrder:1, action:APPROVED}   -> 200
+post-fix  same request, same step requiring role "BCM_EXPORT"                         -> 403
+          "Not an authorised approver for step 1"
+guard     a step requiring the REAL role RISK_MANAGER                     -> 200 in BOTH runs
+```
+
+### 🔑🔑 Three other sites strip `ROLE_` and all three FILTER on the prefix first
+
+* `NdiAuditService#firstRole` — `.filter(a -> a != null && a.startsWith("ROLE_"))`
+* `SignatureService` — `.filter(a -> a.startsWith("ROLE_"))`
+* `WorkflowRequestService` — `.filter(a -> a.startsWith("ROLE_"))`, **a sibling service of the
+  same module**
+
+**One outlier of four, and the outlier was the one feeding an authorisation decision.** F2-205 /
+F2-282's lone-outlier tell, and F2-215's two-of-N with the correct idiom present three times over
+— once in the same module.
+
+### ⚠ Latent, and say which you have
+
+Measured in **both** databases: the role-name / permission-name intersection is **0**, and none of
+the **15** configured `required_role` values (`BOARD_CHAIR`, `CISO`, `DPO`, `RISK_OWNER` …) is a
+permission string. So nothing was mis-authorised, and the narrowing **provably cannot refuse a
+step that works today** (F2-214). What it buys is that the hazard is **absent** rather than latent
+(F2-213) — and `required_role` being free text is what makes "latent" the right word rather than
+"impossible".
+
+### The second half: one normalisation, two readers
+
+`matchesActor`'s parameter is named `rolesUpper`, and only **one** of its two callers supplied one
+— `pendingForUser` built `rolesUpper` explicitly, `recordAction` passed the controller's raw set.
+Every role name is upper-case in both databases, so the divergence was latent, but **its failure is
+asymmetric and legible**: a lower-case role name would make `pendingForUser` list a step in the
+user's inbox that `recordAction` then refuses with 403. Normalised where the set is built, so the
+parameter name is a claim about both callers rather than about one.
+
+### ⚠⚠ A control survived because my own quotation was not faithful
+
+The gate strips comments before scanning, because the fix's javadoc quotes the retired expression
+to record what it replaced (F2-193). Control C — *disable the stripping* — **SURVIVED**: I had
+quoted the expression as ``` `name.startsWith("ROLE_") ? name.substring(5) : name` ```, ending at a
+backtick, and the detector requires the closing paren. So the mutated code gave the same answer and
+the stripping was **not** load-bearing.
+
+🔑 The fix was not to weaken the detector but to **quote the retired expression in full, closing
+paren included** — which makes the documentation faithful *and* makes the stripping demonstrably
+necessary. 4/4 controls fire after.
+
+### ⚠ Where this came from, and two classifier lessons worth more than the census
+
+The slice began as a sweep for `substring` with a literal index — F2-393's `subList` family one
+method over. That vein is a **clean sweep: 89 sites, 0 defects** (44 fixed-length receivers, 37
+guarded), and **all 8 candidates were refuted by my own classifier's blind spots**:
+
+* **`startsWith("PREFIX")` is a length guard for `substring(prefix.length())`** — the commonest
+  correct idiom, and omitting it from a guard vocabulary produces a false positive on exactly the
+  right-looking code.
+* **A fixed-length receiver reached through a CHAIN** (`UUID.randomUUID().toString().replace("-","")
+  .substring(0, 6)`) is invisible to a pattern keyed on the immediate receiver — that accounted for
+  6 of the 8.
+
+Following the one remaining candidate — `ApprovalChainController`'s ternary, which is *correct* as a
+`substring` — to **what the stripped set decides** is what found this. 🔑 A refuted candidate can
+still be the right place to read.
+
+### Verification
+
+| | |
+|---|---|
+| Unit | 33/33 — 3 controller legs capturing what reaches the service (F2-431's shape), 27 service (**26 pre-existing unchanged**, the corroboration that the narrowing broke nothing, + 1 lifted), 3 gate legs |
+| Gate | `ActingRoleSetContractTest` — hard zero, **no exemption map**, safe because the filtered form is always available and strictly more precise, so there is no correct code for it to fail on |
+| Live probe | **7/7 post-fix, 5/7 pre-fix** with exactly the two discriminating legs failing; planted its own rows (F2-206), cleaned with `CHARINDEX` in a `finally`, registers verified back at 6/24/6 in both runs |
+| Controls | **4/4 fire**, 0 survived, post-restore GREEN |
+| Build | `mvn -o clean package` **5144/0/0**, predicted exactly |
+
+### ⚠ `matchesActor` is package-private, and that is where its test belongs
+
+Two legs had to move from the controller's test to `ApprovalChainInstanceServiceTest` — F2-417's
+recorded lesson verbatim: *the answer is not to widen the method to public for a test's convenience
+but to put the behavioural assertion with that service's own tests.*
+
+### Filed, not fixed (F2-188)
+
+* **`required_role` is unconstrained free text** with no CHECK and no reference to `iam.roles`, so a
+  tenant admin can configure a step requiring a role nobody holds — F2-253's zero-holder shape at a
+  workflow step rather than at a guard. Validating it against the role catalogue is a product
+  decision (an admin may legitimately pre-configure a step for a role they are about to create).
+* **The `catch`-swallow vein was measured and rejected as a gate**: ~36 catch blocks neither log,
+  rethrow nor return, and the large majority are legitimate — an optional PDF decoration failing
+  (`DocumentException ignored`), a `NumberFormatException` meaning *not a number, skip*, a retry
+  loop keeping `last = ex`. A gate there would fail on correct code (F2-214), which is the one
+  thing a gate must never do.
+* **F2-294's filed `BcmSettings#validate()` unboxing item is REFUTED**: all ten validated columns
+  are NOT NULL with 0 nulls in both databases, `update()` null-guards every scalar write, and
+  `getOrInit()`/`reset()` always produce a fully-populated row — so no null can reach the unboxing.
+  Recorded so nobody re-derives it (F2-283).
+
 ## F2-449 — a caller-supplied search term IS the `LIKE` pattern, and house rule 5's own trap had never been asked of user input
 
 | Field | Value |
