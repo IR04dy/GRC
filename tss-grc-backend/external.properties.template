@@ -47,10 +47,26 @@ DB_USERNAME=grc_app
 DB_PASSWORD=REPLACE-ME-DB-PASSWORD
 
 # ── Flyway (restored-DB deployment) ─────────────────────────────────────────
-# The restored TSS_GRC already carries every migration up to V292. Baseline
-# there so only FUTURE migrations (V293+) auto-apply at startup.
+# ⚠ THIS NUMBER IS NOT A CONSTANT, AND IT IS THE MOST DANGEROUS VALUE IN THIS
+# FILE. It must equal the newest migration ALREADY PRESENT in the backup you
+# restored. Flyway then records a baseline there and applies only what is above
+# it. Set it LOWER and Flyway replays every migration in between against objects
+# that already exist, and the startup dies part-way with the schema half-applied.
+#
+# This template read a flat `292` for months. That was correct for the 2026-07-11
+# backup and is wrong for any backup taken since: the tree is at V398, so a
+# database copied today needs 398. A dev-sourced backup carries NO
+# flyway_schema_history at all (dev applies migrations by hand with Flyway off),
+# so there is nothing in the database to correct a wrong value here.
+#
+# Verified 2026-09-03 by restoring a V398 backup and booting this jar against it:
+# "Successfully baselined schema with version: 398", then "Schema [platform] is
+# up to date. No migration necessary.", and zero "Migrating schema" lines.
+#
+# After the first boot, confirm with /actuator/info -- packagedHead, appliedHead
+# and an empty `pending` list are the check that this value was right.
 FLYWAY_BASELINE_ON_MIGRATE=true
-FLYWAY_BASELINE_VERSION=292
+FLYWAY_BASELINE_VERSION=398
 
 # ── HTTP (behind the nginx reverse proxy) ───────────────────────────────────
 # nginx terminates on :80 and proxies to the backend on loopback:8084.

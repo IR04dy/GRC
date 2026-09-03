@@ -1,9 +1,35 @@
 # TSS GRC — Windows Server Deployment Runbook
 
+> ## ⚠ READ THIS BEFORE FOLLOWING ANY VERSION NUMBER BELOW
+>
+> This runbook documents the **2026-07-11 go-live**, whose backup carried the schema up to
+> **V292**. Every `292` in this file is that deployment's figure, not a constant.
+>
+> 🔑 **`FLYWAY_BASELINE_VERSION` is not a fixed value — it must equal the newest migration
+> already present in the backup you are restoring.** Set it lower and Flyway replays every
+> migration above it against objects that already exist, and the startup dies part-way with
+> the schema half-modified. The tree is now at **V398**, so a backup taken today needs
+> `FLYWAY_BASELINE_VERSION=398`.
+>
+> **For a NEW server, use the self-contained bundle instead of this file.** It ships the jar,
+> the UI, the uploads, a fresh verified backup, service definitions, a verification script and
+> its own guide — and the restore-plus-first-boot was rehearsed on the build machine before
+> hand-over:
+>
+> ```
+> D:\TSS-GRC-Deploy-2026-09-03\SERVER_DEPLOYMENT_GUIDE.md
+> ```
+>
+> This file remains the reference for the **existing** deployment at `D:\Deployment\tss-grc`,
+> which is genuinely baselined at V292 (Flyway history V292→V344, so V345–V398 apply on its
+> next restart).
+
 Deploys the platform to a Windows Server cloud machine, reachable by **IP over
 HTTP** (TLS can be added at the reverse proxy later). Database arrives as a
 **restore of the dev `TSS_GRC` database** (all schema + demo tenants), with
-Flyway baselined at **V292** so only future migrations auto-apply.
+Flyway baselined at the head already present in that backup (**V292** for the
+July 2026 backup; **V398** for one taken today) so only future migrations
+auto-apply.
 
 **Topology**
 
@@ -106,7 +132,10 @@ Sanity check:
 
 ```powershell
 sqlcmd -S localhost\SQLEXPRESS -U grc_app -P "<STRONG-DB-PASSWORD>" -d TSS_GRC -Q "SELECT COUNT(*) AS users FROM iam.users; SELECT COUNT(*) AS perms FROM iam.permissions"
-# expect: users >= 7, perms = 94
+# expect: users >= 7, perms = the catalogue size of the backup you restored
+# (94 in the July 2026 backup; 144 in the dev database as of 2026-09-03, 114 on the
+#  deployed server, which is behind by the pending V345-V398 range. This line said a
+#  flat "perms = 94" and that stopped being true the moment the catalogue grew.)
 ```
 
 ---
@@ -308,9 +337,14 @@ schtasks /Create /TN "TSS GRC DB backup" /SC DAILY /ST 02:00 /RU SYSTEM /TR "sql
    like a bug if you skip it. Change authorisation **fails closed** by design
    (ADR-017 D-2): a `CAB`/`ECAB` gate whose committee is unmapped, or mapped to
    a committee with no active voting members, **refuses every approval** with a
-   409 rather than approving without an authority. Measured on the deployment
-   database: the `CAB` gate points at committee 13 and `ECAB` at committee 12,
-   and **both hold zero member terms**. Check with
+   409 rather than approving without an authority. ⚠ **This is a per-database
+   fact and the two differ.** On the *deployment* database the `CAB` gate points
+   at committee 13 and `ECAB` at committee 12 and **both hold zero member
+   terms**; on the *dev* database (the source of the 2026-09-03 bundle) the same
+   two gates map to committee 13 (IT Steering) and 12 (Executive) with **3
+   active seated terms each, all linked to real users and all inside their term
+   window** — measured 2026-09-03, so change authorisation works there out of
+   the box. Do not carry either answer across; check with
    `GET /api/v1/changes/governance-health` (it names which half is missing) and
    follow **`docs/change-manager/CAB_OPERATING_RUNBOOK.md`** §0–§2. Appointing
    members is a tenant decision, so no migration can do it for you.
