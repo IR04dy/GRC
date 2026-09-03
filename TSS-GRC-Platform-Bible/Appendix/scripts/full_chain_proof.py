@@ -17,6 +17,7 @@ import pyodbc
 
 sys.path.insert(0, r"D:\AYMAN\GRC\TSS-GRC-Platform-Bible\Appendix\scripts")
 import schema_from_catalog as G                                     # noqa: E402
+import chain_marker                                                 # noqa: E402
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 SCRATCH = "TSS_GRC_FULL_CHAIN"
@@ -125,6 +126,15 @@ try:
     print("\n   JPA-mapped tables STILL missing from the built database: %d" % len(missing))
     for x in missing[:25]:
         print("      %s.%s" % x)
+
+    # F2-444 — stamp the provenance so schema_convergence.py can read the head instead of being
+    # told it. The reader defaulted to whatever database was there and had no way to notice a
+    # build twenty-seven days old; measured cost of that was 28 CHECKs, 7 FKs and 18 columns
+    # reported as defects when every one was merely newer than the build.
+    reached = files[-1][0] if STOP_AFTER >= files[-1][0] else STOP_AFTER
+    chain_marker.stamp(cur, reached, ok, G.MIG_DIR, complete=(ok == len(files)))
+    print("   stamped chain_build_marker: head V%d %s, %d of %d applied"
+          % (reached, "complete" if ok == len(files) else "ABORTED", ok, len(files)))
 finally:
     # --keep leaves the built database in place so another instrument can read it.
     #

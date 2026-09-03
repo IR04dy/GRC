@@ -38,6 +38,9 @@ import sys
 
 import pyodbc
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import chain_marker                                                    # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 PROOF_DB = "TSS_GRC_ChainProof"
@@ -121,6 +124,15 @@ for ver, fn in vs:
             print("chain reached: V%d applied cleanly, then V%d failed" % (vs[vs.index((ver, fn)) - 1][0] if vs.index((ver, fn)) else 0, ver))
             cu.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'")
             print("tables created so far: %d" % cu.fetchone()[0])
+            if "--keep" in sys.argv:
+                # F2-444: record the head the build REACHED, which is the last version applied
+                # cleanly. That is precisely the number schema_convergence.py needs and could not
+                # ask for — without it a partial build reads as a complete one and every object
+                # above the stop reads as a defect.
+                reached = vs[vs.index((ver, fn)) - 1][0] if vs.index((ver, fn)) else 0
+                chain_marker.stamp(cu, reached, applied, MIG, complete=False)
+                print("stamped chain_build_marker: head V%d (ABORTED), %d applied"
+                      % (reached, applied))
             if "--keep" not in sys.argv:
                 cn.close()
                 mc.execute("ALTER DATABASE [" + PROOF_DB + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
@@ -136,6 +148,10 @@ tables = cu.fetchone()[0]
 print("\n" + "=" * 100)
 print("THE WHOLE CHAIN RAN: %d migrations applied, %d tables created" % (applied, tables))
 print("=" * 100)
+chain_marker.stamp(cu, vs[-1][0] if stop_after is None else stop_after, applied, MIG,
+                   complete=stop_after is None)
+print("stamped chain_build_marker: head V%d, %d applied"
+      % (vs[-1][0] if stop_after is None else stop_after, applied))
 if "--keep" not in sys.argv:
     cn.close()
     mc.execute("ALTER DATABASE [" + PROOF_DB + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")

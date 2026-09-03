@@ -15229,6 +15229,143 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-444 — a builder that drops its own database, a reader that could not ask which head it saw, and 28 phantom findings
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — provenance stamped, derived, gated; and F2-153's residue re-measured |
+| **Severity** | **P2 — an instrument that manufactures findings.** No product defect: what was broken is the pair of scripts F2-09 and F2-153 are measured with, and the register still carries their stale numbers |
+| **Source** | asked of F2-09's own row, which names the **index axis** as still open — the chain proof was run first to see whether its recorded claim still held |
+| **Size** | M — one shared module, three script edits, one gate, no production change |
+
+### What was found, and it was found by nearly filing it
+
+`Appendix/scripts` holds three instruments for one question. `chain_proof.py` and
+`full_chain_proof.py` **build** a scratch database by applying V1 → head in Flyway's order;
+`schema_convergence.py` **reads** that database and diffs it against the Python-bootstrapped dev
+schema. They were coupled by nothing but a database name — and **both builders DROP the database on
+a successful run**, so the only database the reader can ever find is one left behind by an aborted
+run or by `--keep`.
+
+Run at the start of this slice, the reader reported — against a scratch database built **twenty-seven
+days earlier at V372**:
+
+```
+COLUMNS missing from the build: 18
+CHECK:       dev 445 · built 414 · missing 31
+  [2] named by a migration at or below the stop and ABSENT from the build: 28
+      V375 consumer.complaint.ck_complaint_category … V377 scm.fourth_party_exposures.ck_fpe_status
+FOREIGN KEY: dev 185 · built 178 · missing 7
+```
+
+**Every one of those 28 CHECKs and 18 columns was merely newer than the build** — V375/V376/V377
+(F2-183, F2-221, F2-229) and V387/V388/V389 (F2-271, F2-272), migrations written by the slices that
+added them. Rebuilt at V398 the honest answer is **0 columns and 0 in the defect bucket**.
+
+🔑 **I had a complete, plausible, entirely false finding drafted** — *"28 CHECK constraints that three
+recent migrations declare and a fresh install does not get"* — and what stopped it was noticing that
+the header said `built=TSS_GRC_FULL_CHAIN (467 tables)` while the chain I had just run built **471**.
+
+### 🔑🔑 The reader said so in its own second line, and one partition asserted the opposite
+
+It printed *"⚠ could not determine the chain's stopping point"*, and its **TABLE** and **COLUMN**
+partitions each printed an explicit caveat — *"⚠ NO STOP GIVEN, so this cannot be read as a defect"*.
+Its **CONSTRAINT** partition instead asserted a conclusion:
+
+> The migration ran and the constraint is not there.
+
+That is true only if the build **reached** that migration, which the reader cannot know. **One
+script, three partitions, two honest** — and the one that asserted is the one that produced the
+phantom findings. F2-184's shape (a heading that answers the question a reader was about to ask) at
+the level of a report, with the correct treatment visible twice over (F2-215's two-of-N).
+
+### The fix, and the distinction that makes it legitimate
+
+`stop_point()`'s docstring said the obstacle plainly: *"full_chain_proof.py prints its stopping point
+but records it nowhere, so there is no marker table to read"* — and refused to infer the stop, with
+the right reason: *"guessing the stop from the highest-numbered object present would make the caveat
+depend on the same migrations it is meant to qualify."*
+
+⚠⚠ **That reasoning was always correct and is preserved verbatim. Reading a RECORDED head is not
+INFERRING one.** What changed is that the builders now record it:
+
+- **`chain_marker.py`** — `stamp` / `read` / `describe` / `folder_head`; one declaration, three
+  readers (F2-190). The marker records the head **reached**, which on an aborted run is the last
+  version applied cleanly.
+- **both builders stamp it**, including `chain_proof.py`'s `--keep` failure path — the path that
+  leaves a *partial* build for the reader to find, and therefore the one that matters most.
+- **the reader derives the stop from the marker** when no `--stop` is given, prints the provenance
+  **first**, and names staleness with both heads.
+- **bucket [2]'s prose is conditional** on knowing the stop.
+
+### Control, on ONE genuinely stale V372 database built for the purpose
+
+| | pre-fix | post-fix |
+|---|---|---|
+| provenance | *"could not determine the chain's stopping point"* | `head V372 ABORTED, 360 applied, built 2026-09-03 00:23 UTC (folder head is now V398)` + **STALE, 26 ahead** |
+| CHECK `[1]` expected-missing | 0 | **28** |
+| CHECK `[2]` "the migration ran" | **28** | **0** |
+| CHECK `[3]` never named | 3 | 3 |
+| FOREIGN KEY | 0 / 0 / 7 | 0 / 0 / 7 |
+
+Both readings come from the same database, so the difference is the fix and nothing else.
+
+### ⚙ And the measurement the slice set out to make: F2-153's residue is not 32 + 53
+
+The register records F2-153 as *"32 CHECKs and 53 FKs a fresh install does not enforce"*, measured
+2026-08-07 at ~V372. Re-measured at **V398 against a fresh build**:
+
+- **3 tables** missing — the known ADR-017 §D-2 bootstrap-only trio, unchanged.
+- **0 columns** missing.
+- **CHECK 3 missing · FOREIGN KEY 7 missing**, and **bucket [2] is 0 across tables, columns, CHECKs
+  and FKs** — so the guard-skipped-CREATE mechanism F2-153 traced is **fully closed**.
+
+⚠⚠ And the residue means less than the numbers suggest, which is the point of measuring provenance
+rather than counting: **all 10 are named by no migration anywhere, and none of the six tables they
+sit on is `@Table`-mapped.** Two (`compliance.compliance_assessments`, `compliance.compliance_findings`)
+are the bootstrap-only trio, so a fresh install lacks the table itself; `workflow.workflow_instances`
+and `workflow.workflow_tasks` are **F2-301's shadow tables** (unmapped, with mapped bare twins);
+`risk.risk_indicators` and `platform.business_units` are unmapped too. So no code writes any of them
+through the platform. 🔑 **The honest reading is "10 constraints on six tables the platform does not
+read", not "10 constraints a fresh install does not enforce"** — and the register's 32 + 53 overstates
+the debt, i.e. it errs pessimistically (F2-210's less-likely-to-be-reported direction).
+
+⚙ The chain itself: **V1 → V398 runs to completion, 386 migrations, 471 tables.** The register's
+recorded claim was *"V1→V372 to completion"*; it now extends to V398, which nothing had checked.
+
+### ⚠⚠ The controls found two real holes in my own gate, both the same shape
+
+- **`chain_proof.py` stamps on TWO paths**, so reverting either left
+  `contains("chain_marker.stamp(")` satisfied by the other and the mutation **SURVIVED** — while the
+  mutated code was genuinely wrong (a completed chain would no longer record its head).
+- **the reader reads the marker at TWO sites** answering different questions (`stop_point()` derives
+  the stop, `main()` prints the provenance), with the same survival — and there the mutated code is
+  worse than wrong: the report would claim the provenance is unknown *while still using the head*.
+
+F2-194's substring-satisfied-by-something-else, **third consecutive slice** in which the harness
+finds it in a leg written after quoting it. Both legs now assert **counts** with the expected number
+and its reason recorded, and the aborted path must stamp `complete=False` — because **a partial build
+recorded as complete is worse than one recorded as unknown**: the reader would then attribute every
+later object to a defect *with confidence*.
+
+### Verification
+
+- `ChainBuildProvenanceContractTest` **5/5**, hermetic — it reads the four Python files, the same
+  cross-tree shape `ConnectorBackingContractTest` (F2-193) and
+  `SelfReportingControlReaderContractTest` (F2-437) use. These scripts had **no test coverage of any
+  kind**, which is not the same as somebody deciding they were safe (F2-248).
+- **5/5 controls fire**, one per half, post-restore green. The load-bearing one is **D, the prose**:
+  the coupling can be restored and the caveat reverted independently, and it was the caveat that
+  turned a stale build into 28 findings.
+- The detector finds the enclosing conditional **by indentation**, never a fixed character window —
+  F2-424 measured that a javadoc longer than the window silently pushes the guard out of it and the
+  population then reads as clean. Its self-test carries the literal pre-fix shape plus two
+  legitimate guarded forms that must **not** be flagged (F2-214).
+- Both scratch databases dropped afterwards, so nothing is left behind for the next reader to
+  mistake for current — which is the hazard this finding is about.
+
+---
+
 ## F2-443 — the fourth member of F2-442's class, gated: three startup-fatal resolutions, all measured clean
 
 | | |
