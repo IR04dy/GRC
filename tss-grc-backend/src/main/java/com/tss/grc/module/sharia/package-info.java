@@ -114,11 +114,36 @@
  *   <li>{@code SHARIA_AUDIT_FINDING_RAISED} (severity-tagged) /
  *       {@code SHARIA_AUDIT_FINDING_TRANSITIONED}</li>
  *   <li>{@code SHARIA_NC_EVENT_DETECTED} (with SNCI amount) /
- *       {@code SHARIA_NC_EVENT_PURIFIED} / {@code SHARIA_NC_EVENT_CLOSED}</li>
+ *       {@code SHARIA_NC_EVENT_TRANSITIONED} (with {@code from} / {@code to} in the payload) /
+ *       {@code SHARIA_NC_EVENT_PURIFIED}</li>
  *   <li>{@code SHARIA_PRODUCT_SUBMITTED} / {@code SHARIA_PRODUCT_APPROVED} /
  *       {@code SHARIA_PRODUCT_LAUNCHED} / {@code SHARIA_PRODUCT_DECOMMISSIONED}</li>
- *   <li>{@code SHARIA_SCHOLAR_COI_DECLARED} / {@code SHARIA_SCHOLAR_TERM_EXPIRING}</li>
- *   <li>{@code SHARIA_BOARD_MEETING_SHORTFALL} — annual cadence breach</li>
+ *   <li>{@code SHARIA_SCHOLAR_COI_DECLARED} / {@code SHARIA_SCHOLAR_REGISTERED} /
+ *       {@code SHARIA_SCHOLAR_UPDATED}</li>
  * </ul>
+ *
+ * <p><b>F2-459 -- three tokens were removed from that list because nothing emits them.</b> It
+ * previously named {@code SHARIA_SCHOLAR_TERM_EXPIRING}, {@code SHARIA_BOARD_MEETING_SHORTFALL}
+ * and {@code SHARIA_NC_EVENT_CLOSED}. Measured against every string literal in
+ * {@code src/main/java}, this module emits <b>21</b> {@code SHARIA_*} tokens and none of those
+ * is one of them: the term-expiry ladder AR-260 triggers on the first and has fired 0 times;
+ * the second is the SAMA cadence-breach escalation AR-260's own description promises and no
+ * code path publishes; and the third does not exist because closure rides
+ * {@code SHARIA_NC_EVENT_TRANSITIONED} with {@code to} in the payload, so a rule wanting "NC
+ * event closed" has to match the transition and read the payload.
+ *
+ * <p>⚙ That third one was found by the gate, not by reading: the leg below re-derives the
+ * emitted set from real code and refuted the count in this very paragraph on its first run
+ * (two, then three). A mechanical check over a documented list is worth more than a careful
+ * reading of it, which is the whole argument for the leg existing.
+ *
+ * <p>🔑 A list headed "Emits F7 audit + F8 trigger codes" is the artefact a developer reads
+ * before wiring a rule, so a token documented here reads as available. It is also why the
+ * absence was invisible to F2-436's census: that finding's shortlist required a trigger to be
+ * "present in NO Java file", and a {@code package-info.java} is a Java file made entirely of
+ * comments -- so every token a module DOCUMENTS as emitted counted as evidence that it IS
+ * (F2-193's epitaph-as-corpse, in a detector rather than in a fix). Re-run with comments
+ * stripped, 13 further triggers are present in Java only inside a comment and 7 of them
+ * survive that finding's full criteria, so its readable shortlist is 15 rather than 8.
  */
 package com.tss.grc.module.sharia;

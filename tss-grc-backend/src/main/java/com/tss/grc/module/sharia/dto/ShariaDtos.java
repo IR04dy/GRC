@@ -72,7 +72,10 @@ public final class ShariaDtos {
         private String coiNotesEn;
         private String coiNotesAr;
         private BigDecimal annualFeeSar;
-        private Integer meetingsAttendedYtd;
+        // F2-459: `meetingsAttendedYtd` is deliberately ABSENT. Nothing in the platform writes
+        // that column and nothing resets it, so publishing it shipped a frozen seed value as a
+        // SAMA Shariah-governance attendance figure. Declaring a field the wire cannot honestly
+        // fill is the shape that produced F2-211's em-dash-on-every-row defect.
         private String email;
         private String phone;
         private LocalDateTime createdAt;

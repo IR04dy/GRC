@@ -745,7 +745,6 @@ public class ShariaService {
                 .coiDeclaredAt(s.getCoiDeclaredAt())
                 .coiNotesEn(s.getCoiNotesEn()).coiNotesAr(s.getCoiNotesAr())
                 .annualFeeSar(s.getAnnualFeeSar())
-                .meetingsAttendedYtd(s.getMeetingsAttendedYtd())
                 .email(s.getEmail()).phone(s.getPhone())
                 .createdAt(s.getCreatedAt()).updatedAt(s.getUpdatedAt())
                 .build();
