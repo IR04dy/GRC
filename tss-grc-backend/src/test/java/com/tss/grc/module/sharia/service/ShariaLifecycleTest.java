@@ -682,6 +682,30 @@ class ShariaLifecycleTest {
             .containsPattern("(?s)title=\\{attendanceNotRecorded\\}"
                 + ".{0,80}?aria-label=\\{attendanceNotRecorded\\}");
 
+        // And the CLIENT TYPE must not declare it either. Nothing asserted this until the
+        // control harness re-aimed a mis-anchored control at it: a type declaring a field the
+        // wire never carries is F2-211's own family, and it is the declaration a future reader
+        // would wire a cell to, believing the figure exists.
+        java.nio.file.Path client = Paths.get("../tss-grc-ui-v2/src/lib/sharia.ts")
+            .toAbsolutePath().normalize();
+        assertThat(Files.exists(client)).as(
+            "Expected %s to exist. A wrong path would make this leg vacuous rather than "
+            + "failing.", client).isTrue();
+        String clientCode = Pattern
+            .compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/")
+            .matcher(Files.readString(client, StandardCharsets.UTF_8))
+            .replaceAll("");
+        assertThat(clientCode).as(
+            "lib/sharia.ts should still declare the scholar type -- otherwise the assertion "
+            + "below passes over nothing (F2-235).").contains("annualFeeSar");
+        assertThat(clientCode).as("""
+            lib/sharia.ts must not declare the retired attendance field.
+
+            The server no longer sends it, and a client type declaring a field the wire never \
+            carries is what produced F2-211's em-dash-on-every-row defect. It is also the \
+            declaration the next reader would wire a cell to, believing the figure exists.""")
+            .doesNotContain("meetingsAttendedYtd");
+
         assertThat(stripped).as("""
             The hint must say the figure CANNOT be measured, not that it is not yet computed. \
             UX-008 has three states and the difference between the last two is the whole point: \
