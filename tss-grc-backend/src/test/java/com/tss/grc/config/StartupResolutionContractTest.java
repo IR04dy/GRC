@@ -266,7 +266,13 @@ class StartupResolutionContractTest {
         return new Corpus(out, unloadable);
     }
 
-    private static List<Class<?>> shippedClasses() {
+    /**
+     * Package-private because it is the platform's one classpath walk and F2-460 is its third
+     * reader ({@code UnboundedBulkWriteContractTest}). Copying the walk would give that gate a
+     * second corpus free to disagree with this one about which classes shipped (F2-190), and
+     * the tolerance for a load failure is asserted empty in exactly one place -- here.
+     */
+    static List<Class<?>> shippedClasses() {
         return corpus().loaded();
     }
 
