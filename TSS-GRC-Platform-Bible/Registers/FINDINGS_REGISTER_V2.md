@@ -15229,6 +15229,147 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-446 — one name, three escaping contracts; and thirteen sites with none, on a ledger that cannot be repaired
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — the primitive, thirteen conversions, a hard-zero gate, live-proven in both directions |
+| **Severity** | **P2** — one caller-reachable site, and it is the BREAK_GLASS audit row. The corruption it writes is permanent by construction |
+| **Source** | F2-434's filing, re-derived first (F2-221) — and its numbers moved |
+| **Size** | M — one primitive, 14 call sites, 3 helper bodies, 1 unit class, 1 gate, no schema change |
+
+### Part 1 — what F2-434 filed, and what re-deriving it changed
+
+F2-434 filed: *"~19 sites build audit JSON by string concatenation with only 4 files declaring an
+escape helper, so a caller-supplied `\"` (a role name, a break-glass `incidentRef`) or an exception
+message produces malformed `old_value_json` — measured harmless today because nothing parses those
+two columns, so it degrades a forensic artefact rather than breaking a reader."*
+
+Re-derived: **16 concatenation sites in 13 files**, and — more usefully — **17 interpolations that
+land inside a JSON string**. But the count was never the finding. The classification is:
+
+| what is interpolated | sites | reachable? |
+|---|---|---|
+| a break-glass activation's `incidentRef` | 1 | **YES** — `@NotBlank @Size(100)`, **no `@Pattern`** |
+| an exception message | 5 | **YES** — a Jackson message routinely holds a quote (`Unrecognized field "x"`) and a newline |
+| a role name, a permission CSV, an id, a date, a hard-coded file name | 11 | **no** — guarded upstream or numeric |
+
+🔑 **`RoleUpsertRequest.roleName` is `@Pattern("[A-Z][A-Z0-9_]*")`, so the three
+`AccessGovernanceService` sites F2-434's filing named first cannot carry a quote at all.** F2-182's
+rule: a guard sits in a DTO annotation, which no setter-site scan can see. They were converted
+anyway — a `@Pattern` can be relaxed, and reachability is a fact about today rather than a property
+of a control (F2-213: make the hazard *absent*, not latent).
+
+### 🔑🔑 Part 2 — the escaping that existed was three functions under one name
+
+Four files declared a `private static String esc(String)`. They were not four copies of one
+function:
+
+| file | what it did |
+|---|---|
+| `ExportAuditInterceptor` | escaped `\` and `"` — and left a **raw newline**, which is invalid JSON (RFC 8259 forbids an unescaped control character in a string) |
+| `AccessEvidencePackageService` | escaped `\` and `"`, **replaced** newlines with spaces — nothing for tab or any other C0 character |
+| `RegulatorPackageService` | byte-identical to the above, which is itself the finding (F2-177) |
+| `AnnexExportService` | **not a JSON escaper at all** — a CSV escaper carrying an OWASP formula-injection guard |
+
+🔑 **One name, three contracts: a reader who finds `esc` in one file and carries the idiom into
+another gets a different function** — F2-419's divergent-helper shape (its census was
+single-expression-scoped, so a two-statement `esc` was outside it), F2-190's remedy.
+
+⚠⚠ **And the CSV one is pinned APART, in both directions.** A later *"make these consistent"* sweep
+would delete a control: a cell beginning `= + - @` executes as a formula when a regulator opens the
+annex. F2-430's precedent, where two charsets had to be pinned apart for the same reason. Control F
+mutates exactly that and must fire.
+
+### Part 3 — why "nothing parses those columns" is a weaker defence here than usual
+
+`platform.audit_log` is hash-chained (F2-31), so a malformed value written there **cannot be
+repaired later** without breaking the seal. F2-434 established that; **F2-445, one firing earlier,
+measured six ledger rows that must be left corrupted for exactly that reason.** Corruption written
+to that ledger is permanent by construction — which is what made the one reachable site worth
+closing rather than tolerating.
+
+### Live, both directions — probed as `so_officer` (CISO), never `admin`
+
+`IAM:BREAK_GLASS` is held by `CISO`, `GRC_ADMINISTRATOR` and `IR_LEAD` (0 users), measured from
+`iam.role_permissions`. The probe plants its own break-glass event (F2-206) and cleans up in a
+`finally`.
+
+- **pre-fix** (surgical revert of `BreakGlassService` only, recompiled, DevTools restart confirmed
+  by a **new start marker** rather than a 200 — F2-217):
+  `{"userId":8,…,"incidentRef":"[REVIEW-TEST] F2-446 PREFIX INC "quoted" ref"}` →
+  **`Expecting ',' delimiter: line 1 column 134`.** Malformed, in the ledger, unrepairable.
+- **post-fix, 8/8:** the same activation writes
+  `…"incidentRef":"[REVIEW-TEST] F2-446 INC \"quoted\" ref"}` — parses, value intact, the other
+  three fields unchanged, and a second activation for the same user is still refused with a 409.
+
+⚠ The BREAK_GLASS audit row the probe wrote is **not cleaned**: the ledger is append-only and
+hash-chained, so a probe's row correctly outlives it (F2-285). Nothing was written to production.
+
+### 🔑🔑 The instrument findings
+
+**(a) The shipped gate found three sites my throwaway locator missed.** My Python locator counted
+**statements** containing a JSON opener; the gate counts **positions**, and the three
+`.append(sha256(blobs[i]))` interpolations sit in continuation literals of statements the locator
+had already flagged. F2-213's rule for the fourth time in this lineage — *write the sweep as the
+gate, over the same tree, in the same language* — and the sharper form: **a locator that counts
+statements agrees with a gate that counts positions right up until one statement holds two.**
+
+**(b) ⚠⚠ The gate overflowed the stack INTERMITTENTLY, and F2-418 had recorded the exact regex.**
+That finding's words are *"the cause was the literal pattern `"((?:[^"\\]|\\.)*)"` applied over a
+WHOLE file, where an alternation inside `*` recurses once per character consumed"* — and I wrote
+that pattern anyway. It threw `StackOverflowError` in the harness's post-restore run **after
+passing every run I used to validate the fix.** 🔑 **An intermittently-overflowing gate is worse
+than a failing one: it is green exactly when you are looking.** Replaced by a character scanner
+(`literalSpans` / `statements` / `endOfLiteral`), which is what F2-418 prescribed.
+
+**(c) A post-restore RED must be diagnosed, not theorised about.** I first read it as Maven
+incremental-compile staleness (F2-278's mechanism) and added an `os.utime` — it reproduced. Printing
+the failing leg named `StackOverflow` in one call. **The `touch` is kept because it is right, and it
+was not the cause.**
+
+**(d) `\u` in a Java COMMENT is a unicode escape.** javac processes them in the lexical phase,
+before comments are stripped, so *"an escaper that {@code \u}-escaped Arabic"* in a javadoc is an
+`illegal unicode escape` and the file does not compile. Cost one round trip; the sentence now says
+"six-character unicode escape" and explains why.
+
+**(e) ⚠⚠ I wrote raw control bytes into my own files TWICE IN ONE SLICE — the test fixture (six
+bytes: bell, unit separator, NUL) and then this register spec (a bell, inside a code span).**
+Composing text that *contains* a tab or a bell or a NUL by typing the character writes the
+character, and it is **invisible in the composed text**, so `grep` reports the file as **binary**
+and the next patch anchor cannot match. F2-435's shape for the third and fourth time, and the first
+time the mechanism is named rather than the instance: **compose such a fixture from escapes —
+`\u0007` in Java, `\x07` in Python — never by typing the character.** 🔑 And the honest account is
+that `ScannableSourceContractTest`, built in F2-443 for exactly this, is **not** what caught either:
+a missed patch anchor caught the first and a `cat -A` of the spec caught the second. ⚠⚠ **The
+second one matters more than the first: a raw byte in `FINDINGS_REGISTER_V2.md` would make the
+register itself binary to every grep, including `GovernanceDocumentIntegrityTest` and every future
+search of it** — and that gate walks `.md`, so it would have failed the build rather than shipping.
+
+### Verification
+
+- `JsonTextTest` **7** legs. The load-bearing two are the ones nobody writes from the shape of the
+  defect: a **control character** (all four helpers missed every C0 character but newline, and two
+  missed that) and **Arabic left alone** (house rule 7 — an escaper emitting a unicode escape per
+  letter is valid JSON and unreadable). Every leg parses its output with a real `ObjectMapper`
+  rather than comparing strings, and one leg is the **positive control**: the literal pre-fix string
+  must fail to parse, or the rest pass whether or not the defect was real (F2-235).
+- `AuditJsonEscapingContractTest` **4** legs — a **hard zero with no exemption map**, safe by
+  F2-214's test because escaping is always available and never wrong; the three-versus-one helper
+  boundary; the one reachable site named so a revert is legible; and a synthetic self-test with one
+  must-flag and three must-not-flag cases (a numeric position, a non-JSON string, and **a comment
+  quoting the retired shape** — F2-193).
+- ⚠ The gate says nothing about a **numeric** position, and says so: a text value in
+  `{"userId":oops}` is a different defect and deciding it needs the expression's TYPE, which a
+  source scan does not have (F2-182). Measured by reading — all seven are `Long`/`int`. A hard zero
+  over a population the instrument cannot see is the most reassuring possible artefact (F2-205).
+- **8/8 controls fire**, one per half (F2-289), 0 survived, 0 anchor-miss, post-restore GREEN.
+  ⚠ Control F first **DID NOT COMPILE** because the mutation replaced one line of a method and left
+  the rest — a control that cannot run reads exactly like a gate that passed (F2-287/F2-414); it
+  replaces the whole body now, **fully qualified so no import has to be re-added** (F2-438).
+
+---
+
 ## F2-445 — F2-09's last two axes, shape-keyed; and a "fixed" text corruption that has been reproducing itself for three months
 
 | | |
