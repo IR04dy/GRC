@@ -15229,6 +15229,131 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-445 — F2-09's last two axes, shape-keyed; and a "fixed" text corruption that has been reproducing itself for three months
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — both axes shipped and gated; the live corruption measured and FILED (owner decision) |
+| **Severity** | **P2 — a live governance-register corruption with a producer still enabled.** The instrument half is P3 |
+| **Source** | F2-444's row named the index axis as the remaining unmeasured half of F2-09; the corruption was found *by* that axis |
+| **Size** | M — two axes on the existing reader, one new census script, two gate legs, no production change |
+
+### Part 1 — the two axes, and why shape-keying is the whole thing
+
+F2-09's plan row has named the **index axis** as open since 2026-08-07, and it **excluded the
+DEFAULT axis** with a stated reason: *"1,910 of dev's 2,259 are system-named, so a name comparison
+is noise."* That reason is correct and it is not a property of DEFAULTs — it is a property of
+**name-keying**.
+
+⚠⚠ **SQL Server auto-names a primary key with a per-database random suffix**
+(`PK__committe__3213E83F66D1F096`), so a name-keyed diff reports the **same primary key on the same
+table** as both missing and extra. Measured at V398 against a freshly stamped build:
+
+| keyed on | missing | extra | of the missing, "unique" |
+|---|---|---|---|
+| **name** | 393 | 400 | 386 |
+| **shape** (table, uniqueness, key columns, filter) | **14** | **21** | **6** |
+
+🔑 **96% of a name-keyed answer is noise, and every bit of it looks like a unique constraint a fresh
+install lacks** — the single most alarming shape this axis could report.
+
+**The index residue, read:** 3 of the 6 unique are PKs on F2-444's known bootstrap-only tables. The
+other three are real —
+
+- `platform.control_frameworks (framework_code, version)` — `UQ_framework_code`
+- `platform.lookup_tables (organisation_id, lookup_type, code)` — `UQ_lookup_type_code` *(the one
+  F2-433 found by accident)*
+- `platform.translations (entity_type, entity_id, field_name, locale)` — `UQ_translation`
+
+⚙ **Measured harmless and filed, not fixed:** none of the three tables is `@Table`-mapped, none has
+a finder over its key, rows are 6 / 0 / 0 with **0 duplicate key groups**. Same conclusion as
+F2-444's constraint residue — *the objects a fresh install lacks sit on tables the platform does not
+read.* A unique index a fresh install lacks is a defect only when something depends on it (F2-426).
+
+### Part 2 — what the DEFAULT axis found, which is the real finding
+
+**21 defaults missing, 1 extra — and one column appears on BOTH sides.** That is what the axis
+exists to surface: appearing twice means the definition **differs** rather than being absent.
+
+`bcm.bcp_binder_export.watermark_text` differs by **ENCODING**. Both live databases store
+`LEN = 88` with `0xE2 0x20AC 0x201D` where an em-dash belongs; the fresh build stores `LEN = 65` with
+`0x2014`. The stored text **repairs cleanly as cp1252 → UTF-8**, i.e. it is UTF-8 bytes that were
+read as Windows-1252 when the constraint was created.
+
+### 🔑🔑 Part 3 — the repair that fixed 117 cells and left the producer
+
+Commit **`aa5dc762` (2026-06-08)** repaired 117 double-encoded cells and wrote
+`.tools/MOJIBAKE_FIX_REPORT.md`. Its root-cause analysis is right (*apply-time: BOM-less UTF-8 `.sql`
+applied by a reader using the Windows ANSI code page*) and its prevention section is **apply-time
+discipline plus a hardened repair tool — no detector that runs.** Its population was narrowed three
+ways, and each narrowing hid part of the corruption:
+
+| narrowing | what it hid |
+|---|---|
+| **by row id** — its inventory reads `automation_rules.name_en = ids 1-52 … 53+ clean` | rule **174** carries **24 corrupted runs, all above that bound** |
+| **by column** — it swept `name_en` | rule 174 is corrupted in `name_en`, `name_ar`, `description_ar` **and `action_json`** |
+| **by surface** — its scope was *"every NVARCHAR column of every user table"*, i.e. **cells** | a corrupted **column DEFAULT** is invisible to a cell sweep |
+
+⚠⚠ **`action_json` is the one that reproduces.** Rule **174 `AR-EVD-GAP`** is **ENABLED**, has fired
+**3 times**, and its action is
+`{"type":"CREATE_RECORD","entity":"AuditFinding","fields":{"title_template":"Evidence rejected â€” control gap (sub-control %subControlId%)"}}`.
+Its three outputs are `compliance.findings` ids **39, 40, 41**, dated **2026-06-29, 2026-07-02 and
+2026-07-04** — **after the repair**, one per firing, titles corrupted.
+
+🔑 **A data repair that does not fix the PRODUCER is a repair the next firing undoes.** And the
+producer was outside all three of the repair's narrowings at once.
+
+### ⚠⚠ The test must be PER RUN, and my own first sweep proves it
+
+A value holding **correct Arabic and mojibake together** cannot encode to cp1252 at all, so a
+**whole-value** round-trip reports it **clean**. My first sweep of this exact corpus reported **3**
+corrupted cells and read rule 174's four corrupted columns as **one**; the per-run test finds **16
+cells / 36 runs**. The quiet direction, in the instrument I had just written after warning about it.
+
+**Honest population, byte-identical in dev and prod — 7 columns, 16 cells, 36 runs, every one
+tracing to rule 174:**
+
+| surface | cells | repairable? |
+|---|---|---|
+| `automation_rules` (`name_en`, `name_ar`, `description_ar`, `action_json`) | 4 | **yes, and first** — it is the producer |
+| `compliance.findings.title` (ids 39–41) | 3 | yes, but it is governance history |
+| `automation_rule_runs.result_summary` | 3 | yes, run records |
+| `platform.audit_log.message` | 6 | **NO — hash-chained (F2-31); repairing a sealed row breaks it (F2-434)** |
+
+⚙ **Filed, not repaired: every write lands in a customer database (house rule 6)**, and the ledger
+half may not be touched at all. The census reports the ledger rows **anyway**, because an operator
+needs to know the corruption reached the ledger even though nothing may repair it.
+
+### ⚠⚠ And I read a clean file as a defect first — F2-193's epitaph-as-corpse
+
+My source sweep flagged `V108__bcm_demo_seed.sql` as carrying mojibake, and I drafted a finding that
+*"a packaged migration writes mangled Arabic on a fresh install"* — which would have **refuted the
+2026-06-08 report's central claim**. It is **line 6, a comment**: the file's own header documenting
+the symptom, and the very comment the report quotes as its root-cause evidence. `fix_arabic_mojibake.py`'s
+docstring is the same. 🔑 **Source trees: 4,272 files, 3 hits, all three legitimate quotations —
+CLEAN, and the report's claim that the corruption was entirely apply-time is CONFIRMED.** I had
+warned myself about exactly this trap one step earlier.
+
+⚙ A second detector correction in the same sweep: a **whole-line** round-trip found nothing in V108,
+because the line mixes correct Arabic with the quoted mojibake. Per-run again.
+
+### Verification
+
+- `ChainBuildProvenanceContractTest` **5 → 7**, hermetic. The load-bearing assertions are that the
+  index shape carries what the index **enforces** and that the **name is a value of the map, never
+  part of its key**; that `bad_runs` walks **runs**; and that the census names
+  `platform.audit_log` as unrepairable *with the reason* and stays read-only.
+- **8/8 controls fire**, one per half, post-restore green.
+- ⚠⚠ **Control H first SURVIVED**: renaming `UNREPAIRABLE` to `UNREPAIRABLE_RENAMED` left
+  `contains("UNREPAIRABLE")` satisfied, because the longer token **contains** the shorter — and the
+  mutated script would raise `NameError`, so it was genuinely wrong. **F2-194's rule for the fourth
+  consecutive slice, each time in a leg written after quoting it.** Both maps now assert the
+  declaration (`X = {`) **and** the usage (`in X`), which a rename breaks in two places.
+- The census and both axes were run against a chain build stamped **head V398 complete** (F2-444), so
+  no "missing" object here can be merely newer.
+
+---
+
 ## F2-444 — a builder that drops its own database, a reader that could not ask which head it saw, and 28 phantom findings
 
 | | |

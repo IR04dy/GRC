@@ -69,6 +69,8 @@ class ChainBuildProvenanceContractTest {
 
     private static final String MARKER = "chain_marker.py";
     private static final String READER = "schema_convergence.py";
+    private static final String CENSUS = "mojibake_census.py";
+
 
     /**
      * Each builder, and <b>how many paths in it can leave a database behind</b>.
@@ -249,6 +251,101 @@ class ChainBuildProvenanceContractTest {
                 the leg above passes on a clean corpus whether the detector works or not — an
                 empty list is what a working detector and a dead one both produce (F2-235).""")
             .hasSize(1);
+    }
+
+    @Test
+    void theConvergenceReaderComparesIndexesAndDefaultsByShapeRatherThanByName() throws IOException {
+        String src = read(READER);
+        assertThat(src)
+            .as("""
+                F2-09's row named the INDEX axis as still open and EXCLUDED the DEFAULT axis with a
+                stated reason \u2014 "1,910 of dev's 2,259 are system-named, so a name comparison is
+                noise". F2-445 added both, keyed on SHAPE.""")
+            .contains("def report_indexes(", "def report_defaults(",
+                      "def index_shapes(", "def default_shapes(");
+
+        // \u26a0\u26a0 The load-bearing property: SQL Server auto-names a primary key with a
+        //    per-database random suffix, so a NAME-keyed diff reports the same PK on the same table
+        //    as BOTH missing and extra. Measured: name-keyed 393 missing / 400 extra, shape-keyed
+        //    14 / 21 \u2014 96% of a name-keyed answer is noise. The shape must therefore carry the
+        //    key columns, the uniqueness and the filter, and the NAME must not be part of it.
+        String shapes = body(src, "def index_shapes(");
+        assertThat(shapes)
+            .as("the index shape must carry what the index ENFORCES, not what it is called")
+            .contains("bool(uq)", "bool(pk)", "cols", "filt");
+        assertThat(shapes)
+            .as("""
+                and the name must be a VALUE of the map, never part of its key \u2014 the whole
+                point of the axis. `out.setdefault(key, []).append(name)` keeps the names for
+                reporting while keying on the shape.""")
+            .contains("out.setdefault(key, []).append(name)");
+
+        assertThat(body(src, "def default_shapes("))
+            .as("a DEFAULT's identity is (table, column, definition); its name is system-generated"
+                + " for 1,910 of dev's 2,259 and carries no information")
+            .doesNotContain("d.name");
+
+        assertThat(src)
+            .as("""
+                and the reader must say what it means when one column appears on BOTH sides: the
+                definition DIFFERS rather than being absent. That is how F2-445 found
+                bcm.bcp_binder_export.watermark_text, where the difference was ENCODING.""")
+            .contains("BOTH missing and extra");
+    }
+
+    @Test
+    void theMojibakeCensusTestsPerRunAndNamesWhatMustNotBeRepaired() throws IOException {
+        String src = read(CENSUS);
+
+        // \u26a0\u26a0 PER RUN, not per value. A value holding correct Arabic AND mojibake cannot
+        //    encode to cp1252 at all, so a whole-value round-trip reports it CLEAN \u2014 the quiet
+        //    direction. My own first sweep of this corpus reported 3 corrupted cells where the
+        //    per-run test finds 16, and read rule 174's four corrupted columns as one.
+        assertThat(src)
+            .as("the detector must be a ROUND-TRIP, never a blacklist of suspicious sequences \u2014"
+                + " a blacklist flags legitimate text and misses novel corruption")
+            .contains("encode(\"cp1252\"", "decode(\"utf-8\"");
+        assertThat(body(src, "def bad_runs("))
+            .as("""
+                and it must walk maximal non-ASCII RUNS rather than testing the whole value. This
+                is the one property the 2026-06-08 repair's successor cannot afford to lose: a
+                mixed value reads as clean under a whole-value test.""")
+            .contains("for ch in", "cur.append(ch)");
+
+        assertThat(src)
+            .as("""
+                platform.audit_log is hash-chained (F2-31), so its corrupted messages may NOT be
+                repaired \u2014 repairing a sealed row breaks the chain (F2-434). The census must
+                report them and say so, because an operator needs to know the corruption reached
+                the ledger even though nothing may touch it.""")
+            .contains("UNREPAIRABLE = {", "in UNREPAIRABLE", "platform.audit_log.message",
+                      "hash-chained");
+        assertThat(src)
+            .as("""
+                and it must name the PRODUCER columns \u2014 a corrupted template regenerates
+                corrupted rows, so repairing its output first is repairing the symptom. Rule 174's
+                action_json produced three corrupted findings AFTER the 2026-06-08 repair.""")
+            .contains("PRODUCER_COLUMNS = {", "in PRODUCER_COLUMNS",
+                      "platform.automation_rules.action_json");
+        assertThat(src)
+            .as("read-only: every write would land in a customer database (house rule 6)")
+            .doesNotContain("UPDATE ", "DELETE ");
+    }
+
+    /**
+     * One Python function's body: from its {@code def} line to the next line at column 0 that is
+     * not blank. Indentation-delimited, never a fixed character window (F2-424).
+     */
+    private static String body(String src, String def) {
+        int i = src.indexOf(def);
+        assertThat(i).as("%s must exist", def).isGreaterThanOrEqualTo(0);
+        String[] lines = src.substring(i).split("\r?\n", -1);
+        StringBuilder out = new StringBuilder(lines[0]).append('\n');
+        for (int j = 1; j < lines.length; j++) {
+            if (!lines[j].isBlank() && !Character.isWhitespace(lines[j].charAt(0))) break;
+            out.append(lines[j]).append('\n');
+        }
+        return out.toString();
     }
 
     @Test
