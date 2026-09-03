@@ -15229,6 +15229,150 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-449 — a caller-supplied search term IS the `LIKE` pattern, and house rule 5's own trap had never been asked of user input
+
+| Field | Value |
+|---|---|
+| **Id** | F2-449 |
+| **Title** | No search query escaped its caller's `LIKE` metacharacters, and none declared `ESCAPE` |
+| **Severity** | P3 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, asking house rule 5's recorded bracket trap of **user input** rather than of test data |
+| **Fixed** | `dcd8c165`, merged `fix/f2-449-like-metacharacter-escaping` |
+| **Module** | `common/util` + 6 repositories, 6 binding sites |
+| **Migration** | none |
+
+### What was wrong
+
+SQL Server treats **`%`**, **`_`** and a **closed `[..]`** as `LIKE` pattern metacharacters, and
+`LIKE` has **no default escape character** — a query has to declare one. Every search query in the
+platform built its pattern as `CONCAT('%', :q, '%')` with no `ESCAPE` clause, so **the caller's own
+string was the pattern.**
+
+Probed live pre-fix as `compliance` / `admin`:
+
+```
+GET /api/v1/admin/users?search=zzzznosuchuser   ->   0 rows
+GET /api/v1/admin/users?search=%                ->   7 of 7      (the whole register)
+GET /api/v1/admin/users?search=_                ->   7 of 7
+GET /api/v1/admin/users?search=[ac]             ->   7 of 7
+GET /api/v1/compliance/controls?q=%             ->  35 of 35
+GET /api/v1/compliance/controls?q=_             ->  35 of 35
+```
+
+🔑 **This is house rule 5's own recorded trap** — *"`[REVIEW-TEST]` in a `LIKE` is a character
+class — use `CHARINDEX` for literals"* — **asked of user input rather than of test data.** The
+platform already knew the shape and had written it down; nobody had put the question to the search
+boxes.
+
+The everyday case is the underscore rather than the percent: this platform's vocabularies are
+`UPPER_SNAKE_CASE` (`NCA_ECC`, `AR_OFFICIAL`, `BREACH_REPORT`), so a term containing `_` is the
+normal way to search its data, and unescaped that `_` matches any single character.
+
+### 🔑🔑 The population had to come from reflection, and a source scan under-reported it by 5 of 14
+
+A census keyed on the source text `"@Query("` found **9 methods / 21 `LIKE` occurrences**. The
+honest figure, by reflection over the shipped classes, is **14 methods / 30 occurrences** —
+because `PrivacyNoticeRepository` writes the annotation **fully qualified** as
+`@org.springframework.data.jpa.repository.Query(`, and three MAX-seed minters were missed for
+similar spelling reasons. Those two PrivacyNotice methods carry **8 further `LIKE` occurrences**, on
+the **PDPL Article 31 ROPA-to-notice linkage**, whose `code` reaches the query from a
+`@PathVariable`.
+
+🔑 **An under-report reads exactly like a clean tree.** `@Query` is `@Retention(RUNTIME)`, so the
+annotation value is readable by reflection and **no source spelling can hide a member** — the gate
+matches an annotation by *type name ending in `.Query`* rather than by import. That immunity is
+asserted positively (`theCensusSeesAFullyQualifiedQueryAnnotation`) because it cannot be mutated in
+the gate: reflection sees the **type**, so the spelling is irrelevant by construction.
+
+### ⚠⚠ And a reflective census is only as wide as its classpath
+
+Driven from a throwaway program with only `target/classes` on the classpath, **every** repository
+interface failed to load — they extend Spring Data types that live in the dependency jars — and the
+census printed **`0 methods, 0 LIKE occurrences`**. A clean-looking zero produced by loading
+nothing; only the `!!` lines it happened to print made it visible. The gate therefore **counts what
+it could not load and fails on it**, rather than reporting a zero it did not earn — and control F
+narrows the classpath to prove that leg fires.
+
+### Both halves are required and neither works alone
+
+Escaping with no `ESCAPE` clause stores a literal backslash in the pattern and **matches nothing**;
+an `ESCAPE` clause with no escaping **changes nothing at all**. So the fix is
+`common/util/LikePatterns.escape(...)` at **6 binding sites** *and* `ESCAPE '\'` at **all 25**
+caller-facing `LIKE` occurrences. The probe's *"an ordinary term still finds its rows"* legs are
+what separate a fix from a break.
+
+⚠ `escape(null)` returns null unchanged, deliberately: every one of these queries reads
+`:q IS NULL OR …`, so null means *no filter*, and turning it into `""` would change which rows a
+filterless request returns — a fix that breaks correct usage (F2-214). Asserted, and control D
+fires on it.
+
+⚠ **`]` is deliberately not escaped.** Outside a character class SQL Server treats `]` as an
+ordinary character, and escaping `[` means a class can never open — so a lone `]` has nothing to
+close and stays literal. Escaping it would be harmless and would state a rule that is not the one
+doing the work. Asserted in both directions; control C fires on it.
+
+### ⚠⚠ Five methods pinned APART rather than "made consistent"
+
+`SodRule.rolePatternCsv`'s **own javadoc** says the column holds *"names or LIKE patterns"* — so a
+wildcard in `SodViolationRepository#readonlyPersonaWriters` / `#serviceMultiModuleUsers` is the
+configured intent of an SoD detection rule an administrator wrote, and escaping it would **disable
+the rule**. Three MAX-seed minters (`RegInspectionRepository#findMaxOsiOrdinal`,
+`TreatmentPlanRepository`/`VendorEsgSurveyRepository#findMaxExternalIdSeq`) compose their prefix
+server-side, so there is no caller string to escape. Same judgement as F2-430, which had to pin two
+charsets apart because one of them was a control rather than an inconsistency — enforced in both
+directions, so an entry naming a method the scan no longer finds fails the build (F2-199).
+
+### ⚠⚠ The control harness found two holes in my own gate
+
+**A survived the first run**: the hard zero asked `q.toUpperCase().contains("ESCAPE")`, and
+`UserRepository` carries **three** `LIKE`s — so removing one clause left two behind and the gate
+stayed green. F2-194's substring-satisfied-by-something-else, in a gate written after quoting it.
+**Count, never `contains`**: one `ESCAPE` per `LIKE`.
+
+**B survived too**, and that showed the escaping half had **no gate at all** — the mutation deleting
+`LikePatterns.escape(...)` from `UserService` passed the whole build, caught only by the live probe.
+*"Is this value escaped before it is bound"* is a dataflow question a scan cannot answer in general
+(F2-182), so it is asserted per **named binding site**, the shape F2-307 used.
+
+**E was withdrawn as invalid** rather than counted: it was meant to mutate *"keyed on the simple
+annotation name"*, and reflection makes that immune by construction — mutating my own assertion
+would always pass (F2-206), and the `|| true` I first wrote made *nothing* match, a different and
+much larger mutation that correctly fired the anti-vacuity leg.
+
+### Found on the way (F2-184)
+
+`CommitteeFormTemplateRepository#findActiveApplicableTo`'s javadoc read *"so we filter client-side
+after pulling the small forms set — there are ~10 forms, not enough to warrant a SQL LIKE join"*,
+directly above a query whose `WHERE` clause **is** a SQL `LIKE`. Corrected in place rather than
+deleted: the substring caveat it was reaching for is real, and now carries F2-431's measurement
+(the `committee_type` vocabulary holds 22 values with **0 substring pairs** in both databases, so no
+token can false-positive against another — true of today's data rather than by construction).
+
+### Verification
+
+| | |
+|---|---|
+| Unit | `LikePatternsTest` **6/6**, `LikePatternEscapingContractTest` **5/5** (hard zero + both directions + census + binding sites + the fully-qualified-annotation leg) |
+| Live probe | **20/20** as `compliance`, `admin` and `rmanager` — every metacharacter now returns fewer rows, every ordinary term still finds its rows, a filterless request is unchanged, and the PDPL linkage still resolves a real code |
+| Startup | a malformed `@Query` kills the app at **context startup**, so the app was started: `Started GrcApplication in 12.337 seconds` after the 25 query edits |
+| Controls | **5/5 fire**, 0 survived, 0 anchor-miss, 0 did-not-compile, post-restore GREEN; one withdrawn as invalid |
+| Build | `mvn -o clean package` **5137/0/0**, predicted exactly |
+| Probe hygiene | every leg is a **GET**; nothing planted, nothing to clean |
+
+### Filed, not fixed (F2-188)
+
+* **`BcmExerciseScenarioRepository#search` has no caller** — a declared-and-uncalled finder with 3
+  `LIKE`s (F2-427's tell). It gained the clause because a future caller would otherwise inherit the
+  defect, and it has no binding site to escape.
+* **`/api/v1/bcm/scenario-library` is a pure role guard** naming `BCM_MANAGER`, which F2-253/F2-254
+  measured as a **zero-holder role** — so `compliance` is correctly 403 there and the route sits in
+  F2-05's conversion backlog. Asserted as a probe leg rather than worked around silently (F2-259).
+* **The ROPA code space still has no producer** (F2-274): `linked_ropa_codes` is a comma list with
+  no foreign key, and the `%` case on that path is additionally blocked by Spring Security's
+  `StrictHttpFirewall`, which refuses `%25` in a path segment — a fact about today's configuration,
+  not a property of the query (F2-182).
+
 ## F2-448 — `?sort=<anything>` answered an opaque 500 on every paged endpoint, and the class is not an `IllegalArgumentException`
 
 | Field | Value |
