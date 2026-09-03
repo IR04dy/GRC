@@ -15229,6 +15229,196 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-451 — a capped fetch is fine to render from and wrong to count, and on a regulator submission the count is the half a machine reads
+
+| Field | Value |
+|---|---|
+| **Id** | F2-451 |
+| **Title** | The regulator package published its capped page size under a manifest key called "counts" |
+| **Severity** | P2 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, following a zip-slip sweep that came up clean into what the ZIP's manifest asserts |
+| **Fixed** | `49b0d29f`, merged `fix/f2-451-capped-export-disclosure` |
+| **Module** | `module/reporting` (+ `common/export`) |
+| **Migration** | none |
+
+### What was wrong
+
+`RegulatorPackageService.generate()` caps its three fetches so the emitted ZIP cannot grow without
+bound — deliberate and correct — and then published `list.size()` of the **capped page** as though
+it were the register's size:
+
+```java
+List<AuditLogEntry> audit = auditLogService.list(null, null, null, 0, MAX_AUDIT).getContent();
+...
+sb.append("  \"counts\": { ... \"auditEntries\": ").append(auditEntries).append(" },\n");
+PdfTheme.kpiStrip(doc, List.of(..., new PdfTheme.Kpi("Audit", String.valueOf(auditEntries),
+                                                    "Trail entries")));
+```
+
+Probed live as `auditor` (AUDITOR holds `REGULATORY:EXPORT` + `READ`), never `admin` — **5/5 pre-fix
+legs on the wire**:
+
+```
+PRE-FIX manifest counts : {"controls": 35, "evidenceItems": 78, "auditEntries": 200}
+PRE-FIX includedRows    : (absent)
+PRE-FIX truncated       : (absent)
+PRE-FIX README tile     : "Audit / 200 / Trail entries"     <- unqualified
+```
+
+against `platform.audit_log` holding **12,473** rows for organisation 1 — a **62x under-report**, in
+the flattering direction, in the machine-readable half of a document a regulator's tooling parses.
+Prod holds **5,133** rows, the same shape. Controls (35) and evidence (78) are comfortably inside
+their 5000 cap, so those two figures are latent; closed anyway, so the hazard is **absent** rather
+than latent (F2-213).
+
+### 🔑 Which cap bites first was predictable without measuring
+
+Of the seven capped figures in this platform's emitters, **exactly one truncates today**, and it is
+the only one whose register grows with every **write in the platform** rather than with the
+organisation's own governance work — and `platform.audit_log` is append-only and hash-chained
+(F2-31), so it can never shrink. The business registers grow with the customer's actual work; the
+audit log grows with every click. **Ask that of a cap before measuring it.**
+
+### 🔑🔑 The fix differs per artefact, and the artefact's shape is what decides
+
+A cover KPI strip counts **every** tile over the rows the document contains — Critical, High, Open
+are all `stream().filter(...).count()` over the same capped page. Making only the "Total" tile true
+would leave the cover **contradicting itself** (Total 12,473 beside a figure counted from 200 rows),
+which F2-203 records as worse than a figure with no provenance. So:
+
+* **a rendered strip** lets the tiles describe the document and **discloses** what the document
+  holds, *beside the figure*;
+* **a machine-readable manifest** can carry both, so it publishes the register total under `counts`
+  (the key's own name), what the sheets hold under `includedRows`, and a `truncated` flag.
+
+`common/export/ExportTruncation` is the one primitive: `isTruncated` / `note` / `hint`,
+`Locale.ROOT` digits (F2-416 — a bare `String.format("%,d")` emits Arabic-Indic digits on an `ar-SA`
+JVM and every other figure in these documents is ASCII), bilingual (house rule 7), and `hint`
+**replaces** a completeness subtitle rather than appending to it, because `"Trail entries"` next to
+a windowed figure is the claim that was wrong rather than the figure.
+
+### ⚠⚠ The second half is one level down, and it cost this finding its first set of numbers
+
+`MAX_AUDIT` read **1000**. `AuditLogService.list` clamps every caller with `Math.min(size, 200)`, so
+**200 arrived** — the constant overstated the package's audit coverage **5x** to any reader of that
+file (F2-184's shape at a constant: it answers the question a reader was about to ask). And reading
+the constant rather than the wire is how the first draft of this finding claimed a **12x**
+under-report when the measured figure is **62x**.
+
+🔑 **The live probe refuted it, not a reading** — two probe legs failed, both of them my own
+expectations, and the truth was worse than the claim. Corrected to the effective cap with the clamp
+recorded in place. Raising the coverage means raising a shared clamp every audit-log caller
+inherits, which is an owner decision and is filed.
+
+### ⚠ Two clean sweeps on the way in, both worth recording so nobody re-runs them
+
+The slice began as a **zip-slip** sweep — a caller-derived ZIP **entry name**, the sink F2-388
+(`Content-Disposition`) and F2-389 (`Paths.get` containment) do not cover. Four ZIP builders, and
+**0 defects**: three use literal entry names, and the fourth sanitises `\ / : * ? " < > | CR LF` to
+`_` before a literal `Evidence_Files/` prefix, so a separator can never be introduced and traversal
+is structurally unreachable.
+
+⚠ It also showed **three of the four ZIP builders do not cap at all** (0 cap sites), so their
+`.size()` figures genuinely are totals — which is what makes `RegulatorPackageService` the outlier
+rather than one of four.
+
+### The population, and why four members carry no verdict
+
+`CappedExportDisclosureContractTest` derives every service that **caps a fetch AND builds a KPI
+tile** — **5 emitters, 16 figures**:
+
+| Emitter | Figures | State |
+|---|---|---|
+| `RegulatorPackageService` | 3 tiles + 3 manifest counts | ✅ DISCLOSED |
+| `CyberExportService` | 6 `Kpi("Total", rows.size())` tiles over one `Pageable CAP` | ⬜ not yet read |
+| `ExportService` | 3 `Total` tiles, subtitle `"All states"` | ⬜ not yet read |
+| `DocxExportService` | 3 `Total` tiles, no cap note anywhere | ⬜ not yet read |
+| `SocOpsExportService` | 1 `Kpi("Total events", rows.size(), "")` | ⬜ not yet read |
+
+They are a **work list, not a set of judgements**: F2-188 measured what happens when a slice writes
+a reason for code it has not read (five claims, five false, and the fluency was what made them look
+verified), and **three of the four have no test of any kind** (F2-248). Printed with its figures to
+`target/capped-export-figures.txt`.
+
+### ⚠ My own claim about the exemplar was wrong, and reading refuted it
+
+The first reading of this was *"`ExportService` discloses its cap and `DocxExportService` does
+not — a lone outlier"*. False: `ExportService` carries the **same** unqualified tile
+(`Kpi("Total risks", <capped size>, "All states")`) and its cap note sits in a `ReportMetadata`
+**scope row elsewhere on the page**, reading `"All risks (max 1000)"` — which names the **cap**
+rather than the **truncation**, so it cannot say whether anything was withheld, and the tile it
+qualifies asserts completeness. **All four unread emitters have the unqualified tile; one has a
+static note in a different artefact of the same document.**
+
+### ⚠ Why the population is keyed on a KPI tile
+
+Keying it on the emitter API was tried and abandoned: `SocOpsExportService` emits through
+`RegisterExport.pdf(...)` and touches neither `PdfWriter` nor `XSSFWorkbook`, so a detector keyed on
+the emitters already seen reported a **smaller** population — which reads exactly like a cleaner
+tree (F2-422). A figure-level detector was also built and rejected: it missed `SocOpsExportService`
+*and* flagged `ExportService`'s legitimate row-count argument, so it was wrong in both directions.
+**A KPI tile is the artefact that makes the claim**, and `PdfTheme.Kpi` / `kpiStrip` are two stable
+symbols rather than a growing list of helpers. Both complements are asserted — **11 emitters build
+a tile and never cap** (their figures are totals) and 59 services cap without publishing one —
+because an empty population is indistinguishable from a swept one (F2-235).
+
+### ⚠⚠ Two harness bugs, and their combination manufactured "7 of 8 survived"
+
+The first control run reported **7 survived**, which reads exactly like seven holes in the gate.
+Neither was a hole:
+
+1. **`re.search` on `Tests run:` finds the FIRST match — a per-class line, not the summary.** The
+   baseline printed `Tests run: 6` for a 16-test suite, so every verdict was computed from whichever
+   class Maven happened to run first. 🔑 **A present `Tests run:` line is not evidence the right
+   tests ran** (F2-414 one notch further): assert the expected COUNT.
+2. **`git diff --quiet HEAD -- <path git does not know>` exits 0.** The restore guard used
+   backend-relative paths against `cwd=REPO`, so `git checkout` failed silently and the guard
+   **confirmed a restore that never happened** — leaving mutations in the tree for the next control
+   to run against. 🔑 **A restore verification keyed on the wrong path agrees with itself.**
+
+Fixed, the same eight controls are **8/8 fire, 0 survived**, post-restore green.
+
+### ⚠⚠ And F2-443's landmine bit twice, the second time silently
+
+That rule is *commit the fix first, because `git checkout HEAD --` restores to HEAD and discards
+every uncommitted change to the files it touches*. The `MAX_AUDIT` correction was made **after** the
+fix commit, so the pre-fix probe's restore **discarded it** — and the amended commit message then
+claimed a correction that was not in the tree. 🔑 **The tell is that the commit's own claim and the
+tree disagree; a commit message asserting a fix the tree does not carry is worse than no message.**
+Re-applied and re-verified.
+
+### Verification
+
+| | |
+|---|---|
+| Unit | **16/16** — 6 primitive legs (incl. the digits under an `ar-SA` default and `hint` replacing rather than appending), 3 behavioural legs on the real ZIP (manifest truncated / manifest complete / README text extracted with OpenPDF's `PdfTextExtractor`, checked on the classpath rather than assumed), 6 gate legs, 1 pre-existing F2-326 leg unchanged |
+| Gate | `CappedExportDisclosureContractTest` — hard zero on the fixed emitter with **no exemption map** (the primitive returns the original subtitle when nothing was withheld, so there is no correct code for it to fail on), plus the 5-member census asserted exactly in both directions, both complements floored, and the detector driven over synthetic input in both directions |
+| Live probe | **5/5 pre-fix** on the wire, **12/12 post-fix**, as `auditor`; read-only (the package is a GET), so nothing planted and nothing to clean |
+| Controls | **8/8 fire**, 0 survived, post-restore green — including E (the comment-stripping is load-bearing) and F (the `kpiStrip(` alternative, without which `DocxExportService` leaves the population) |
+| Build | `mvn -o clean package` **5159/0/0**, predicted exactly |
+
+### ⚠ The comment-stripping was made load-bearing rather than recorded as untested
+
+Measured first: the population is 5 with or without stripping, so a control disabling it would have
+**survived**. F2-450's answer applies — **make the quotation faithful**: the fix's javadoc now quotes
+the retired tile in full, closing paren included, which is both better documentation (this
+register's convention is that a correction quotes what it replaced — F2-193) and makes the stripping
+demonstrably necessary. Control E then fires two legs on a correct tree.
+
+### Filed, not fixed (F2-188)
+
+* **The four unread emitters**, 13 figures, printed with their shapes. `CyberExportService` is the
+  largest by figure count; `DocxExportService` is the one with no cap note of any kind.
+* **`AuditLogService.list`'s `Math.min(size, 200)` clamp** — raising the regulator package's audit
+  coverage means raising a clamp every caller of the audit-log API inherits. An **owner decision**.
+* **The README lists `Evidence_Files/` unconditionally** while `evidence.evidence_items` has
+  `file_path` populated on **0 of 78** rows in both databases, so that directory is never present
+  and `embedEvidenceFiles` has never once embedded anything. The `noFile` counter goes to the log
+  only (F2-437's channel-with-no-reader), so the package tells a regulator nothing about 78 evidence
+  items whose binaries are absent — a disclosure question about a different thing, and the whole
+  `Evidence_Files/` mechanism is unexercised.
+
 ## F2-450 — a set built from `getAuthorities()` is not a set of roles, and this one decided who may sign an approval step
 
 | Field | Value |
