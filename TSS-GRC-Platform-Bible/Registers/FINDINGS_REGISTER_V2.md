@@ -15397,6 +15397,28 @@ rides `SHARIA_NC_EVENT_TRANSITIONED` with `to` in the payload. 🔑 **A mechanic
 documented list is worth more than a careful reading of it**, which is the whole argument for
 that leg rather than a comment.
 
+### The probe
+
+**10/10** as `compliance` (never `admin`; route and guard resolved from `ShariaController` as
+`GET /api/v1/sharia/scholars` behind `hasPermission('SHARIA','READ')`), asserting **three
+halves in one run** because the fix retires a *published figure* and not the data: the key has
+left the wire, the five real fields are still on it, and the column still holds its 5 rows
+with its values unchanged.
+
+⚠⚠ **Two of the probe's own expectations were wrong, and both were caught by running
+it.** (a) Its anti-vacuity leg demanded each surviving field on **every** row, and
+`annualFeeSar` is nullable — so under `default-property-inclusion: non_null` the key is
+simply absent from some scholars and the leg failed on a correct server. That is **F2-202's
+rule verbatim** (*one row's key set cannot answer "is this field on the wire?"*), arriving on
+my own instrument rather than on a DTO. 🔑 **The remedy is also the stronger check:
+take the UNION of keys across rows, which one lucky row cannot satisfy.** (b) The
+data-preservation leg asserted a range of `1..5`, having measured only that the maximum is 5
+and that no row is zero; it is **2..5** — a guessed range, inside the leg whose whole
+purpose is to prove the data was left untouched. 🔑 **A probe is the one artefact whose
+disagreement with you is the point, so write the expectation precisely enough to be
+refutable** — a loosely written leg would have passed over both.
+
+
 ### Errors of mine, all caught by running something
 
 - ⚠⚠ **My anti-vacuity floor was a guess and failed on a correct tree.** I asserted the walk
@@ -15412,6 +15434,12 @@ that leg rather than a comment.
   leaving the page referencing an undefined identifier — caught by `tsc` immediately, but the
   lesson is the recurring one: **resolve an identifier from the file, never from the shape of
   the name.**
+- ⚠ **A guessed anchor, for the sixth time in this slice**: a docs patch script anchored on
+  *"and the sharpest of the other 23…"* where `CLAUDE.md` says *"the sharpest of the other
+  23…"*. Fail-before-write held, so nothing was written — and 🔑 **my own
+  assertion message read "anchor not unique" for a count of ZERO, which conflates *absent*
+  with *duplicated* and sends the next reader looking for a second occurrence that does not
+  exist.** Print the count.
 - ⚠ **`awk … | cat -A` was avoided this time** because F2-458 recorded it one slice earlier;
   every patch script detects its target's own line endings from the byte count and preserves
   them, and all seven touched files were verified free of mixed endings and control bytes.
