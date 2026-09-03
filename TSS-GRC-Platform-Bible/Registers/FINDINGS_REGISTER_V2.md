@@ -15229,6 +15229,194 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-453 — a compliance-evidence register recorded a policy reference nothing ever resolved
+
+| Field | Value |
+|---|---|
+| **Id** | F2-453 |
+| **Title** | `createAttestation` stored a caller-supplied `policyId` with no tenant check and no foreign key, beside a `policyVersion` the caller chose |
+| **Severity** | P2 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, by asking *which mutating route authorises with a `READ` permission?* |
+| **Fixed** | `4c478cc3`, merged `fix/f2-453-attestation-policy-reference` |
+| **Module** | `module/policy` |
+| **Migration** | **V399** — `FK_policy_att_document` |
+
+### What was wrong
+
+`policy.attestations` is the register that evidences that a named individual read and accepted a
+named policy (ISO 27001 A.5.1, NCA ECC policy acknowledgement).
+`PolicyManagementService.createAttestation` is its **single writer** — no other code in the tree
+constructs a `PolicyAttestation` — and its entire validation of the reference was:
+
+```java
+if (body.getPolicyId() == null)     throw new IllegalArgumentException("policyId is required");
+if (body.getUserUsername() == null) throw new IllegalArgumentException("userUsername is required");
+```
+
+A null check, then `attestations.save(body)`. And `policy.attestations` carried **no FOREIGN KEY
+on `policy_id`** — 0 rows in `sys.foreign_keys` for that table, checked rather than assumed — so
+nothing downstream refused what the service accepted.
+
+### Proved live
+
+Probed as **`ranalyst`**, who holds `COMPLIANCE:READ` and nothing else — **32 roles hold it**, and
+it is the permission guarding this route — never `admin`, which proves nothing about
+authorization. **8/8 pre-fix:**
+
+| Request | Pre-fix | Post-fix |
+|---|---|---|
+| `policyId: 999999` (exists nowhere) | **200**, row stored | **404** `Policy not found: 999999` |
+| `policyId` = another tenant's document | **200**, row stored | **404** `Policy not found: 79` |
+| `policyVersion: "9.9-FORGED"` on a document whose only version is `2.1` | **200**, stored verbatim | **400** naming both versions and the policy code |
+| a legitimate assignment on an owned policy | **200** | **200** |
+| `policyVersion` omitted | stored `null` | **derived** `2.1` |
+| an **echo** of the true version | accepted (nothing checked) | accepted, document's spelling stored |
+
+Pre-fix the register was left holding **2 rows naming a policy the caller's tenant does not own**.
+
+⚠ **Latent in data, live in code** ([[F2-283]]): across the 18 live rows in **both** databases
+there are 0 dangling `policy_id` values, 0 cross-tenant references and 0 version mismatches. What
+made it harmless was the data, not the code.
+
+⚙ The cross-tenant leg is not constructible from real data — all 41 policy documents belong to
+organisation 1 — so the probe **plants its own org-2 document** rather than pointing at a real
+governance row ([[F2-206]]), tags everything and removes it in a `finally`.
+
+### The tell was five lines below
+
+`attest()` has always resolved its own row with `findByIdAndOrganisationId(id, org())`, and
+`attest`/`decline` each carry a **SEC-CMP-004** comment explaining their object-level ownership
+control and take `Authentication`. `createAttestation` sits **between them**, binding the raw
+entity, with no actor and no comment. [[F2-215]]'s two-of-N at three adjacent routes.
+
+🔑 And [[F2-219]] hardened *this very method* — it closed the forged `status: "ATTESTED"` and the
+back-dated completion stamps, and left the **reference** unresolved. The method therefore reads
+as audited: it carries a long comment about what a caller may not forge.
+**When a create has been hardened for one field, ask which of its other fields is a reference.**
+
+### The two halves do different jobs
+
+⚠⚠ A foreign key refuses a **NONEXISTENT** id and knows **NOTHING ABOUT TENANCY**: another
+tenant's policy id is a perfectly valid reference to it. So **the constraint that looks like it
+protects this reference is the one that cannot** ([[F2-242]], [[F2-243]]).
+
+* **The service** resolves through `get()`, the module's one tenant-scoped policy resolver, so the
+  reference is verified where it is **stored** rather than by whoever dereferences it later.
+* **V399** adds `FK_policy_att_document` as the existence backstop that survives a future writer
+  forgetting the guard.
+
+⚙ **No cascade**, deliberately: an attestation is evidence a person accepted a policy and must not
+disappear because the policy row did. And restrict semantics can refuse nothing that works today
+— **both delete paths in `module/policy` are soft** (`setIsDeleted(true)` at two sites; there is
+no hard delete of a policy document anywhere in the tree), so the parent row is never removed.
+
+⚠ Measured **0 dangling `policy_id` over ALL rows** in both databases before writing it — an
+`ADD CONSTRAINT` verifies soft-deleted rows too — so no `WITH NOCHECK` and nothing to reconcile
+([[F2-183]]). Applied to dev **twice**; nine THROWing self-checks including `is_not_trusted` and
+`is_disabled` ([[F2-299]]) and a live refusal probe conditional on a row existing to clone.
+
+### `policy_version` is derived, and the schema settles that it can be
+
+`policy.documents` holds **one row per version** — measured **41 live rows and 41 distinct
+`(policy_code, version)` pairs** — so `policyId` already identifies a specific version and
+`policy_version` is a pure **copy** of that row's own field. That is [[F2-245]]'s
+parent-identity-copy shape: a copy travelling beside a reference can describe a different row than
+the reference names, and here it named versions that never existed.
+
+An **ECHO is accepted and a CONTRADICTION refused**, which is the house pattern for a derived
+identity copy ([[F2-252]], [[F2-277]]): a client that round-trips the record keeps working, and one
+relinking by version is told rather than silently corrected. The comparison is case- and
+whitespace-insensitive because the column collates case-insensitively, so an exact-match refusal
+would reject a value the database itself treats as equal ([[F2-179]]) — and **the document's
+spelling is stored, never the caller's**, or the register's version string depends on how somebody
+happened to type it.
+
+### The entity javadoc described a lifecycle that does not exist
+
+It read *"EXPIRED applies when the underlying policy version is superseded."*
+
+`EXPIRED` **is** in the attestation vocabulary and the summary counts it
+(`case "EXPIRED" -> expired++`). **No code path anywhere writes it.**
+`PolicyAttestation.getPolicyVersion()` has **zero readers** on that entity — every
+`getPolicyVersion` hit in the tree belongs to `BcmGovernanceRecord`, a different entity in another
+module — and **0 rows sit at EXPIRED** in either database.
+
+So an attestation of a superseded policy version reads as current for ever, and the "expired"
+figure on the summary is permanently zero. Building the supersede pass is a **feature**, filed
+rather than smuggled in ([[F2-188]]); the sentence needed correcting because it answered the
+question a reader was about to ask ([[F2-184]]). 🔑 **The column having no reader is exactly why
+nobody noticed the claim.**
+
+⚙ The audit row now names the policy code and version. It read `"on policy 1"` — an id an auditor
+cannot resolve — and the code and version were unavailable to say more until this method resolved
+the document.
+
+### How it was found, and why 4 of 5 candidates were refuted
+
+The question was **which mutating route authorises with a `READ` permission?** No gate pairs the
+HTTP verb with the permission action — `permission-usage-sites.txt` publishes
+`Controller#method MODULE:ACTION` and carries no verb — so it was unmeasured.
+
+Over **254 controllers / 2,234 mapped handlers / 1,238 write handlers**, the action distribution
+is **WRITE 663 · DELETE 74 · APPROVE 41 · READ 5 · BREAK_GLASS 1 · TRIAGE 1**. Five candidates,
+and **four were refuted by reading**:
+
+* `FairCalculatorController#calculate` — carries its own comment,
+  `SEC-RISK-004: pure read-only what-if computation (no persistence)`, and explains why it is a
+  real module permission rather than `isAuthenticated()`. **By design, with provenance.**
+* `ThreatIntelController#correlate` — `@Transactional(readOnly = true)`, and its javadoc says the
+  ingestion table is a stub. Reads and returns a report. ⚠ Two classes share that simple name
+  ([[F2-222]]'s hazard), and the locator keyed on the filename.
+* `PolicyController#attest` and `#decline` — **duties**, whose object-level SEC-CMP-004 check
+  (caller == assignee, plus an admin override) is the control. [[F2-219]]'s ADR-010 shape.
+
+🔑 **A tiny outlier population against an overwhelmingly consistent convention is the right shape
+to chase — and most of it will still be correct code.**
+
+### It is a member of a filed population, reached from another direction
+
+⚠⚠ [[F2-243]] filed a **26-site store-side work list**: *a create or update writing a
+caller-supplied FK whose target carries `organisation_id`, no tenant predicate in the method*,
+deliberately with no verdicts. `PolicyManagementService#createAttestation::policyId` fits that
+definition exactly and was not among the three members it named.
+
+Worse, the count is **stale**: [[F2-244]] closed `CoiService#recordRecusal::userId`, which that
+filing still lists as *sharpest unread*. With this slice the honest figure is **24**, not 26.
+
+🔑 **A population filed with no verdicts is not a list anybody re-derives, so its members get
+found again from another angle and the count never moves** — [[F2-330]]'s meta-finding (*a closed
+defect still printing NEEDS-VERDICT is worse than a missing row*) at a prose filing rather than a
+gate map. **Strike a member off in the commit that closes it.**
+
+### Verification
+
+* `createAttestation` had **no test of any kind**, which is not the same as a path somebody
+  decided was safe ([[F2-248]]). `PolicyManagementServiceTest` **44 → 49**.
+* Live **8/8 pre-fix**, **8/8 post-fix**.
+* **Two controls, one per half** ([[F2-289]]): reverting the whole hunk fires all 5 new legs;
+  reverting **only** the version derivation fires 4 while the tenant leg stays **green**. The
+  isolation is what proves the halves are separately asserted. Both surgical, so the suite still
+  compiles ([[F2-287]]), each asserting the mutation landed and that **49** tests ran ([[F2-451]]:
+  a present `Tests run:` line is not evidence the right tests ran). Post-restore 49/0.
+* A third control **disables the foreign key** and re-runs V399: checks 2 and 5 both fire, and go
+  green again once it is re-enabled `WITH CHECK`. A disabled key enforces nothing and looks
+  identical to a live one in any listing that checks only the name ([[F2-299]]).
+* Full build **5172/0/0**, predicted exactly.
+
+### Filed
+
+* **The EXPIRED supersede pass** — a feature. Nothing writes the status that the vocabulary and
+  the KPI both admit.
+* **`createAttestation` still performs no duplicate check**, and
+  `PolicyAttestationRepository.findByOrganisationIdAndPolicyIdAndUserUsername` — the `Optional`
+  finder that *states* an identity invariant — has **zero callers** ([[F2-426]]'s filing,
+  re-derived and still open). ⚠ Note the triple is **not** the real key: re-attestation to a new
+  version is legitimate, so a unique index on `(org, policy, user)` would refuse the platform's
+  own lifecycle. Whether a second assignment for the same `(policy, user, version)` is a re-issue
+  or a duplicate is a **product decision**.
+* The **24** remaining members of F2-243's store-side population, still with no verdicts.
+
 ## F2-452 — a bean is a singleton, so an instance field is shared by every tenant; four of them let an HTTP health probe write to one without the lock
 
 | Field | Value |
