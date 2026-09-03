@@ -144,7 +144,12 @@ class ExerciseScenarioLibraryServiceTest {
         // of blank strings) and the result is mapped to a ScenarioSummary.
         BcmExerciseScenario s = scenarioFixture();
         Page<BcmExerciseScenario> page = new PageImpl<>(List.of(s));
-        when(scenarioRepo.filter(eq("TABLETOP"), eq("ADVANCED"), eq("SAMA_CSF"), eq("ransom"), any(Pageable.class)))
+        // F2-449: the framework and the free-text query are both bound into a LIKE, so the
+        //         service escapes them first. SAMA_CSF contains an underscore, which was
+        //         silently a single-character wildcard -- this fixture's own token is an
+        //         instance of the everyday case, and asserting the RAW string arrives here
+        //         was asserting the defect.
+        when(scenarioRepo.filter(eq("TABLETOP"), eq("ADVANCED"), eq("SAMA\\_CSF"), eq("ransom"), any(Pageable.class)))
             .thenReturn(page);
 
         Page<ScenarioSummary> out =
@@ -233,11 +238,12 @@ class ExerciseScenarioLibraryServiceTest {
 
     @Test
     void recommended_strips_whitespace() {
-        when(scenarioRepo.findByFrameworkAlignmentContaining("SAMA_CSF"))
+        // F2-449: trimmed AND escaped -- the underscore in SAMA_CSF was a wildcard
+        when(scenarioRepo.findByFrameworkAlignmentContaining("SAMA\\_CSF"))
             .thenReturn(List.of(scenarioFixture()));
         List<ScenarioSummary> out = service.recommended("  SAMA_CSF  ");
         assertThat(out).hasSize(1);
-        verify(scenarioRepo).findByFrameworkAlignmentContaining("SAMA_CSF");
+        verify(scenarioRepo).findByFrameworkAlignmentContaining("SAMA\\_CSF");
     }
 
     // ─── Instantiation ─────────────────────────────────────────────────
