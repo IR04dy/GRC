@@ -181,6 +181,8 @@ def main():
     report_partition(missing_t, int(stop) if stop else None)
     report_column_partition(missing_c, int(stop) if stop else None)
     report_constraints(int(stop) if stop else None)
+    report_indexes(int(stop) if stop else None)
+    report_defaults(int(stop) if stop else None)
 
 
 MIG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..",
@@ -409,6 +411,156 @@ def migration_corpus():
         body = io.open(os.path.join(MIG_DIR, f), encoding="utf-8-sig", errors="replace").read()
         out[int(m.group(1))] = LINE_COMMENT.sub(" ", BLOCK_COMMENT.sub(" ", body)).lower()
     return out
+
+
+# ─────────────────────────── F2-445: the index and DEFAULT axes ───────────────────────────
+
+INDEX_SQL = """
+SELECT s.name + '.' + t.name,
+       i.name,
+       i.is_unique,
+       i.is_primary_key,
+       i.is_unique_constraint,
+       ISNULL(i.filter_definition, ''),
+       STUFF((SELECT ',' + c.name
+                FROM sys.index_columns ic
+                JOIN sys.columns c ON c.object_id = ic.object_id
+                                  AND c.column_id = ic.column_id
+               WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+                 AND ic.is_included_column = 0
+               ORDER BY ic.key_ordinal
+               FOR XML PATH('')), 1, 1, '')
+  FROM sys.indexes i
+  JOIN sys.tables t  ON t.object_id = i.object_id
+  JOIN sys.schemas s ON s.schema_id = t.schema_id
+ WHERE i.name IS NOT NULL AND i.is_hypothetical = 0 AND i.type IN (1, 2)
+   AND t.is_ms_shipped = 0
+   AND s.name NOT IN ('dbo','sys','INFORMATION_SCHEMA')"""
+
+DEFAULT_SQL = """
+SELECT s.name + '.' + t.name, c.name, d.definition
+  FROM sys.default_constraints d
+  JOIN sys.columns c  ON c.object_id = d.parent_object_id AND c.column_id = d.parent_column_id
+  JOIN sys.tables t   ON t.object_id = d.parent_object_id
+  JOIN sys.schemas s  ON s.schema_id = t.schema_id
+ WHERE s.name NOT IN ('dbo','sys','INFORMATION_SCHEMA')"""
+
+
+def index_shapes(db):
+    """{(table, unique, pk, uq_constraint, key columns, filter): [names]}.
+
+    ⚠⚠ Keyed on the index's SHAPE, never its NAME, and that is the whole reason this axis is
+    measurable. SQL Server auto-names a primary key with a per-database random suffix
+    (`PK__committe__3213E83F66D1F096`), so a name-keyed diff reports the SAME primary key on the
+    SAME table as both missing and extra. Measured 2026-09-03: name-keyed gives **393 missing / 400
+    extra**, of which **386 of the 393 are "unique"** and almost all are auto-named PKs;
+    shape-keyed the honest answer is **14 missing / 21 extra**. 96% of a name-keyed answer is noise.
+
+    🔑 This script already recorded that hazard for DEFAULT constraints — *"1,910 of dev's 2,259 are
+    system-named, so a name comparison is noise"* — and EXCLUDED that axis rather than solving it.
+    Shape-keying solves both, which is why {@code default_shapes} exists below.
+    """
+    with connect(db) as cn:
+        cur = cn.cursor()
+        cur.execute(INDEX_SQL)
+        out = {}
+        for tbl, name, uq, pk, uc, filt, cols in cur.fetchall():
+            key = (tbl, bool(uq), bool(pk), bool(uc),
+                   (cols or "").lower(), " ".join((filt or "").split()).lower())
+            out.setdefault(key, []).append(name)
+        return out
+
+
+def default_shapes(db):
+    """{(table, column, definition)} — no name, for the reason above."""
+    with connect(db) as cn:
+        cur = cn.cursor()
+        cur.execute(DEFAULT_SQL)
+        return {(t, c, " ".join((d or "").split()).lower()) for t, c, d in cur.fetchall()}
+
+
+def report_indexes(stop):
+    print("\n" + "=" * 78)
+    print("INDEXES — keyed on SHAPE, never on name (F2-445)")
+    print("=" * 78)
+    corpus = migration_corpus()
+    try:
+        dev = index_shapes(DEV)
+        built = index_shapes(BUILT)
+    except pyodbc.Error as e:
+        print("cannot read indexes: %s" % e)
+        return
+
+    missing = sorted(set(dev) - set(built))
+    extra = sorted(set(built) - set(dev))
+    uq = [k for k in missing if k[1]]
+    print("shapes: dev %d · built %d · missing %d (unique %d) · extra %d"
+          % (len(dev), len(built), len(missing), len(uq), len(extra)))
+
+    later, skipped, never = [], [], []
+    for k in missing:
+        names = dev[k]
+        vs = sorted(v for v, txt in corpus.items() if any(n.lower() in txt for n in names))
+        if not vs:
+            never.append(k)
+        elif stop is not None and min(vs) > stop:
+            later.append((min(vs), k))
+        else:
+            skipped.append((min(vs), k))
+
+    if stop is not None:
+        print("  [1] first named ABOVE V%s — expected-missing: %d" % (stop, len(later)))
+    else:
+        print("  [1] (no stop known, cannot separate expected-missing): %d" % len(later))
+    print("  [2] ⚠ named by a migration at or below the stop and ABSENT: %d" % len(skipped))
+    if skipped and stop is None:
+        print("      ⚠⚠ NO STOP KNOWN, so this CANNOT be read as a defect — F2-444.")
+    for v, k in skipped:
+        print("        V%-4d %-44s unique=%-5s cols=%-34s %s"
+              % (v, k[0], k[1], k[4], ("WHERE " + k[5]) if k[5] else ""))
+    print("  [3] ⚠ NO migration anywhere names it — a fresh install never enforces it: %d"
+          % len(never))
+    for k in sorted(never, key=lambda x: (not x[1], x[0])):
+        print("        %-44s unique=%-5s pk=%-5s cols=%-34s %s   [dev: %s]"
+              % (k[0], k[1], k[2], k[4], ("WHERE " + k[5]) if k[5] else "", ",".join(dev[k])))
+    if uq:
+        print("      🔑 A UNIQUE shape a fresh install lacks is the sharp case: every"
+              " check-then-insert guard it backstops is unbackstopped for a new customer"
+              " (F2-426's family), and dev cannot see it.")
+
+
+def report_defaults(stop):
+    print("\n" + "=" * 78)
+    print("COLUMN DEFAULTS — keyed on (table, column, definition), never on name (F2-445)")
+    print("=" * 78)
+    try:
+        dev = default_shapes(DEV)
+        built = default_shapes(BUILT)
+    except pyodbc.Error as e:
+        print("cannot read defaults: %s" % e)
+        return
+    missing = sorted(set(dev) - set(built))
+    extra = sorted(set(built) - set(dev))
+    print("shapes: dev %d · built %d · missing %d · extra %d"
+          % (len(dev), len(built), len(missing), len(extra)))
+    print("  ⚠ This axis was DELIBERATELY EXCLUDED before F2-445, for a reason the script stated"
+          " and that shape-keying removes: dev's defaults are overwhelmingly system-named, so a"
+          " name comparison is noise. The definition IS the identity.")
+    for t, c, d in missing[:30]:
+        print("    MISSING %-44s %-26s %s" % (t, c, d[:60]))
+    if len(missing) > 30:
+        print("    ... and %d more" % (len(missing) - 30))
+    for t, c, d in extra[:10]:
+        print("    EXTRA   %-44s %-26s %s" % (t, c, d[:60]))
+    both = {(t, c) for t, c, _ in missing} & {(t, c) for t, c, _ in extra}
+    if both:
+        print("\n  🔑 Appearing as BOTH missing and extra means the same column's default DIFFERS"
+              " between dev and a fresh install — not an absence. F2-445 found"
+              " bcm.bcp_binder_export.watermark_text that way, and the difference was ENCODING:"
+              " dev stores mojibake where the migration produces correct Arabic. Run"
+              " mojibake_census.py.")
+        for t, c in sorted(both):
+            print("        %s.%s" % (t, c))
 
 
 def report_constraints(stop):
