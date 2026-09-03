@@ -46,10 +46,19 @@ import sys
 
 import pyodbc
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import chain_marker                                    # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 DEV = os.environ.get("CONV_DEV_DB", "TSS_GRC")
 BUILT = os.environ.get("CONV_BUILT_DB", "TSS_GRC_FULL_CHAIN")
+
+# F2-444 — needed to say whether the build is BEHIND the folder, which is the whole
+# difference between "3 objects missing" and "35 objects newer than this database".
+MIG_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "tss-grc-backend", "src", "main", "resources", "db", "migration", "sqlserver")
 
 # Schemas that exist only to serve the migration mechanism or SQL Server itself. Comparing them
 # reports noise: Flyway's own history table is present in a built database by construction and absent
@@ -85,19 +94,34 @@ def objects(db):
     return tables, columns
 
 
-def stop_point():
-    """Which migration the built database reached.
+def stop_point(cursor=None):
+    """Which migration the built database reached, and where that answer came from.
 
-    full_chain_proof.py prints its stopping point but records it nowhere, so there is no marker table
-    to read — pass it in with --stop 330 or CONV_STOP=330. ⚠ It is deliberately NOT inferred:
-    guessing the stop from the highest-numbered object present would make the caveat depend on the
-    same migrations it is meant to qualify, and a wrong stop turns 30 unrun files into 30 phantom
-    defects.
+    ⚠ It is still deliberately NOT INFERRED, and that reasoning was always right: guessing the stop
+    from the highest-numbered object present would make the caveat depend on the same migrations it
+    is meant to qualify, and a wrong stop turns 30 unrun files into 30 phantom defects.
+
+    ⚠⚠ F2-444 — what changed is that the builders now RECORD it. This docstring used to read
+    *"full_chain_proof.py prints its stopping point but records it nowhere, so there is no marker
+    table to read"*, which was true and was the whole defect: the operator had to remember `--stop`,
+    and forgetting it produced a report that looked like findings. Measured on 2026-09-03 against a
+    twenty-seven-day-old build: **28 CHECKs, 7 FKs and 18 columns reported as missing**, every one
+    merely newer than the build. Reading a recorded head is not inferring one.
+
+    An explicit --stop or CONV_STOP still wins, so a database built by something else can be
+    qualified by hand.
     """
     for i, a in enumerate(sys.argv):
         if a == "--stop" and i + 1 < len(sys.argv):
-            return sys.argv[i + 1].lstrip("Vv")
-    return os.environ.get("CONV_STOP")
+            return sys.argv[i + 1].lstrip("Vv"), "--stop"
+    env = os.environ.get("CONV_STOP")
+    if env:
+        return env, "CONV_STOP"
+    if cursor is not None:
+        marker = chain_marker.read(cursor)
+        if marker is not None:
+            return str(marker["head_reached"]), "chain_build_marker"
+    return None, None
 
 
 def report(label, items, cap=30):
@@ -119,12 +143,19 @@ def main():
         sys.exit("cannot read built database %s — run `py full_chain_proof.py --keep` first.\n  %s"
                  % (BUILT, e))
 
-    stop = stop_point()
+    built_cur = connect(BUILT).cursor()
+    marker = chain_marker.read(built_cur)
+    stop, source = stop_point(built_cur)
     print("F2-09 schema convergence:  built=%s (%d tables)  vs  dev=%s (%d tables)"
           % (BUILT, len(built_t), DEV, len(dev_t)))
+
+    # F2-444 — the build's provenance, printed FIRST, because every 'missing' count below is
+    # meaningless without it.
+    stale, line = chain_marker.describe(marker, chain_marker.folder_head(MIG_DIR))
+    print(line)
     if stop:
-        print("built database reached V%s — anything a LATER migration creates is expected-missing"
-              % stop)
+        print("built database reached V%s (from %s) — anything a LATER migration creates is "
+              "expected-missing" % (stop, source))
     else:
         print("⚠ could not determine the chain's stopping point; read 'missing' as "
               "'not created at or below wherever it stopped', not as 'never created'")
@@ -426,7 +457,17 @@ def report_constraints(stop):
 
         print("  [2] ⚠ named by a migration at or below the stop and ABSENT from the build: %d"
               % len(skipped))
-        if skipped:
+        if skipped and stop is None:
+            print("      ⚠⚠ NO STOP KNOWN, so this CANNOT be read as a defect. It mixes"
+                  " constraints whose migration ran and had its CREATE skipped with constraints"
+                  " from migrations that never ran at all. F2-444: run"
+                  " `full_chain_proof.py --keep` so the head is stamped, or pass --stop <version>."
+                  "\n      🔑 This partition used to assert *\"The migration ran and the"
+                  " constraint is not there\"* unconditionally, while the TABLE and COLUMN"
+                  " partitions above printed exactly this caveat — one script, three partitions,"
+                  " two honest. That sentence is what turned a stale build into 28 phantom"
+                  " findings.")
+        if skipped and stop is not None:
             print("      The migration ran and the constraint is not there. The usual cause is an"
                   " idempotency-guarded CREATE TABLE that was skipped because an EARLIER migration"
                   " already made the table — every inline CONSTRAINT in that CREATE goes with it."
