@@ -1,5 +1,9 @@
 package com.tss.grc.common.exception;
 
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.data.util.ClassTypeInformation;
+import org.springframework.data.mapping.PropertyReferenceException;
+import java.lang.reflect.Method;
 import jakarta.persistence.NoResultException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
@@ -595,5 +599,65 @@ class GlobalExceptionHandlerTest {
             return e;
         }
         throw new AssertionError("expected LocalDate.parse(\"" + bad + "\") to fail");
+    }
+
+    // ── F2-448 ── ?sort=<anything> answered an opaque 500 on every paged endpoint ───────────
+
+    /**
+     * ⚠⚠ THE LOAD-BEARING LEG. The defect is one of ROUTING, so what has to be asserted
+     * is Spring's own resolution and not what the method returns: a direct call proves the body,
+     * and the thing that actually changed is which handler Spring PICKS. F2-339 and F2-348 each
+     * recorded this and it is the only leg the pre-fix control can fire on.
+     */
+    @Test
+    @DisplayName("F2-448 — Spring routes PropertyReferenceException to the 400 handler")
+    void aBadSortPropertyResolvesToItsOwnHandlerRatherThanTheCatchAll() {
+        ExceptionHandlerMethodResolver resolver =
+            new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+        Method m = resolver.resolveMethod(badSort());
+        assertThat(m).isNotNull();
+        assertThat(m.getName())
+            .as("""
+                PropertyReferenceException lives in org.springframework.data.mapping and is NOT an
+                IllegalArgumentException, so before F2-448 it matched only
+                @ExceptionHandler(Exception.class) and any paged route answered 500 to
+                ?sort=<nonexistent> — for any authenticated reader.""")
+            .isEqualTo("handleBadSortProperty");
+    }
+
+    @Test
+    @DisplayName("F2-448 — the 400 names the property and NOT the entity type")
+    void theBadSortDetailNamesThePropertyAndNotTheEntity() {
+        ProblemDetail pd = new GlobalExceptionHandler().handleBadSortProperty(badSort());
+        assertThat(pd.getStatus()).isEqualTo(400);
+        assertThat(pd.getDetail())
+            .as("the property is the caller's own input, so telling them is the point")
+            .contains("nonexistentProperty");
+        assertThat(pd.getDetail())
+            .as("""
+                ⚠ but the exception's own message is "No property 'x' found for type
+                'RiskAppetiteStatement'", and the entity class is an internal detail SEC-CFG-001
+                keeps out of a production response. Asserting the status alone would pass over
+                that half.""")
+            .doesNotContain("RiskAppetiteStatement");
+        assertThat(pd.getProperties()).containsKey("property");
+        assertThat(pd.getProperties())
+            .as("class and root cause stay dev-only, the same gate as the catch-all")
+            .doesNotContainKey("exception");
+    }
+
+    /** A real PropertyReferenceException, built the way Spring Data builds one. */
+    private static PropertyReferenceException badSort() {
+        return new PropertyReferenceException("nonexistentProperty",
+            ClassTypeInformation.from(SortProbe.class), java.util.List.of());
+    }
+
+    /** Named for the entity whose type name must NOT reach the response. */
+    static class SortProbe {
+        private String titleEn;
+
+        public String getTitleEn() {
+            return titleEn;
+        }
     }
 }
