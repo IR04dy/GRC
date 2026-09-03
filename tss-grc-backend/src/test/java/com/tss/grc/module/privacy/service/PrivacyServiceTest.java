@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,6 +59,11 @@ class PrivacyServiceTest {
     @Mock private DataBreachRepository breachRepo;
     @Mock private DataSubjectRequestRepository dsrRepo;
     @Mock private ProcessingActivityRepository ropaRepo;
+    // F2-458: getStats() reads all five repositories, so the two the lifecycle legs never
+    // needed have to be mocked for it to run at all. An unstubbed count defaults to 0, which
+    // is what keeps each leg's arithmetic readable.
+    @Mock private com.tss.grc.module.privacy.repository.DpiaRepository dpiaRepo;
+    @Mock private com.tss.grc.module.privacy.repository.ConsentRecordRepository consentRepo;
     @InjectMocks private PrivacyService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -369,5 +375,238 @@ class PrivacyServiceTest {
             .isInstanceOf(EntityNotFoundException.class);
 
         verify(dsrRepo, never()).save(any());
+    }
+    // ─── PDPL dashboard figures (F2-458) ─────────────────────────────
+    //
+    // getStats() had NO test of any kind before this (F2-248: a path with no test is not a
+    // path somebody decided was safe), and four of its keys asserted a statutory condition
+    // the arithmetic behind them did not measure:
+    //
+    //   dsrSlaBreaches       = count(status = ESCALATED)      -> now open AND past due_date
+    //   breachNotifications  = count(status = NOTIFIED)       -> now SDAIA-discharged
+    //   processorsWithoutDpa = literal 0L                     -> not published at all
+    //   retentionViolations  = literal 0L                     -> not published at all
+    //
+    // These legs are BEHAVIOURAL rather than structural, and that is forced: a source scan
+    // cannot tell a re-added `m.put("dsrSlaBreaches", dsrEscalated)` from the comment that
+    // quotes it, and this fix quotes every retired expression on purpose (F2-450). The only
+    // assertion that discriminates is what the map actually contains.
+
+    /** Enough stubbing for getStats() to run; every unstubbed count defaults to 0. */
+    private void stubRopaReadsForStats() {
+        when(ropaRepo.findByOrganisationId(ORG_ID, org.springframework.data.domain.Pageable.unpaged()))
+            .thenReturn(org.springframework.data.domain.Page.empty());
+    }
+
+    @Test
+    void stats_dsrSlaBreaches_countsOpenRequestsPastTheirDeadline_notTheEscalatedOnes() {
+        stubRopaReadsForStats();
+        when(dsrRepo.countByOrganisationIdAndStatusNotIn(ORG_ID, DsrRequestLifecycle.TERMINAL_LIST))
+            .thenReturn(12L);
+        when(dsrRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
+                eq(ORG_ID), eq(DsrRequestLifecycle.TERMINAL_LIST), any(LocalDate.class)))
+            .thenReturn(12L);
+
+        assertThat(service.getStats()).as("""
+            `dsrSlaBreaches` must be the count of OPEN requests past their recorded statutory \
+            deadline, which is what the key is named for and what the dashboard renders beside a \
+            gauge captioned "within SLA".
+
+            It used to be count(status = ESCALATED). Escalation is what an operator does when \
+            somebody NOTICES a request is late; the register carries the deadline itself, so the \
+            proxy was measurable against the real thing and diverged badly. Measured 2026-09-04, \
+            byte-identical in dev and the deployed database: 12 of 12 open requests were past \
+            their due_date (74 to 504 days over) and 2 were ESCALATED, so the gauge reported 83%% \
+            within SLA where the honest answer is 0%%.""")
+            .containsEntry("dsrOpen", 12L)
+            .containsEntry("dsrSlaBreaches", 12L);
+
+        // The old computation must be gone, not merely outvoted. This is the whole population:
+        // the ESCALATED proxy was the service's only use of the single-status DSR count.
+        verify(dsrRepo, never()).countByOrganisationIdAndStatus(any(), any());
+    }
+
+    @Test
+    void stats_pastDueCount_isScopedToTheOpenSet_soItCanNeverExceedIt() {
+        stubRopaReadsForStats();
+        when(dsrRepo.countByOrganisationIdAndStatusNotIn(ORG_ID, DsrRequestLifecycle.TERMINAL_LIST))
+            .thenReturn(5L);
+        when(dsrRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
+                eq(ORG_ID), eq(DsrRequestLifecycle.TERMINAL_LIST), any(LocalDate.class)))
+            .thenReturn(3L);
+
+        service.getStats();
+
+        org.mockito.ArgumentCaptor<java.util.List<String>> terminal =
+            org.mockito.ArgumentCaptor.forClass(java.util.List.class);
+        org.mockito.ArgumentCaptor<LocalDate> asOf = org.mockito.ArgumentCaptor.forClass(LocalDate.class);
+        verify(dsrRepo).countByOrganisationIdAndStatusNotInAndDueDateBefore(
+            eq(ORG_ID), terminal.capture(), asOf.capture());
+
+        assertThat(terminal.getValue()).as("""
+            The past-due count must AND the same open predicate the open count uses, so the \
+            breached set is a subset of `dsrOpen` by construction.
+
+            That relation is why the client no longer clamps: PdplDashboardPage used to compute \
+            `Math.min(stats.dsrSlaBreaches ?? 0, open)`, a defence against two figures describing \
+            different populations -- and the wrong defence, because it hid the divergence instead \
+            of surfacing it (F2-457: a cap on a ratio's numerator is a bug report about the \
+            numerator). If this list ever stops being the terminal set, the two figures are free \
+            to disagree again and the clamp would have to come back.""")
+            .isEqualTo(DsrRequestLifecycle.TERMINAL_LIST);
+        assertThat(asOf.getValue()).as(
+            "The deadline is compared against a date, not left open-ended.").isNotNull();
+    }
+
+    @Test
+    void stats_breachNotifications_countsSdaiaSubmissions_notTheLifecycleStatus() {
+        stubRopaReadsForStats();
+        // Answered on the argument rather than stubbed per status: getStats() calls this with
+        // seven different statuses to build incidents12m, and a single-status stub trips
+        // strict stubbing. This also makes the incidents12m assertion below exact -- only
+        // NOTIFIED contributes, so 4 can only have come from the lifecycle count.
+        when(breachRepo.countByOrganisationIdAndStatus(eq(ORG_ID), any()))
+            .thenAnswer(inv -> "NOTIFIED".equals(inv.getArgument(1)) ? 4L : 0L);
+        when(breachRepo.countByOrganisationIdAndSdaiaNotificationStatusIn(
+                ORG_ID, PrivacyService.SDAIA_DISCHARGED)).thenReturn(0L);
+
+        java.util.Map<String, Long> m = service.getStats();
+
+        assertThat(m).as("""
+            "Regulator-notified" must be answered from `sdaia_notification_status`, the column \
+            that records what was said to SDAIA -- never from the breach LIFECYCLE status, which \
+            is a state an operator sets on the record itself.
+
+            F2-209 measured that those two disagree and corrected the reader in \
+            PdplBreachConsole; this is the reader it did not touch. Measured 2026-09-04, \
+            byte-identical in both databases: 4 of 17 breaches are status NOTIFIED while all 17 \
+            are sdaia_notification_status = NOT_REPORTED and sdaia_submitted_at is NULL on every \
+            one -- so the dashboard told an operator four breaches had been reported to the \
+            regulator when none had.""")
+            .containsEntry("breachNotifications", 0L);
+
+        // The boundary in the other direction: the lifecycle count is still a legitimate term of
+        // "how many breaches exist", so it must keep feeding incidents12m. Dropping it there
+        // would trade a false assurance for an under-count (F2-457's rule -- assert what a fix
+        // must NOT change, or the next reader removes the rest of it).
+        assertThat(m).as(
+            "The lifecycle NOTIFIED count must still be one term of the incident total.")
+            .containsEntry("privacyIncidents12m", 4L);
+    }
+
+    @Test
+    void sdaiaDischarged_isTheTwoPostedStates_andASubsetOfTheVocabulary() {
+        assertThat(PrivacyService.SDAIA_DISCHARGED).as("""
+            IN_PREPARATION is progress, not discharge. The entity's own javadoc puts the discharge \
+            at sdaia_submitted_at being set, and that stamp is written only on the way to \
+            SUBMITTED or ACKNOWLEDGED -- so admitting IN_PREPARATION here would count a \
+            notification somebody started six months ago and never sent as one that had left the \
+            building. F2-209 drew exactly this distinction on the frontend (isSdaiaSubmitted vs \
+            isSdaiaReported) and this is its server-side twin.""")
+            .containsExactly("ACKNOWLEDGED", "SUBMITTED");
+
+        assertThat(PrivacyService.SDAIA_STATES).as("""
+            SDAIA_DISCHARGED must be a genuine subset of the vocabulary. A token one letter out \
+            would match no stored row and read exactly like a tenant that has reported no \
+            breaches (F2-177's one-letter-away trap). The static initialiser refuses it at \
+            class-init; this leg proves the initialiser's premise rather than trusting it.""")
+            .containsAll(PrivacyService.SDAIA_DISCHARGED);
+    }
+
+    @Test
+    void stats_publishesNoFigureForAControlThisModuleDoesNotTrack() {
+        stubRopaReadsForStats();
+
+        assertThat(service.getStats()).as("""
+            `processorsWithoutDpa` and `retentionViolations` were published as a literal 0L under \
+            the comment "Not tracked in this module yet -- surfaced as 0 rather than absent", as \
+            though 0 were the safer of the two. It is the opposite: PdplDashboardPage rendered \
+            both with tone `> 0 ? danger : success`, so a control this module does not track at \
+            all appeared as a GREEN tile asserting zero processors without a DPA and zero \
+            retention violations.
+
+            An invented figure invites a question; an invented all-clear closes one (F2-197). If \
+            either control is ever really measured, publish it then -- and the surface will stop \
+            rendering the em-dash on its own.""")
+            .doesNotContainKey("processorsWithoutDpa")
+            .doesNotContainKey("retentionViolations");
+    }
+
+    /**
+     * The frontend half, asserted from here because nothing else can see it.
+     *
+     * <p>Reverting it re-declares the two retired fields on {@code PrivacyStatsShape}, {@code tsc}
+     * is satisfied because the server's map is untyped on the wire, and the panels interpolate
+     * {@code undefined} into a green Badge with nothing in either suite to notice. The
+     * {@code ConnectorBackingContractTest} precedent (F2-193, F2-213, F2-437, F2-457).
+     *
+     * <p>Comments are stripped first, in ONE left-to-right alternation, because this fix quotes
+     * every retired name on purpose -- a raw scan would read the epitaph as the corpse (F2-193)
+     * and fail on a correct tree. Two sequential passes corrupt the source (F2-198), and the
+     * {@code (?<!:)} stops a {@code https://} inside a string literal opening a comment.
+     */
+    @Test
+    void thePdplDashboardNamesNoKeyTheStatsMapNoLongerSends() throws java.io.IOException {
+        java.nio.file.Path page = java.nio.file.Paths.get(
+            "../tss-grc-ui-v2/src/pages/dashboards/PdplDashboardPage.tsx")
+            .toAbsolutePath().normalize();
+        assertThat(java.nio.file.Files.exists(page)).as(
+            "Expected %s to exist. A wrong path would make this leg vacuous rather than failing, "
+            + "which is the one outcome a cross-codebase assertion must not have.", page)
+            .isTrue();
+
+        String stripped = java.util.regex.Pattern
+            .compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/")
+            .matcher(java.nio.file.Files.readString(page))
+            .replaceAll("");
+
+        // Anti-vacuity: the stripper must leave the page's real code behind, or every absence
+        // assertion below passes over nothing (F2-235).
+        assertThat(stripped).as(
+            "The comment stripper appears to have blanked real code -- the page's own KPI array "
+            + "should survive it.").contains("const kpis").contains("dsrSlaBreaches");
+
+        for (String retired : java.util.List.of("processorsWithoutDpa", "retentionViolations")) {
+            assertThat(stripped).as("""
+                PdplDashboardPage still references %s outside a comment, and PrivacyService no \
+                longer publishes it. Both were a server-side literal 0L for a control this module \
+                does not track, rendered `> 0 ? danger : success` -- a green tile asserting \
+                compliance nobody measured.
+
+                If either control is ever really measured, add it to the stats map FIRST and this \
+                leg will let the page read it again.""".formatted(retired))
+                .doesNotContain(retired);
+        }
+
+        // Both surfaces must survive as an explicit absence rather than disappearing. UX-008's
+        // convention exists so an unmeasurable control stays visible; deleting the tile drops the
+        // question instead of answering it (F2-197). Asserted as a PAIRING, never as the token --
+        // F2-457's control G survived a `contains("notMeasured")` leg because the const
+        // DECLARATION satisfied it, so the tile could be reverted with the build still green.
+        assertThat(stripped).as("""
+            The "Processors w/o DPA" tile must survive as an em-dash whose hint is `notTracked`.
+
+            UX-008 distinguishes a figure that is COMING from one that is NOT, and this is the \
+            second: nothing in this module tracks the control, so "not yet computed" would \
+            promise a number that never arrives (F2-457).""")
+            .containsPattern("(?s)'Processors w/o DPA',.{0,120}?value:\\s*null,\\s*emptyHint:\\s*notTracked");
+
+        assertThat(stripped).as("""
+            The retention-violations line must survive as an em-dash carrying its reason on BOTH \
+            `title` and `aria-label`. A `title` alone is a tooltip a keyboard or screen-reader \
+            user never receives (F2-209), which on an Arabic-primary platform is house rule 7 as \
+            much as it is accessibility.""")
+            .containsPattern("(?s)title=\\{notTracked\\}.{0,80}?aria-label=\\{notTracked\\}");
+
+        // And the clamp must stay gone. With the server's count scoped to the open set, the
+        // breached figure is a subset by construction; a Math.min would hide a future divergence
+        // rather than surface it, which is exactly what it did for as long as it was there.
+        assertThat(stripped).as("""
+            PdplDashboardPage must not clamp the breached count to the open count. The clamp \
+            existed because the two figures described different populations -- ESCALATED against \
+            open -- and it hid that divergence for as long as it was there. The server now ANDs \
+            the open predicate, so there is nothing to clamp, and re-adding one would mean the \
+            populations have come apart again (F2-457).""")
+            .doesNotContain("Math.min(stats.dsrSlaBreaches");
     }
 }
