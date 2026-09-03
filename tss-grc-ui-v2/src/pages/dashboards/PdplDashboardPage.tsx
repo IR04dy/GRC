@@ -15,9 +15,12 @@ import { useDashboardLoader } from '../../lib/useDashboardLoader';
  * PDPL Dashboard — task #36 (prompt §30.6).
  *
  * Widgets: ROPA count, high-risk activities, PIAs (completed +
- * overdue), DSRs (open + SLA breaches), active consents,
- * cross-border transfers, breach notifications, processors w/o DPA,
- * retention violations.
+ * overdue), DSRs (open + past their statutory deadline), active
+ * consents, cross-border transfers, SDAIA breach reports.
+ *
+ * F2-458: "processors w/o DPA" and "retention violations" were in that list and are not
+ * measured by this module - both were a server-side literal 0L rendered as a green tile.
+ * Retiring a figure means retiring the sentence that advertised it (F2-207).
  */
 interface PrivacyStatsShape {
   ropaCount?: number;
@@ -30,9 +33,19 @@ interface PrivacyStatsShape {
   withdrawnConsents30d?: number;
   crossBorderTransfers?: number;
   privacyIncidents12m?: number;
+  /**
+   * F2-458: breaches whose SDAIA notification has actually been POSTED
+   * (`sdaia_notification_status` in SUBMITTED / ACKNOWLEDGED). It used to be the count of
+   * breaches at lifecycle status NOTIFIED, which is a different question and answered 4
+   * where the honest answer is 0 in both databases.
+   */
   breachNotifications?: number;
-  processorsWithoutDpa?: number;
-  retentionViolations?: number;
+  // F2-458: `processorsWithoutDpa` and `retentionViolations` are deliberately ABSENT. The
+  // server published both as a literal 0L for controls this module does not track, and this
+  // page rendered them `> 0 ? danger : success` - so an untracked control showed as a green
+  // tile asserting compliance. Declaring a field the wire never carries is the shape that
+  // produced F2-211's em-dash-on-every-row defect; the surfaces below render UX-008's
+  // em-dash with a reason instead.
 }
 
 export function PdplDashboardPage() {
@@ -60,19 +73,31 @@ export function PdplDashboardPage() {
   }
   const stats = data;
 
+  // UX-008 distinguishes a figure that is COMING from one that is NOT, and the difference is
+  // the whole point of using it here: nothing in this module tracks either control, so
+  // "not yet computed" would promise a number that never arrives (F2-457).
+  const notTracked = isAr
+    ? 'لا تُتابع هذه الوحدة هذا الضابط بعد، فلا يمكن قياسه'
+    : 'This module does not track this control yet, so it cannot be measured';
+
   const kpis: DomainDashboardKpi[] = [
     { Icon: Fingerprint, label: isAr ? 'نشاطات معالجة' : 'Processing activities', value: stats.ropaCount ?? 0, tone: 'primary', to: '/privacy' },
     { Icon: ShieldAlert, label: isAr ? 'نشاطات عالية الخطورة' : 'High-risk activities', value: stats.highRiskRopa ?? 0,
       tone: (stats.highRiskRopa ?? 0) > 0 ? 'warning' : 'success' },
     { Icon: AlertOctagon, label: isAr ? 'PIA متأخر' : 'PIAs overdue', value: stats.piaOverdue ?? 0,
       tone: (stats.piaOverdue ?? 0) > 0 ? 'danger' : 'success' },
+    // F2-458: the tone reads `dsrSlaBreaches`, which now counts open requests past their
+    // recorded statutory deadline rather than the ones somebody happened to escalate. The
+    // expression is unchanged and became correct when the figure did - which is why the
+    // measurement mattered more than the predicate: with 12 of 12 open requests past due
+    // and 2 escalated, this tile was `danger` for the wrong reason, and would have read a
+    // neutral `info` for a tenant that never escalates anything.
     { Icon: Users, label: isAr ? 'طلبات أصحاب البيانات' : 'DSRs open', value: stats.dsrOpen ?? 0,
       tone: (stats.dsrSlaBreaches ?? 0) > 0 ? 'danger' : 'info' },
     { Icon: Send, label: isAr ? 'نقل عبر الحدود نشط' : 'Cross-border active', value: stats.crossBorderTransfers ?? 0,
       tone: 'info' },
     { Icon: FileWarning, label: isAr ? 'مُعالجون بدون اتفاقية' : 'Processors w/o DPA',
-      value: stats.processorsWithoutDpa ?? 0,
-      tone: (stats.processorsWithoutDpa ?? 0) > 0 ? 'danger' : 'success' },
+      value: null, emptyHint: notTracked },
   ];
 
   const widgets: DomainDashboardWidget[] = [
@@ -97,7 +122,7 @@ export function PdplDashboardPage() {
       title: isAr ? 'تقييمات أثر الخصوصية (PIA)' : 'Privacy Impact Assessments',
       body: (
         <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'مكتملة' : 'Completed'}: <strong>{stats.piaCompleted}</strong></div>
+          <div>{isAr ? 'مكتملة' : 'Completed'}: <strong>{stats.piaCompleted ?? 0}</strong></div>
           <div>{isAr ? 'متأخرة' : 'Overdue'}: <Badge tone="danger">{stats.piaOverdue}</Badge></div>
           <div className="text-muted" style={{ marginTop: 4 }}>
             {isAr
@@ -115,7 +140,13 @@ export function PdplDashboardPage() {
       badgeTone: 'danger',
       body: (() => {
         const open = stats.dsrOpen ?? 0;
-        const breaches = Math.min(stats.dsrSlaBreaches ?? 0, open);
+        // F2-458: this was `Math.min(stats.dsrSlaBreaches ?? 0, open)`. The clamp was a
+        // defence against two figures describing different populations - and it was the
+        // wrong defence, because it hid the divergence instead of surfacing it. The server's
+        // count now ANDs the open predicate, so the breached set is a subset of `open` by
+        // construction and there is nothing left to clamp. F2-457's rule: a cap on a ratio's
+        // numerator is a bug report about the numerator.
+        const breaches = stats.dsrSlaBreaches ?? 0;
         const slaHealth = open > 0 ? Math.round(((open - breaches) / open) * 100) : 100;
         return (
           <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -124,8 +155,8 @@ export function PdplDashboardPage() {
               aria-label={`${isAr ? 'صحة SLA لطلبات أصحاب البيانات' : 'DSR SLA health'} ${slaHealth}%`}
               bands={ragBands()} />
             <div className="text-xs" style={{ lineHeight: 1.8, minWidth: 130 }}>
-              <div>{isAr ? 'طلبات مفتوحة' : 'Open requests'}: <strong>{stats.dsrOpen}</strong></div>
-              <div>{isAr ? 'خرق SLA' : 'SLA breaches'}: <Badge tone="danger">{stats.dsrSlaBreaches}</Badge></div>
+              <div>{isAr ? 'طلبات مفتوحة' : 'Open requests'}: <strong>{open}</strong></div>
+              <div>{isAr ? 'متجاوزة المهلة' : 'Past deadline'}: <Badge tone="danger">{breaches}</Badge></div>
               <div className="text-muted" style={{ marginTop: 4 }}>
                 {isAr ? 'SLA 30 يوم (PDPL مادة 18) — قابل للتمديد 60 يوماً بمبرر.'
                       : '30-day SLA (PDPL Art. 18) — extendable by 60 days with justification.'}
@@ -141,8 +172,11 @@ export function PdplDashboardPage() {
       title: isAr ? 'إشعارات الخروقات' : 'Breach notifications',
       body: (
         <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'حوادث خصوصية (12 شهر)' : 'Privacy incidents (12m)'}: <strong>{stats.privacyIncidents12m}</strong></div>
-          <div>{isAr ? 'تم إشعار الجهة التنظيمية' : 'Regulator-notified'}: <Badge tone="info">{stats.breachNotifications}</Badge></div>
+          <div>{isAr ? 'حوادث خصوصية (12 شهر)' : 'Privacy incidents (12m)'}: <strong>{stats.privacyIncidents12m ?? 0}</strong></div>
+          {/* F2-458: this reads the SDAIA submission column, not the breach lifecycle status.
+              The label is the one an operator judges a statutory obligation by, so it may not
+              be answered from a state an operator sets on the record itself. */}
+          <div>{isAr ? 'أُبلغت سدايا' : 'Reported to SDAIA'}: <Badge tone={(stats.breachNotifications ?? 0) > 0 ? 'info' : 'warning'}>{stats.breachNotifications ?? 0}</Badge></div>
           <div className="text-muted" style={{ marginTop: 4 }}>
             {isAr ? 'AR-04 يُفعِّل عدّاد 72 ساعة على الحوادث السيبرانية التي تمسّ بيانات شخصية.'
                   : 'AR-04 starts the 72-hour timer when a cyber incident affects personal data.'}
@@ -158,7 +192,11 @@ export function PdplDashboardPage() {
         <div className="text-xs" style={{ lineHeight: 1.8 }}>
           <div>{isAr ? 'موافقات نشطة' : 'Active consents'}: <strong>{formatNum(stats.activeConsents)}</strong></div>
           <div>{isAr ? 'سحب (30 يوم)' : 'Withdrawn (30d)'}: <Badge tone="info">{formatNum(stats.withdrawnConsents30d)}</Badge></div>
-          <div>{isAr ? 'انتهاكات الاحتفاظ' : 'Retention violations'}: <Badge tone={(stats.retentionViolations ?? 0) > 0 ? 'danger' : 'success'}>{stats.retentionViolations}</Badge></div>
+          {/* F2-458: was a `> 0 ? danger : success` Badge over a server-side literal 0L, so
+              a control this module does not track rendered as a green all-clear. */}
+          <div title={notTracked} aria-label={notTracked}>
+            {isAr ? 'انتهاكات الاحتفاظ' : 'Retention violations'}: <strong>&mdash;</strong>
+          </div>
         </div>
       ),
       href: '/privacy?tab=ropa',

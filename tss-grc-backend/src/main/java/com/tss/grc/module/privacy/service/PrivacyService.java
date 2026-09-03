@@ -153,9 +153,44 @@ public class PrivacyService {
     //   SUBMITTED     → ACKNOWLEDGED
     //   ACKNOWLEDGED  (terminal)
 
-    /** Valid SDAIA notification states. */
-    private static final java.util.Set<String> SDAIA_STATES = java.util.Set.of(
+    /**
+     * Valid SDAIA notification states.
+     *
+     * <p>Package-private rather than private so {@code PrivacyServiceTest} can assert that
+     * {@link #SDAIA_DISCHARGED} is a genuine SUBSET of it. The static block below already
+     * enforces that at class-init, but a test that can only trust the block cannot prove the
+     * block's premise.
+     */
+    static final java.util.Set<String> SDAIA_STATES = java.util.Set.of(
         "NOT_REPORTED", "IN_PREPARATION", "SUBMITTED", "ACKNOWLEDGED");
+
+    /**
+     * The states in which the notification has actually been POSTED to SDAIA, so the
+     * PDPL Article 31 72-hour clock is discharged.
+     *
+     * <p>{@code IN_PREPARATION} is progress, not discharge - the entity's own javadoc puts
+     * the discharge at {@code sdaia_submitted_at} being set, and that stamp is written only
+     * on the way to these two states. This is the server-side twin of the frontend's
+     * {@code isSdaiaSubmitted} (F2-209), and it is a subset of {@link #SDAIA_STATES} rather
+     * than a second vocabulary: the static block below refuses a member that is not one of
+     * them, because a token one letter out would silently count nothing and read exactly
+     * like a tenant that has reported no breaches (F2-177).
+     *
+     * <p>Sorted for a stable, diffable repository query parameter.
+     */
+    public static final java.util.List<String> SDAIA_DISCHARGED =
+        java.util.List.of("ACKNOWLEDGED", "SUBMITTED");
+
+    static {
+        for (String s : SDAIA_DISCHARGED) {
+            if (!SDAIA_STATES.contains(s)) {
+                throw new IllegalStateException(
+                    "SDAIA_DISCHARGED names '" + s + "', which is not a member of SDAIA_STATES "
+                    + SDAIA_STATES + " - a discharged state the vocabulary does not contain can "
+                    + "never match a stored row, so the count would silently read zero.");
+            }
+        }
+    }
 
     /**
      * The state a breach starts in — nothing has been said to the regulator yet.
@@ -515,12 +550,34 @@ public class PrivacyService {
         // is counted and chased rather than excused. ESCALATED is also reported separately
         // below as the at-risk bucket; being at risk does not stop it being open.
         long dsrOpen = dsrRepo.countByOrganisationIdAndStatusNotIn(orgId, DsrRequestLifecycle.TERMINAL_LIST);
-        long dsrSla  = dsrRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED");
+
+        // F2-458: this was `countByOrganisationIdAndStatus(orgId, "ESCALATED")`, published under
+        // the key `dsrSlaBreaches` and rendered "SLA breaches" beside a radial gauge captioned
+        // "within SLA". Escalation is what an operator does when somebody NOTICES a request is
+        // late; the register carries the deadline itself, so the proxy was measurable against the
+        // real thing. Measured, byte-identical in dev and the deployed database: 12 of 12 open
+        // requests are past their due_date (74 to 504 days over) and 2 are ESCALATED, so the
+        // gauge read 83% within SLA where the honest answer is 0%. The name was right and the
+        // arithmetic was a stand-in.
+        long dsrPastDue = dsrRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
+                orgId, DsrRequestLifecycle.TERMINAL_LIST, java.time.LocalDate.now());
 
         long openBreaches = breachRepo.countByOrganisationIdAndStatus(orgId, "OPEN")
                           + breachRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATING");
-        long notified     = breachRepo.countByOrganisationIdAndStatus(orgId, "NOTIFIED");
-        long incidents12m = openBreaches + notified
+        // F2-458: `incidents12m` still counts the lifecycle status NOTIFIED, correctly - it is
+        // one term of "how many breaches exist". What may NOT be read off the lifecycle is
+        // whether the regulator was told, which is the next statement.
+        long lifecycleNotified = breachRepo.countByOrganisationIdAndStatus(orgId, "NOTIFIED");
+
+        // F2-458: the "Regulator-notified" figure was `lifecycleNotified` - the breach lifecycle
+        // status, not the column recording what was said to SDAIA. F2-209 measured that those two
+        // disagree and corrected the reader in PdplBreachConsole; this is the reader it did not
+        // touch. Measured, byte-identical in both databases: 4 of 17 breaches are status NOTIFIED
+        // while all 17 are sdaia_notification_status = NOT_REPORTED with sdaia_submitted_at NULL,
+        // so the dashboard reported four submissions to SDAIA where there have been none.
+        long sdaiaSubmitted = breachRepo.countByOrganisationIdAndSdaiaNotificationStatusIn(
+                orgId, SDAIA_DISCHARGED);
+        long incidents12m = openBreaches + lifecycleNotified
                           + breachRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATED")
                           + breachRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED")
                           + breachRepo.countByOrganisationIdAndStatus(orgId, "REMEDIATED")
@@ -545,14 +602,19 @@ public class PrivacyService {
         m.put("piaCompleted", piaCompleted);
         m.put("piaOverdue", piaOverdue);
         m.put("dsrOpen", dsrOpen);
-        m.put("dsrSlaBreaches", dsrSla);
+        m.put("dsrSlaBreaches", dsrPastDue);
         m.put("activeConsents", activeConsents);
         m.put("withdrawnConsents30d", withdrawn);
         m.put("privacyIncidents12m", incidents12m);
-        m.put("breachNotifications", notified);
-        // Not tracked in this module yet — surfaced as 0 rather than absent.
-        m.put("processorsWithoutDpa", 0L);
-        m.put("retentionViolations", 0L);
+        m.put("breachNotifications", sdaiaSubmitted);
+        // F2-458: `processorsWithoutDpa` and `retentionViolations` used to be published here as
+        // literal 0L under the comment "Not tracked in this module yet - surfaced as 0 rather
+        // than absent", as though 0 were the safer of the two. It is the opposite. The dashboard
+        // renders both with tone `> 0 ? danger : success`, so a control this module does not
+        // track at all appeared as a GREEN tile asserting zero processors without a DPA and zero
+        // retention violations. An invented figure invites a question; an invented all-clear
+        // closes one (F2-197). Both keys are gone, and the surface renders UX-008's em-dash with
+        // a reason, which is what "absent" actually looks like to an operator.
         return m;
     }
 }
