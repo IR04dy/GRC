@@ -1,5 +1,6 @@
 package com.tss.grc.module.integrations.crowdstrike.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
@@ -323,7 +324,7 @@ public class CrowdStrikeInboundService {
         try {
             return objectMapper.writeValueAsString(d);
         } catch (JsonProcessingException ex) {
-            return "{\"_serialise_error\":\"" + ex.getMessage() + "\"}";
+            return "{\"_serialise_error\":\"" + JsonText.escape(ex.getMessage()) + "\"}";
         }
     }
 

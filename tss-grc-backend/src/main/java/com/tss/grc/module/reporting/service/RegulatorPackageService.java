@@ -1,5 +1,6 @@
 package com.tss.grc.module.reporting.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.module.platform.export.ExportNaming;
 import com.tss.grc.module.platform.export.PdfFonts;
 import com.tss.grc.module.platform.export.PdfTheme;
@@ -273,7 +274,8 @@ public class RegulatorPackageService {
         for (int i = 0; i < names.length; i++) {
             sb.append("    { \"name\": \"").append(esc(names[i]))
               .append("\", \"bytes\": ").append(blobs[i].length)
-              .append(", \"sha256\": \"").append(sha256(blobs[i])).append("\" }");
+              .append(", \"sha256\": \"").append(JsonText.escape(sha256(blobs[i])))
+              .append("\" }");
             sb.append(i < names.length - 1 ? ",\n" : "\n");
         }
         sb.append("  ]\n");
@@ -356,8 +358,11 @@ public class RegulatorPackageService {
 
     private static String nz(String s) { return s == null ? "" : s; }
 
+    /**
+     * F2-446 — delegates. Identical to AccessEvidencePackageService's copy, which is the
+     * finding: one name, and until F2-446 three different contracts (F2-177/F2-190).
+     */
     private static String esc(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
+        return JsonText.escape(s);
     }
 }

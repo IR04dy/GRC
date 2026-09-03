@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.finance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.PageSize;
@@ -132,8 +133,10 @@ public class GreenFinancePackageService {
             .append("  \"generatedBy\": \"").append(generatedBy == null ? "system" : generatedBy).append("\",\n")
             .append("  \"files\": [\n");
         for (int i = 0; i < names.length; i++) {
-            manifest.append("    { \"name\": \"").append(names[i]).append("\", \"bytes\": ")
-                .append(blobs[i].length).append(", \"sha256\": \"").append(sha256(blobs[i])).append("\" }")
+            manifest.append("    { \"name\": \"").append(JsonText.escape(names[i]))
+                .append("\", \"bytes\": ")
+                .append(blobs[i].length).append(", \"sha256\": \"").append(JsonText.escape(sha256(blobs[i])))
+                .append("\" }")
                 .append(i < names.length - 1 ? "," : "").append('\n');
         }
         manifest.append("  ]\n}\n");

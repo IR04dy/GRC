@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.service;
 
+import com.tss.grc.common.json.JsonText;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.entity.Role;
 import com.tss.grc.module.iam.entity.User;
@@ -258,7 +259,8 @@ public class AccessRequestService {
             .actionType("ACCESS_GRANT").sourceModule("IAM")
             .entityType("UserRoleAssignment").entityId(saved.getId())
             .newValueJson("{\"userId\":" + req.getBeneficiaryUserId() + ",\"roleId\":" + req.getRoleId()
-                + ",\"validTo\":\"" + req.getValidTo() + "\",\"insertedRows\":" + inserted + "}")
+                + ",\"validTo\":\"" + JsonText.escape(String.valueOf(req.getValidTo()))
+                + "\",\"insertedRows\":" + inserted + "}")
             .message("Access request approved + provisioned (request " + saved.getId() + ")"));
         settleEngineRequestAfterCommit(saved.getId(), saved.getEngineRequestId(), "APPROVED");
         return saved;
