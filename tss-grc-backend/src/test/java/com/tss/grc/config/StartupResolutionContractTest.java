@@ -4,11 +4,14 @@ import jakarta.persistence.Entity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.ResolvableType;
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.repository.query.parser.PartTree;
 import org.springframework.util.ClassUtils;
 
 import java.io.File;
@@ -77,9 +80,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>F2-454</b> — no {@code @Param} names a placeholder its query does not contain. Dead
  *       rather than fatal, and an F2-184 decoy: it answers "is this parameter bound?" with a yes
  *       that is not true. Safe as a hard zero only because this corpus has NO SpEL query.</li>
+ *   <li><b>F2-455</b> — every DERIVED query method name resolves against its domain type. With
+ *       no {@code @Query} to fall back on, {@code CREATE_IF_NOT_FOUND} parses the method NAME, so
+ *       an unresolvable property is a {@code PropertyReferenceException} while the repository bean
+ *       is created. Hard zero, no exemptions, and the verdict comes from
+ *       {@code new PartTree(name, domainType)} — the exact type {@code PartTreeJpaQuery}
+ *       constructs at bootstrap, so this gate cannot disagree with the framework.</li>
  *   <li><b>F2-454</b> — the shipped tree LOADED. Every leg above measures over
  *       {@code shippedClasses()}, which tolerates a load failure so one absent optional
- *       dependency cannot take the gate down; a class that fails to load instead leaves all six
+ *       dependency cannot take the gate down; a class that fails to load instead leaves all seven
  *       legs measuring a narrower tree with no symptom (F2-449).</li>
  * </ol>
  *
@@ -89,6 +98,25 @@ import static org.assertj.core.api.Assertions.assertThat;
  * "which other thing does Spring resolve at bootstrap?". Named-parameter binding is that thing:
  * the same annotation, the same failure moment, the same blindness in a hermetic build — and it
  * sat outside the gate built for this family. F2-215's two-of-N, in the gate that owns the family.
+ *
+ * <h3>⚠⚠ F2-455 — the FIFTH member, and the list had grown to five before anybody asked again</h3>
+ *
+ * F2-454 wrote the paragraph above, added its two legs, and left a list of <b>five</b> true
+ * entries — <b>every one of them about {@code @Query}</b>. So the same sentence applies one turn
+ * later, and the answer this time is not another property of that annotation but <b>its
+ * absence</b>: a repository method with no {@code @Query} has its NAME parsed instead, and that
+ * population is <b>1,684 methods across 427 domain types</b> against the annotation's 253 — the
+ * largest in the family by an order of magnitude, and outside all five legs.
+ *
+ * <p>🔑 The reusable rule is sharper than "enumerate more": F2-454's own correction was that a
+ * true enumeration is what stops the next reader asking, and it then produced a longer true
+ * enumeration keyed on the same annotation. <b>When a gate's legs all name one mechanism, the
+ * unasked question is usually what happens when that mechanism is ABSENT.</b>
+ *
+ * <p>Measured: <b>0</b> unresolvable, which is guaranteed rather than lucky — the application
+ * boots, so every derived name must already resolve. A latent-hazard closure, not a defect
+ * discovery (F2-283); what it buys is that the next one fails the build rather than the
+ * deployment, which is precisely what F2-442 cost when it did not.
  *
  * <p>Measured over the shipped bytecode: <b>253</b> {@code @Query} methods, <b>224</b> binding by
  * name across <b>445</b> placeholders, <b>0</b> unbound and <b>0</b> dead {@code @Param}. A
@@ -265,6 +293,77 @@ class StartupResolutionContractTest {
             }
         }
         return out;
+    }
+
+    /**
+     * F2-455 — one DERIVED query method: a repository method with no {@code @Query}, whose name
+     * Spring Data resolves into a query at bootstrap.
+     *
+     * <p>The domain type is the first generic of {@link Repository} in the interface's hierarchy,
+     * resolved by Spring's own {@link ResolvableType} rather than by reading the {@code extends}
+     * clause as text — a repository here may extend {@code JpaRepository} directly or through an
+     * intermediate interface, and only the framework's resolution agrees with the framework.
+     */
+    private record Derived(String site, String methodName, Class<?> domainType) { }
+
+    /**
+     * Every method whose name Spring Data must parse. The exclusions are STRUCTURAL, never a
+     * name list, and each one is a shape that genuinely is not a derived query:
+     *
+     * <ul>
+     *   <li>{@code @Query} — a declared query wins; the name is never parsed.</li>
+     *   <li>{@code default} — a Java method body, not a query at all (18 of them here).</li>
+     *   <li>{@code static} / synthetic — not repository methods.</li>
+     *   <li>inherited — {@code getDeclaredMethods()} already excludes {@code JpaRepository}'s own
+     *       surface, which Spring Data implements rather than derives.</li>
+     * </ul>
+     *
+     * <p>⚠ Two further exclusions exist in Spring Data and are deliberately NOT coded, because
+     * this corpus has neither and coding for an absent shape is untested branch: a <b>custom
+     * fragment</b> ({@code XxxRepositoryCustom} + {@code XxxRepositoryImpl}, measured 0) and a
+     * <b>named query</b> ({@code @NamedQuery("Entity.method")} or {@code orm.xml}, measured 0 and
+     * 0 files). {@link #theCorpusWasActuallyRead()} floors the population so a future fragment
+     * cannot shrink this census in silence; if one is ever added, exclude it HERE rather than
+     * exempting its methods, or the exclusion becomes a name list.
+     */
+    private static List<Derived> derivedQueries(List<Class<?>> classes) {
+        List<Derived> out = new ArrayList<>();
+        for (Class<?> c : classes) {
+            if (!c.isInterface() || !Repository.class.isAssignableFrom(c)) continue;
+            ResolvableType domain = ResolvableType.forClass(c).as(Repository.class).getGeneric(0);
+            Class<?> domainType = domain.resolve();
+            if (domainType == null) continue;             // a raw or unresolvable declaration
+            for (Method m : c.getDeclaredMethods()) {
+                if (m.isDefault() || m.isSynthetic()) continue;
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) continue;
+                if (m.getAnnotation(Query.class) != null) continue;
+                out.add(new Derived(c.getSimpleName() + "#" + m.getName(), m.getName(), domainType));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Ask SPRING DATA whether it can parse this name — never a reimplementation of its grammar.
+     *
+     * <p>{@link PartTree} is the exact type {@code PartTreeJpaQuery} constructs at bootstrap, so a
+     * name this accepts is a name the application starts with and a name it rejects is a name the
+     * application does not. Reimplementing the grammar (subject keywords, {@code And}/{@code Or}
+     * splitting, the ~40 predicate keywords, {@code IgnoreCase}, {@code OrderBy…}) would be a
+     * second copy of a primitive free to disagree with the one that runs (F2-190) — and its
+     * disagreements would be a gate failing on correct code, the one failure a gate must never
+     * have (F2-214).
+     *
+     * @return null when the name resolves, else the failure as Spring Data reports it
+     */
+    static String partTreeFailure(String methodName, Class<?> domainType) {
+        try {
+            new PartTree(methodName, domainType);
+            return null;
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() == null ? "" : e.getMessage().split("\\R", 2)[0];
+            return e.getClass().getSimpleName() + ": " + msg;
+        }
     }
 
     // ─────────────────────────── the detectors ───────────────────────────
@@ -670,6 +769,39 @@ class StartupResolutionContractTest {
     }
 
     @Test
+    void everyDerivedQueryMethodNameResolvesAgainstItsDomainType() {
+        List<String> unresolvable = new ArrayList<>();
+        for (Derived d : derivedQueries(shippedClasses())) {
+            String failure = partTreeFailure(d.methodName(), d.domainType());
+            if (failure != null) {
+                unresolvable.add(d.site() + "   [" + d.domainType().getSimpleName() + "]   " + failure);
+            }
+        }
+        assertThat(unresolvable)
+            .as("""
+                F2-455 — a DERIVED query method whose name Spring Data cannot resolve is a STARTUP
+                FAILURE, and it is the largest population in this family by an order of magnitude:
+                1,731 declarations against F2-454's 253 `@Query` methods.
+
+                With no `@Query` to fall back on, `CREATE_IF_NOT_FOUND` parses the method NAME, so
+                `findByOrganisationIdAndFooBar` on an entity with no `fooBar` is a
+                `PropertyReferenceException` while the repository bean is created — and because no
+                `spring.data.jpa.repositories.bootstrap-mode` is configured, repositories load
+                EAGERLY and the failure is at startup rather than at first call.
+
+                Hard zero with no exemption map, and the argument is F2-214's: `@Query` is always
+                available, and so is spelling the property correctly, so an unresolvable derived
+                name is never correct code. Fix the name or declare the query; do not add an
+                allow-list.
+
+                ⚠ The verdict comes from `new PartTree(name, domainType)` — the exact type
+                `PartTreeJpaQuery` constructs at bootstrap — so this gate cannot disagree with the
+                framework about what parses. A hand-written grammar could, and its disagreements
+                would fail the build on working repositories.""")
+            .isEmpty();
+    }
+
+    @Test
     void theWholeShippedTreeLoadedSoEveryLegAboveMeasuredTheWholeTree() {
         assertThat(corpus().unloadable())
             .as("""
@@ -830,6 +962,45 @@ class StartupResolutionContractTest {
                 leaves those bindings unchecked.""")
             .containsExactlyInAnyOrder("orgId", "onlyInTheCount");
 
+        // ── F2-455: the derived-name detector, and the exclusions that shape its population ──
+        assertThat(partTreeFailure("findByCode", SyntheticDomain.class))
+            .as("a name whose every part is a declared field must NOT be flagged — a gate that "
+                + "fires on correct code trains the next reader to edit the assertion (F2-214)")
+            .isNull();
+        assertThat(partTreeFailure("findByOwnerCode", SyntheticDomain.class))
+            .as("""
+                a TRAVERSAL must not be flagged either: `ownerCode` is not a field, and Spring Data
+                resolves it as `owner.code` — a nested path is legal, so a detector that demanded a
+                local field would fail on every relation-traversing finder in the platform.""")
+            .isNull();
+        assertThat(partTreeFailure("findByTotallyMadeUp", SyntheticDomain.class))
+            .as("""
+                THE MUST-FLAG CASE. Without it this whole leg is a negative assertion over a tree
+                whose 1,684 names all resolve, and an empty report is what a correct detector and a
+                dead one both produce (F2-235). Spring Data's own words are reported verbatim.""")
+            .contains("PropertyReferenceException").contains("totallyMadeUp");
+        assertThat(partTreeFailure("recomputeEverything", SyntheticDomain.class))
+            .as("""
+                A name with NO subject keyword is also fatal, and the corpus contains such names —
+                they are legal only because they carry a `@Query`. Remove the annotation and the
+                whole name becomes the predicate, which is why the `@Query` exclusion in
+                `derivedQueries` is load-bearing rather than an optimisation.""")
+            .contains("PropertyReferenceException");
+
+        List<Derived> synthDerived = derivedQueries(List.of(SyntheticRepo.class));
+        assertThat(synthDerived.stream().map(Derived::methodName).toList())
+            .as("""
+                The exclusions are STRUCTURAL and each is a shape that is not a derived query: a
+                `@Query` method (the name is never parsed), a `default` method (a Java body), a
+                `static` one. Pinned in BOTH directions — including a `default` whose name would
+                FAIL to parse, because that is the shape whose accidental inclusion would fail the
+                build on correct code.""")
+            .containsExactly("findByCode");
+        assertThat(synthDerived.stream().map(d -> d.domainType().getSimpleName()).distinct().toList())
+            .as("the domain type comes from Spring's own ResolvableType, through an INTERMEDIATE "
+                + "interface — reading the `extends` clause as text resolves this one to nothing")
+            .containsExactly("SyntheticDomain");
+
         // ── the placeholder detector, over a class the corpus can never contain ──
         // The corpus walk is rooted at target/classes and this fixture lives in target/test-classes,
         // so it is excluded STRUCTURALLY rather than by a name ending in `Test` (F2-301).
@@ -876,6 +1047,46 @@ class StartupResolutionContractTest {
         Object countQueryBindsToo(Long orgId, Long onlyInTheCount);
     }
 
+    /**
+     * F2-455's domain fixture. {@code code} is a local field and {@code owner} a relation, so the
+     * self-test can pin BOTH readings Spring Data gives a name — a local property and a nested
+     * traversal — as legal, which is what stops the leg failing on the platform's own
+     * relation-traversing finders.
+     */
+    static final class SyntheticDomain {
+        String code;
+        SyntheticOwner owner;
+    }
+
+    static final class SyntheticOwner {
+        String code;
+    }
+
+    /**
+     * Deliberately extends {@code Repository} through an INTERMEDIATE interface, because that is
+     * the shape a text read of the {@code extends} clause resolves to nothing — the platform's own
+     * repositories extend {@code JpaRepository}, which is itself two hops from {@code Repository}.
+     */
+    interface SyntheticBase<T, ID> extends Repository<T, ID> { }
+
+    interface SyntheticRepo extends SyntheticBase<SyntheticDomain, Long> {
+        /** The one derived method: no annotation, so Spring Data parses this NAME at bootstrap. */
+        Object findByCode(String code);
+
+        /** Excluded: a declared query wins and the name is never parsed. */
+        @Query("SELECT e FROM SyntheticDomain e")
+        Object recomputeEverything();
+
+        /**
+         * Excluded: a Java body, not a query — and its name would FAIL to parse, which is why it
+         * is the right shape to pin. Include `default` methods and the build breaks on correct
+         * code (F2-214); 18 of them exist in the platform's repositories.
+         */
+        default Object helperThatIsNotAQuery() {
+            return null;
+        }
+    }
+
     @Test
     void theCorpusWasActuallyRead() throws IOException {
         List<Class<?>> classes = shippedClasses();
@@ -907,6 +1118,50 @@ class StartupResolutionContractTest {
             .isGreaterThan(20);
         assertThat(declaredProperties())
             .as("property keys read by Spring's own YAML loader").hasSizeGreaterThan(300);
+
+        // ── F2-455: the derived-name population, and the branch that could swallow it ──
+        List<Class<?>> repos = classes.stream()
+            .filter(c -> c.isInterface() && Repository.class.isAssignableFrom(c)).toList();
+        assertThat(repos)
+            .as("""
+                Spring Data repository interfaces — 429 measured. The wrong answer if
+                `Repository.class.isAssignableFrom` stops resolving is 0, and 0 is what the
+                derived-name leg then reports as a clean tree (F2-235).""")
+            .hasSizeGreaterThan(380);
+        assertThat(repos.stream()
+                .filter(c -> ResolvableType.forClass(c).as(Repository.class).getGeneric(0).resolve() == null)
+                .map(Class::getSimpleName).toList())
+            .as("""
+                ⚠ The `continue` in `derivedQueries` skips a repository whose domain type does not
+                resolve, and a skipped repository's methods are checked by NOTHING — so that
+                branch is exactly how this census could shrink with no symptom (F2-205: a hard
+                zero over a population the instrument cannot see is the most reassuring possible
+                artefact).
+
+                Measured EMPTY: all 429 declare a resolvable domain type, so the tolerance is
+                true by construction here and not by luck. If this fires, a repository has a raw
+                or unresolvable generic — fix the declaration; do not widen the skip.""")
+            .isEmpty();
+
+        List<Derived> derived = derivedQueries(classes);
+        assertThat(derived)
+            .as("""
+                DERIVED query methods — 1,684 measured across 427 domain types, against F2-454's
+                253 `@Query` methods, which is why the omission mattered: this is the largest
+                population in the family by an order of magnitude.
+
+                The wrong answers this floor sits above: 0 if the annotation or the assignability
+                test stops resolving, and ~0 again if the `@Query` exclusion inverts — that last
+                one is the dangerous direction, because it would leave the leg reporting a clean
+                tree over almost nothing (F2-215: a floor is only worth having above the largest
+                WRONG answer).""")
+            .hasSizeGreaterThan(1_400);
+        assertThat(derived.stream().map(Derived::domainType).distinct().count())
+            .as("""
+                distinct domain types those names are resolved AGAINST. Floored separately,
+                because resolving every repository against ONE domain type would leave the site
+                count untouched while making 426 of the 427 resolutions meaningless.""")
+            .isGreaterThan(380L);
 
         // ── F2-454: the named-binding population, and the reliance inside it ──
         List<NamedBinding> bindings = namedBindings(classes);

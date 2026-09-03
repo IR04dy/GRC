@@ -15229,6 +15229,175 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-455 — five true legs all named one annotation, and the unasked question was its absence
+
+| Field | Value |
+|---|---|
+| **Id** | F2-455 |
+| **Title** | A derived query method name Spring Data cannot resolve is refused at repository bootstrap, and the gate for that family had five legs all naming `@Query` |
+| **Severity** | P3 (latent-hazard closure — 0 unresolvable today, guaranteed by the app booting) |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, by asking *what does Spring Data resolve at bootstrap when `@Query` is ABSENT?* |
+| **Fixed** | `beba590c`, merged `fix/f2-455-derived-query-name-resolution` |
+| **Module** | `config` (gate only — no production code changed) |
+| **Migration** | none |
+
+### The defect class
+
+[[F2-443]] built `StartupResolutionContractTest` for one class of defect and names it plainly:
+**fatal when the Spring context refreshes, and invisible to `mvn -o clean package`**, because
+nothing in the suite boots a context and deliberately nothing should. [[F2-247]] (a duplicate bean
+name), [[F2-439]] (an unsatisfiable path placeholder) and [[F2-442]] (a propagation
+`RestrictedTransactionalEventListenerFactory` refuses) are its siblings, and F2-442 is the measured
+cost of the blindness: `BUILD SUCCESS` printed over a tree the application could not start from,
+**twice**.
+
+[[F2-454]] found the fourth member and wrote the correction into that gate's own header: *a true
+enumeration is what stops the next reader asking what else belongs in it*. It then added its two
+legs, leaving a list of **five** true entries.
+
+🔑🔑 **Every one of the five named `@Query`.** So the same sentence applies one turn later, and the
+answer this time is not another property of that annotation but **its absence**: a repository method
+with no `@Query` has its **NAME** parsed instead. Spring Data JPA's `CREATE_IF_NOT_FOUND` lookup
+strategy tries a declared query first and falls back to deriving one from the method name, so
+`findByOrganisationIdAndFooBar` on an entity with no `fooBar` is a `PropertyReferenceException`
+raised while the repository bean is created. As F2-454 established, no
+`spring.data.jpa.repositories.bootstrap-mode` is configured in any packaged document, so
+repositories load **eagerly** and the failure is at startup rather than at first call.
+
+🔑 **The reusable rule is sharper than "enumerate more".** F2-454's correction was that a true
+enumeration stops the next reader asking — and it then produced a *longer* true enumeration keyed on
+the same annotation, which stopped the next reader in exactly the same way. **When a gate's legs all
+name one mechanism, the unasked question is usually what happens when that mechanism is ABSENT.**
+
+### The measurement
+
+From the shipped bytecode:
+
+| | |
+|---|---|
+| Spring Data repository interfaces | **429** |
+| …with an unresolvable domain type | **0** |
+| Derived query methods (no `@Query`) | **1,684** |
+| Distinct domain types resolved against | **427** |
+| Distinct method names | **933** |
+| **Unresolvable names** | **0** |
+
+**1,684 against F2-454's 253** — the largest population in the family by an order of magnitude, and
+outside all five existing legs. For comparison, [[F2-439]]'s population was 1,352 mapped
+placeholders and 2,253 distinct verb/path keys.
+
+⚠ The zero is **guaranteed rather than lucky**: the application boots, so every derived name must
+already resolve. This is a **latent-hazard closure, not a defect discovery** — say which you have
+([[F2-283]]). What it buys is that the next one fails the build rather than the deployment, which is
+precisely what F2-442 cost when nothing did.
+
+### The instrument
+
+The verdict comes from **`new PartTree(name, domainType)`** — the exact type `PartTreeJpaQuery`
+constructs at bootstrap — so a name this gate accepts is a name the application starts with, and a
+name it rejects is a name the application does not.
+
+⚠ Reimplementing the grammar (subject keywords, `And`/`Or` splitting, the ~40 predicate keywords,
+`IgnoreCase`, `OrderBy…`) would be a second copy of a primitive free to disagree with the one that
+runs ([[F2-190]]) — and its disagreements would be **a gate failing on correct code**, the one
+failure a gate must never have ([[F2-214]]). The domain type likewise comes from Spring's own
+`ResolvableType.forClass(c).as(Repository.class).getGeneric(0)` rather than a text read of the
+`extends` clause: a repository here reaches `Repository` through `JpaRepository`, two hops away, and
+only the framework's resolution agrees with the framework.
+
+**Hard zero, no exemption map**, and the argument is [[F2-214]]'s: `@Query` is always available, and
+so is spelling the property correctly, so an unresolvable derived name is never correct code.
+
+### The exclusions are structural, and two are deliberately absent
+
+A method leaves the population only for a reason that means it is genuinely not a derived query:
+`@Query` (a declared query wins and the name is never parsed), `default` (a Java body — 18 of them
+here), `static`/synthetic, and inherited (`getDeclaredMethods()` already excludes `JpaRepository`'s
+own surface, which Spring Data implements rather than derives).
+
+⚠ Two further exclusions exist in Spring Data and are **deliberately not coded**, because this
+corpus has neither and coding for an absent shape is untested branch: a **custom fragment**
+(`XxxRepositoryCustom` + `XxxRepositoryImpl` — measured **0**) and a **named query**
+(`@NamedQuery("Entity.method")` or `orm.xml` — measured **0** and **0 files**). The population floor
+means a future fragment cannot shrink this census in silence; if one is added, exclude it in
+`derivedQueries` rather than exempting its methods, or the exclusion becomes a name list — which is
+[[F2-217]]'s defect.
+
+⚠⚠ **The `continue` for an unresolvable domain type is asserted EMPTY, and that is the leg that
+matters most.** A skipped repository's methods are checked by nothing, so that branch is exactly how
+this census could shrink with no symptom — a hard zero over a population the instrument cannot see
+is the most reassuring possible artefact ([[F2-205]]). All 429 declare a resolvable domain type, so
+the tolerance is true by construction here rather than by luck.
+
+### Verification
+
+No production code changed, so the verification **is** the mutation harness ([[F2-284]]/[[F2-301]])
+plus the self-test: **6 killed · 0 survived · 0 anchor-miss · 0 did-not-compile**, post-restore
+green, baseline green.
+
+Which leg each control fires is the useful half:
+
+| # | Mutation | Fires |
+|---|---|---|
+| A | a real repository gains `findByTotallyMadeUpProperty` | the **hard zero** alone |
+| B | `partTreeFailure` always answers OK | the **self-test** alone |
+| C | the `@Query` exclusion dropped | hard zero **+** self-test |
+| D | the `default` exclusion dropped | hard zero **+** self-test |
+| E | `derivedQueries` returns nothing | the **corpus floor** alone |
+| F | every name resolved against ONE type | hard zero **+** distinct-domain floor |
+
+⚠⚠ **Control A is the only thing that can prove a hard zero over a population the application's own
+startup already guarantees clean** — F2-454's control G one slice earlier, where a member had to be
+manufactured because none existed. **Control B is the load-bearing one**: breaking the detector
+fires *only* the self-test, because a negative assertion over a clean corpus reports the same empty
+list whether the detector works or is dead ([[F2-235]]). **Control E** fires only the *floor*, never
+the hard zero, which is the whole argument for that floor existing rather than for trusting the zero.
+
+Full build **5176/0/0**, predicted exactly (5175 + 1: the class went 8 legs → 9).
+
+⚙ No live probe, deliberately: the defect is Spring's own bootstrap resolution over Java bytecode,
+with no data, collation, `row_version` or wire dimension a unit test cannot reach
+([[F2-320]]/[[F2-325]]'s calibration).
+
+### Filed
+
+⚙ **The adjacent question a reader of this leg asks next, measured so nobody re-runs it**
+([[F2-216]]): *which derived finder on a tenant-bearing entity carries no `organisationId`
+predicate?* CLAUDE.md's multi-tenancy rule is that every repository query filters `organisation_id`
+and that it is the developer's responsibility, so there is no mechanism — only discipline. Measured
+with the same `PartTree`, reading each `Part`'s resolved dot path: **1,623 of the 1,684 derived
+methods sit on a tenant-bearing entity, and 50 carry no `organisationId` part** (2 resolve through a
+traversal).
+
+⚠ **50 is small and readable rather than a work list, and the shapes are the three [[F2-418]] and
+[[F2-243]] already classified as legitimate**: a **child keyed on its parent's PK**
+(`findByCommitteeMeetingId`, `findByResolutionId`, `findByListId`, `findByBiaQuantitativeId`,
+`findByProcessId`, `findByCaseId`, `findByCampaignId` — transitively tenant-scoped, since the parent
+id is unique platform-wide), a **globally-unique token** (`findByJti`, `findBySubmissionToken`,
+`existsByComplaintNo`), and a **scheduler sweep** that iterates every tenant by design
+(`findByWorkflowStatusNotInAndDueDateBetween`, `findByStatusInAndExpiryDateBefore`,
+`findByStatusAndSlaBreachFalseAndCreatedAtBefore` — [[F2-317]]/[[F2-318]]/[[F2-320]]'s swept family).
+No verdicts are written for the rest ([[F2-188]]).
+
+⚙ **The one worth reading, and it is narrower than it looks.** `ComplaintService#generateNextComplaintNo`
+seeds from `findTopByOrderByComplaintNoDesc()` and skip-loops on `existsByComplaintNo(candidate)` —
+**both global**, so the SAMA consumer-complaint sequence is platform-wide rather than per-tenant.
+There is **no collision**, because both halves are global; what it costs is that one tenant's numbers
+carry gaps where another tenant's sit, which is a weak signal about another tenant's complaint
+volume. Contrast [[F2-266]], which keyed a unique index on `(organisation_id, alert_code)`
+specifically because *"a global unique index would let one tenant's reference block another's"* — the
+failure here is the mirror and much milder. ⚠ Its **per-year non-restart** is already filed under
+[[F2-231]] and is unchanged: the ordering is over the whole `CMP-YYYY-NNNNNN` string, so on 1 January
+the seed is still the previous year's highest ordinal.
+
+⚙ Unchanged from F2-454: whether the 45 compiled-name bindings should carry explicit `@Param`
+annotations, and pinning `<parameters>true</parameters>` in the POM's own compiler block so the
+reliance does not rest on inheritance — a build-configuration decision. Plus [[F2-443]]'s
+constructor-injection cycle detector, still deferred because a correct detector must first subtract
+every legal cycle-breaker (`@Lazy`, `ObjectProvider`, setter injection) and one that does not would
+fail on correct code.
+
 ## F2-454 — the gate for startup-fatal defects enumerated three legs, and named-parameter binding was the fourth
 
 | Field | Value |
