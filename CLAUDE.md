@@ -123,7 +123,14 @@ mounts. Measured: `App.tsx` served with **676 `React.createElement` calls, zero 
 imports, zero refresh markers**.
 🔑 **The one-request test is `curl /@react-refresh`**: with the plugin loaded it is a ~117 KB JS
 module; without it Vite's SPA fallback answers **200 with `index.html`**, so the status code proves
-nothing and the `Content-Type` is the tell (F2-199 recorded exactly that trap). A second, independent
+nothing and the `Content-Type` is the tell (F2-199 recorded exactly that trap).
+⚠⚠ **IT IS A `GET` TEST, AND `curl -I` FAKES THE FAILURE**: measured 2026-09-03, a HEAD request
+for that path falls through the same SPA fallback and answers `Content-Type: text/html` on a server
+whose GET returns the 117,548-byte `text/javascript` module — so `curl -I` reproduces the exact
+signature this rule exists to detect. 🔑 **The tell is the Content-Type OF A GET; asking only for the
+headers is how you diagnose a healthy dev server as the blank-page condition.** Confirm with the
+body size, and with `curl /src/App.tsx` (plugin loaded ⇒ **0** `React.createElement`, refresh markers
+present). A second, independent
 confirmation is the bound interface — `vite.config.ts` sets `host: true`, so a server that loaded it
 binds `0.0.0.0`; one binding `[::1]` only did not load it.
 ⚠ **This tree is a `pnpm` install** (`node_modules/.pnpm/…`) while the tracked lockfile is npm's
