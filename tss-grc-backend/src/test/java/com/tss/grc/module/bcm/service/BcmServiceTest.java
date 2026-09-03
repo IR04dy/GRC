@@ -713,12 +713,13 @@ class BcmServiceTest {
         assertThat(m.get("exerciseSuccessRate")).isEqualTo(75L);
         long keysCarrying75 = m.entrySet().stream()
                 .filter(e -> e.getValue() != null && e.getValue() == 75L)
-                .filter(e -> !e.getKey().equals("rtoCompliancePercent")
-                          && !e.getKey().equals("rpoCompliancePercent"))
                 .count();
         assertThat(keysCarrying75).as("""
-            The exercise completion rate must reach exactly one map key besides the legacy \
-            rtoCompliancePercent/rpoCompliancePercent aliases this fix retired. Two keys carrying \
+            The exercise completion rate must reach exactly ONE map key. An earlier draft \
+            excluded rtoCompliancePercent/rpoCompliancePercent from this count, which only ever \
+            suppressed a CORRECT failure: re-adding either alias must fail here as well as in \
+            the absence leg above, and defence in depth is the point of having both. Two keys \
+            carrying \
             one measurement is how F2-457 happened: the number was correct and two of its three \
             labels were not.
 
