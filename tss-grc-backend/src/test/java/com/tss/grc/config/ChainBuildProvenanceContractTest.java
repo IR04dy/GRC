@@ -318,13 +318,15 @@ class ChainBuildProvenanceContractTest {
                 repaired \u2014 repairing a sealed row breaks the chain (F2-434). The census must
                 report them and say so, because an operator needs to know the corruption reached
                 the ledger even though nothing may touch it.""")
-            .contains("UNREPAIRABLE", "platform.audit_log.message", "hash-chained");
+            .contains("UNREPAIRABLE = {", "in UNREPAIRABLE", "platform.audit_log.message",
+                      "hash-chained");
         assertThat(src)
             .as("""
                 and it must name the PRODUCER columns \u2014 a corrupted template regenerates
                 corrupted rows, so repairing its output first is repairing the symptom. Rule 174's
                 action_json produced three corrupted findings AFTER the 2026-06-08 repair.""")
-            .contains("PRODUCER_COLUMNS", "platform.automation_rules.action_json");
+            .contains("PRODUCER_COLUMNS = {", "in PRODUCER_COLUMNS",
+                      "platform.automation_rules.action_json");
         assertThat(src)
             .as("read-only: every write would land in a customer database (house rule 6)")
             .doesNotContain("UPDATE ", "DELETE ");
