@@ -68,8 +68,25 @@ class ChainBuildProvenanceContractTest {
         Path.of("..", "TSS-GRC-Platform-Bible", "Appendix", "scripts");
 
     private static final String MARKER = "chain_marker.py";
-    private static final List<String> BUILDERS = List.of("chain_proof.py", "full_chain_proof.py");
     private static final String READER = "schema_convergence.py";
+
+    /**
+     * Each builder, and <b>how many paths in it can leave a database behind</b>.
+     *
+     * <p>⚠⚠ Counted, not merely present, and the control harness is why: {@code chain_proof.py}
+     * stamps on TWO paths — the completed chain, and the {@code --keep} failure path that leaves a
+     * PARTIAL build for the reader to find — so reverting either one leaves a
+     * {@code contains("chain_marker.stamp(")} satisfied by the other. That mutation
+     * <b>SURVIVED</b>, and the mutated code was genuinely wrong: a completed chain would no longer
+     * record its head. F2-194's substring-satisfied-by-something-else, in a leg written after
+     * quoting it.
+     *
+     * <p>🔑 The failure path is the one that matters most, because a database left behind by an
+     * ABORTED run is exactly the artefact the reader will find.
+     */
+    private static final List<String[]> BUILDERS = List.of(
+        new String[] { "chain_proof.py", "2" },
+        new String[] { "full_chain_proof.py", "1" });
 
     /**
      * Prose that asserts the build reached a migration. Each must sit inside a branch that knows the
@@ -138,31 +155,50 @@ class ChainBuildProvenanceContractTest {
             .as("the shared marker must declare stamp/read/describe — one declaration, three readers")
             .contains("def stamp(", "def read(", "def describe(", "def folder_head(");
 
-        for (String builder : BUILDERS) {
+        for (String[] entry : BUILDERS) {
+            String builder = entry[0];
+            int expected = Integer.parseInt(entry[1]);
             String src = read(builder);
-            assertThat(src)
+            assertThat(src.split("chain_marker\\.stamp\\(", -1).length - 1)
                 .as("""
                     %s builds a scratch database and DROPS it on success, so the only database the
-                    reader can ever find is one a --keep or an aborted run left behind. It must
-                    record the head it reached, or the reader is guessing.""", builder)
-                .contains("chain_marker.stamp(");
+                    reader can ever find is one a --keep or an aborted run left behind. EVERY path
+                    that can leave one must record the head it reached, or the reader is guessing —
+                    and a bare `contains` is satisfied by whichever path survives, which is how the
+                    control mutation on this leg first SURVIVED.""", builder)
+                .isEqualTo(expected);
             assertThat(src)
                 .as("%s must import the shared marker rather than declaring a second one (F2-190)",
                     builder)
                 .contains("import chain_marker");
         }
+        assertThat(read("chain_proof.py"))
+            .as("""
+                and the aborted path must stamp complete=False — a partial build recorded as
+                complete is worse than one recorded as unknown, because the reader would then
+                attribute every later object to a defect with confidence.""")
+            .contains("complete=False");
     }
 
     @Test
     void theReaderDerivesTheHeadFromTheMarkerAndSaysWhenTheBuildIsStale() throws IOException {
         String src = read(READER);
-        assertThat(src)
+        assertThat(src.split("chain_marker\\.read\\(", -1).length - 1)
             .as("""
-                The reader must READ the recorded head rather than requiring --stop. ⚠ It must not
-                INFER one: guessing the stop from the highest-numbered object present makes the
-                caveat depend on the same migrations it qualifies, and that reasoning is preserved
-                verbatim in stop_point()'s docstring.""")
-            .contains("chain_marker.read(", "chain_marker.describe(");
+                TWO call sites, and they answer different questions: stop_point() reads the marker
+                to DERIVE the stop, and main() reads it to PRINT the provenance. Counted rather
+                than merely present because reverting either one left a `contains` satisfied by the
+                other, and that mutation SURVIVED — the mutated code being genuinely wrong, since
+                the report would then claim the provenance is unknown while still using the head.
+
+                ⚠ It must not INFER the head: guessing it from the highest-numbered object present
+                makes the caveat depend on the same migrations it qualifies, and that reasoning is
+                preserved verbatim in stop_point()'s docstring.""")
+            .isEqualTo(2);
+        assertThat(src)
+            .as("and the provenance line must be built by the shared describe(), never re-worded"
+                + " locally — one declaration, three readers (F2-190)")
+            .contains("chain_marker.describe(");
         assertThat(read(MARKER))
             .as("and the stale banner has to name both heads, or 'stale' is not actionable")
             .contains("STALE BUILD", "folder is %d version(s) ahead");
@@ -220,8 +256,8 @@ class ChainBuildProvenanceContractTest {
         // Derived floors, never arithmetic: F2-438 asserted a guessed bound and failed on a correct
         // tree, and F2-443 did it again one slice later.
         assertThat(read(MARKER).length()).as("chain_marker.py").isGreaterThan(2_000);
-        for (String b : BUILDERS) {
-            assertThat(read(b).length()).as(b).isGreaterThan(3_000);
+        for (String[] b : BUILDERS) {
+            assertThat(read(b[0]).length()).as(b[0]).isGreaterThan(3_000);
         }
         String reader = read(READER);
         assertThat(reader.length()).as(READER).isGreaterThan(15_000);
