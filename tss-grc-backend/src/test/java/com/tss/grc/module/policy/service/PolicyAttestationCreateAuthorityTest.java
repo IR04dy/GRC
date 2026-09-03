@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.DomainAccessDeniedException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
+import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentControlLinkRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
@@ -72,6 +73,28 @@ class PolicyAttestationCreateAuthorityTest {
         service = new PolicyManagementService(docs, exceptions, attestations, audit, publisher,
                                               controls, controlLinks, attachments);
         lenient().when(attestations.save(any())).thenAnswer(i -> i.getArgument(0));
+        // F2-453 — createAttestation now RESOLVES the policy in-tenant before saving, so a fixture
+        // naming policyId 7 has to supply document 7. Before that fix the reference was stored
+        // unresolved: `assigned()` named a policy that does not exist and the create returned 200.
+        //
+        // Lenient because the four legs asserting a refused status throw at the status guard,
+        // before the resolution is reached — so those must not be charged an unused stub.
+        //
+        // ⚠ Reading the FIXTURE first is the rule here: when this family's fix breaks a test, the
+        // fixture is usually describing a row that could not exist (F2-240). Nothing about F2-219's
+        // assertions changed — they are all about what a caller may not forge, and they still hold.
+        lenient().when(docs.findByIdAndOrganisationId(7L, ORG_ID))
+            .thenReturn(Optional.of(fixturePolicy()));
+    }
+
+    /** The policy `assigned()` names. Version "1.0" is what createAttestation now derives. */
+    private static PolicyDocument fixturePolicy() {
+        PolicyDocument d = new PolicyDocument();
+        d.setId(7L);
+        d.setOrganisationId(ORG_ID);
+        d.setPolicyCode("POL-FIXTURE-007");
+        d.setVersion("1.0");
+        return d;
     }
 
     @AfterEach void tearDown() { TenantContext.clear(); }

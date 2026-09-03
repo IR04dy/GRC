@@ -15391,8 +15391,29 @@ gate map. **Strike a member off in the commit that closes it.**
 
 ### Verification
 
-* `createAttestation` had **no test of any kind**, which is not the same as a path somebody
-  decided was safe ([[F2-248]]). `PolicyManagementServiceTest` **44 → 49**.
+* ⚠⚠ **CORRECTED — this slice first recorded that *"`createAttestation` had **no test of any kind**,
+  which is not the same as a path somebody decided was safe ([[F2-248]])"*, and that is FALSE.**
+  [[F2-219]] wrote `PolicyAttestationCreateAuthorityTest` (`84c9b923`) — **7 legs, 4 of them driving
+  `createAttestation`** — and **not one of them asks what the policy reference points at**:
+  `setPolicyId(7L)` appears exactly once, in the `assigned()` helper, and `getPolicyId` /
+  `getPolicyVersion` appear in **no assertion at all**. The create was tested, thoroughly, for the
+  three fields F2-219 was closing.
+  🔑🔑 **The corrected fact is the sharper finding: [[F2-215]]'s two-of-N in the TEST CLASS, which is
+  the artefact a reader trusts MOST.** The method's comment *says* what a caller may not forge; a
+  dedicated test class named for the create's authority *proves* it — for three fields out of four.
+  A reader who finds `PolicyAttestationCreateAuthorityTest` green has far stronger grounds to stop
+  looking than one who merely finds a comment.
+  🔑 **My error was the scope of one grep.** `createAttestation` in `PolicyManagementServiceTest.java`
+  returned nothing and I wrote a claim about the whole tree — [[F2-198]]'s shape in my own
+  reconnaissance — and it failed in the **flattering** direction, because *"no test"* makes a finding
+  look bigger and the slice before it look less careful. **A claim of ABSENCE is only as wide as the
+  scope it was measured over.**
+  ⚙ And the fixture was itself a specimen of the defect: `assigned()` names **policy 7, which does
+  not exist**, and both legs that reach the save failed the instant the reference had to resolve. It
+  could only ever have been written that way *because* the create did not check — so [[F2-240]]'s
+  *read the FIXTURE before the code* arrived here as a **locator** rather than as a nuisance.
+* `PolicyManagementServiceTest` **44 → 49**; `PolicyAttestationCreateAuthorityTest` stays at **7**,
+  its fixture given the document it always named.
 * Live **8/8 pre-fix**, **8/8 post-fix**.
 * **Two controls, one per half** ([[F2-289]]): reverting the whole hunk fires all 5 new legs;
   reverting **only** the version derivation fires 4 while the tenant leg stays **green**. The
