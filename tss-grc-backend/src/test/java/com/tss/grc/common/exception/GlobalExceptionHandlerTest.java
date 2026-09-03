@@ -635,11 +635,15 @@ class GlobalExceptionHandlerTest {
             .contains("nonexistentProperty");
         assertThat(pd.getDetail())
             .as("""
-                ⚠ but the exception's own message is "No property 'x' found for type
-                'RiskAppetiteStatement'", and the entity class is an internal detail SEC-CFG-001
-                keeps out of a production response. Asserting the status alone would pass over
-                that half.""")
-            .doesNotContain("RiskAppetiteStatement");
+                ⚠⚠ The banned string is THIS FIXTURE'S own type name, and that is the whole
+                point of the leg. The exception's message is "No property 'nonexistentProperty'
+                found for type 'SortProbe'" — live, against the real register, it reads
+                'RiskAppetiteStatement'. A first draft banned that live name instead, so the
+                assertion named a string the fixture could never produce and it passed for an
+                unrelated reason: the control replacing the detail with ex.getMessage() SURVIVED
+                the whole build (F2-192). The entity class is an internal detail SEC-CFG-001 keeps
+                out of a production response, so ban the name this exception actually carries.""")
+            .doesNotContain("SortProbe");
         assertThat(pd.getProperties()).containsKey("property");
         assertThat(pd.getProperties())
             .as("class and root cause stay dev-only, the same gate as the catch-all")
