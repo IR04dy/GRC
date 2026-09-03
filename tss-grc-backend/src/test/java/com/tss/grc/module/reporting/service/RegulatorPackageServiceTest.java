@@ -19,10 +19,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -128,7 +132,99 @@ class RegulatorPackageServiceTest {
         }
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────
+    // ── F2-451: a capped list is fine to RENDER and wrong to COUNT ─────────
+
+    @Test void theManifestPublishesTheRegisterTotalAndSeparatelyWhatTheSheetsHold() throws Exception {
+        // The shape measured in dev on 2026-09-03: platform.audit_log held 12,470 rows for
+        // organisation 1 (5,133 in prod) against MAX_AUDIT = 1000, and the manifest published the
+        // capped page size under a key called "counts".
+        when(auditLogService.list(any(), any(), any(), anyInt(), anyInt()))
+            .thenReturn(new PageImpl<>(List.of(entry(1L), entry(2L), entry(3L)),
+                                       PageRequest.of(0, 1000), 12_470L));
+
+        String manifest = new String(
+            readZipEntryBytes(service.generate("auditor.tester").bytes(), "manifest.json"),
+            StandardCharsets.UTF_8);
+
+        assertThat(manifest)
+            .as("\"counts\" means the REGISTER's size -- the key's own name")
+            .contains("\"counts\": { \"controls\": 0, \"evidenceItems\": 0, \"auditEntries\": 12470 }");
+        assertThat(manifest)
+            .as("and \"includedRows\" means what the sheets in this ZIP actually hold")
+            .contains("\"includedRows\": { \"controls\": 0, \"evidenceItems\": 0, \"auditEntries\": 3 }");
+        assertThat(manifest)
+            .as("with the subtraction done for a consumer's tooling")
+            .contains("\"truncated\": true");
+    }
+
+    @Test void aCompletePackageDeclaresNoTruncationAndInventsNoAlarm() throws Exception {
+        // The guard leg: the fix must not put a truncation note on a package that holds its whole
+        // register. Every other register in both databases is comfortably inside its cap, so this
+        // is the case almost every real package takes.
+        when(auditLogService.list(any(), any(), any(), anyInt(), anyInt()))
+            .thenReturn(new PageImpl<>(List.of(entry(1L))));
+
+        byte[] zip = service.generate("auditor.tester").bytes();
+        String manifest = new String(readZipEntryBytes(zip, "manifest.json"), StandardCharsets.UTF_8);
+
+        assertThat(manifest).contains("\"truncated\": false");
+        assertThat(manifest)
+            .as("counts and includedRows agree when nothing was withheld")
+            .contains("\"counts\": { \"controls\": 0, \"evidenceItems\": 0, \"auditEntries\": 1 }")
+            .contains("\"includedRows\": { \"controls\": 0, \"evidenceItems\": 0, \"auditEntries\": 1 }");
+        assertThat(readmeText(zip))
+            .as("the completeness subtitle survives, and no shortfall sentence is invented")
+            .contains("Trail entries")
+            .doesNotContain("Truncated for size");
+    }
+
+    @Test void theReadmeDisclosesTheTruncationBesideTheFigureNotInAMetadataRow() throws Exception {
+        when(auditLogService.list(any(), any(), any(), anyInt(), anyInt()))
+            .thenReturn(new PageImpl<>(List.of(entry(1L), entry(2L), entry(3L)),
+                                       PageRequest.of(0, 1000), 12_470L));
+
+        String readme = readmeText(service.generate("auditor.tester").bytes());
+
+        assertThat(readme)
+            .as("the disclosure sits with the figure, in the KPI subtitle")
+            .contains("showing 3 of 12,470");
+        assertThat(readme)
+            .as("a subtitle asserting completeness must not survive next to a windowed figure")
+            .doesNotContain("Trail entries");
+        assertThat(readme)
+            .as("and the contents section names which sheet was cut, and where the totals are")
+            .contains("Truncated for size")
+            .contains("Audit_Trail.xlsx")
+            .contains("counts");
+    }
+
+    private static AuditLogEntry entry(long id) {
+        AuditLogEntry e = new AuditLogEntry();
+        e.setId(id);
+        e.setCreatedAt(LocalDateTime.of(2026, 8, 24, 9, 15, 0));
+        e.setActionType("TRANSITION");
+        e.setSourceModule("bcm");
+        e.setSeverity("INFO");
+        e.setMessage("row " + id);
+        return e;
+    }
+
+    private static String readmeText(byte[] zipBytes) throws Exception {
+        byte[] pdf = readZipEntryBytes(zipBytes, "README.pdf");
+        PdfReader reader = new PdfReader(pdf);
+        try {
+            PdfTextExtractor x = new PdfTextExtractor(reader);
+            StringBuilder sb = new StringBuilder();
+            for (int page = 1; page <= reader.getNumberOfPages(); page++) {
+                sb.append(x.getTextFromPage(page)).append('\n');
+            }
+            return sb.toString();
+        } finally {
+            reader.close();
+        }
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────
 
     private static List<String> rowStrings(Row row) {
         List<String> out = new ArrayList<>();
