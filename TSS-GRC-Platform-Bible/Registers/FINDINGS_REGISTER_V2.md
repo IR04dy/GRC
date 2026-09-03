@@ -15229,6 +15229,215 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-460 — an unbounded bulk DELETE over `iam.user_roles`, dark since V294 replaced it
+
+| Field | Value |
+|---|---|
+| **Id** | F2-460 |
+| **Title** | `AccessRequestRepository.expireAssignments()` bound no parameter at all, so it was the whole of `iam.user_roles` by construction — twelve lines above the per-org sweep V294 introduced to replace it, with zero callers |
+| **Severity** | P2 (latent — zero callers in main, zero mentions in test; a cross-tenant HARD delete of IAM role assignments if reached) |
+| **Status** | ✅ CLOSED 2026-09-04 |
+| **Found** | 2026-09-04, asking of the WRITE side the question F2-455 asked of derived finders: which statement narrows by nothing? |
+| **Fixed** | `ffc7e05f` + `3a7b28ec`, merged `fix/f2-460-unbounded-modifying-write` |
+| **Module** | `iam/governance` |
+| **Migration** | none |
+
+### The statement
+
+```sql
+DELETE FROM iam.user_roles
+WHERE valid_to IS NOT NULL AND valid_to < SYSUTCDATETIME()
+```
+
+`int expireAssignments();` — an empty parameter list, so **no caller could have scoped it and no
+reading of its callers could make it narrower**. One mention in the entire tree: its own
+declaration.
+
+It sat twelve lines above
+
+```sql
+DELETE ur FROM iam.user_roles ur
+JOIN iam.users u ON u.id = ur.user_id
+WHERE u.organisation_id = :org
+  AND ur.valid_to IS NOT NULL AND ur.valid_to < SYSUTCDATETIME()
+```
+
+whose javadoc reads *"V294 — per-org expiry sweep so the scheduler can notify each tenant's
+IAM_LEAD"*, and which both live callers use. The unscoped one's own javadoc read *"Expiry sweep:
+remove every assignment whose validity window has passed"* — **which reads like THE expiry
+sweep**, and is what a caller looking for one would find first.
+
+⚠ **Latent, and say which you have** (F2-283): zero callers in `src/main`, zero mentions in
+`src/test`, introduced by the original RBAC governance slice and superseded by V294's. What this
+closes is a hazard, not an observed miscount — and it makes it **absent** rather than latent
+(F2-213).
+
+### What a caller reaching for it would have got
+
+`AccessRequestService.scheduledExpirySweep` loops `distinctOrganisationIds()` and gives each
+tenant its **own transaction** (F2-322 made that change specifically), an `ACCESS_REVOKE` audit row
+naming that org, and a notification to that org's IAM_LEAD. Substituting the unscoped statement:
+
+- every tenant's expired assignments deleted **on the first tick**;
+- all of them attributed to whichever org that iteration was on;
+- a count in the audit row and the notification that is **other tenants' work**;
+- every remaining org reporting nothing to revoke, correctly, having had its rows deleted already.
+
+⚠⚠ **`iam.user_roles` rows are HARD-deleted** — the platform's one documented exception to the
+soft-delete convention — so there is nothing to recover.
+
+### Why the gate asks "binds anything", not "filters by tenant"
+
+The weaker question is the obvious one and it is wrong twice over.
+
+**It fails on correct code** (F2-214), which is the one failure a gate must never have. Measured
+over the same corpus it flags roughly fifteen correct methods: `iam.user_roles` has **no
+`organisation_id` column at all**, so `DELETE ... WHERE user_id = :userId` is tenant-correct
+*transitively* — the caller resolved the user in-tenant — and `iam.roles` is a global catalogue
+where every row is `organisation_id IS NULL`.
+
+⚠⚠ **And it would have EXCLUDED this defect.** The table the statement deletes from carries no
+tenant column, so a tenant-predicate rule has nothing to demand of it. The statement crossed
+tenants **through the user**, which is exactly the reachability a column-shaped rule cannot see.
+
+🔑 **A write that binds no parameter cannot be narrowed by a tenant, a user, a row or a window. It
+is the whole table by construction, and that is a property of the statement rather than of the
+table's columns.**
+
+### Why F2-454's gate could not see it
+
+`StartupResolutionContractTest.namedBindings` is the platform's instrument for `@Query` parameter
+binding. Its builder reads:
+
+```java
+Set<String> needed = namedPlaceholders(q.value(), q.countQuery());
+if (needed.isEmpty()) continue;
+```
+
+🔑🔑 **So a query that binds NOTHING is dropped from the population of the gate whose whole subject
+is query parameter binding, by construction.** Its legs ask whether every placeholder a query names
+is supplied; a query naming none satisfies that vacuously.
+
+F2-455 found one gap in that class's family — the absence of `@Query` entirely, where the method
+NAME is parsed instead — and recorded the lesson that *a gate's enumeration of what it asserts is
+what stops anybody asking what else belongs in it*. This is a second gap in the same family, and it
+sits at a `continue` rather than at an annotation. **Assume a third.**
+
+⚠ It is a separate class rather than a leg there, deliberately: that class's family is *fatal at
+context refresh*, and an unbounded write starts perfectly well. It reuses that class's classpath
+walk (widened to package-private — third reader) and its `namedPlaceholders` rather than copying
+either (F2-190).
+
+### The instrument finding: my source scan was wrong three ways
+
+Read from source, the population and its verdicts were wrong in three distinct ways, and
+**reflection is immune to all three at once** — `@Modifying` and `@Query` are both
+`@Retention(RUNTIME)`, verified with `javap` rather than assumed.
+
+| # | failure | direction |
+|---|---|---|
+| 1 | **A concatenated `@Query`**: three of four candidates build their value as `"..." + "..." + "..."` and the regex captured only the first literal, so the later `:param` was invisible. F2-454's recorded lesson verbatim. | over-reports |
+| 2 | **`@Modifying` inside javadoc** in an entity and three schedulers — F2-193's epitaph-as-corpse. | over-reports |
+| 3 | **The comment stripper blanked a REAL annotation** in `ChangeRequestRepository` along with a javadoc mention of it, so the file read as comment-only and a live member vanished. F2-198's stripper trap. | **under-reports** |
+
+🔑 **The third is the dangerous one: a smaller population reads exactly like a cleaner tree.** The
+source scan reported 18 members and got **three of its four verdicts wrong**; reflection reports
+**19 before the fix and 18 after**.
+
+### The gate
+
+`UnboundedBulkWriteContractTest`, four legs, reflection over `target/classes`, DB-free.
+
+| leg | asserts |
+|---|---|
+| 1 | **hard zero, empty exemption map**: no `@Modifying` statement binds nothing |
+| 2 | the population is measured — a floor **and an upper bound** |
+| 3 | the detector fires on the shape it claims, in both directions |
+| 4 | the surviving sweep **compares the tenant column to a bound parameter** |
+
+⚠ **The upper bound is what catches an over-counting detector, which no floor can see**: a mutation
+dropping the `@Modifying` filter turns the population into every `@Query` in the tree (F2-454
+measured 253), and almost all of those bind something, so the hard zero would stay green over a
+gate that had stopped asking its question. F2-215's floor rule applied in the other direction.
+
+⚠ The derived-modifier branch (`@Modifying` with no `@Query`, narrowing through its method name) is
+**unreachable from the live corpus — measured 0 — and the census asserts that** rather than letting
+the branch read as covered (F2-454's approach). The day a `deleteByX` appears the census fails until
+somebody decides whether a method name is narrowing enough.
+
+⚠ Positional bindings (`?1`) are counted and measured at **0** platform-wide. Not a rule — a
+measurement, so a first one surfaces instead of blending in.
+
+### Control F: binding a parameter is not narrowing by it
+
+⚠⚠ **The harness found a real hole in my own gate, and it is this slice's own subject.** Control F
+substituted `WHERE :org IS NOT NULL AND ur.valid_to IS NOT NULL` for the scoped sweep's tenant
+predicate and **SURVIVED**. The mutated statement deletes every tenant's role assignments, so the
+mutated code is genuinely wrong (F2-206's test) — a hole, not an equivalent mutant.
+
+The cause: the tenant leg asserted `scoped.named()).contains("org")` — that the statement **BINDS**
+the parameter. `WHERE :org IS NOT NULL` binds it and narrows nothing.
+
+🔑 **The hard zero can only ever ask whether SOMETHING is bound; that is its honest limit, and the
+reason the per-site leg has to ask the stronger question of the one statement whose narrowing is
+the whole point.** It now asserts the tenant column is COMPARED to a bound parameter, and that the
+parameter it narrows by is one the method supplies — with control F's exact statement as the
+self-test's must-not-match case.
+
+### Control E: DID-NOT-RUN is not SURVIVED
+
+⚠ Renaming a repository method breaks compilation at its two call sites, so control E reported
+**DID-NOT-RUN**. That is the distinction earning its place: a control that cannot compile reads
+exactly like a gate that passed (F2-287). Re-aimed as a multi-file edit — the method and its
+callers together — it is killed by the leg it was aimed at.
+
+**6 killed / 0 survived / 0 anchor-miss**, baseline and post-restore green; all four legs
+discriminate.
+
+### No live probe, and that is a calibration rather than a gap
+
+The method has zero callers, so there is no behaviour to observe: nothing in the platform executes
+the statement, and manufacturing a caller in order to watch it delete another tenant's rows would
+damage a real database to demonstrate what the gate demonstrates exactly (F2-434's rule).
+The verification is the harness (F2-284, F2-301) plus the reflective census, never the green.
+
+### Errors of mine, all caught by running something
+
+- ⚠⚠ **The inline-script escape chain damaged a payload SEVEN times this session.** A heredoc
+  collapsed a double backslash; a `py -c` collapsed a regex *and* let bash expand backticks as
+  command substitution; and `sed` turned a Maven path into `D:Sourcespache-maven-3.9.15binmvn.CMD`
+  by eating three escapes out of its middle. My own repair script then wrote raw control bytes into
+  itself, because its docstring quoted the damaged path (F2-446). 🔑 **The durable fix is not better
+  escaping — it is having no literal to damage: `shutil.which` resolves the launcher at runtime and
+  no path in the harness contains a backslash.**
+- ⚠ **Two guessed anchors.** One paraphrased `CLAUDE.md` (*"and the sharpest of the other 23…"* for
+  *"the sharpest of the other 23…"*), one paraphrased a javadoc I had written an hour earlier
+  (*"blanked first: a colon inside one is data"* for *"the same span F2-454 blanks"*). Both were
+  fail-before-write, so nothing was written. 🔑 **Anchor on the code line: it does not depend on my
+  recollection of prose.**
+- ⚠ **A guessed launcher path**, for the recorded reason that Maven is on **D:** here and I keep
+  writing C:.
+
+### Filed
+
+- ⚠⚠ **V265 is the only `WITH NOCHECK` in the whole 386-migration chain, and it left two
+  constraints untrusted on `cyber.cyber_evidence` in BOTH databases** — `ck_cyber_evidence_status`
+  and `FK_cyber_evidence_control`, `is_disabled = 0` but `is_not_trusted = 1`, so the rows already
+  present were never verified against either. **Sixteen later migrations each write *"No WITH
+  NOCHECK anywhere"*** and several carry a `THROW` self-check asserting `is_not_trusted = 0` for
+  their own constraints — F2-299's V395 says in as many words that it *"looks identical to a
+  verified constraint in any listing that only checks the name"*. 🔑 **The rule is stated sixteen
+  times and gated over each migration's own constraints, so the population — every constraint in the
+  live catalogue — is nobody's.** Latent: 12 rows in each database, all statuses in-vocabulary, 0
+  dangling references, so a `WITH CHECK CHECK CONSTRAINT` re-verification would succeed today and is
+  provably safe. V265's own comment says the rows *"that predate CY-H are grandfathered"*; the
+  grandfathering is no longer needed. Its own slice: a migration plus a hermetic gate over the
+  migration corpus (V265 itself must stay exempt and named, because an applied migration may never
+  be edited).
+- The remaining `@Modifying` writes whose bound parameter is not a tenant are deliberately **not** a
+  work list: measured, they are correct, and a gate over them would fail on correct code. What is
+  gated is the shape that cannot be correct.
+
 ## F2-459 — an SSB attendance counter nothing writes, published as a Shariah-governance figure
 
 | Field | Value |

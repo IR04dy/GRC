@@ -53,19 +53,38 @@ public interface AccessRequestRepository extends JpaRepository<AccessRequest, Lo
     @Query(value = "DELETE FROM iam.user_roles WHERE user_id = :userId", nativeQuery = true)
     int deleteAllAssignments(@Param("userId") Long userId);
 
-    /** Expiry sweep: remove every assignment whose validity window has passed. */
-    @Modifying
-    @Query(value = "DELETE FROM iam.user_roles WHERE valid_to IS NOT NULL AND valid_to < SYSUTCDATETIME()",
-           nativeQuery = true)
-    int expireAssignments();
-
     /** V294 — stamp the engine linkage WITHOUT a second entity save (ROWVERSION rule). */
     @Modifying
     @Query(value = "UPDATE iam.access_requests SET engine_request_id = :engineId WHERE id = :id",
            nativeQuery = true)
     int stampEngineRequestId(@Param("id") Long id, @Param("engineId") Long engineId);
 
-    /** V294 — per-org expiry sweep so the scheduler can notify each tenant's IAM_LEAD. */
+    /**
+     * V294 — per-org expiry sweep so the scheduler can notify each tenant's IAM_LEAD.
+     *
+     * <p>F2-460: this is the ONLY expiry sweep, deliberately. It replaced an
+     * {@code expireAssignments()} that bound no parameter at all —
+     * {@code DELETE FROM iam.user_roles WHERE valid_to IS NOT NULL AND valid_to <
+     * SYSUTCDATETIME()} — so it was the whole table by construction, and no caller could
+     * have scoped it. It survived V294 with zero callers, one method above this one, under a
+     * javadoc reading <em>"Expiry sweep: remove every assignment whose validity window has
+     * passed"</em>, which reads like THE expiry sweep.
+     *
+     * <p>What a caller reaching for it would have got: {@code scheduledExpirySweep} loops
+     * {@code distinctOrganisationIds()} and gives each tenant its own transaction (F2-322),
+     * an ACCESS_REVOKE audit row naming that org, and a notification to that org's IAM_LEAD.
+     * The unscoped statement would have deleted EVERY tenant's expired assignments on the
+     * first tick, attributed them all to whichever org the loop was on, reported a count that
+     * is other tenants' work, and left the remaining orgs reporting nothing to revoke.
+     * {@code iam.user_roles} rows are HARD-deleted — the platform's one documented
+     * exception to the soft-delete convention — so there is nothing to recover.
+     *
+     * <p>A bulk write that binds no parameter cannot be narrowed by any reading of its
+     * callers, which is why {@code UnboundedBulkWriteContractTest} holds that shape at zero
+     * rather than asking the weaker question "does it filter by tenant?": this table has no
+     * {@code organisation_id} column at all, so the weaker question would have excluded the
+     * very statement that crossed tenants.
+     */
     @Modifying
     @Query(value = """
         DELETE ur FROM iam.user_roles ur
