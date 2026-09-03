@@ -177,7 +177,20 @@ public class StubTenableClient implements TenableClient {
     }
 
     @Override
-    public boolean isHealthy() {
+    /**
+     * F2-452 — {@code synchronized} because this method WRITES to {@code recordedCalls}, the
+     * same shared {@code ArrayList} every other writer here guards with the monitor. It was
+     * the only toucher without the modifier, and it is reachable in every profile: the
+     * {@code /status} (or {@code /health}) route calls the client directly, guarded by
+     * {@code INTEGRATIONS:READ} and NOT by {@code grc.integrations.*.enabled}, and this stub
+     * is the default bean ({@code matchIfMissing = true}). Two concurrent status probes were
+     * therefore enough for two unsynchronized {@code ArrayList.add} calls to lose an element,
+     * corrupt {@code size}, or throw {@code ArrayIndexOutOfBoundsException}.
+     *
+     * <p>A health probe reads as a read, which is why three synchronized writers beside it
+     * made it look covered (F2-215's two-of-N) — it records the probe, so it is a writer.
+     */
+    public synchronized boolean isHealthy() {
         recordedCalls.add(new StubInvocation(Instant.now(), "HEALTH", null, Map.of()));
         return true;
     }

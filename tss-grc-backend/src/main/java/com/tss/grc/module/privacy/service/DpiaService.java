@@ -326,6 +326,4 @@ public class DpiaService {
         throw new IllegalArgumentException("DPIA must be in " + java.util.Arrays.toString(allowed) + " (was " + d.getStatus() + ")");
     }
 
-    @SuppressWarnings("unused")
-    private List<DpiaQuestion> _q;  // keep imports tidy
 }
