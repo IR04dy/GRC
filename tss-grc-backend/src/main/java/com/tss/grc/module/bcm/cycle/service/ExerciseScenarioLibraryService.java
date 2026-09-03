@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.dto.ScenarioLibraryDtos.InjectView;
 import com.tss.grc.module.bcm.cycle.dto.ScenarioLibraryDtos.InstantiateRequest;
@@ -90,8 +91,9 @@ public class ExerciseScenarioLibraryService {
         Pageable p = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
         String type = blankToNull(scenarioType);
         String cmp  = blankToNull(complexity);
-        String fw   = blankToNull(framework);
-        String q    = blankToNull(query);
+        // F2-449: both reach a LIKE pattern, so the caller's own %, _ and [ must be escaped
+        String fw   = LikePatterns.escape(blankToNull(framework));
+        String q    = LikePatterns.escape(blankToNull(query));
         return scenarioRepo.filter(type, cmp, fw, q, p).map(ExerciseScenarioLibraryService::toSummary);
     }
 
@@ -132,7 +134,7 @@ public class ExerciseScenarioLibraryService {
         if (framework == null || framework.isBlank()) {
             throw new IllegalArgumentException("framework is required");
         }
-        return scenarioRepo.findByFrameworkAlignmentContaining(framework.trim())
+        return scenarioRepo.findByFrameworkAlignmentContaining(LikePatterns.escape(framework.trim()))
             .stream().map(ExerciseScenarioLibraryService::toSummary).toList();
     }
 

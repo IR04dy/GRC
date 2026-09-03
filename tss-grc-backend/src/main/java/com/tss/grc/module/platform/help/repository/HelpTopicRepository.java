@@ -67,12 +67,12 @@ public interface HelpTopicRepository extends JpaRepository<HelpTopic, Long> {
          WHERE h.isDeleted = false
            AND (h.organisationId = :orgId OR h.organisationId IS NULL)
            AND (
-                LOWER(h.titleEn)    LIKE LOWER(CONCAT('%', :q, '%'))
-             OR LOWER(h.titleAr)    LIKE LOWER(CONCAT('%', :q, '%'))
-             OR LOWER(h.summaryEn)  LIKE LOWER(CONCAT('%', :q, '%'))
-             OR LOWER(h.summaryAr)  LIKE LOWER(CONCAT('%', :q, '%'))
-             OR LOWER(h.bodyEn)     LIKE LOWER(CONCAT('%', :q, '%'))
-             OR LOWER(h.bodyAr)     LIKE LOWER(CONCAT('%', :q, '%'))
+                LOWER(h.titleEn)    LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+             OR LOWER(h.titleAr)    LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+             OR LOWER(h.summaryEn)  LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+             OR LOWER(h.summaryAr)  LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+             OR LOWER(h.bodyEn)     LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+             OR LOWER(h.bodyAr)     LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
            )
          ORDER BY h.organisationId DESC NULLS LAST, h.displayOrder ASC
         """)

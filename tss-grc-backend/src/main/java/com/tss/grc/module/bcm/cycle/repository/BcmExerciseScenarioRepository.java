@@ -50,9 +50,9 @@ public interface BcmExerciseScenarioRepository
      */
     @Query("""
         SELECT s FROM BcmExerciseScenario s
-        WHERE (:q IS NULL OR LOWER(s.titleEn) LIKE LOWER(CONCAT('%', :q, '%'))
-                          OR LOWER(s.titleAr) LIKE LOWER(CONCAT('%', :q, '%'))
-                          OR LOWER(s.scenarioCode) LIKE LOWER(CONCAT('%', :q, '%')))
+        WHERE (:q IS NULL OR LOWER(s.titleEn) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+                          OR LOWER(s.titleAr) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+                          OR LOWER(s.scenarioCode) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
         ORDER BY s.titleEn ASC
         """)
     Page<BcmExerciseScenario> search(@Param("q") String q, Pageable pageable);
@@ -65,10 +65,10 @@ public interface BcmExerciseScenarioRepository
         SELECT s FROM BcmExerciseScenario s
         WHERE (:type IS NULL OR s.scenarioType = :type)
           AND (:complexity IS NULL OR s.complexity = :complexity)
-          AND (:framework IS NULL OR s.frameworkAlignment LIKE CONCAT('%', :framework, '%'))
-          AND (:q IS NULL OR LOWER(s.titleEn) LIKE LOWER(CONCAT('%', :q, '%'))
-                          OR LOWER(s.titleAr) LIKE LOWER(CONCAT('%', :q, '%'))
-                          OR LOWER(s.scenarioCode) LIKE LOWER(CONCAT('%', :q, '%')))
+          AND (:framework IS NULL OR s.frameworkAlignment LIKE CONCAT('%', :framework, '%') ESCAPE '\\')
+          AND (:q IS NULL OR LOWER(s.titleEn) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+                          OR LOWER(s.titleAr) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+                          OR LOWER(s.scenarioCode) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
         ORDER BY s.usageCount DESC, s.titleEn ASC
         """)
     Page<BcmExerciseScenario> filter(
@@ -85,7 +85,7 @@ public interface BcmExerciseScenarioRepository
      */
     @Query("""
         SELECT s FROM BcmExerciseScenario s
-        WHERE s.frameworkAlignment LIKE CONCAT('%', :framework, '%')
+        WHERE s.frameworkAlignment LIKE CONCAT('%', :framework, '%') ESCAPE '\\'
         ORDER BY s.usageCount DESC, s.titleEn ASC
         """)
     List<BcmExerciseScenario> findByFrameworkAlignmentContaining(@Param("framework") String framework);

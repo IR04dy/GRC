@@ -32,9 +32,9 @@ public interface PrivacyNoticeRepository extends JpaRepository<PrivacyNotice, Lo
         select n from PrivacyNotice n
          where n.organisationId = :orgId
            and ( n.linkedRopaCodes = :code
-              or n.linkedRopaCodes like CONCAT(:code, ',%')
-              or n.linkedRopaCodes like CONCAT('%,', :code)
-              or n.linkedRopaCodes like CONCAT('%,', :code, ',%') )
+              or n.linkedRopaCodes like CONCAT(:code, ',%') ESCAPE '\\'
+              or n.linkedRopaCodes like CONCAT('%,', :code) ESCAPE '\\'
+              or n.linkedRopaCodes like CONCAT('%,', :code, ',%') ESCAPE '\\' )
          order by n.version desc
         """)
     List<PrivacyNotice> findByOrgAndLinkedRopa(
@@ -46,9 +46,9 @@ public interface PrivacyNoticeRepository extends JpaRepository<PrivacyNotice, Lo
         select count(n) from PrivacyNotice n
          where n.organisationId = :orgId
            and ( n.linkedRopaCodes = :code
-              or n.linkedRopaCodes like CONCAT(:code, ',%')
-              or n.linkedRopaCodes like CONCAT('%,', :code)
-              or n.linkedRopaCodes like CONCAT('%,', :code, ',%') )
+              or n.linkedRopaCodes like CONCAT(:code, ',%') ESCAPE '\\'
+              or n.linkedRopaCodes like CONCAT('%,', :code) ESCAPE '\\'
+              or n.linkedRopaCodes like CONCAT('%,', :code, ',%') ESCAPE '\\' )
         """)
     int countByOrgAndLinkedRopa(
             @org.springframework.data.repository.query.Param("orgId") Long orgId,

@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.service;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.module.admin.committee.entity.CommitteeFormTemplate;
 import com.tss.grc.module.admin.committee.entity.CommitteeStandingItem;
 import com.tss.grc.module.admin.committee.entity.CommitteeTemplate;
@@ -152,7 +153,10 @@ public class CommitteeCatalogService {
     public List<CommitteeFormTemplate> getFormsForCommitteeType(String committeeType) {
         // SQL LIKE pattern: %TYPE% — matches anywhere in the comma list.
         // ALL match is handled in the query.
-        String pattern = "%" + committeeType + "%";
+        // F2-449: escaped, so a committee type carrying a LIKE metacharacter cannot widen
+        //         the applicability match. contains() keeps the wrapping and the escaping
+        //         together, because this repository parameter takes a whole pattern.
+        String pattern = LikePatterns.contains(committeeType);
         try {
             return forms.findActiveApplicableTo(pattern);
         } catch (RuntimeException e) {

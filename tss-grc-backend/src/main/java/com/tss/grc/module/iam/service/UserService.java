@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.service;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.dto.UserRequest;
 import com.tss.grc.module.iam.dto.UserResponse;
@@ -31,7 +32,9 @@ public class UserService {
     @Transactional(readOnly = true)
     public Page<UserResponse> list(String search, String role, Boolean enabled, Pageable pageable) {
         Long orgId = TenantContext.getCurrentTenant();
-        return userRepository.findWithFilters(orgId, search, role, enabled, pageable).map(this::toResponse);
+        // F2-449: :search is bound into a LIKE over three columns
+        return userRepository.findWithFilters(orgId, LikePatterns.escape(search), role, enabled, pageable)
+                             .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

@@ -66,9 +66,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
         SELECT DISTINCT u FROM User u
         LEFT JOIN u.roles r
         WHERE u.organisationId = :orgId
-          AND (:search IS NULL OR LOWER(u.fullNameEn) LIKE LOWER(CONCAT('%', :search, '%'))
-               OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%'))
-               OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:search IS NULL OR LOWER(u.fullNameEn) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '\\'
+               OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '\\'
+               OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '\\')
           AND (:role IS NULL OR r.roleName = :role)
           AND (:enabled IS NULL OR u.isActive = :enabled)
         """)
