@@ -15229,6 +15229,211 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-459 — an SSB attendance counter nothing writes, published as a Shariah-governance figure
+
+| Field | Value |
+|---|---|
+| **Id** | F2-459 |
+| **Title** | `sharia.sharia_scholar.meetings_attended_ytd` is written by no mechanism of any kind, and was published on the wire and rendered as a column headed *"Meetings YTD"* — while three artefacts advertised the SAMA §3.6 attendance control that would have fed it, and none of it is implemented |
+| **Severity** | P2 (live and rendered, both databases; a display figure with no gate behind it) |
+| **Status** | ✅ CLOSED 2026-09-04 |
+| **Found** | 2026-09-04, asking F2-457/F2-458's question of the **period** rather than the quantity: which identifier names a time window whose computation reads no date? |
+| **Fixed** | `d9675681`, merged `fix/f2-459-ssb-attendance-counter` |
+| **Module** | `sharia` + `tss-grc-ui-v2` |
+| **Migration** | none |
+
+### The mechanism
+
+`ShariaScholar` declares:
+
+```java
+/** Meetings attended in the current fiscal year (used by AR-260 cadence rule). */
+@Column(name = "meetings_attended_ytd")
+private Integer meetingsAttendedYtd = 0;
+```
+
+Every one of the **7 mentions in the whole tree** is a declaration or a read:
+
+| where | what |
+|---|---|
+| `ShariaScholar` ×2 | the `@Column` and the field |
+| `ShariaDtos.ScholarResponse` | a response field |
+| `ShariaService:748` | the read mapping |
+| `V341` | `INT NOT NULL DEFAULT ((0))` |
+| `lib/sharia.ts` | the client type |
+| `ShariaScholarsPage:120` | `{s.meetingsAttendedYtd ?? 0}` |
+
+Nothing writes it. Checked against **every** filling mechanism F2-215 enumerates and two more:
+
+- no service, scheduler or helper calls the setter anywhere in `src/main/java`;
+- **no computed column** (`sys.computed_columns`) and **no trigger** (`sys.triggers`);
+- **no native `@Modifying` UPDATE** names the column;
+- **no automation rule** mentions it — 0 of 214 live rules, in `condition_json` or `action_json`;
+- and — the mechanism F2-441 warns a bytecode or setter scan cannot see — **no caller can set
+  it either**, because both write paths take purpose-built records and *neither*
+  `CreateScholarRequest` *nor* `UpdateScholarRequest` declares it. There is no entity-bound
+  scholar endpoint (checked, not assumed).
+
+So its value is whatever `seed_real_data.py` wrote — **1..5 across 5 scholars, byte-identical
+in dev and the deployed database** — frozen there for ever, rendered under a header claiming a
+rolling year. 🔑 **It is not a zero that reads as absent; it is a plausible small integer that
+reads as a measurement**, and because nothing can ever move it, ordinary use will never correct it.
+
+### The three artefacts that advertised the control
+
+🔑🔑 **The finding is not really the column — it is that a SAMA §3.6 minimum-attendance control
+is described as implemented by three separate artefacts and exists nowhere.**
+
+1. **The entity javadoc**: *"used by AR-260 cadence rule"*. ⚠ **AR-260 exists**, which is
+   exactly what makes the claim credible and stops anybody checking it: it is *"SSB scholar term
+   expiring → T-90/T-30 reminder ladder"*, it triggers on `SHARIA_SCHOLAR_TERM_EXPIRING`, and it
+   reads `term_end` — the field the register's `termsExpiring90d` figure correctly consults.
+   F2-184's shape, with a real citation rather than an invented one.
+
+2. **AR-260's own stored `description_en`**, seeded by `V207`:
+
+   > *"The platform also **monitors the scholar's YTD meeting attendance** — if it falls below
+   > the **SAMA §3.6 minimum (4/year)**, the rule fires **BOARD_MEETING_SHORTFALL** on the same
+   > ladder."*
+
+   `BOARD_MEETING_SHORTFALL` is published by **no code path**. ⚠⚠ And AR-260's own trigger
+   `SHARIA_SCHOLAR_TERM_EXPIRING` is emitted by **no code path either**, so the rule has fired
+   **0** times and cannot fire — consistent with its measured `fire_count`.
+
+3. **`package-info.java`**, under a heading reading *"Emits F7 audit + F8 trigger codes"*. That
+   is the artefact a developer reads before wiring a rule, so a token listed there reads as
+   available. It named **three** tokens this module does not emit.
+
+### The instrument finding
+
+⚠⚠ **F2-436's census could not see any of this, and the reason is one line of its method.**
+That finding's shortlist required a trigger token to be *"present in NO Java file"*. A
+`package-info.java` is a Java file made **entirely of comments** — so every token a module
+*documents* as emitted counted as evidence that it *is* emitted. F2-193's epitaph-as-corpse, in
+a detector rather than in a fix.
+
+Re-run with comments stripped:
+
+| bucket | count |
+|---|---|
+| trigger tokens on live automation rules | 142 |
+| absent from Java entirely (F2-436's own bucket) | 22 |
+| present in Java **only inside a comment** | **13** |
+| …of those, surviving F2-436's *full* criteria | **7** |
+
+🔑 The 13 → 7 narrowing is the honest half, and it came from applying F2-436's **other**
+criterion rather than stopping at the first: six are **composable** at runtime
+(`DATA_EXCEPTION_`, `DATA_FLOW_`, `DSR_`, `OUTSOURCING_` ×3 — 46 composed prefixes harvested
+from real code), so a whole-string test cannot see them either way. The seven that survive —
+`BIA_UPDATED`, `DATA_REVIEW_DUE`, `INCIDENT_CLASSIFIED`, `OB_API_ABUSE`, `OB_CERT_EXPIRING`,
+`RISK_APPETITE_BREACHED`, `SHARIA_SCHOLAR_TERM_EXPIRING` — are all **0 fires**.
+
+**So F2-436's readable shortlist is 15, not 8.** Filed rather than swept: each needs one file
+read, and manufacturing seven verdicts is F2-188's failure mode.
+
+### The population
+
+The counter question has never been asked of **numbers**. F2-441 asked it of **booleans** (443
+flag fields, resolved per owner type from ASM) and closed `iam.roles.is_privileged`. Asked of
+counter-shaped numeric entity fields:
+
+| stage | count |
+|---|---|
+| counter-shaped numeric entity fields with **no setter call anywhere in main** | 30 |
+| minus 2 COMPUTED columns (`risk.inherent_score`, `risk.residual_score`) | 28 |
+| minus 1 native `@Modifying` UPDATE (`evidence.chain_version_count`) | 27 |
+| surviving every **mechanical** subtraction | **25** |
+
+⚠ That 25 is a **locator, not a verdict** (F2-182): the Jackson subtraction is per-endpoint and
+cannot be automated, so each member needs its module's bound request types read — which is what
+turned this one from a candidate into a defect. One is already filed (`ExerciseRunResponse
+.quality_score`, F2-425, *"no writer at all"* — independently reproduced here). The other 23 are
+filed with no verdicts.
+
+### The fix
+
+**Stop publishing it; keep the column; disclose the absence.**
+
+- `ScholarResponse` and `lib/sharia.ts` stop declaring the field, and the mapper stops filling it.
+- The register's column survives as UX-008's em-dash with a bilingual reason on `title` **and**
+  `aria-label` (F2-209: a `title` alone is a tooltip a keyboard user never receives, which on an
+  Arabic-primary platform is house rule 7 as much as accessibility).
+- ⚠ The hint says the figure **cannot be measured**, not that it is *not yet computed* —
+  F2-457's three states, where the second promises a number that never arrives. There is no SSB
+  attendance register anywhere in `sharia`; the platform's only attendance data is
+  `admin.committee_meeting_attendee`, which would need the SSB modelled as a committee and
+  scholars linked to committee members. A **feature**, filed (F2-188).
+- ⚠ **Deleting the column would have been wrong** and **rendering `0` would have been worse**:
+  the first drops the question, the second asserts the scholar attended no meetings (F2-197).
+- ⚠ **The entity keeps its mapping.** The fix retires a *published figure*, not the data: the
+  column holds real values in both databases, and an unmapped populated column is *invisible*
+  rather than merely absent (F2-279). It is also where a future attendance link would write.
+- The entity javadoc and `package-info.java` are corrected, because a false claim in the
+  artefact a developer reads first is the input to the next person's estimate.
+
+⚙ **AR-260's stored description is filed, not corrected.** Rewriting it is a data write to a
+live governance table, and — measured, re-deriving F2-436 — **the frontend has no client for
+`GET /api/v1/automation/rules` at all**, so no operator ever reads a rule description. That
+lowers its reach to whoever reads SQL and makes filing it correct rather than lazy.
+
+### The gate
+
+Four legs on `ShariaLifecycleTest`, the class that already owns this service (F2-190). 12 → 16.
+
+| leg | asserts |
+|---|---|
+| 1 | `ScholarResponse` does not declare the field — **and still declares the real ones** (anti-vacuity) |
+| 2 | nothing in `src/main/java` writes or publishes it, **and the entity still maps the column** (both directions) |
+| 3 | `package-info`'s emitted list names only tokens the tree really emits, re-derived from real code |
+| 4 | cross-codebase: the page does not read the retired field, and the em-dash carries its reason on **both** attributes |
+
+Comments are stripped in every scan, because the fix **names** the field in three places to
+explain why it is unpublished — a raw scan would read the epitaph as the corpse and fail on a
+correct tree (F2-193).
+
+⚠⚠ **Leg 3 refuted my own count on its first run.** I had read **two** unemitted tokens; it
+found **three** — `SHARIA_NC_EVENT_CLOSED` is documented and does not exist, because closure
+rides `SHARIA_NC_EVENT_TRANSITIONED` with `to` in the payload. 🔑 **A mechanical check over a
+documented list is worth more than a careful reading of it**, which is the whole argument for
+that leg rather than a comment.
+
+### Errors of mine, all caught by running something
+
+- ⚠⚠ **My anti-vacuity floor was a guess and failed on a correct tree.** I asserted the walk
+  reaches `> 2_000` Java files; `src/main/java` holds **1,898** (CLAUDE.md's 1,895 top-level
+  classes is the corroboration). F2-438's rule verbatim — **a floor must sit above the largest
+  WRONG answer**, which for a walk narrowed to one module is ~50 files, not two thousand.
+- ⚠ **The heredoc escape-collapse landmine, again.** `\\` became `\` inside a Python string in a
+  `<<'PYEOF'` block and the census died on a `SyntaxError`. CLAUDE.md prescribes the Write tool
+  for any payload carrying escapes and I reached for a heredoc anyway.
+- ⚠ **A guessed patch anchor half-applied a two-part edit.** I wrote
+  `const columns: Column<ScholarDto>[]` from the shape of the name; it is
+  `const cols: Column<ScholarResponse>[]`. The column cell landed and the hint constant did not,
+  leaving the page referencing an undefined identifier — caught by `tsc` immediately, but the
+  lesson is the recurring one: **resolve an identifier from the file, never from the shape of
+  the name.**
+- ⚠ **`awk … | cat -A` was avoided this time** because F2-458 recorded it one slice earlier;
+  every patch script detects its target's own line endings from the byte count and preserves
+  them, and all seven touched files were verified free of mixed endings and control bytes.
+
+### Filed
+
+- **AR-260's stored description** promising SAMA §3.6 attendance monitoring and a
+  `BOARD_MEETING_SHORTFALL` escalation. Correcting it is a data write to `platform
+  .automation_rules` in two databases; unrendered, so its reach is SQL readers. Joins F2-436.
+- **F2-436's shortlist is 15, not 8** — its presence test is comment-blind. The seven new
+  members are named above; each needs one file read.
+- **The 23 unread counter fields** surviving every mechanical subtraction, with the Jackson
+  subtraction still to apply per module. Sharpest by shape are the four
+  `NdiAssessmentCycle` / six `BcmAssessmentCycle` completion percentages and gap counts, which
+  are *rollups* and therefore F2-385/F2-405's family rather than this one.
+- **`SHARIA_OFFICER` and `SHARIA_AUDITOR` hold `SHARIA:READ` with 0 live users**, so the Shariah
+  module's own two personas are seated in nobody and the register is read by
+  `compliance` / `auditor` / `rmanager`. F2-253's shape; an administrator remedy, not a defect.
+- **An SSB attendance register** is the feature this whole finding is the shadow of. It needs a
+  decision about whether the SSB is a committee in `admin.committee_meetings` — which would make
+  the figure derivable and this column redundant.
+
 ## F2-458 — four PDPL dashboard figures asserted a statutory condition they did not measure
 
 | Field | Value |

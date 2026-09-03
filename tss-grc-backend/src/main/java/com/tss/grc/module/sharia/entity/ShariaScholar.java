@@ -76,7 +76,30 @@ public class ShariaScholar extends BaseEntity {
             columnDefinition = "DECIMAL(18, 2)")
     private java.math.BigDecimal annualFeeSar;
 
-    /** Meetings attended in the current fiscal year (used by AR-260 cadence rule). */
+    /**
+     * Meetings attended in the current fiscal year.
+     *
+     * <p><b>F2-459 -- nothing writes this, and nothing resets it.</b> The javadoc here used to
+     * read "used by AR-260 cadence rule", which is false in the way that is hardest to check:
+     * AR-260 exists, and it triggers on {@code SHARIA_SCHOLAR_TERM_EXPIRING} and reads
+     * {@link #termEnd}. No automation rule's {@code condition_json} or {@code action_json}
+     * mentions this column (measured 0 of 214 live rules), no service, scheduler, native
+     * {@code @Modifying} query, trigger or computed column writes it, and neither
+     * {@code CreateScholarRequest} nor {@code UpdateScholarRequest} declares it -- so no caller
+     * can set it either. Its value is whatever the seed wrote (1..5 across 5 scholars,
+     * byte-identical in dev and the deployed database) and it is frozen there for ever.
+     *
+     * <p>It is therefore <b>NOT on the wire</b>: {@code ScholarResponse} no longer carries it and
+     * the scholars register renders an em-dash with a reason, because a frozen figure named for a
+     * rolling window is worse than an absent one -- it is plausible, and "0" would assert that a
+     * scholar attended nothing (F2-197).
+     *
+     * <p>The mapping is kept rather than removed so the column stays visible to a reader and has
+     * a home if SSB attendance is ever recorded. There is no attendance register in
+     * {@code sharia} today; the platform's only attendance data is
+     * {@code admin.committee_meeting_attendee}, which would need the SSB modelled as a committee
+     * and scholars linked to committee members -- a feature, filed rather than smuggled in.
+     */
     @Column(name = "meetings_attended_ytd")
     private Integer meetingsAttendedYtd = 0;
 

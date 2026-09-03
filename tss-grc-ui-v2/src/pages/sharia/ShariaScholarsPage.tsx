@@ -95,6 +95,13 @@ export function ShariaScholarsPage() {
     } finally { setActing(false); }
   };
 
+  // F2-459: `notMeasured` in UX-008's sense -- a figure that is NOT coming, as distinct from
+  // one that is not yet computed. There is no SSB meeting-attendance register anywhere in the
+  // platform, so this cannot become a number without one.
+  const attendanceNotRecorded = lang === 'ar'
+    ? 'لا تُسجّل المنصّة حضور اجتماعات الهيئة الشرعية، فلا يمكن قياس هذا الرقم'
+    : 'The platform does not record SSB meeting attendance, so this cannot be measured';
+
   const cols: Column<ScholarResponse>[] = [
     { header: lang === 'ar' ? 'المرجع' : 'Reference', mono: true, width: '130px',
       cell: s => <span style={{ fontSize: 12 }}>{s.reference}</span> },
@@ -116,8 +123,22 @@ export function ShariaScholarsPage() {
       </span> },
     { header: lang === 'ar' ? 'تعارض المصالح' : 'COI declared', width: '130px',
       cell: s => <span style={{ fontSize: 12 }}>{s.coiDeclaredAt ?? '—'}</span> },
+    /*
+     * F2-459: this rendered `s.meetingsAttendedYtd ?? 0` over a column nothing writes and
+     * nothing resets, so every scholar showed a frozen seed value under a header claiming a
+     * rolling year. Deleting the column would assert nothing at all; rendering 0 would assert
+     * that the scholar attended no meetings. UX-008's third state is the honest one -- an
+     * em-dash whose reason says the figure CANNOT be measured, not that it is merely not yet
+     * computed, because there is no SSB attendance register for it to come from (F2-457).
+     * The reason reaches `title` AND `aria-label`: a `title` alone is a tooltip a keyboard or
+     * screen-reader user never receives (F2-209), which on an Arabic-primary platform is house
+     * rule 7 as much as it is accessibility.
+     */
     { header: lang === 'ar' ? 'الحضور هذا العام' : 'Meetings YTD', width: '120px',
-      cell: s => <span style={{ fontSize: 12 }}>{s.meetingsAttendedYtd ?? 0}</span> },
+      cell: () => (
+        <span style={{ fontSize: 12 }} title={attendanceNotRecorded}
+              aria-label={attendanceNotRecorded}>&mdash;</span>
+      ) },
     { header: '', width: '120px',
       cell: s => (
         <Button variant="ghost" size="sm"

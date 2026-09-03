@@ -483,4 +483,234 @@ class ShariaLifecycleTest {
     private static String permissionIn(String src, String constant) {
         return GuardExpressions.permissionPairOfConstant(src, constant);
     }
+    // ─── SSB attendance counter (F2-459) ─────────────────────────────
+    //
+    // sharia.sharia_scholar.meetings_attended_ytd is written by NOTHING: no service, no
+    // scheduler, no native @Modifying query, no trigger, no computed column, and neither
+    // CreateScholarRequest nor UpdateScholarRequest declares it, so no caller can set it
+    // either. Its value is whatever the seed wrote (1..5 across 5 scholars, byte-identical in
+    // dev and the deployed database) and it is frozen there for ever — while the register
+    // rendered it under a header claiming a rolling year.
+    //
+    // These legs are STRUCTURAL where the claim is structural (nothing writes it; the column
+    // stays mapped) and behavioural where it is observable (the wire no longer carries it).
+
+    @Test
+    @DisplayName("F2-459 — the scholar wire carries no attendance figure")
+    void scholarResponseDoesNotPublishTheUnwritableAttendanceCounter() {
+        Set<String> published = new TreeSet<>();
+        for (java.lang.reflect.Field f
+                : com.tss.grc.module.sharia.dto.ShariaDtos.ScholarResponse.class.getDeclaredFields()) {
+            if (!f.isSynthetic()) {
+                published.add(f.getName());
+            }
+        }
+
+        assertThat(published).as("""
+            ScholarResponse must not declare `meetingsAttendedYtd`.
+
+            Nothing in the platform writes sharia_scholar.meetings_attended_ytd and nothing \
+            resets it, so publishing it shipped a frozen seed value as a SAMA Shariah-governance \
+            attendance figure. A client type declaring a field the wire cannot honestly fill is \
+            the shape that produced F2-211's em-dash-on-every-row defect.
+
+            If SSB attendance is ever really recorded, give it a writer FIRST and this leg will \
+            let the response carry it again.""")
+            .doesNotContain("meetingsAttendedYtd");
+
+        // Anti-vacuity: a renamed or emptied response type would make the absence trivial.
+        assertThat(published).as(
+            "ScholarResponse should still publish the scholar's real fields — otherwise the "
+            + "assertion above passes over nothing (F2-235).")
+            .contains("reference", "fullNameEn", "fullNameAr", "termEnd", "annualFeeSar");
+    }
+
+    @Test
+    @DisplayName("F2-459 — nothing writes the attendance counter, and the column stays mapped")
+    void theAttendanceCounterHasNoWriterAndKeepsItsColumn() throws IOException {
+        java.nio.file.Path main = Paths.get("src", "main", "java").toAbsolutePath().normalize();
+        assertThat(Files.isDirectory(main)).as(
+            "Expected %s to exist. A wrong path would make this leg vacuous rather than "
+            + "failing, which is the one outcome a source scan must not have.", main).isTrue();
+
+        java.util.List<String> writers = new java.util.ArrayList<>();
+        int scanned = 0;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(main)) {
+            for (java.nio.file.Path p : walk.filter(x -> x.toString().endsWith(".java")).toList()) {
+                scanned++;
+                String code = GuardExpressions.stripComments(
+                    Files.readString(p, StandardCharsets.UTF_8));
+                if (code.contains("setMeetingsAttendedYtd(")
+                        || code.contains("meetingsAttendedYtd(")) {
+                    writers.add(main.relativize(p).toString().replace('\\', '/'));
+                }
+            }
+        }
+
+        // 1,500 rather than a round 2,000: measured, src/main/java holds 1,898 .java files
+        // (CLAUDE.md records 1,895 top-level classes, which is the corroboration). The first
+        // draft asserted > 2_000 from arithmetic and FAILED ON A CORRECT TREE -- F2-438's rule
+        // that a floor must sit above the largest WRONG answer, which for a walk narrowed to one
+        // module is ~50 files, not two thousand.
+        assertThat(scanned).as(
+            "The walk should reach the whole main tree; a narrowed scan reports a smaller "
+            + "population, which reads exactly like a clean answer (F2-235).")
+            .isGreaterThan(1_500);
+
+        assertThat(writers).as("""
+            Something now writes or publishes meetings_attended_ytd, and this leg is the record \
+            that nothing did.
+
+            Comments are stripped first (F2-193): the entity's javadoc and the response DTO's \
+            comment both NAME the field to explain why it is unpublished, so a raw scan would \
+            read the epitaph as the corpse and fail on a correct tree.
+
+            If a writer has genuinely arrived — an SSB attendance register, a scheduler that \
+            resets the counter each fiscal year — then the register may render the figure again \
+            and this leg should be retired deliberately, not edited around.""")
+            .isEmpty();
+
+        // The other direction: the column must STAY mapped. Unmapping it would make a populated
+        // column invisible to every reader (F2-279), and there would be nowhere for a future
+        // attendance link to write.
+        String entity = Files.readString(Paths.get("src", "main", "java", "com", "tss", "grc",
+            "module", "sharia", "entity", "ShariaScholar.java").toAbsolutePath().normalize(),
+            StandardCharsets.UTF_8);
+        assertThat(GuardExpressions.stripComments(entity)).as("""
+            ShariaScholar must keep mapping meetings_attended_ytd. The fix is that the figure is \
+            not PUBLISHED, not that the column is forgotten: it holds real values in both \
+            databases, and an unmapped populated column is invisible rather than merely absent \
+            (F2-279).""")
+            .contains("meetings_attended_ytd");
+    }
+
+    @Test
+    @DisplayName("F2-459 — package-info claims no trigger this module does not emit")
+    void thePackageInfoEventListNamesOnlyTokensThisModuleEmits() throws IOException {
+        java.nio.file.Path main = Paths.get("src", "main", "java").toAbsolutePath().normalize();
+
+        // Every SHARIA_* token this module (or any other) actually emits, from real code.
+        Set<String> emitted = new TreeSet<>();
+        Pattern token = Pattern.compile("\"(SHARIA_[A-Z_]+)\"");
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(main)) {
+            for (java.nio.file.Path p : walk.filter(x -> x.toString().endsWith(".java")).toList()) {
+                String code = GuardExpressions.stripComments(
+                    Files.readString(p, StandardCharsets.UTF_8));
+                Matcher m = token.matcher(code);
+                while (m.find()) {
+                    emitted.add(m.group(1));
+                }
+            }
+        }
+        assertThat(emitted).as(
+            "The emitted-token scan found nothing — a rotted pattern reports an empty set, and "
+            + "the assertion below would then pass over nothing (F2-235).")
+            .hasSizeGreaterThan(15);
+
+        // Every SHARIA_* token the module DOCUMENTS as emitted.
+        String pkg = Files.readString(Paths.get("src", "main", "java", "com", "tss", "grc",
+            "module", "sharia", "package-info.java").toAbsolutePath().normalize(),
+            StandardCharsets.UTF_8);
+        int listStart = pkg.indexOf("Emits F7 audit + F8 trigger codes");
+        assertThat(listStart).as(
+            "package-info.java should still head its event list with the phrase this leg keys "
+            + "on; if it was reworded, fix the pattern rather than deleting the assertion.")
+            .isGreaterThan(0);
+        int listEnd = pkg.indexOf("</ul>", listStart);
+        Set<String> documented = new TreeSet<>();
+        Matcher m = Pattern.compile("SHARIA_[A-Z_]+").matcher(pkg.substring(listStart, listEnd));
+        while (m.find()) {
+            documented.add(m.group());
+        }
+        assertThat(documented).as("The documented-token parse found nothing.").isNotEmpty();
+
+        Set<String> claimedButNotEmitted = new TreeSet<>(documented);
+        claimedButNotEmitted.removeAll(emitted);
+        assertThat(claimedButNotEmitted).as("""
+            package-info.java's list is headed "Emits F7 audit + F8 trigger codes", so it is the \
+            artefact a developer reads before wiring an automation rule to one of these — a token \
+            documented there reads as available.
+
+            It previously named SHARIA_SCHOLAR_TERM_EXPIRING and SHARIA_BOARD_MEETING_SHORTFALL, \
+            and no code path publishes either: AR-260 triggers on the first and has fired 0 \
+            times, and the second is the SAMA §3.6 cadence-breach escalation AR-260's own \
+            description promises. 🔑 It is also why F2-436's census could not see them — that \
+            finding's shortlist required a trigger to be "present in NO Java file", and a \
+            package-info.java is a Java file made entirely of comments, so every token a module \
+            DOCUMENTS as emitted counted as evidence that it IS.
+
+            If one of these is genuinely emitted now, this leg will let the list name it.""")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("F2-459 — the scholars register discloses the attendance figure as unmeasurable")
+    void theScholarsRegisterRendersTheAttendanceColumnAsAnExplicitAbsence() throws IOException {
+        java.nio.file.Path page = Paths.get(
+            "../tss-grc-ui-v2/src/pages/sharia/ShariaScholarsPage.tsx")
+            .toAbsolutePath().normalize();
+        assertThat(Files.exists(page)).as(
+            "Expected %s to exist. A wrong path would make this cross-codebase leg vacuous "
+            + "rather than failing.", page).isTrue();
+
+        String stripped = Pattern
+            .compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/")
+            .matcher(Files.readString(page, StandardCharsets.UTF_8))
+            .replaceAll("");
+
+        // Anti-vacuity: the stripper must leave the page's real code behind (F2-235).
+        assertThat(stripped).as(
+            "The comment stripper appears to have blanked real code — the page's own column "
+            + "array should survive it.").contains("const cols").contains("Meetings YTD");
+
+        assertThat(stripped).as("""
+            ShariaScholarsPage must not read `meetingsAttendedYtd` outside a comment; the server \
+            no longer sends it, so a client that keeps reading it renders `0` — which asserts \
+            that the scholar attended NO meetings rather than that the figure is unknown.""")
+            .doesNotContain("meetingsAttendedYtd");
+
+        // Asserted as a PAIRING, never as the token: F2-457's control G survived a
+        // contains("notMeasured") leg because the const DECLARATION satisfied it, so the tile
+        // could be reverted with the build still green (F2-194).
+        assertThat(stripped).as("""
+            The Meetings YTD column must survive as an em-dash carrying its reason on BOTH \
+            `title` and `aria-label`.
+
+            Deleting the column would drop the question instead of answering it (F2-197), and a \
+            `title` alone is a tooltip a keyboard or screen-reader user never receives (F2-209) — \
+            which on an Arabic-primary platform is house rule 7 as much as it is accessibility.""")
+            .containsPattern("(?s)title=\\{attendanceNotRecorded\\}"
+                + ".{0,80}?aria-label=\\{attendanceNotRecorded\\}");
+
+        // And the CLIENT TYPE must not declare it either. Nothing asserted this until the
+        // control harness re-aimed a mis-anchored control at it: a type declaring a field the
+        // wire never carries is F2-211's own family, and it is the declaration a future reader
+        // would wire a cell to, believing the figure exists.
+        java.nio.file.Path client = Paths.get("../tss-grc-ui-v2/src/lib/sharia.ts")
+            .toAbsolutePath().normalize();
+        assertThat(Files.exists(client)).as(
+            "Expected %s to exist. A wrong path would make this leg vacuous rather than "
+            + "failing.", client).isTrue();
+        String clientCode = Pattern
+            .compile("(?<!:)//[^\\n]*|/\\*[\\s\\S]*?\\*/")
+            .matcher(Files.readString(client, StandardCharsets.UTF_8))
+            .replaceAll("");
+        assertThat(clientCode).as(
+            "lib/sharia.ts should still declare the scholar type -- otherwise the assertion "
+            + "below passes over nothing (F2-235).").contains("annualFeeSar");
+        assertThat(clientCode).as("""
+            lib/sharia.ts must not declare the retired attendance field.
+
+            The server no longer sends it, and a client type declaring a field the wire never \
+            carries is what produced F2-211's em-dash-on-every-row defect. It is also the \
+            declaration the next reader would wire a cell to, believing the figure exists.""")
+            .doesNotContain("meetingsAttendedYtd");
+
+        assertThat(stripped).as("""
+            The hint must say the figure CANNOT be measured, not that it is not yet computed. \
+            UX-008 has three states and the difference between the last two is the whole point: \
+            there is no SSB attendance register anywhere in the platform, so "not yet computed" \
+            would promise a number that never arrives (F2-457).""")
+            .containsPattern("(?s)attendanceNotRecorded\\s*=[^;]{0,400}?cannot be measured");
+    }
 }

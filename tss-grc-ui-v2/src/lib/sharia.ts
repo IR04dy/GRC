@@ -168,7 +168,9 @@ export interface ScholarResponse {
   coiNotesEn?: string;
   coiNotesAr?: string;
   annualFeeSar?: number;
-  meetingsAttendedYtd?: number;
+  // F2-459: `meetingsAttendedYtd` is deliberately ABSENT from this type. Nothing in the
+  // platform writes sharia.sharia_scholar.meetings_attended_ytd and nothing resets it, so
+  // the server no longer publishes a frozen seed value as an attendance figure.
   email?: string;
   phone?: string;
   createdAt?: string;
