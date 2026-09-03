@@ -17,7 +17,8 @@ import { regulatorCountdownSummary, type CountdownSummary } from '../../lib/bcmR
  * BCM Dashboard — task #36.
  *
  * Per Saudi GRC prompt §30.2: critical services, BIA/BCP/DRP
- * completion, RTO/RPO compliance, exercise success, open BCM gaps.
+ * completion, exercise success, open BCM gaps. RTO/RPO compliance is NOT shown as a
+ * figure: nothing computes it (F2-457), so it renders as an explicit absence.
  * Pulls from `/api/v1/bcm/stats` + lists; falls back to a
  * representative scaffold while the backend is being wired.
  */
@@ -26,8 +27,10 @@ interface BcmStatsShape {
   biaCompletionPercent?: number;
   bcpCompletionPercent?: number;
   drpCompletionPercent?: number;
-  rtoCompliancePercent?: number;
-  rpoCompliancePercent?: number;
+  // F2-457: rtoCompliancePercent / rpoCompliancePercent are deliberately ABSENT. The
+  // server used to send the exercise completion rate under both names; it now sends
+  // neither, and declaring a field the wire never carries is the shape that produced
+  // F2-211's em-dash-on-every-row defect.
   exerciseSuccessRate?: number;
   failedExercises?: number;
   openGaps?: number;
@@ -65,6 +68,12 @@ export function BcmDashboardPage() {
   // UX-008 — tooltip for an unavailable/uninitialised metric, so a "—" tile
   // reads as "not yet measured" and never collapses to a misleading 0.
   const notComputed = isAr ? 'لم يُحتسب بعد' : 'Not yet computed';
+  // F2-457 — distinct from notComputed on purpose. UX-008's three states are a value,
+  // a metric not yet measured, and one the platform cannot measure at all; RTO/RPO
+  // compliance is the third, because no exercise records an achieved recovery time.
+  const notMeasured = isAr
+    ? 'لا يُسجَّل أي تمرين زمن الاستعادة الفعلي، فلا يمكن حساب الالتزام'
+    : 'No exercise records an achieved recovery time, so compliance cannot be computed';
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Building2, label: isAr ? 'خدمات حرجة' : 'Critical services', value: stats.criticalServiceCount,
@@ -78,9 +87,11 @@ export function BcmDashboardPage() {
     { Icon: ShieldCheck, label: isAr ? 'اكتمال DRP' : 'DRP completion',
       value: stats.drpCompletionPercent == null ? null : `${stats.drpCompletionPercent}%`,
       tone: tonePct(stats.drpCompletionPercent), emptyHint: notComputed },
+    // F2-457: kept as an explicit em-dash rather than removed. UX-008's convention exists
+    // so a metric the platform cannot compute stays VISIBLE as absent; deleting the tile
+    // would quietly drop the question instead of answering it.
     { Icon: Timer, label: isAr ? 'الالتزام بـ RTO' : 'RTO compliance',
-      value: stats.rtoCompliancePercent == null ? null : `${stats.rtoCompliancePercent}%`,
-      tone: tonePct(stats.rtoCompliancePercent), emptyHint: notComputed },
+      value: null, emptyHint: notMeasured },
     // Open BCM gaps — zero here is genuinely good ("clean"), so a real 0 gets a
     // confirming ✓ + success tint, while a missing metric shows the no-data dash.
     { Icon: AlertTriangle, label: isAr ? 'فجوات مفتوحة' : 'Open BCM gaps', value: stats.openGaps,
@@ -123,12 +134,20 @@ export function BcmDashboardPage() {
     },
     {
       id: 'rto-rpo',
-      title: isAr ? 'الالتزام بأهداف الاستعادة' : 'Recovery objectives compliance',
+      // F2-457: retitled with the figures. This read 'Recovery objectives compliance'
+      // over <strong>{stats.rtoCompliancePercent}%</strong> -- unguarded, so once the
+      // server stopped sending the key it would have rendered 'undefined%'. Retiring a
+      // figure means retiring the sentence that advertised it (F2-207).
+      title: isAr ? 'أهداف الاستعادة' : 'Recovery objectives',
       body: (
-        <ul className="text-xs" style={{ marginInlineStart: 0, paddingInlineStart: 18, lineHeight: 1.8 }}>
-          <li>{isAr ? 'الالتزام بـ RTO' : 'RTO compliance'}: <strong>{stats.rtoCompliancePercent}%</strong></li>
-          <li>{isAr ? 'الالتزام بـ RPO' : 'RPO compliance'}: <strong>{stats.rpoCompliancePercent}%</strong></li>
-        </ul>
+        <div className="text-xs" style={{ lineHeight: 1.8 }}>
+          <div>{isAr
+            ? 'RTO و RPO مسجّلان على كل خطة وتحليل أثر أعمال'
+            : 'RTO and RPO targets are recorded on each plan and BIA'}</div>
+          <div title={notMeasured} aria-label={notMeasured}>
+            {isAr ? 'الالتزام بها' : 'Compliance against them'}: <strong>—</strong>
+          </div>
+        </div>
       ),
       href: '/bcm',
     },
