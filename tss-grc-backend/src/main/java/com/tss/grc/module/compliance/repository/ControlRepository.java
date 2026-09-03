@@ -18,7 +18,7 @@ public interface ControlRepository extends JpaRepository<Control, Long> {
         WHERE c.organisationId = :orgId
           AND (:framework IS NULL OR c.framework = :framework)
           AND (:status    IS NULL OR c.status    = :status)
-          AND (:q        IS NULL OR LOWER(c.nameEn) LIKE LOWER(CONCAT('%',:q,'%')))
+          AND (:q        IS NULL OR LOWER(c.nameEn) LIKE LOWER(CONCAT('%',:q,'%')) ESCAPE '\\')
         """)
     Page<Control> findWithFilters(
         @Param("orgId") Long orgId,

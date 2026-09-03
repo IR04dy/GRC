@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.extensions.controller;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.CrossBorderResponse;
@@ -54,7 +55,7 @@ public class RopaWorkflowsController {
         Long orgId = TenantContext.getCurrentTenant();
 
         List<NoticeResponse> notices = noticeRepo
-                .findByOrgAndLinkedRopa(orgId, ropaCode).stream()
+                .findByOrgAndLinkedRopa(orgId, LikePatterns.escape(ropaCode)).stream()
                 .map(NoticeResponse::from).toList();
         List<CrossBorderResponse> cbts = cbtRepo
                 .findByOrganisationIdAndRopaCodeOrderByCreatedAtDesc(orgId, ropaCode).stream()
@@ -74,7 +75,7 @@ public class RopaWorkflowsController {
     public Counts counts(@PathVariable String ropaCode) {
         Long orgId = TenantContext.getCurrentTenant();
         return new Counts(
-                noticeRepo.countByOrgAndLinkedRopa(orgId, ropaCode),
+                noticeRepo.countByOrgAndLinkedRopa(orgId, LikePatterns.escape(ropaCode)),
                 cbtRepo.countByOrganisationIdAndRopaCode(orgId, ropaCode),
                 disposalRepo.countByOrganisationIdAndRelatedEntityTypeAndRelatedEntityId(orgId, "ropa", ropaCode));
     }

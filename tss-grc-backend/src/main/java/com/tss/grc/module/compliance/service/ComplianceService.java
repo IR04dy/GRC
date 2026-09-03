@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.service;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.dto.*;
@@ -36,7 +37,8 @@ public class ComplianceService {
         Long orgId = TenantContext.getCurrentTenant();
         String fwNull    = (framework != null && !framework.isBlank()) ? framework : null;
         String statusNull = (status   != null && !status.isBlank())   ? status    : null;
-        String qNull      = (q        != null && !q.isBlank())        ? q         : null;
+        // F2-449: :q is bound into a LIKE, so a caller's %, _ or [ would be a wildcard
+        String qNull      = (q        != null && !q.isBlank())        ? LikePatterns.escape(q) : null;
         return controlRepo.findWithFilters(orgId, fwNull, statusNull, qNull, pageable)
                           .map(this::toControlResponse);
     }

@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.help.service;
 
+import com.tss.grc.common.util.LikePatterns;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -107,7 +108,7 @@ public class HelpTopicService {
     public List<HelpTopicResponse> searchTopics(String query) {
         if (query == null || query.isBlank()) return List.of();
         Long orgId = TenantContext.requireOrganisationId();
-        return repo.search(orgId, query.trim()).stream()
+        return repo.search(orgId, LikePatterns.escape(query.trim())).stream()
                 .map(HelpTopicResponse::from)
                 .toList();
     }
