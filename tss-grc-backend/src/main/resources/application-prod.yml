@@ -170,7 +170,10 @@ grc:
   workflow-request-sla:
     scheduler-enabled: ${WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED:true}
   storage:
-    base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
+    # F2-456: prod prefers FILE_STORAGE_PATH and accepts STORAGE_BASE_PATH, so an
+    # operator who set either one gets a consistent answer for attachments,
+    # evidence AND binder exports rather than two roots.
+    base-path: ${FILE_STORAGE_PATH:${STORAGE_BASE_PATH:/var/data/tss-grc/uploads}}
   notifications:
     from-email: ${NOTIFY_FROM_EMAIL:noreply@tss-grc.com}
     from-name: TSS GRC Platform

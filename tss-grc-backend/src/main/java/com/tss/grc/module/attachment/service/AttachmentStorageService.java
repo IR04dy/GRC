@@ -15,13 +15,22 @@ import java.util.Locale;
  * evidence storage (allow-list, size cap, server-generated UUID name,
  * path-traversal guard, SHA-256 — all shared via {@link LocalFileStorageSupport})
  * and adds a safe {@link #load} for download. Files live under
- * {@code <base>/attachments/<entityType>/org-<id>/}.
+ * {@code <base>/attachments/<entityType>/org-<id>/}, where {@code <base>} is
+ * {@code grc.storage.base-path} -- the property, so a profile override reaches it.
  */
 @Service
 public class AttachmentStorageService extends LocalFileStorageSupport {
 
     public AttachmentStorageService(
-            @Value("${STORAGE_BASE_PATH:./uploads}") String basePath,
+            // F2-456: read the PROPERTY, never the bare env key. This was
+            // @Value("${STORAGE_BASE_PATH:./uploads}"), which resolves the pre-profile
+            // key, so it is invisible to
+            // every override the yml expresses -- and application-prod.yml re-points
+            // grc.storage.base-path at ${FILE_STORAGE_PATH}. The two spellings AGREE in
+            // dev and DIVERGE in prod, which is why no amount of local testing saw it:
+            // binder PDFs went to the operator's configured root while attachments and
+            // evidence went to ./uploads, relative to the service working directory.
+            @Value("${grc.storage.base-path:./uploads}") String basePath,
             @Value("${grc.evidence.max-file-size-mb:50}") long maxFileSizeMb) {
         super(basePath, "attachments", maxFileSizeMb, "attachment");
     }

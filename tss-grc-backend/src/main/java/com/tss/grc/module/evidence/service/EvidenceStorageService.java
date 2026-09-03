@@ -23,7 +23,10 @@ import java.nio.file.Path;
  *
  * <p>Config (base {@code application.yml} / env):
  * <ul>
- *   <li>{@code STORAGE_BASE_PATH} (default {@code ./uploads}) — base dir; files go under {@code <base>/evidence/org-<id>/}.</li>
+ *   <li>{@code grc.storage.base-path} (default {@code ./uploads}) — base dir; files go
+ *       under {@code <base>/evidence/org-<id>/}. Set it with {@code STORAGE_BASE_PATH}
+ *       or, under {@code prod}, {@code FILE_STORAGE_PATH}: the yml maps both onto this
+ *       one property, which is what this class reads.</li>
  *   <li>{@code grc.evidence.max-file-size-mb} (default 50) — per-file cap, also enforced by Spring multipart.</li>
  * </ul>
  */
@@ -31,7 +34,15 @@ import java.nio.file.Path;
 public class EvidenceStorageService extends LocalFileStorageSupport {
 
     public EvidenceStorageService(
-            @Value("${STORAGE_BASE_PATH:./uploads}") String basePath,
+            // F2-456: read the PROPERTY, never the bare env key. This was
+            // @Value("${STORAGE_BASE_PATH:./uploads}"), which resolves the pre-profile
+            // key, so it is invisible to
+            // every override the yml expresses -- and application-prod.yml re-points
+            // grc.storage.base-path at ${FILE_STORAGE_PATH}. The two spellings AGREE in
+            // dev and DIVERGE in prod, which is why no amount of local testing saw it:
+            // binder PDFs went to the operator's configured root while attachments and
+            // evidence went to ./uploads, relative to the service working directory.
+            @Value("${grc.storage.base-path:./uploads}") String basePath,
             @Value("${grc.evidence.max-file-size-mb:50}") long maxFileSizeMb) {
         super(basePath, "evidence", maxFileSizeMb, "evidence");
     }
