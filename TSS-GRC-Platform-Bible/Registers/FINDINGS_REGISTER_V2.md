@@ -15414,6 +15414,25 @@ that was weakened for the author's convenience.
 
 ### Filed
 
+- **The unguarded interpolation is a population, measured rather than swept** ([[F2-188]]). Retiring
+  `rtoCompliancePercent` would have rendered the literal `undefined%` because the panel interpolated
+  it bare, and the same shape sits one field over: `<strong>{stats.exerciseSuccessRate}%</strong>`.
+  Measured across the four `DomainDashboardKpi` dashboards, comment-stripped: **10 bare
+  `<strong>{…}</strong>` interpolations, of which 4 are over a field its own `*Shape` type declares
+  OPTIONAL** — `BcmDashboardPage :: exerciseSuccessRate`, and `PdplDashboardPage ::
+  piaCompleted`, `:: dsrOpen`, `:: privacyIncidents12m`. The other six are typed non-optional, so
+  `tsc` guarantees a value and they are not members.
+  🔑 **The KPI tiles are already safe and the PANELS are not**: `Kpi` treats `value == null` as
+  no-data and renders UX-008's em-dash with a hint ([[F2-195]]), so every figure in the tile strip
+  degrades honestly — while a panel body interpolates into a template and prints `undefined%`. **The
+  same page can carry both treatments of the same field**, which is why noticing it on one field
+  says nothing about the others.
+  ⚠ `dsrOpen` is the sharpest of the four: it is [[F2-196]]'s PDPL Article 23 open-DSR count, the
+  figure that finding had to correct twice, so an `undefined` there is a statutory tile reading as a
+  bug rather than as an absence. All four are latent today — the server sends every one — so what
+  is filed is making the hazard **absent** rather than latent ([[F2-213]]), which needs each site
+  read: some may sit inside an enclosing conditional a bare scan cannot see ([[F2-182]]).
+
 - **`bcpCompletionPercent` / `drpCompletionPercent`**: their cap is honest about a real limit
   (`bcm.bcp_plans` has no process link), but whether "BCP completion" should mean *plans per
   process* or *processes with a plan* is a product decision, and answering it needs a column.
