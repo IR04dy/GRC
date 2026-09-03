@@ -15229,6 +15229,198 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-457 — two ISO 22301 KPI keys carried the exercise completion rate, so one number reached the dashboard three times
+
+| Field | Value |
+|---|---|
+| **Id** | F2-457 |
+| **Title** | `BcmService.getStats()` published `rtoCompliancePercent` and `rpoCompliancePercent` as the exercise completion rate — a figure nothing in the platform computes, rendered as recovery-objective compliance on the BCM readiness dashboard |
+| **Severity** | P2 (live in code and rendered; every tenant with at least one exercise) |
+| **Status** | ✅ CLOSED 2026-09-04 |
+| **Found** | 2026-09-04, asking which dashboard figure is published under a name that does not describe it |
+| **Fixed** | `c7e6c9bf` + `99f10f23`, merged `fix/f2-457-rto-rpo-kpi-substitution` |
+| **Module** | `bcm` + `tss-grc-ui-v2` |
+| **Migration** | none |
+
+### The mechanism
+
+`BcmService.getStats()` computed one ratio and published it under three names:
+
+```java
+long successRate = totalEx == 0 ? 0 : Math.round(completedEx * 100.0 / totalEx);
+m.put("exerciseSuccessRate", successRate);
+m.put("rtoCompliancePercent", successRate);   // retired
+m.put("rpoCompliancePercent", successRate);   // retired
+```
+
+`successRate` is **completed exercises over total exercises**. That is the exercise completion
+rate. It is not an RTO compliance figure and it is not an RPO compliance figure, and the two are
+not even the same question as each other — RTO is *how long until the process is back*, RPO is
+*how much data was lost*.
+
+`BcmDashboardPage.tsx` rendered all three:
+
+- a toned KPI tile **"RTO compliance"** / **"الالتزام بـ RTO"**, next to a tile reading
+  **"Exercise success"** carrying the identical value;
+- a `rto-rpo` panel titled **"Recovery objectives compliance"** printing both as
+  `<strong>{stats.rtoCompliancePercent}%</strong>` and `<strong>{stats.rpoCompliancePercent}%</strong>`.
+
+So one measurement appeared **three times under three labels**, twice as a recovery-objective
+compliance figure, in both languages, on the readiness dashboard an ISO 22301 / NCEMA reviewer is
+shown.
+
+🔑 **Nothing in this platform computes either figure.** The two key names occur in **exactly two
+places in all of `src/main`** — the `m.put` lines themselves. No exercise record carries an
+achieved recovery time, so there is nothing to compare against the RTO/RPO targets the BIAs and
+plans do carry. The only RTO comparisons that exist anywhere are `BcmSettings`'s tolerance breach
+check and `BcmBiaAssessmentService`'s `RTO <= MTPD` ordering invariant — neither of which is a
+compliance percentage.
+
+### Why no instrument saw it
+
+This is the [[F2-195]] family — a KPI whose value has no provenance — reached from the other end,
+and the four gates that exist for it are each blind for a structural reason:
+
+- **`kpiProvenance.test.ts`** ([[F2-195]]) keys on a literal or a `|| N` fallback **inside the
+  `<Kpi>` tag**. Here the value arrives as a prop from a server field, so there is no literal in
+  the page's JSX to find. That is [[F2-197]]'s own recorded blind spot ("the numbers arrive as
+  PROPS from a catalogue two files away"), one layer further out: the catalogue is the server.
+- **`pageDataProvenance.test.ts`** ([[F2-198]]) asks whether the page calls a server. It does.
+- **`exportProvenance.test.ts`** ([[F2-199]], sharpened by [[F2-203]]/[[F2-205]]) asks about
+  emitted documents. This is a screen.
+- **`PrivacyWireContractTest`** ([[F2-211]]) adjudicates *a DTO field the table does not have*.
+  Both keys were on the wire and both carried a real, non-null number — **the value was honest and
+  its NAME was the lie**, which is the mirror of everything that lineage measures.
+
+🔑🔑 **A fabricated figure and a mislabelled one are indistinguishable from the client**: both
+arrive as a plausible percentage from the server, and no provenance gate keyed on *where the
+number came from* can see one whose problem is *what it is called*. The tell is not in the
+frontend at all — it is that two key names are written in exactly one place each and read by
+nothing that computes them.
+
+### The second half, in the same method
+
+`biaCompletionPercent` divided BIA **rows** by **process** count:
+
+```java
+long biaPct = Math.min(100, Math.round(totalBia * 100.0 / denom));   // retired
+```
+
+🔑 **The `Math.min(100, …)` was the confession.** A ratio that needs capping at 100% is not a
+coverage ratio; it is two different populations divided by each other. Measured in dev
+(byte-identical in prod): organisation 1 has **8 critical processes** and **10 BIA records over 8
+distinct `process_id` values**, so the honest coverage is **100%** and the retired arithmetic
+computed **125%** and capped it. Latent *today* — the two answers coincide — and wrong in the
+flattering direction the moment a process is added without a BIA, because the row count carries on
+covering for it. ⚠ Say which you have ([[F2-283]]): this is a **latent-hazard closure**, not a
+defect discovery, and the discriminating test is the one where four rows cover two of four
+processes: 100% by the old arithmetic, 50% honestly.
+
+⚙ `bcpCompletionPercent` / `drpCompletionPercent` **keep** their cap, and now say why:
+`bcm.bcp_plans` and `bcm.dr_plans` carry **no process link at all**, so coverage of processes by
+plans is not computable from those registers. Deriving it needs a column that does not exist —
+which is a **feature**, filed rather than smuggled in ([[F2-188]]).
+
+### The fix
+
+**Publish neither.** `BcmStatsShape` stops declaring the two fields, the tile renders UX-008's
+em-dash with a reason, and the panel is retitled from *"Recovery objectives compliance"* to
+*"Recovery objectives"* with a disclosure beneath it.
+
+⚠ **Deleting the tile would have been wrong** ([[F2-197]]): the convention exists so a metric the
+platform cannot compute stays *visible as absent* rather than quietly disappearing — an invented
+figure invites a question, and an absence that reads as health closes one.
+
+⚠⚠ **The hint is deliberately distinct from the page's own `notComputed`.** UX-008 has **three**
+states and the difference between the last two is the whole point:
+
+| state | treatment | meaning |
+|---|---|---|
+| a value | the number | measured |
+| `notComputed` | em-dash + *"Not yet computed"* | a figure that is coming |
+| `notMeasured` | em-dash + *"cannot be measured — no exercise records an achieved recovery time"* | a figure that is not |
+
+RTO compliance is the **third**. Telling an operator it is *"not yet computed"* promises a number
+that is never coming, which is a smaller version of the defect being fixed. The reason reaches
+both `title` and `aria-label`, because a `title` alone is a tooltip a keyboard user never receives
+([[F2-209]]).
+
+⚠ The panel's `{stats.rtoCompliancePercent}%` was **unguarded**, so the backend change alone would
+have rendered the literal `undefined%`. Both halves land in one commit — which is also why the
+frontend leg is not optional (below).
+
+### The gate
+
+Six legs on `BcmServiceTest`, the class that already owns this service ([[F2-190]]) — which had
+**37 tests and none of them touched `getStats()`** ([[F2-248]]: a path with no test is not a path
+somebody decided was safe). 37 → 43.
+
+**Behavioural, not structural, and that is forced by this register's own conventions.** A source
+scan cannot tell a re-added `m.put("rtoCompliancePercent", …)` from a comment naming it, and the
+fix deliberately **quotes both retired names** ([[F2-450]]) — so the only assertion that
+discriminates is what the map actually contains.
+
+⚠⚠ **Leg 6 is cross-codebase** (the `ConnectorBackingContractTest` precedent — [[F2-193]],
+[[F2-213]], [[F2-437]]), and without it the entire frontend half is unasserted: reverting it
+re-declares the field on `BcmStatsShape`, `tsc` is satisfied, and the panel interpolates
+`undefined%` with nothing in either suite to notice. It strips comments in **one left-to-right
+alternation** ([[F2-198]]/[[F2-211]]) with `(?<!:)` so a `https://` inside a string literal cannot
+open a comment, and carries an **anti-vacuity** assertion that the stripper leaves the page's real
+KPI array behind ([[F2-235]]).
+
+### The controls
+
+**7 killed · 0 survived · 0 anchor-miss**, baseline and post-restore green. Which leg each fires is
+the result ([[F2-289]]):
+
+| # | control | fires |
+|---|---|---|
+| A | republish both retired keys | the absence leg **and** the one-label leg |
+| B | `biaPct` back to the capped row count | both discriminating coverage legs |
+| C | the frontend TYPE re-declares the keys | leg 6 |
+| D | the panel interpolates the retired key | leg 6 |
+| E | leg 6's comment stripper matches nothing | leg 6 |
+| F | leg 6's comment stripper blanks everything | leg 6 (the anti-vacuity assertion) |
+| G | the RTO tile deleted instead of kept | leg 6 |
+
+⚠⚠ **G SURVIVED the first run, and the hole was in a leg written after quoting the rule that
+predicts it.** The tile assertion was `contains("notMeasured")` — and `notMeasured` is also the
+name of the **const declaration** two lines above the KPI array, so swapping the tile's hint back
+to `notComputed` left the token present and the build green. [[F2-194]]'s
+substring-satisfied-by-something-else, verbatim. 🔑 **Assert the PAIRING, not the token**:
+`containsPattern("(?s)'RTO compliance'.{0,240}?emptyHint:\\s*notMeasured")`, plus F2-209's
+`title=\{notMeasured\}` → `aria-label=\{notMeasured\}` pairing as its own leg.
+
+⚠ **Control A originally killed leg 1 alone**, because leg 2 *excluded* the two retired names from
+its count. That exclusion only ever suppressed a **correct** failure — re-adding either alias
+should fail in the one-label leg as well as in the absence leg — so it was removed and A now fires
+both. 🔑 A special case in an assertion that needs a paragraph to justify is usually an assertion
+that was weakened for the author's convenience.
+
+### Errors of mine, all caught by running something
+
+- ⚠⚠ **Five literal `—` escapes reached a Java file** because a patch payload was written as a
+  **raw** Python string. It compiled — and only because `2014` happens to be valid hex.
+  🔑 **javac processes a unicode escape in the LEXICAL phase, before comments are stripped, so a
+  bare backslash-u in a Java COMMENT is still an escape**; one wrong digit and the file does not
+  build, with an error that points at a comment. Replaced with ASCII.
+- ⚠ Then `.\{0,240\}` in the replacement payload put `\{` into a Java string literal — **not a
+  legal Java escape** — producing four `illegal escape character` errors. The regex *quantifier*
+  braces need no escaping at all; only the literal braces around `{notMeasured}` do.
+- ⚠ A patch anchor was **truncated** — I ended it at `labels were not.""")` where the message
+  continues — so it matched 0 times. Line-scoped edits with per-line content assertions after that.
+- ⚠ `Stop-Process` guard script died on `Cannot overwrite variable PID` — **`$pid` is a read-only
+  automatic variable in PowerShell**, the same family as the recorded `$host` trap in nginx configs.
+
+### Filed
+
+- **`bcpCompletionPercent` / `drpCompletionPercent`**: their cap is honest about a real limit
+  (`bcm.bcp_plans` has no process link), but whether "BCP completion" should mean *plans per
+  process* or *processes with a plan* is a product decision, and answering it needs a column.
+  Owner decision.
+- **A real RTO/RPO compliance figure** is a feature: it needs an achieved-recovery-time column on
+  the exercise record, and a decision about whether a tabletop exercise can evidence one at all.
+
 ## F2-456 — a `@Value` on a bare env key reads the pre-profile name, so it is invisible to every profile override
 
 | Field | Value |
