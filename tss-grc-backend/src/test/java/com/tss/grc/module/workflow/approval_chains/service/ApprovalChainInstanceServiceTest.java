@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.approval_chains.service;
 
+import org.junit.jupiter.api.DisplayName;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -653,5 +654,27 @@ class ApprovalChainInstanceServiceTest {
         a.setActorUserId(42L);
         a.setDecidedAt(LocalDateTime.now());
         return a;
+    }
+
+    @Test
+    @DisplayName("F2-450 — a step requiring a permission-shaped role is no longer satisfied by it")
+    void aStepRequiringAPermissionShapedRoleIsNoLongerSatisfied() {
+        ApprovalChainStep step = new ApprovalChainStep();
+        step.setStepOrder(1);
+        step.setRequiredRole("BCM_EXPORT");
+
+        assertThat(ApprovalChainInstanceService.matchesActor(step, 42L, Set.of("RISK_MANAGER")))
+            .as("""
+                The narrowing is what makes this false: holding the BCM_EXPORT permission no
+                longer puts BCM_EXPORT in the actor's role set, so a step configured to require
+                it is not satisfied by the permission. ⚠ Latent — measured in both databases, the
+                role-name / permission-name intersection is 0 and none of the 15 configured
+                required_role values is a permission string, so nothing was mis-authorised and
+                the narrowing cannot refuse a step that works today (F2-214).""")
+            .isFalse();
+
+        assertThat(ApprovalChainInstanceService.matchesActor(step, 42L, Set.of("BCM_EXPORT")))
+            .as("and a genuine ROLE of that name would still match — the matcher is unchanged")
+            .isTrue();
     }
 }

@@ -537,6 +537,12 @@ public class ApprovalChainInstanceService {
         if (s.getRequiredUserId() != null && Objects.equals(s.getRequiredUserId(), actorUserId)) {
             return true;
         }
+        // F2-450 — rolesUpper must be exactly that: ROLE_-derived names, upper-cased. Both
+        // callers now supply one (ApprovalChainController#acting normalises, and
+        // pendingForUser's local set is built the same way), so the parameter name is no longer
+        // a claim about only one of them. Before F2-450 the set also carried every permission
+        // string the principal held, so a step whose required_role happened to be spelled like a
+        // permission was satisfied by holding that permission.
         if (s.getRequiredRole() != null && rolesUpper.contains(s.getRequiredRole().toUpperCase(Locale.ROOT))) {
             return true;
         }
