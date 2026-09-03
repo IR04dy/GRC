@@ -15229,6 +15229,129 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-447 — `instanceof` is a null check for the THEN branch, and that is what made the ELSE branch look guarded
+
+| | |
+|---|---|
+| **Status** | ✅ CLOSED 2026-09-03 — one line, a hard-zero gate, live-proven in both directions; three adjacent veins swept clean |
+| **Severity** | **P2** — an opaque 500 on the route that raises a CRO/board appetite-breach escalation |
+| **Source** | F2-431's filing, re-derived and **widened** first (F2-221) |
+| **Size** | S — one call site, one private helper, 1 gate, 1 behaviour class, no schema change |
+
+### The defect, and why it read as guarded
+
+`RiskAppetiteController#updateExposure` bound a raw `Map` body and read:
+
+```java
+BigDecimal value = body.get("value") instanceof Number n
+    ? new BigDecimal(n.toString())
+    : new BigDecimal(body.get("value").toString());
+```
+
+🔑 **`x instanceof T` IS a null check — for the THEN branch.** So the ELSE branch dereferenced
+null, and a body omitting `value` raised a `NullPointerException`, which matches no handler but
+`@ExceptionHandler(Exception.class)`. Probed live as `rmanager` (RISK_MANAGER, never `admin`):
+
+- **pre-fix**, one line reverted and the context restarted (confirmed by a **new start marker**, not
+  a 200 — F2-217): `POST {}` → **500**, `NullPointerException: Cannot invoke "Object.toString()"
+  because the return value of "java.util.Map.get(Object)" is null`. ⚠ That message is visible only
+  because dev sets `grc.errors.verbose=true`; **in production SEC-CFG-001 strips the class**, so an
+  operator gets a bare unexpected-error page.
+- **post-fix, 9/9:** `POST {}` → **400 `value is required`**; `{"value":"not a number"}` → **400
+  `value must be a number`**; `{"value":12.5}` → 200 storing `12.5000`; `{"value":"7.25"}` → 200
+  storing `7.2500` (the ELSE branch's own job, still done); no token → 401.
+
+⚠ **A `@NotNull` DTO is deliberately not the fix.** `@Valid` fires **before** `@PreAuthorize`, so a
+bean-validated field would 400 an unauthorized caller before the 403 — a recorded landmine, and the
+reason these routes bind a raw `Map` at all. F2-394's remedy is a manual check after the guard.
+
+⚙ **Neither branch can break a request that works today**: an absent key was a 500 and is now a
+400, and a non-numeric value was **already** a 400 (`NumberFormatException` is an
+`IllegalArgumentException`) whose message named no field and now names it. Deliberately no
+`trim()` — `" 12 "` fails today, and making it succeed would be a behaviour change rather than a
+diagnostic one.
+
+### 🔑🔑 The population, and my own classifier reproducing F2-431's error in a new spelling
+
+F2-431 measured this family over **controllers**: 54 binding a raw `Map`, 17 dereferences, 14
+guarded, 3 candidates — and **2 of its 3 were its own classifier**, which knew `!= null` and
+`containsKey` and missed `== null ? null : …`. F2-447 widened the sweep to **all of
+`src/main/java`**, because a `Map` payload also reaches services (F2-175's `SystemIntakePort` takes
+one) and scoping to controllers was a narrowing nobody had stated.
+
+Widened: **302 files mention `.get(`, 29 keyed dereferences, 28 guarded, 1 real** — exactly the site
+F2-431 filed.
+
+⚠⚠ **And my widening reported a second candidate that was my classifier again.**
+`CommitteeMeetingPapersService`'s `entry.get("userId").asLong()` is guarded by
+`entry.has("userId")` — the receiver is a Jackson `JsonNode`, whose containment test is `has(...)`,
+not `containsKey(...)`. 🔑 **There are five polarities in this tree, and a classifier that knows
+four returns a FALSE POSITIVE rather than a smaller population** — the loud direction, which is the
+only reason it cost one reading instead of a wrong conclusion. All five are named in the gate and
+every one is a must-not-flag case in its self-test:
+
+| polarity | where it appears |
+|---|---|
+| `x.get(k) != null` | the house idiom, 20-odd sites |
+| `x.containsKey(k)` | `Map` |
+| `x.has(k)` | **Jackson `JsonNode`** — the one I missed |
+| `x.get(k) == null ? … : …` | the one F2-431 missed |
+| `x.getOrDefault(k, <non-null>)` | never null |
+
+### ⚙ Three adjacent veins swept CLEAN, recorded so nobody re-runs them (F2-216)
+
+**(a) An `@Entity` mapping a column its table does not have** — a 500 on every read of that entity.
+F2-279/F2-280 measured the *other* direction (an entity mapping a strict subset of its table); this
+one is **0 of 8,381 fields across 432 `@Entity` types**, and the 432 matches the figure CLAUDE.md
+records, which is the corroboration.
+
+⚠⚠ Two instrument corrections got it there, and the first is a recorded rule: **a source file is
+not a type** (F2-256). Taking the file's first `@Table` attributed **148 phantom missing columns**
+to one table, almost all of them `data_officer/Entities.java`, which declares fourteen nested
+`@Entity` classes. And the four entities whose `@Table` carries no `schema=` are **correct**:
+`application.yml` sets `hibernate.default_schema: platform` and all four tables are in `platform`,
+so a scanner that defaults to `dbo` reports them as pointing at nothing. ⚙ The same measurement
+answers a sharper question for free: **only 4 of 432 entities omit the schema, and all 4 are
+`platform` tables**, so nothing silently resolves to the wrong schema.
+
+**(b) A `@Cacheable`/`@CacheEvict` naming a cache `CacheConfig` does not declare** — the
+`CaffeineCacheManager` is given an explicit five-name list *precisely* so it does not create caches
+lazily, so a name outside it would be an unbounded never-expiring cache. **0 undeclared**, and the
+one declared-but-unused name (`permissions`) is F2-425's already-filed item, unchanged.
+
+**(c) An `@EventListener` whose parameter type nothing publishes** — statically decidable, unlike
+F2-436's runtime-composed trigger tokens. **2 listeners, both on `DomainEvent`, which is
+published.** 0 inert.
+
+### Verification
+
+- `RiskAppetiteExposureBodyTest` **6** legs — the controller had **no test of any kind**, which is
+  not the same as a path somebody decided was safe (F2-248). ⚠ Every leg asserts the **message**,
+  not the exception type: the non-numeric path was already a 400, so a type-only assertion would
+  pass over the half being fixed.
+- `MapBodyDereferenceContractTest` **3** legs — a **hard zero with no exemption map**, safe by
+  F2-214's test because a guard is always available and adding one is never wrong; the fixed site
+  named so a revert is legible; and a self-test with one must-flag case (the literal
+  `instanceof`-ELSE shape), one fixed-form case, **all five polarities**, and a comment quoting the
+  retired shape (F2-193).
+- **5/5 controls fire**, one per half (F2-289), 0 survived, post-restore GREEN. Controls C and D
+  each delete one polarity and must fire *because deleting one produces a false positive* — which
+  is the failure mode this finding is about, asserted rather than described.
+- ⚠ Control D first reported **ANCHOR-MISS**: the line I anchored on ends in a comment written with
+  **ellipsis characters (U+2026)** and I wrote `...`. 🔑 An anchor that includes a comment inherits
+  the comment's typography; anchor on the code.
+
+### ⚠ And a guessed column name crashed the cleanup — inside the `finally`
+
+The probe's cleanup deleted from `risk.appetite_breach_events WHERE statement_id = ?`; the column is
+**`appetite_id`**. The exception escaped the `finally`, so the planted appetite statement was left
+**live** until a follow-up removed it. F2-249 recorded exactly this — *"a guessed column name threw
+inside a `finally`, which is the worst place for it"* — and the remedy is the one already on the
+record: **resolve every column from `sys.columns` before writing a cleanup**, because a cleanup is
+the one part of a probe whose failure leaves state behind.
+
+---
+
 ## F2-446 — one name, three escaping contracts; and thirteen sites with none, on a ledger that cannot be repaired
 
 | | |
