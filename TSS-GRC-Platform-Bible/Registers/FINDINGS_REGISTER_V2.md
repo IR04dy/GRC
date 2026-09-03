@@ -15428,12 +15428,31 @@ the figure can only have come from the lifecycle count.
   direction). Bounding it needs a decision about which column dates a breach — F2-209
   established `discoveredAt` is the awareness instant while `occurredAt` and `reportedAt`
   have no column at all — so it is a product question, not a side effect of this fix.
-- **`piaCompleted` counts `APPROVED` only.** [[F2-402]] established that
-  `APPROVED_WITH_CONDITIONS` is a **decided** state — the DPIA machine stamps `decidedAt`
-  for it exactly as for `APPROVED` — and corrected the sibling reader `dpiaOpen` in
-  `DataOfficerQueryService`. This reader kept the narrower list. Latent: **0 rows hold that
-  status** in either database, so the count is right today and wrong the first time a DPIA
-  is approved with conditions. F2-215's two-of-N across two modules.
+- ⚠⚠ **`piaCompleted` counting `APPROVED` only was filed here as a defect and is REFUTED —
+  and the refutation is the better finding.** The filed claim read *"[[F2-402]] established
+  that `APPROVED_WITH_CONDITIONS` is a **decided** state … and corrected the sibling reader
+  `dpiaOpen` in `DataOfficerQueryService`. This reader kept the narrower list."* Measured:
+  **`APPROVED_WITH_CONDITIONS` appears nowhere in `src/main/java`** as a status this reader's
+  register can hold. There are **two DPIA registers**, and F2-402's is the other one:
+  `module/data_officer`'s machine is `DRAFT → DPO_REVIEW → BUSINESS_REVIEW → APPROVED |
+  APPROVED_WITH_CONDITIONS | REJECTED → ARCHIVED`, while `module/privacy`'s — the one
+  `PrivacyService.getStats()` reads — is `DRAFT → IN_REVIEW → APPROVED | REJECTED` with
+  `EXPIRED` driven by `next_review_date`. So `piaCompleted` is **correct for the register it
+  reads**, and the two vocabularies are disjoint.
+  🔑 **The sharper finding is the one the refutation exposes: two registers for one PDPL
+  Article 25 concept, and TWO `DpiaRepository` interfaces sharing a simple name** —
+  [[F2-196]]'s disjoint-register shape with [[F2-222]]'s duplicate-simple-name hazard (15
+  such names measured) on top. Measured statuses, byte-identical in both databases:
+  `privacy.dpia` holds `APPROVED 2 / DRAFT 1 / IN_REVIEW 1 / UNDER_REVIEW 1`. ⚠ That
+  `UNDER_REVIEW` row is a status its own machine does not declare, so it can never be
+  approved, rejected or expired by any route — already filed under [[F2-206]]/[[F2-215]] and
+  re-confirmed here. Which register is authoritative for a PDPL Article 25 assessment is an
+  **owner decision**, and a display fix must not pick one.
+  ⚙ 🔑 **Recorded because of how it was caught: checking a filing's own claim before shipping
+  it, rather than after.** Roughly two in ten of a slice's own claims fall on first
+  examination ([[F2-188]], [[F2-192]], [[F2-204]], [[F2-211]], [[F2-252]]), and this one
+  would have sent the next reader to widen a count that is already right — the direction that
+  manufactures work rather than finding it.
 - **An open DSR with no `due_date` is in neither bucket.** `DueDateBefore` excludes a NULL,
   correctly — a request with no recorded deadline is not *provably* past one — so the
   breached count is not the complement of "within SLA". Measured **0 such rows** in both
