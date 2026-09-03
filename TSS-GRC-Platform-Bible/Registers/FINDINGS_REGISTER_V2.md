@@ -15229,6 +15229,212 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-454 — the gate for startup-fatal defects enumerated three legs, and named-parameter binding was the fourth
+
+| Field | Value |
+|---|---|
+| **Id** | F2-454 |
+| **Title** | A `@Query` naming `:x` its method supplies under no other name is refused at repository bootstrap, and nothing asserted it |
+| **Severity** | P3 (latent-hazard closure — 0 unbound today) |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, by asking *what else does Spring resolve at context refresh that a hermetic build cannot see?* |
+| **Fixed** | `1147c1a5`, merged `fix/f2-454-named-query-parameter-binding` |
+| **Module** | `config` (gate only — no production code changed) |
+| **Migration** | none |
+
+### What was wrong
+
+[[F2-443]] built `StartupResolutionContractTest` for one class of defect, and states it plainly:
+**fatal when the context refreshes, and invisible to `mvn -o clean package`**, because nothing in
+the suite boots a Spring context and — deliberately — nothing should. [[F2-247]] (a duplicate bean
+name), [[F2-439]] (an unsatisfiable path placeholder) and [[F2-442]] (a propagation
+`RestrictedTransactionalEventListenerFactory` refuses) are its siblings, and F2-442 is the measured
+cost: `BUILD SUCCESS` printed over a tree the application could not start from, **twice**.
+
+That class's own **"What this asserts"** section enumerated **three** legs — entity names, first-hop
+property paths, `@Value` placeholders — and every one of them was true.
+
+**Named-parameter binding is the fourth.** Spring Data resolves a `@Query`'s `:name` against the
+method's parameters at repository bootstrap, and refuses the repository when it cannot:
+
+> Name for parameter binding must not be null or empty! For queries with named parameters you need
+> to provide names for method parameters; use `@Param` for query method parameters, or when on
+> Java 8+ use the javac flag `-parameters`.
+
+`spring.data.jpa.repositories.bootstrap-mode` is set in **no** packaged document, so the default
+applies and repositories bootstrap **eagerly** — the failure is at startup, not at first call.
+
+🔑 **Three true legs are what hid the fourth.** A reader consulting that section finds the family
+described and three members enumerated, and has no reason to ask which other thing Spring resolves
+at the same moment. [[F2-215]]'s two-of-N, in the gate that owns the family.
+
+### Measured
+
+Over the shipped bytecode, by reflection:
+
+| | |
+|---|---|
+| `@Query` methods | **253** |
+| binding by name | **224** (43 of them native) |
+| distinct `:name` placeholders | **445** |
+| **unbound** | **0** |
+| **dead `@Param`** | **0** |
+| classes that failed to load | **0** |
+
+So this is a **latent-hazard closure, not a defect discovery** — say which you have ([[F2-283]]).
+What it buys is that the next one fails the build rather than the deployment, which is the whole
+argument [[F2-443]] and [[F2-439]] were built on.
+
+### 🔑 45 repositories bootstrap only because of a compiler flag, and the assertion protecting them says it protects something else
+
+**45 of the 224** bind at least one placeholder ONLY by its compiled parameter name. Those resolve
+because `spring-boot-starter-parent` compiles with `-parameters` — verified from bytecode, not
+assumed: `javap -v` shows `MethodParameters` on the repository interfaces, and the POM's own
+compiler block overrides `<source>`, `<target>` and `<annotationProcessorPaths>` **without**
+re-declaring `<parameters>`, so the reliance rests on inheritance surviving a config block that
+already overrides its siblings.
+
+That flag **is** asserted — by
+`RequestMappingBindabilityContractTest#theBuildCompilesWithParameterNamesSoTheFirstLegIsSound`,
+whose name and message frame it as a soundness check on *that* gate's own first leg (a
+`@PathVariable` bound by name). It protects these 45 repositories as well, and nothing said so.
+🔑 **A reader retiring the leg it names would take the platform's startup with it** — [[F2-184]]'s
+shape inverted: not a comment describing a check that does not exist, but a check whose stated
+reason understates what it protects.
+
+The reliance is asserted **exactly** (`isEqualTo(45)`) rather than decrease-only, because a new
+method joining that population is not a defect and should be visible rather than absorbed into a
+tolerance. And every method annotates **all** its bindings or **none** — 45 / 179 / **0** in
+between — which is worth pinning because a half-annotated method is the shape that reads as
+covered: a reader who sees one `@Param` has no reason to check the parameter beside it.
+
+### The three legs added
+
+1. `everyNamedQueryParameterIsSuppliedByItsMethod` — hard zero, **no exemption map**. Safe by
+   [[F2-214]]'s test: `@Param("x")` is always available, so an unbindable placeholder is never
+   correct code.
+2. `noParamAnnotationNamesAPlaceholderItsQueryDoesNotContain` — hard zero. Dead rather than fatal,
+   and an [[F2-184]] decoy: it answers *"is this parameter bound?"* with a yes that is not true,
+   and it is exactly how a renamed placeholder leaves a stale annotation behind. ⚠ Safe as a hard
+   zero **only because this corpus contains no SpEL query** — a `@Param` used solely through
+   `:#{#x}` would read as dead. Measured, not assumed.
+3. `theWholeShippedTreeLoadedSoEveryLegAboveMeasuredTheWholeTree` — [[F2-449]]'s rule.
+
+### ⚠ The corpus builder swallowed load failures under a comment asserting it could not matter
+
+`shippedClasses()` caught `Throwable` and ignored it, commented *"an optional-dependency reference
+that is genuinely absent — **never a query holder**"*. That is a **claim**, and every leg in the
+class measures over that corpus, so a class which fails to load leaves all six legs measuring a
+narrower tree **with no symptom** — [[F2-198]]'s shape at a classpath, and [[F2-449]]'s measured
+cost (its census, driven from a narrower classpath, printed `0 methods, 0 LIKE occurrences`: a
+clean-looking zero produced by loading nothing).
+
+Measured: **0 classes fail to load**, so the claim was true **by luck rather than by
+construction**. The tolerance is kept — one absent optional dependency must not take the whole gate
+down — and is now auditable. Both halves come from **one** walk ([[F2-190]]): a second walk inside
+the leg would be free to disagree with the one the other legs read.
+
+⚙ That leg cannot be killed by a mutation on a clean tree (M8 survives, correctly), so it is
+demonstrated by **control G**: copying any class file to a mismatched name inside `target/classes`
+makes the leg fire naming `com.tss.grc.config.F2454Bogus -> NoClassDefFoundError`, and removing it
+restores green.
+
+### ⚠ A fully-qualified annotation defeats a substring scan — in BOTH directions
+
+[[F2-449]] recorded that `PrivacyNoticeRepository` writes
+`@org.springframework.data.jpa.repository.Query(` in full, so a source census keyed on `"@Query("`
+**under-reported by 5 of 14** — the quiet direction, which reads as a clean tree.
+
+**That same file writes `@Param` in full too.** This slice's throwaway source locator tested
+`"@Param" in decl` and reported **49** relying methods where reflection says **45**. The four
+phantoms:
+
+* `PrivacyNoticeRepository#countByOrgAndLinkedRopa`
+* `PrivacyNoticeRepository#findByOrgAndLinkedRopa`
+* `ProcessingActivityRepository#findAtRiskCrossBorder`
+* `ShariaNonComplianceEventRepository#sumSnciByStatus`
+
+🔑 **One spelling, two annotations, two opposite error directions** — F2-449's under-reported and
+mine over-reported. Over-reporting fails loudly and invents findings; under-reporting reads as a
+clean tree. And the reflective figure is authoritative *here* only because the unloadable count is
+asserted zero: without that, "reflection says 45" is a statement about a classpath rather than
+about the tree.
+
+### Verification
+
+No production code changed, so the verification **is** the mutation harness
+([[F2-284]] / [[F2-301]]) plus control G.
+
+**7 killed · 1 survived-and-explained · 0 anchor-miss · 0 did-not-compile.**
+
+| Mutation | Verdict | What it proves |
+|---|---|---|
+| the binding pattern cannot match | KILLED | both hard zeros go vacuous; only the floors see it |
+| `countQuery` ignored | KILLED | 6 queries' own placeholders stop being checked |
+| SQL literals not blanked | KILLED | a colon inside a literal invents a binding |
+| compiled name wins over `@Param` | KILLED | the site the detector exists to catch is cleared |
+| `deadParams()` reads `supplied` | KILLED | a `Pageable`'s compiled name reads as a dead `@Param` |
+| reliance never detected | KILLED | the `-parameters` census stops measuring anything |
+| native queries excluded | KILLED | 43 bindings leave the population |
+| unloadable swallowed | SURVIVED | expected on a clean tree — **control G** proves that leg fires |
+
+⚠⚠ **Two of my own assertions were wrong and each was caught by running something rather than by
+reading.**
+
+* The self-test claimed **exactly ONE** fixture method was unbindable and **contradicted the
+  assertion two blocks below it**, which asserts that very method is unbound. Two are, by design:
+  `:orgId` against a parameter named `organisationId`, and `:orgId` against a parameter named
+  `orgId` carrying `@Param("nope")` — because the annotation wins, that one is unbindable too. The
+  detector was right and the claim was wrong ([[F2-206]], applied to an assertion rather than to a
+  mutation).
+* ⚠⚠ **The SQL-literal blanking was not load-bearing and only the harness could tell.** Its case
+  read `'12:30'`, and `:30` cannot match a capture group requiring a letter or underscore first —
+  so the assertion was satisfied by the **digit rule** while claiming to test the blanking. An
+  assertion whose name claims more than it can see. Re-cased on `'see :notAPlaceholder'`, which
+  only the blanking can clear, with the digit rule kept as its own case so the two are separately
+  visible.
+
+⚠ **A floor set from arithmetic was wrong by six.** The native-query leg's comment predicted that
+excluding native queries takes the count 224 → 187; measured, it is 224 → **181**, clearing the
+site floor of 180 **by one**. The margin being one is the argument for that leg existing rather
+than for raising the floor ([[F2-195]]: a baseline lifted from a prediction is worse than none,
+because it looks measured).
+
+⚠ **The harness reported `RESTORE FAILED -- tree left mutated` over a tree `git status` and
+`git diff HEAD` both called clean.** `core.autocrlf=true` means `git checkout HEAD --` writes the
+worktree as **CRLF** ([[F2-309]]) while the edited copy was LF, so a byte comparison of the restore
+fails on line endings alone. The same fact makes a bare-`\n` anchor match **nothing** on the
+restored file — [[F2-212]]'s trap, sixth firing in this programme — so the harness normalises every
+anchor to the target's own endings and compares the restore endings-normalised.
+
+⚠ And [[F2-443]]'s own rule bit once: the `'12:30'` correction was made **after** the fix commit, so
+the harness's `git checkout HEAD --` would have discarded it. Amended into the fix commit before
+re-running.
+
+### ⚙ Three veins measured in the same firing and NOT gated
+
+* **`@Scheduled` / `@EventListener` on a class Spring never instantiates** — never fires, silently,
+  which is [[F2-441]]'s flag-with-no-writer shape at a trigger. **Clean sweep: 34 trigger-bearing
+  files, 0 without a stereotype.**
+* **`@Modifying` with no transaction boundary** — 17 of 18 sites declare no `@Transactional` on the
+  method or the interface, and the vein is **inert**: [[F2-415]] measured 0 of 333 `@Service`
+  classes with a write lacking a class-level `@Transactional`, so every call joins a real
+  read-write transaction; and absent that, Spring Data's fallback is `SimpleJpaRepository`'s
+  class-level `@Transactional(readOnly = true)`, which is still a transaction, and the Microsoft
+  JDBC driver treats `setReadOnly` as an ignorable hint. Adding `@Transactional` to 17 repository
+  methods would be a refactor of working code ([[F2-188]]) — measured and deliberately not made
+  ([[F2-278]]).
+* **`-parameters` absent from the POM** — read as a finding for a moment, and refuted from bytecode:
+  `spring-boot-starter-parent` sets `maven.compiler.parameters` and `MethodParameters` is present.
+  The reliance it creates is the census above.
+
+### ⚙ Filed
+
+* Whether the 45 should carry explicit `@Param` annotations. It is **not** a defect — the flag is
+  asserted and the reliance is now measured — and annotating 45 methods is a refactor of working
+  code. The honest alternative is pinning `<parameters>true</parameters>` in the POM's own compiler
+  block so the reliance does not rest on inheritance; that is a build-configuration decision.
+* The constructor-injection cycle detector, unchanged from [[F2-443]]'s filing.
 ## F2-453 — a compliance-evidence register recorded a policy reference nothing ever resolved
 
 | Field | Value |
