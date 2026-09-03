@@ -87,6 +87,23 @@ class UnboundedBulkWriteContractTest {
     private static final Pattern SQL_STRING = Pattern.compile("'(?:[^']|'')*'");
 
     /**
+     * The tenant column COMPARED to the bound parameter, with an optional table alias.
+     *
+     * <p>Control F earned this pattern. The tenant leg below used to assert that the statement
+     * BINDS {@code :org}, and {@code WHERE :org IS NOT NULL} binds it while narrowing nothing —
+     * so a mutation that deleted every tenant's assignments passed the leg. The mutated code
+     * was genuinely wrong, which makes it a hole rather than an equivalent mutant (F2-206),
+     * and it is this class's own subject arriving inside its own gate: binding a parameter is
+     * not narrowing by it.
+     *
+     * <p>The hard zero can only ever ask whether SOMETHING is bound — that is its honest limit,
+     * and the reason the per-site leg has to ask the stronger question of the one statement
+     * whose narrowing is the whole point.
+     */
+    private static final Pattern NARROWS_BY_TENANT =
+        Pattern.compile("(?:\\w+\\.)?organisation_id\\s*=\\s*:(\\w+)");
+
+    /**
      * One {@code @Modifying} statement and what it binds.
      *
      * @param site        {@code Repository#method}
@@ -244,6 +261,17 @@ class UnboundedBulkWriteContractTest {
             .as("blanking the literal must not blank the binding beside it")
             .containsExactly("id");
 
+        // MUST NOT read as narrowing: binding a parameter is not narrowing by it. This is the
+        // exact statement control F substituted, and the earlier form of the tenant leg passed
+        // over it.
+        assertThat(NARROWS_BY_TENANT.matcher(
+                "DELETE ur FROM iam.user_roles ur WHERE :org IS NOT NULL").find())
+            .as("`WHERE :org IS NOT NULL` binds the parameter and narrows nothing")
+            .isFalse();
+        assertThat(NARROWS_BY_TENANT.matcher(scoped).find())
+            .as("the real statement compares the tenant column to the bound parameter")
+            .isTrue();
+
         // MUST flag / MUST NOT flag, positional half, including the literal trap.
         assertThat(positionalBindings("DELETE FROM t WHERE id = ?1")).containsExactly("?1");
         assertThat(positionalBindings("UPDATE t SET note = 'what?1 is this' WHERE id = 5"))
@@ -263,15 +291,28 @@ class UnboundedBulkWriteContractTest {
                 + "sweep for time-bound role assignments; F2-460 removed the unscoped sibling "
                 + "precisely because this one exists."));
 
-        assertThat(scoped.named())
+        Matcher narrowing = NARROWS_BY_TENANT.matcher(scoped.query());
+        assertThat(narrowing.find())
             .as("""
-                The surviving sweep must narrow by tenant, which is a stronger claim than the
-                hard zero above can make: that leg only asks whether SOMETHING is bound, and this
-                statement deletes IAM role assignments, so which thing is bound is the whole
-                question. `scheduledExpirySweep` loops every organisation and gives each its own
+                The surviving sweep must COMPARE the tenant column to a bound parameter, which is
+                a stronger claim than either the hard zero or a binding check can make. That leg
+                only asks whether SOMETHING is bound, and `WHERE :org IS NOT NULL` binds `org`
+                while narrowing nothing — control F proved exactly that passed the earlier form of
+                this assertion while deleting every tenant's assignments.
+
+                This statement deletes IAM role assignments and `iam.user_roles` rows are
+                HARD-deleted, so which thing is narrowed is the whole question.
+                `scheduledExpirySweep` loops every organisation and gives each its own
                 transaction, audit row and IAM_LEAD notification (F2-322) — all three are wrong
-                for every tenant but one if this stops being per-org.""")
-            .contains("org");
+                for every tenant but one if this stops being per-org.
+
+                Statement:
+                %s""".formatted(oneLine(scoped.query())))
+            .isTrue();
+
+        assertThat(scoped.named())
+            .as("and the parameter it narrows by must be one the method supplies")
+            .contains(narrowing.group(1));
 
         assertThat(all.stream().filter(w -> w.site().startsWith("AccessRequestRepository#expire")))
             .as("there must be exactly one expiry sweep, and it is the scoped one")
