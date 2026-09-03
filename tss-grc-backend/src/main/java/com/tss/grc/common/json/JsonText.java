@@ -64,7 +64,14 @@ public final class JsonText {
         if (s == null) {
             return "";
         }
-        return new String(JsonStringEncoder.getInstance().quoteAsString(s));
+        // ⚠ The local is declared char[] deliberately. F2-430's charset gate FAILS on a
+        //    new String(...) whose first argument's type it cannot resolve rather than skipping
+        //    it (F2-206: unresolved reads identically to clean), and it fired on this line within
+        //    one build. It is also the point worth making to a reader: quoteAsString returns
+        //    char[], so this construction is charset-independent — it is the byte[] overload that
+        //    silently uses the platform default, which on this JDK-17 box is Cp1252.
+        char[] quoted = JsonStringEncoder.getInstance().quoteAsString(s);
+        return new String(quoted);
     }
 
     /**
