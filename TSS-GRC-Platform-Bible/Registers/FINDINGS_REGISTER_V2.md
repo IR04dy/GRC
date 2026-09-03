@@ -15229,6 +15229,163 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-452 — a bean is a singleton, so an instance field is shared by every tenant; four of them let an HTTP health probe write to one without the lock
+
+| Field | Value |
+|---|---|
+| **Id** | F2-452 |
+| **Title** | `isHealthy()` appended to a shared `ArrayList` while its three sibling writers held the monitor, on the default bean, over an ungated route |
+| **Severity** | P3 |
+| **Status** | ✅ CLOSED 2026-09-03 |
+| **Found** | 2026-09-03, by asking of every Spring stereotype *which instance field is a mutable holder, and what guards it* |
+| **Fixed** | `e91384e6`, merged `fix/f2-452-singleton-mutable-state` |
+| **Module** | `module/integrations/{splunk,servicenow,crowdstrike,tenable}` (+ a dead field in `module/privacy`) |
+| **Migration** | none |
+
+### What was wrong
+
+A `@Service`/`@Component`/`@RestController` bean is a **singleton**, so an instance field is shared
+by every concurrent request and therefore by every tenant. Measured from the shipped bytecode:
+**686 singleton beans, 0 unloadable, 15 holding a mutable-holder field** (a `Collection` or a `Map`).
+
+Four of the fifteen were **partially** synchronized. Every integration stub client declares
+
+```java
+private final List<Map<String, Object>> recordedCalls = new ArrayList<>();
+```
+
+and guards it with the instance monitor in every writer **but one**:
+
+```java
+public boolean isHealthy() {                 // ← no modifier
+    recordedCalls.add(Map.of("method", "HEALTH", ...));
+    return true;
+}
+public synchronized void pushEvent(...) { recordedCalls.add(...); }
+public synchronized List<...> getRecordedCalls() { return List.copyOf(recordedCalls); }
+public synchronized void reset() { recordedCalls.clear(); }
+```
+
+`ArrayList.add` is not atomic — it writes the element and then `size` — so two concurrent
+unsynchronized adds can lose an element, leave a null hole, or throw
+`ArrayIndexOutOfBoundsException` from inside `add`. Two concurrent health probes are enough.
+
+🔑 **A health probe reads as a read, and that is why three synchronized writers beside it made it
+look covered** ([[F2-215]]'s two-of-N). It records the probe, so it is a writer.
+
+### Reachable in every profile, not dev-only
+
+⚠⚠ **My first reading called this dev-only and it was wrong, because I measured the wrong callers.**
+`grc.integrations.*.enabled` gates the **service-layer** callers; the **controller calls the client
+directly**:
+
+```java
+@GetMapping("/status")
+public ResponseEntity<?> status() { ... client.isHealthy() ... }   // INTEGRATIONS:READ
+```
+
+and the stub is the **default bean** — `@ConditionalOnProperty(..., matchIfMissing = true)`, with
+`application.yml` setting `mode: STUB`. So the write is reachable by any `INTEGRATIONS:READ` holder
+in any profile that has not explicitly configured a real client.
+
+🔑 **Measure the callers of the thing you are judging, not the callers of the layer above it.**
+
+### Proved live, and what the probe deliberately does not prove
+
+Probed **13/13** as **`so_officer`** — the only persona holding both `INTEGRATIONS:READ` and
+`:WRITE` (`compliance` holds READ only), never `admin`. For each of the four: read
+`GET /stub/recorded-calls`, hit `/status` (or `/health` for ServiceNow), read again. All four go
+`0 → 1` entries with `method=HEALTH`.
+
+⚠ **The race itself is not probed, on purpose.** A lost `ArrayList.add` cannot be reproduced
+deterministically, and **a stress test that passes on a defective tree is worse than no test**
+([[F2-235]]). The deterministic instrument for that half is the gate's per-class `SYNCHRONIZED`
+verdict, which checks the modifier by reflection over bytecode.
+
+### The instrument, and how it refuted its own author
+
+⚠⚠ **I read all fifteen fields, concluded a clean sweep, and this gate's verdict-verification leg
+refuted me on its first run.** It re-derives each declared verdict rather than trusting the reason:
+a `SYNCHRONIZED` claim is checked by asking whether every method touching that field is
+`synchronized`, and all four stubs failed. 🔑 **A gate that verifies verdicts mechanically is worth
+more than fifteen careful readings, because the reading is what produced the wrong answer.**
+Three of my fifteen reasons also failed my own substantiality floor ([[F2-188]]) by reading
+*"as `StubSplunkClient#recordedCalls`"*.
+
+⚠ **The detector's first draft flagged `recordAction`, a false positive.** It is `private` and every
+intra-class caller is `synchronized`, so it is effectively guarded — and a gate that fails on
+correct code trains the next reader to edit the assertion ([[F2-214]]). Narrowed with a **two-pass
+fixed point** over intra-class callers, with the boundary asserted in both directions: a
+**caller-less** private method is *not* guarded by vacuous quantification.
+
+`SingletonMutableStateContractTest` ships as four legs plus four self-tests:
+
+* a **hard zero** — no singleton may reassign a mutable-holder field outside its constructor
+  (`@ConfigurationProperties` setters exempt, because Spring's binder calling the setter *is* the
+  design);
+* an **exactly-asserted census** of the 15, each with a `Verdict` of `CONCURRENT`, `SYNCHRONIZED`,
+  `BUILT_IN_CONSTRUCTOR` or `CONFIG_BOUND` and a substantial reason, enforced both ways;
+* **every verdict that can be verified mechanically is** — the leg above;
+* a bean-population floor, so the census cannot pass over nothing.
+
+It publishes `target/singleton-mutable-state.txt`.
+
+### Two things worth knowing from the census
+
+⚙ `EntityOwnershipRegistry#byType` is [[F2-159]]'s ownership dispatch, so a torn read there would be
+an **authorization** decision — it is `Map.copyOf` in the constructor and safe, and that is the
+reason the census names it rather than eliding it.
+
+⚙ `VendorBcpCampaignService#channelsByType` is the **outlier of the six constructor registries**:
+the other five use `Map.copyOf` or `Collectors.toMap`, and it uses `new HashMap<>()` +
+`putIfAbsent`, so its contents are mutable in principle and unmutated in fact. Not a defect; the
+divergence is worth knowing before somebody adds a writer ([[F2-177]]).
+
+### The second half: a dead field whose comment was false
+
+`DpiaService` carried
+
+```java
+@SuppressWarnings("unused")
+private List<DpiaQuestion> _q;  // keep imports tidy
+```
+
+The import it claims to keep is used by `addQuestion`'s own signature two hundred lines above, so
+the field is dead **and** the comment answers a question a reader was about to ask ([[F2-184]] at its
+smallest). Deleted. ⚠ **Anchor a deletion on the whole member including its annotations** — my first
+anchor omitted the `@SuppressWarnings` line and left it stranded, which failed compilation at
+`DpiaService.java:[330,1] illegal start of type`.
+
+### Refuted or swept clean, recorded so nobody re-runs them ([[F2-216]])
+
+* **`LdapRoleMapper` is dark and honestly so** — the LDAP starter is `<optional>`, the setup guide
+  banner says HISTORIC, and the class's own javadoc says `mapRoles` builds its lookup per call and
+  *"avoids stateful field caching on a singleton"*. Not a finding.
+* ⚠ **`DarkServiceMethodTest`'s `@Service` population must NOT be naively widened** to every
+  stereotype: doing so yields ~1000 unexplained methods, almost all `@RestController` handlers the
+  container invokes reflectively. Filed rather than done.
+* **Soft-delete vein clean** — 106 sites across 81 files, no site setting `is_deleted` without also
+  going through the platform's own delete path.
+* **Bow-tie `archive()` clean.**
+
+### Verification
+
+* Gate **8/8**; affected suite **39/39**.
+* Live probe **13/13** as `so_officer`.
+* **6/6 controls fire**, post-restore green. ⚠ Control F first SURVIVED for [[F2-295]]'s vacuity
+  reason (a substantiality floor cannot fail on a corpus that satisfies it) and was closed with a
+  synthetic self-test; **control G was withdrawn as an EQUIVALENT mutant** — on a corpus where
+  nothing fails to load, no assertion can tell a working unloadable-count from a dead one
+  ([[F2-206]]), so it is recorded in the gate as a guard whose tripwire is in the future.
+* Full build **5167/0/0**, predicted exactly.
+
+### Filed
+
+* **`recordedCalls` grows without bound** — `reset()` has no production caller, so a long-lived
+  stub accumulates one entry per health probe for ever. Bounded in practice (the stubs exist for
+  demos and tests), and capping it is a product decision about what the diagnostic route promises.
+* The `DarkServiceMethodTest` widening above.
+
 ## F2-451 — a capped fetch is fine to render from and wrong to count, and on a regulator submission the count is the half a machine reads
 
 | Field | Value |
