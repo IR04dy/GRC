@@ -93,9 +93,7 @@ public class RiskAppetiteController {
     @PreAuthorize("hasPermission('RISK','WRITE')")
     @Operation(summary = "Update current exposure. Auto-generates appetite breach event if exposure exceeds tolerance band.")
     public RiskAppetiteStatement updateExposure(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        BigDecimal value = body.get("value") instanceof Number n
-            ? new BigDecimal(n.toString())
-            : new BigDecimal(body.get("value").toString());
+        BigDecimal value = requiredDecimal(body, "value");
         String notes = body.get("notes") != null ? body.get("notes").toString() : null;
         return appetiteService.updateExposure(id, value, notes);
     }
@@ -119,5 +117,43 @@ public class RiskAppetiteController {
         + "appetite statement (worst residual per category) and escalate any breach via F8.")
     public RiskAppetiteService.ExposureRecompute recomputeAppetiteExposure() {
         return appetiteService.recomputeExposureFromRegister();
+    }
+
+    /**
+     * F2-447 — a REQUIRED numeric read from a raw {@code Map} body, refused with a 400 that
+     * NAMES the field.
+     *
+     * <p>This route was {@code body.get("value") instanceof Number n ? new BigDecimal(n.toString())
+     * : new BigDecimal(body.get("value").toString())}, and the {@code instanceof} is exactly what
+     * made it read as guarded: ⚠ <b>{@code x instanceof T} IS a null check — for the THEN
+     * branch</b>, so the ELSE branch dereferenced null and a body omitting {@code value} answered
+     * an opaque 500 (in prod SEC-CFG-001 strips the class) on a route that raises a CRO/board
+     * appetite-breach escalation. F2-431 filed it; F2-447 widened the sweep from controllers to all
+     * of {@code src/main/java} and it is the only member of 29.
+     *
+     * <p>⚠ A {@code @NotNull} DTO is deliberately NOT the fix. {@code @Valid} fires BEFORE
+     * {@code @PreAuthorize}, so a bean-validated field would 400 an unauthorized caller before the
+     * 403 — a recorded landmine, and the reason these routes bind a raw {@code Map} at all
+     * (F2-394's remedy: a manual check after the guard).
+     *
+     * <p>⚙ Neither branch can break a request that works today: an absent key was a 500 and is
+     * now a 400, and a non-numeric value was already a 400 whose message named no field
+     * ({@code NumberFormatException} is an {@code IllegalArgumentException}) and now names it.
+     * Deliberately no {@code trim()}: {@code " 12 "} fails today, and making it succeed would be a
+     * behaviour change rather than a diagnostic one.
+     */
+    private static BigDecimal requiredDecimal(Map<String, Object> body, String key) {
+        Object raw = body == null ? null : body.get(key);
+        if (raw == null) {
+            throw new IllegalArgumentException(key + " is required");
+        }
+        if (raw instanceof Number n) {
+            return new BigDecimal(n.toString());
+        }
+        try {
+            return new BigDecimal(raw.toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(key + " must be a number");
+        }
     }
 }
