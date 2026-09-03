@@ -9,8 +9,21 @@ import java.time.LocalDateTime;
 /**
  * Per-user attestation of having read + accepted a policy.
  *
- * <p>Status: PENDING → ATTESTED | DECLINED. EXPIRED applies when the
- * underlying policy version is superseded.
+ * <p>Status: PENDING → ATTESTED | DECLINED.
+ *
+ * <p>⚠ This said "EXPIRED applies when the underlying policy version is superseded", and that
+ * lifecycle does not exist. {@code EXPIRED} is in the attestation vocabulary and
+ * {@code PolicyManagementService}'s attestation summary counts it, but <b>no code path ever
+ * writes it</b> — measured across the tree, and 0 rows sit at EXPIRED in either the dev or the
+ * deployed database. So an attestation of a superseded policy version still reads as current,
+ * and the "expired" figure on the summary is permanently zero. Building the supersede pass is a
+ * feature rather than a bug fix, so it is filed rather than smuggled in; the point of correcting
+ * the sentence is that it answered the question a reader was about to ask (F2-184).
+ *
+ * <p>{@code policyVersion} is a COPY of the resolved document's own {@code version} —
+ * {@code policy.documents} holds one row per version, so {@code policyId} already identifies
+ * one. It is derived on the create path and is not the caller's to choose (F2-453). Nothing
+ * reads it today, which is exactly why the claim above went unnoticed.
  */
 @Entity
 @Table(schema = "policy", name = "attestations")
