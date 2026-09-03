@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.approval_chains.controller;
 
+import java.util.Locale;
 import com.tss.grc.module.workflow.approval_chains.dto.ApprovalChainDtos.InstanceActionRequest;
 import com.tss.grc.module.workflow.approval_chains.dto.ApprovalChainDtos.InstanceResponse;
 import com.tss.grc.module.workflow.approval_chains.dto.ApprovalChainDtos.InstanceStartRequest;
@@ -182,10 +183,38 @@ public class ApprovalChainController {
             userId = details.getUserId();
         }
         if (auth != null) {
+            // F2-450 — ROLE_-prefixed authorities ONLY, and upper-cased once here.
+            //
+            // ⚠⚠ This used to read
+            //     roles.add(name.startsWith("ROLE_") ? name.substring(5) : name)
+            // which KEPT every non-prefixed authority — and the retired expression is
+            // quoted here in FULL, closing paren included, deliberately: the gate's
+            // detector matches that shape, so this comment is exactly what makes its
+            // comment-stripping load-bearing rather than decorative. Quoted without the
+            // paren, the control that disables the stripping SURVIVED (F2-193/F2-206).
+            // CustomUserDetailsService grants
+            // ROLE_<roleName> for each role AND each permission name verbatim, so this set also
+            // carried all 144 permission strings (ADMIN_APPROVE, AI_WRITE, BCM_EXPORT, …) — and
+            // it is the input to ApprovalChainInstanceService#matchesActor, i.e. to WHO MAY SIGN
+            // AN APPROVAL STEP. A step's required_role is free text a tenant admin types, and
+            // permission names look exactly like the role names this platform already ships
+            // (DLP_INGEST, SANCTIONS_CHECK), so a step configured to require one would have been
+            // satisfied by every holder of that permission.
+            //
+            // KEY: three other sites strip ROLE_ and all three FILTER on the prefix first —
+            // NdiAuditService#firstRole, SignatureService, and WorkflowRequestService in a SIBLING
+            // SERVICE OF THIS MODULE — so the correct idiom was present three times over and the
+            // one outlier was the one feeding an authorisation decision.
+            //
+            // ⚠ The upper-casing is the second half: matchesActor's parameter is named
+            // rolesUpper and only ONE of its two callers used to supply one — pendingForUser
+            // built it, recordAction passed this set raw. Normalising here means the inbox and
+            // the action path can no longer disagree about a lower-case role name, where the
+            // asymmetry was a step listed as pending that the same principal is then refused.
             for (GrantedAuthority a : auth.getAuthorities()) {
                 String name = a.getAuthority();
-                if (name != null) {
-                    roles.add(name.startsWith("ROLE_") ? name.substring(5) : name);
+                if (name != null && name.startsWith("ROLE_")) {
+                    roles.add(name.substring("ROLE_".length()).toUpperCase(Locale.ROOT));
                 }
             }
         }
