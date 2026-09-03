@@ -12,6 +12,7 @@ import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
 import com.tss.grc.common.exception.ExportException;
+import com.tss.grc.common.export.ExportTruncation;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.repository.ControlRepository;
@@ -30,6 +31,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,7 +77,15 @@ public class RegulatorPackageService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RegulatorPackageService.class);
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_ROWS   = 5000;   // per data sheet
-    private static final int MAX_AUDIT  = 1000;   // audit-trail entries
+    // F2-451: AuditLogService.list does Math.min(size, 200), so asking for more is
+    // SILENTLY refused -- this constant read 1000 and 200 arrived, overstating the
+    // package's audit coverage by 5x to every reader of this file (F2-184's shape at a
+    // constant: it answers the question a reader was about to ask). It is also how the
+    // first draft of this very finding came to claim a 12x under-report when the measured
+    // figure is 62x -- the constant was read instead of the wire, and the live probe is
+    // what refuted it. Raising the coverage means raising that shared clamp, which every
+    // caller of the audit-log API inherits: an owner decision, filed rather than taken.
+    private static final int MAX_AUDIT  = 200;    // the effective cap, clamped by AuditLogService.list
     /** Total embedded evidence-binary budget — guards against OOM buffering the ZIP in memory. */
     private static final long MAX_EVIDENCE_TOTAL_BYTES = 200L * 1024 * 1024;
 
@@ -99,9 +109,17 @@ public class RegulatorPackageService {
         LocalDateTime now = LocalDateTime.now();
 
         // ── gather data (org-scoped) ────────────────────────────────────────
-        List<Control> controls = controlRepo.findByOrganisationId(org, PageRequest.of(0, MAX_ROWS)).getContent();
-        List<EvidenceItem> evidence = evidenceRepo.findByOrganisationId(org, PageRequest.of(0, MAX_ROWS)).getContent();
-        List<AuditLogEntry> audit = auditLogService.list(null, null, null, 0, MAX_AUDIT).getContent();
+        // F2-451: keep the Page. getTotalElements() is the org-scoped total of the SAME query
+        // the capped getContent() came from, so the two can never disagree about scope — and
+        // the manifest's "counts" key means the register's size, not the size of the window
+        // this method fetched. Measured 2026-09-03: the audit cap published 1,000 against
+        // 12,470 rows in dev and 5,133 in prod, both for organisation 1.
+        Page<Control> controlPage = controlRepo.findByOrganisationId(org, PageRequest.of(0, MAX_ROWS));
+        Page<EvidenceItem> evidencePage = evidenceRepo.findByOrganisationId(org, PageRequest.of(0, MAX_ROWS));
+        Page<AuditLogEntry> auditPage = auditLogService.list(null, null, null, 0, MAX_AUDIT);
+        List<Control> controls = controlPage.getContent();
+        List<EvidenceItem> evidence = evidencePage.getContent();
+        List<AuditLogEntry> audit = auditPage.getContent();
 
         // ── build files ─────────────────────────────────────────────────────
         byte[] mapping = writeXlsx(brandColor, "Requirement Mapping",
@@ -136,7 +154,10 @@ public class RegulatorPackageService {
             });
 
         byte[] readme = readmePdf(orgName, o == null ? null : o.getNameAr(), brand, brandColor, now,
-            generatedByName, controls.size(), evidence.size(), audit.size());
+            generatedByName,
+            controls.size(), controlPage.getTotalElements(),
+            evidence.size(), evidencePage.getTotalElements(),
+            audit.size(), auditPage.getTotalElements());
 
         // ── collect core files + the actual evidence-file binaries ──────────
         List<String> names = new ArrayList<>(List.of(
@@ -146,7 +167,9 @@ public class RegulatorPackageService {
 
         // ── assemble ZIP (manifest last — it checksums every other entry) ───
         String manifest = manifestJson(org, orgName, now, generatedByName,
-            controls.size(), evidence.size(), audit.size(),
+            controls.size(), controlPage.getTotalElements(),
+            evidence.size(), evidencePage.getTotalElements(),
+            audit.size(), auditPage.getTotalElements(),
             names.toArray(new String[0]), blobs.toArray(new byte[0][]));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -204,7 +227,9 @@ public class RegulatorPackageService {
 
     private byte[] readmePdf(String orgEn, String orgAr, BrandThemeService.ResolvedBrand brand,
                              Color brandColor, LocalDateTime now, String generatedBy,
-                             int controls, int evidence, int auditEntries) {
+                             int controls, long controlTotal,
+                             int evidence, long evidenceTotal,
+                             int auditEntries, long auditTotal) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         Document doc = new Document(PageSize.A4, 48, 48, 60, 60);
         try {
@@ -226,10 +251,21 @@ public class RegulatorPackageService {
             cv.generatedAt = now;
             PdfTheme.coverHero(doc, cv);
 
+            // F2-451: the subtitle discloses the truncation where there is one, BESIDE the
+            // figure rather than in a metadata row elsewhere on the page. Every tile on this
+            // strip counts the rows the package CONTAINS, so a subtitle reading "Trail
+            // entries" next to a windowed figure is the claim that was wrong, not the figure.
+            // It was: new PdfTheme.Kpi("Audit", String.valueOf(auditEntries), "Trail entries")
+            // -- quoted in full, closing paren included, because the gate that forbids a bare
+            // subtitle strips comments before scanning, and F2-450 recorded a control SURVIVING
+            // because its quotation stopped one character short of what the detector matches.
             PdfTheme.kpiStrip(doc, List.of(
-                new PdfTheme.Kpi("Controls", String.valueOf(controls), "Requirement mapping"),
-                new PdfTheme.Kpi("Evidence", String.valueOf(evidence), "Indexed artifacts"),
-                new PdfTheme.Kpi("Audit", String.valueOf(auditEntries), "Trail entries")
+                new PdfTheme.Kpi("Controls", String.valueOf(controls),
+                    ExportTruncation.hint(controls, controlTotal, false, "Requirement mapping")),
+                new PdfTheme.Kpi("Evidence", String.valueOf(evidence),
+                    ExportTruncation.hint(evidence, evidenceTotal, false, "Indexed artifacts")),
+                new PdfTheme.Kpi("Audit", String.valueOf(auditEntries),
+                    ExportTruncation.hint(auditEntries, auditTotal, false, "Trail entries"))
             ));
 
             var meta = PdfTheme.metadataGrid();
@@ -247,6 +283,17 @@ public class RegulatorPackageService {
             doc.add(new Paragraph("Audit_Trail.xlsx — recent audit-log activity (who / what / when).", PdfFonts.body(11)));
             doc.add(new Paragraph("manifest.json — SHA-256 checksum of every file above (incl. each evidence binary).", PdfFonts.body(11)));
 
+            // F2-451: name what the package does NOT contain. The contents list above already
+            // called the audit sheet "recent" — honest about the sheet, and silent about how
+            // much was withheld — and a silent truncation on a regulator submission closes a
+            // question an explicit one would raise (F2-197).
+            String shortfall = coverageNote(controls, controlTotal, evidence, evidenceTotal,
+                auditEntries, auditTotal);
+            if (!shortfall.isEmpty()) {
+                doc.add(new Paragraph(" ", PdfFonts.body(11)));
+                doc.add(new Paragraph(shortfall, PdfFonts.body(11)));
+            }
+
             doc.close();
             writer.close();
         } catch (DocumentException e) {
@@ -257,8 +304,37 @@ public class RegulatorPackageService {
 
     // ── manifest.json ────────────────────────────────────────────────────────
 
+    /**
+     * F2-451 — the one sentence that says what the package left out. Empty when every sheet
+     * holds its whole register, so a complete package gains no noise.
+     */
+    private static String coverageNote(int controls, long controlTotal,
+                                      int evidence, long evidenceTotal,
+                                      int auditEntries, long auditTotal) {
+        List<String> parts = new ArrayList<>();
+        if (ExportTruncation.isTruncated(controls, controlTotal)) {
+            parts.add("Requirement_Mapping.xlsx "
+                + ExportTruncation.note(controls, controlTotal, false));
+        }
+        if (ExportTruncation.isTruncated(evidence, evidenceTotal)) {
+            parts.add("Evidence_Index.xlsx "
+                + ExportTruncation.note(evidence, evidenceTotal, false));
+        }
+        if (ExportTruncation.isTruncated(auditEntries, auditTotal)) {
+            parts.add("Audit_Trail.xlsx "
+                + ExportTruncation.note(auditEntries, auditTotal, false));
+        }
+        if (parts.isEmpty()) {
+            return "";
+        }
+        return "Truncated for size — " + String.join("; ", parts)
+            + ". manifest.json carries the register totals under \"counts\".";
+    }
+
     private static String manifestJson(Long orgId, String orgName, LocalDateTime now, String generatedBy,
-                                       int controls, int evidence, int auditEntries,
+                                       int controls, long controlTotal,
+                                       int evidence, long evidenceTotal,
+                                       int auditEntries, long auditTotal,
                                        String[] names, byte[][] blobs) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
@@ -267,9 +343,22 @@ public class RegulatorPackageService {
         sb.append("  \"organisation\": \"").append(esc(orgName)).append("\",\n");
         sb.append("  \"generatedAtUtc\": \"").append(now.format(TS)).append("\",\n");
         sb.append("  \"generatedBy\": \"").append(esc(generatedBy)).append("\",\n");
-        sb.append("  \"counts\": { \"controls\": ").append(controls)
+        // F2-451: "counts" means the REGISTER's size — the key's own name — and
+        // "includedRows" means what the sheets in this ZIP hold. Publishing the capped page
+        // size under "counts" read 1,000 against an audit log of 12,470 rows, in the
+        // machine-readable half of a document a regulator's tooling parses. JSON can carry
+        // both, so it carries both, and "truncated" saves a consumer the subtraction.
+        sb.append("  \"counts\": { \"controls\": ").append(controlTotal)
+          .append(", \"evidenceItems\": ").append(evidenceTotal)
+          .append(", \"auditEntries\": ").append(auditTotal).append(" },\n");
+        sb.append("  \"includedRows\": { \"controls\": ").append(controls)
           .append(", \"evidenceItems\": ").append(evidence)
           .append(", \"auditEntries\": ").append(auditEntries).append(" },\n");
+        sb.append("  \"truncated\": ")
+          .append(ExportTruncation.isTruncated(controls, controlTotal)
+               || ExportTruncation.isTruncated(evidence, evidenceTotal)
+               || ExportTruncation.isTruncated(auditEntries, auditTotal))
+          .append(",\n");
         sb.append("  \"files\": [\n");
         for (int i = 0; i < names.length; i++) {
             sb.append("    { \"name\": \"").append(esc(names[i]))
