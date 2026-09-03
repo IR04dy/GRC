@@ -2,6 +2,7 @@ package com.tss.grc.module.policy.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.compliance.entity.Control;
@@ -776,6 +777,111 @@ class PolicyManagementServiceTest {
             .as("riskLevel stays a real default: the form offers it, and ck_policy_exc_risk already "
                 + "narrows it, so it is data entry rather than a decision")
             .isEqualTo("MEDIUM");
+    }
+
+    // ─── F2-453: createAttestation must RESOLVE the policy it records ──────────────────────
+    //
+    // This method had no test of any kind, which is not the same as a path somebody decided was
+    // safe (F2-248). F2-219 hardened its status and completion stamps and left the reference
+    // itself unresolved.
+
+    /** An org-1-owned document at a known version, for the legs below. */
+    private static PolicyDocument doc(Long id, String code, String version) {
+        PolicyDocument d = new PolicyDocument();
+        d.setId(id);
+        d.setOrganisationId(ORG_ID);
+        d.setPolicyCode(code);
+        d.setVersion(version);
+        return d;
+    }
+
+    private static PolicyAttestation assignment(Long policyId, String username, String version) {
+        PolicyAttestation a = new PolicyAttestation();
+        a.setPolicyId(policyId);
+        a.setUserUsername(username);
+        a.setPolicyVersion(version);
+        return a;
+    }
+
+    @Test
+    void createAttestation_refusesAPolicyThisTenantDoesNotOwn() {
+        // The finder is tenant-scoped, so "another tenant's policy" and "no such policy" are the
+        // same empty Optional here — which is the point: the reference is verified where it is
+        // stored, not by whoever dereferences it later.
+        when(docs.findByIdAndOrganisationId(999999L, ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createAttestation(assignment(999999L, "carol", null)))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Policy not found");
+
+        // Nothing may reach the register. Before F2-453 this saved a row naming a policy that
+        // exists nowhere, and answered 200.
+        verify(attestations, never()).save(any());
+    }
+
+    @Test
+    void createAttestation_derivesThePolicyVersionFromTheResolvedDocument() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(doc(1L, "POL-IS-001", "2.1")));
+        when(attestations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyAttestation out = service.createAttestation(assignment(1L, "carol", null));
+
+        assertThat(out.getPolicyVersion())
+            .as("policy.documents is one row per version, so the version is a copy of the "
+                + "resolved document's own field and is derived rather than accepted")
+            .isEqualTo("2.1");
+        assertThat(out.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void createAttestation_acceptsAnEchoAndStoresTheDocumentsOwnSpelling() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(doc(1L, "POL-IS-001", "2.1")));
+        when(attestations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Whitespace and case must not make an echo look like a contradiction: the column
+        // collates case-insensitively, so refusing here would reject a value the database itself
+        // treats as equal (F2-179).
+        PolicyAttestation out = service.createAttestation(assignment(1L, "carol", "  2.1  "));
+
+        assertThat(out.getPolicyVersion())
+            .as("the DOCUMENT's spelling is stored, never the caller's, or the register's version "
+                + "string would depend on how a caller happened to type it")
+            .isEqualTo("2.1");
+    }
+
+    @Test
+    void createAttestation_refusesAVersionThePolicyNeverHad() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(doc(1L, "POL-IS-001", "2.1")));
+
+        assertThatThrownBy(() -> service.createAttestation(assignment(1L, "carol", "9.9-FORGED")))
+            .isInstanceOf(IllegalArgumentException.class)
+            // The refusal must name both versions and the policy, or it sends the caller nowhere
+            // (F2-180): a diagnostic that does not say what it expected is worse than a vague one.
+            .hasMessageContaining("9.9-FORGED")
+            .hasMessageContaining("POL-IS-001")
+            .hasMessageContaining("2.1");
+
+        verify(attestations, never()).save(any());
+    }
+
+    @Test
+    void createAttestation_auditRowNamesThePolicyRatherThanItsId() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(doc(1L, "POL-IS-001", "2.1")));
+        when(attestations.save(any())).thenAnswer(inv -> {
+            PolicyAttestation a = inv.getArgument(0);
+            a.setId(4242L);
+            return a;
+        });
+
+        service.createAttestation(assignment(1L, "carol", null));
+
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(eq("CREATE"), eq("PolicyAttestation"), eq(4242L), msg.capture());
+        assertThat(msg.getValue())
+            .as("the trail said \"on policy 1\", an id an auditor cannot resolve")
+            .contains("carol")
+            .contains("POL-IS-001")
+            .contains("2.1");
     }
 
     private static Control ctl(Long id, String code, String nameEn, String nameAr, String framework) {

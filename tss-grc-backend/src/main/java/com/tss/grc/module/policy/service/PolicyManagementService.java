@@ -914,9 +914,51 @@ public class PolicyManagementService {
         body.setAttestedAt(null);
         body.setDeclinedAt(null);
         body.setDeclinedReason(null);
+        // ⚠⚠ F2-453 — the two lines above this method used to be the WHOLE of its validation:
+        // policyId was null-checked and then stored unresolved. There is no FOREIGN KEY on
+        // policy.attestations.policy_id (checked in sys.foreign_keys, not assumed), so nothing
+        // downstream refused it either. Probed live as `ranalyst`, who holds COMPLIANCE:READ and
+        // nothing else — 32 roles hold it — every one of these answered 200 and stored the row:
+        // a policyId of 999999 that exists nowhere, another tenant's policy, and `policyVersion:
+        // "9.9-FORGED"` on a document whose only version is 2.1. This register is the evidence
+        // that a named individual acknowledged a named policy, and this method is its SINGLE
+        // writer (grep: no other code constructs a PolicyAttestation).
+        //
+        // Resolve through get(), which is the module's one tenant-scoped policy resolver, so the
+        // reference is verified where it is STORED rather than by whoever dereferences it later
+        // (F2-242's discriminator). attest(), five lines below, has always resolved its own row
+        // this way — the mechanism was adjacent the whole time (F2-215).
+        PolicyDocument attestedDoc = get(body.getPolicyId());
+        // policy.documents is ONE ROW PER VERSION — measured 41 live rows and 41 distinct
+        // (policy_code, version) pairs — so policyId already identifies a specific version and
+        // policy_version is a pure COPY of that row's own field. Derive it rather than accept it
+        // beside the id (F2-245): a copy travelling next to a reference can describe a different
+        // row than the reference names, and here it named versions that never existed.
+        //
+        // An ECHO of the true version is accepted and a CONTRADICTION refused, which is the house
+        // pattern for a derived identity copy (F2-252, F2-277): a client that round-trips the
+        // record keeps working, and one relinking by version is told rather than silently
+        // corrected. Compared case- and whitespace-insensitively because the column collates
+        // case-insensitively, so an exact-match refusal would reject a value the database itself
+        // treats as equal (F2-179).
+        String requestedVersion = body.getPolicyVersion() == null ? "" : body.getPolicyVersion().trim();
+        String actualVersion    = nullSafeStr(attestedDoc.getVersion()).trim();
+        if (!requestedVersion.isEmpty() && !requestedVersion.equalsIgnoreCase(actualVersion)) {
+            throw new IllegalArgumentException(
+                "policyVersion " + requestedVersion + " is not the version of policy "
+                + attestedDoc.getPolicyCode() + " (id " + attestedDoc.getId() + "), which is "
+                + actualVersion + ". Omit policyVersion and the server records the version in "
+                + "force, or attest against the policy id that carries the version you mean.");
+        }
+        body.setPolicyVersion(attestedDoc.getVersion());
         PolicyAttestation saved = attestations.save(body);
+        // Name the policy the trail is about. This read "on policy 1", an id an auditor cannot
+        // resolve, and the code and version were unavailable to say more until this method
+        // resolved the document.
         audit.log("CREATE", "PolicyAttestation", saved.getId(),
-            "Attestation assigned to " + nullSafe(saved.getUserUsername()) + " on policy " + saved.getPolicyId());
+            "Attestation assigned to " + nullSafe(saved.getUserUsername()) + " on policy "
+            + attestedDoc.getPolicyCode() + " v" + nullSafeStr(saved.getPolicyVersion())
+            + " (id " + saved.getPolicyId() + ")");
         emitAttestation("POLICY_ATTESTATION_ASSIGNED", saved, null);
         return saved;
     }

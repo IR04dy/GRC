@@ -54,19 +54,22 @@ DB_PASSWORD=REPLACE-ME-DB-PASSWORD
 # that already exist, and the startup dies part-way with the schema half-applied.
 #
 # This template read a flat `292` for months. That was correct for the 2026-07-11
-# backup and is wrong for any backup taken since: the tree is at V398, so a
-# database copied today needs 398. A dev-sourced backup carries NO
+# backup and is wrong for any backup taken since: the tree is at V399, so a
+# database copied today needs 399. A dev-sourced backup carries NO
 # flyway_schema_history at all (dev applies migrations by hand with Flyway off),
 # so there is nothing in the database to correct a wrong value here.
 #
-# Verified 2026-09-03 by restoring a V398 backup and booting this jar against it:
+# The mechanism was verified end to end on 2026-09-03, at the head of that day:
+# a V398 backup restored to a scratch database with this value set to 398 logged
 # "Successfully baselined schema with version: 398", then "Schema [platform] is
-# up to date. No migration necessary.", and zero "Migrating schema" lines.
+# up to date. No migration necessary.", and zero "Migrating schema" lines. What
+# was verified is the RULE -- baseline at the head the backup carries -- so the
+# number above tracks the tree while that observation stays at 398.
 #
 # After the first boot, confirm with /actuator/info -- packagedHead, appliedHead
 # and an empty `pending` list are the check that this value was right.
 FLYWAY_BASELINE_ON_MIGRATE=true
-FLYWAY_BASELINE_VERSION=398
+FLYWAY_BASELINE_VERSION=399
 
 # ── HTTP (behind the nginx reverse proxy) ───────────────────────────────────
 # nginx terminates on :80 and proxies to the backend on loopback:8084.
