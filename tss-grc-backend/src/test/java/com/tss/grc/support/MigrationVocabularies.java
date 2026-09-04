@@ -159,7 +159,12 @@ public final class MigrationVocabularies {
      */
     private record Declaration(String constraint, String table, String body) {}
 
-    private static List<Path> migrationFiles() {
+    /**
+     * Package-private since F2-461: the platform's one list of migration files, and that
+     * gate is its second reader. A second walk would be free to disagree about which files
+     * are migrations, which is the shape of the finding it was written for (F2-190).
+     */
+    public static List<Path> migrationFiles() {
         try (Stream<Path> walk = Files.list(MIGRATIONS)) {
             return walk.filter(p -> p.getFileName().toString().endsWith(".sql"))
                 .sorted(Comparator.comparingInt(MigrationVocabularies::version))
@@ -539,7 +544,7 @@ public final class MigrationVocabularies {
     }
 
     /** Blank every comment, preserving newlines so line structure survives (F2-242). */
-    static String stripComments(String src) {
+    public static String stripComments(String src) {
         Matcher m = COMMENT.matcher(src);
         StringBuilder out = new StringBuilder();
         while (m.find()) {
@@ -550,7 +555,12 @@ public final class MigrationVocabularies {
         return out.toString();
     }
 
-    private static String read(Path f) {
+    /**
+     * Package-private since F2-461. Shared for the same reason as the walk: this normalises
+     * CRLF to LF, and a second reader that did not would give a comment-stripping scan a
+     * different answer about where a line ends.
+     */
+    public static String read(Path f) {
         try {
             return Files.readString(f).replace("\r\n", "\n");
         } catch (IOException e) {
