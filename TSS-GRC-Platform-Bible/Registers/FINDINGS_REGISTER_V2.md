@@ -15229,6 +15229,183 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-461 — the chain states "no `WITH NOCHECK`" eighteen times and left two constraints untrusted
+
+| Field | Value |
+|---|---|
+| **Id** | F2-461 |
+| **Title** | `V265` is the only `WITH NOCHECK` in the whole 388-migration chain, and the two constraints it added on `cyber.cyber_evidence` have been enabled-but-**unverified** in both live databases ever since — indistinguishable from verified ones in every listing that checks only the name |
+| **Severity** | P3 (latent — 12 rows in each database, all in-vocabulary with canonical casing and no dangling reference, so the re-verification had nothing to refuse; what was wrong is that nothing had ever asked) |
+| **Status** | ✅ CLOSED 2026-09-04 |
+| **Found** | 2026-09-04, asking who owns a rule that eighteen migrations each state and each gate over their own constraints only |
+| **Fixed** | `39854ea9` + `365514c4`, merged `fix/f2-461-untrusted-constraints` |
+| **Module** | `cyber` (the data), platform-wide (the rule) |
+| **Migration** | **V400** — `ALTER TABLE … WITH CHECK CHECK CONSTRAINT` on both, in place |
+
+### What `WITH NOCHECK` leaves behind
+
+```sql
+ALTER TABLE cyber.cyber_evidence WITH NOCHECK
+    ADD CONSTRAINT ck_cyber_evidence_status CHECK (status IN (…));
+```
+
+The constraint is **created and ENABLED** — every subsequent write is checked — and the rows
+already in the table are **never validated against it**. SQL Server records that as
+`sys.check_constraints.is_not_trusted = 1`, and *nothing else*: the constraint appears in
+`INFORMATION_SCHEMA`, in `sp_help`, in any migration self-check that asks whether it exists, and in
+any listing that reads `name` and `is_disabled`. 🔑 **An untrusted constraint and a verified one
+differ in exactly one column that nobody reads, so "the constraint is there" is a weaker statement
+than every artefact in this chain treats it as.**
+
+Measured (2026-09-04, read-only, both databases):
+
+| | dev `TSS_GRC` | prod `TSS_GRC_Deployment` |
+|---|---|---|
+| `ck_cyber_evidence_status` | `is_disabled=0`, `is_not_trusted=1` | `is_disabled=0`, `is_not_trusted=1` |
+| `FK_cyber_evidence_control` | `is_disabled=0`, `is_not_trusted=1` | `is_disabled=0`, `is_not_trusted=1` |
+| every other constraint | 0 of 445 CHECKs, 0 of 186 FKs | 0 of 398 CHECKs, 0 of 181 FKs |
+
+So the two are **the entire population in both databases**, and V265 is the only file in the chain
+that could have produced them.
+
+### The rule is stated eighteen times and gated by nobody
+
+Measured over all 388 migrations, comment-stripped and with SQL string literals blanked:
+
+- **19 mention `NOCHECK`**
+- **11** state the rule in a comment — *"No `WITH NOCHECK` anywhere; SQL Server verifies the rows"*
+- **7** state it inside a `THROW` message, so an operator reads it at failure time (V364, V365,
+  V375, V392, V393, V394, and V400 itself)
+- **1 does it** — V265
+
+Several of the eighteen carry a `THROW` self-check asserting `is_not_trusted = 0`. **Every one of
+those is scoped to the constraints that migration itself creates.**
+
+🔑🔑 **So the rule was written down eighteen times, enforced per-migration every time, and the
+population that matters — every constraint in the live catalogue — belonged to nobody.** That is
+[[F2-198]]'s shape at a migration's own scope: the invariant is real, and its POPULATION is *the
+objects this file happens to create*. And [[F2-215]]'s two-of-N at eighteen: a reader who finds the
+discipline stated this often, with self-checks, has no reason to ask whether anything checks the
+catalogue.
+
+⚠ **V265's own comment says why it did it** — *"existing rows that predate CY-H are
+grandfathered"* — which was true when it was written and is **no longer true**. That sentence is
+the reason nobody re-read it: it explains the choice, so the choice reads as considered rather than
+as outstanding.
+
+### Why the fix is a re-verification and not a drop-and-re-add
+
+`ALTER TABLE t WITH CHECK CHECK CONSTRAINT c` validates the rows already present and clears
+`is_not_trusted` **in place**. It drops nothing, adds nothing and widens nothing, so:
+
+- there is no window in which the table is unconstrained;
+- the constraint's definition, name and `object_id` are unchanged, so **no later migration's
+  self-check and no Flyway checksum is affected**;
+- if any row failed, the statement fails and the migration `THROW`s — the safe direction.
+
+⚠ **V265 itself may never be edited.** Flyway stores a checksum, so a changed V265 fails validation
+on the deployed server and blocks every later migration. That is precisely why it stays a **named
+exemption** in the gate rather than being repaired at source.
+
+⚠ **Measured before writing it** ([[F2-183]]): 12 evidence rows in each database, statuses
+`CURRENT=8 / STALE=4` against a six-token vocabulary
+(`SUPERSEDED | ARCHIVED | EXPIRED | STALE | PENDING | CURRENT`), **0 non-canonical casing, 0
+dangling `control_id`**. So the re-verification is provably a no-op on the data and the only thing
+it changes is the flag.
+
+⚠⚠ **My own verification script reported "8 of 12 rows outside the vocabulary" and it was a
+guessed vocabulary** — I had written `('PENDING','APPROVED','REJECTED','STALE')`, and `APPROVED`
+and `REJECTED` are not in this constraint at all. 🔑 **The refutation was structural rather than a
+re-count: dev's constraint is TRUSTED after V400, and SQL Server will not clear `is_not_trusted`
+unless every row passes — so the rows were provably fine and the list was wrong.** Read the real
+definition out of `sys.check_constraints.definition`; a guessed vocabulary produces a
+fully-formed, entirely false finding.
+
+### V400's self-checks
+
+Five, every one a `THROW` (51400):
+
+0. **V265 must have run.** Re-verifying a constraint that does not exist yet is a no-op that reads
+   like success, so the file refuses outright rather than passing vacuously.
+1. Two **pre-flights that NAME the offending rows** (`STRING_AGG` of ids and values) before either
+   `ALTER`. A bare *"the ALTER TABLE statement conflicted with the CHECK constraint"* sends the
+   next reader nowhere, and a failing migration blocks every later one — the house pattern since
+   V399.
+2. Both constraints must end `is_disabled = 0 AND is_not_trusted = 0`. ⚠ **Both halves**, because
+   a disabled constraint and an untrusted one are different failures with the same appearance.
+3. **Platform-wide**: no CHECK and no FOREIGN KEY anywhere may be left disabled or untrusted. That
+   is the assertion the eighteen per-migration self-checks could not make, and it is what makes
+   V400 the file that closes the rule rather than one more file that states it.
+
+⚠ Applied **twice** to dev (house convention, Flyway is off there): idempotent, both flags 1 → 0,
+12 rows untouched.
+
+### The gate
+
+`config/MigrationConstraintVerificationContractTest`, five legs:
+
+1. **A hard zero** over all 388 migrations: no file may contain `WITH NOCHECK`, `NOCHECK
+   CONSTRAINT` or `CHECK_CONSTRAINTS = OFF`. **One exemption, V265**, with a reason long enough to
+   say why ([[F2-188]]) and enforced in **both** directions — the exempt file must still HAVE the
+   shape, or the exemption is a claim about a file that does not exist ([[F2-199]]) and would
+   silently permit the next author to add one there.
+2. **A census** with an anti-vacuity floor above the largest *wrong* answer ([[F2-215]]): a walk
+   that resolves nothing gives 0 and a filter that stops matching `.sql` gives 0, so the floor is
+   300 rather than 1. It also asserts **V400 is present**, because the gate is a rule and V400 is
+   what makes it true today.
+3. **A self-test** driving the detector over synthetic input in both directions.
+4. **A prose leg** counting the files that state the rule without doing it: 18 of the 19 that
+   mention it, and `mentioning == stating + 1`.
+
+⚠⚠ **The gate's own first run accused seven migrations, and they were the most disciplined files
+in the corpus.** Every hit was inside a `THROW` message literal — the text an operator reads when
+a migration refuses. [[F2-193]]'s epitaph-as-corpse, one layer past comment stripping: this chain
+states its rules inside `THROW` messages by convention, so a scan must blank **SQL string literals
+as well as comments**. 🔑 **A detector that cannot tell a warning from a violation reports the
+files that warn about a defect as committing it.**
+
+⚠ **And the obvious literal-blanking regex overflows.** `'(?:[^']|'')*'` is an alternation inside
+`*`, which recurses per character on the JVM and threw `StackOverflowError` over a 300-line
+migration. [[F2-454]] uses that exact pattern safely because it applies it to individual `@Query`
+values, which are short — **the difference is the input size, not the pattern**, which is exactly
+why borrowing it looked sound. Replaced with a character scanner.
+
+### The controls, and the two findings they produced about the gate
+
+**7 killed / 0 survived / 0 anchor-miss**, baseline and post-restore green.
+
+⚠⚠ **Control E is the load-bearing one and it fires the CENSUS, not the hard zero.** With the
+corpus walk resolving nothing, the offender list is empty and leg 1 passes — *a negative assertion
+over an empty population reports the same empty list whether the detector works or is dead*
+([[F2-235]], [[F2-455]]). That is the whole argument for the floor existing rather than for
+trusting the zero.
+
+⚠⚠ **The doubled-quote self-test case could not tell a correct scanner from a broken one.** It put
+the forbidden phrase INSIDE the literal and a real statement AFTER it, so a correct scanner found
+the real one and a broken scanner found the leaked one — **both exactly one hit, from different
+text**, and `containsExactly("WITH NOCHECK x1")` is satisfied either way. 🔑 **A count is what made
+it look complete** — this register's most-repeated instrument defect, in a case written to guard
+against exactly it. Replaced with two cases, one per direction, whose answers differ.
+
+⚠⚠ **And with the better cases the mutation still survived, because the branch is provably
+equivalent.** Traced rather than treated as a hole ([[F2-206]]): `doubled == false` consumes one
+quote and breaks to the outer loop, which sees the second quote, consumes it and re-enters the
+inner loop; `doubled == true` consumes both and stays. Two characters either way, ending inside the
+literal either way — **there is no input, well-formed or not, including a literal ending at the
+last character, on which they differ.** The branch is deleted with the reason in place: a branch
+that cannot change an answer tells a reader that something subtle is being handled. Reachable
+rather than theoretical — **111 of the 388 migrations contain a doubled single quote** — which is
+what made it worth tracing rather than deleting on sight.
+
+### Filed
+
+- **The rule now has a corpus-wide gate and no corpus-wide *runtime* check.** V400's check 3 runs
+  once, at deploy; a constraint disabled by hand afterwards is invisible until the next migration.
+  A periodic assertion is an operations decision, not a side effect of this fix.
+- `cyber.cyber_evidence.status` stores only `CURRENT` and `STALE` of its six declared tokens in
+  both databases. Whether the other four are reachable is a question for whoever owns CY-H, and
+  narrowing a live vocabulary rewrites nothing today but forecloses a state ([[F2-183]]).
+
 ## F2-460 — an unbounded bulk DELETE over `iam.user_roles`, dark since V294 replaced it
 
 | Field | Value |
