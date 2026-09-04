@@ -110,13 +110,16 @@ class MigrationConstraintVerificationContractTest {
             out[i++] = ' ';
             while (i < out.length) {
                 if (out[i] == '\'') {
-                    // A doubled quote is an escaped quote INSIDE the literal, so consume both
-                    // and keep going; a single one closes it.
-                    boolean doubled = i + 1 < out.length && out[i + 1] == '\'';
+                    // A quote ends the literal. The doubled-quote escape needs no branch of
+                    // its own: breaking to the outer loop leaves it looking at the second
+                    // quote, which it consumes and re-enters here -- two characters either
+                    // way, ending inside the literal either way. A branch that handled the
+                    // escape explicitly stood here and its mutation could not be killed,
+                    // because there is no input on which the two answers differ. It is gone:
+                    // a branch that cannot change an answer tells a reader that something
+                    // subtle is being handled (F2-206).
                     out[i++] = ' ';
-                    if (!doubled) break;
-                    out[i++] = ' ';
-                    continue;
+                    break;
                 }
                 // Newlines are preserved so line structure survives, as the comment stripper
                 // does -- a blanked span must not change where a line ends.
@@ -300,12 +303,31 @@ class MigrationConstraintVerificationContractTest {
             .as("a THROW message stating the rule is not a violation of it")
             .isEmpty();
 
-        // And the doubled-quote escape must not run the blanking past the literal's end.
+        // The doubled-quote escape, in BOTH directions. 111 of the 388 migrations contain a
+        // doubled single quote, so this is reachable from the corpus rather than theoretical.
+        //
+        // ⚠ The case that stood here could not tell a correct scanner from one that ignores
+        // the escape: it put the forbidden phrase inside the literal AND a real statement after
+        // it, so the correct scanner found the real one and a broken scanner found the leaked
+        // one -- both exactly one hit, from different text. A count is what made it look
+        // complete. Each case below is arranged so the two scanners give DIFFERENT answers.
         assertThat(disablingShapesIn(
-            "THROW 1, N'don''t add WITH NOCHECK', 1;\n"
+            "THROW 1, N'the owner''s rows are already verified', 1;\n"
             + "ALTER TABLE t WITH NOCHECK ADD CONSTRAINT c CHECK (1=1);"))
-            .as("a doubled quote inside a literal must not swallow the statement after it")
+            .as("""
+                A doubled quote must not end the literal: ignoring the escape re-enters a
+                literal at the closing quote and blanks everything after it, so the real
+                WITH NOCHECK on the next line disappears. That is the quiet direction -- an
+                under-report reads exactly like a clean corpus.""")
             .containsExactly("WITH NOCHECK x1");
+
+        assertThat(disablingShapesIn(
+            "THROW 1, N'don''t add WITH NOCHECK; fix the data instead', 1;"))
+            .as("""
+                And the mirror: ignoring the escape leaks the rest of the literal out as code,
+                so the phrase the message is warning against reads as a use of it. That is the
+                loud direction, and it accuses the file that states the rule most carefully.""")
+            .isEmpty();
     }
 
     @Test
