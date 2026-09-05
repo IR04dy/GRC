@@ -15229,6 +15229,193 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-462 — the operator's own file enumerated the schedulers that were already on
+
+| Field | Value |
+|---|---|
+| **Id** | F2-462 |
+| **Title** | Five of the platform's ten scheduler gates were declared in no packaged yml, so they were off in every profile including production — with no placeholder for `external.properties` to override, no entry in `external.properties.template`, and five javadocs saying *"Off by default **in dev** … Operators flip it on per-env"* |
+| **Severity** | P3 (latent by configuration — the sweeps are correct code that has never had a chance to run; F2-317 measured **24 risks past their review date and unflagged** while one of the five was unreachable) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, asking whether a `@Value` fallback agrees with what a packaged yml sets for the same property — the sibling of F2-456's question about the KEY |
+| **Fixed** | `3953add5` + `7607d253`, merged `fix/f2-462-scheduler-gate-discoverability` |
+| **Module** | platform-wide (configuration surface) |
+| **Migration** | none |
+
+### The population
+
+Ten classes gate a `@Scheduled` tick behind a boolean `@Value("${…:false}")`. Measured by full
+dotted path across all three packaged documents:
+
+| gate | code | dev | prod | base |
+|---|---|---|---|---|
+| `grc.audit.sealing-enabled` | true | – | – | `${AUDIT_SEALING_ENABLED:true}` |
+| `grc.cyber-capa-sla.scheduler-enabled` | false | true | `${…:true}` | – |
+| `grc.cyber-evidence-expiry.scheduler-enabled` | false | true | `${…:true}` | – |
+| `grc.vuln-sla.scheduler-enabled` | false | true | `${…:true}` | – |
+| `grc.workflow-request-sla.scheduler-enabled` | false | true | `${…:true}` | – |
+| **`grc.approval-chain.scheduler-enabled`** | false | – | – | – |
+| **`grc.ccm.scheduler-enabled`** | false | – | – | – |
+| **`grc.kri.scheduler-enabled`** | false | – | – | – |
+| **`grc.risk.review-scheduler-enabled`** | false | – | – | – |
+| **`grc.sanctions.scheduler-enabled`** | false | – | – | – |
+
+Five and five. The declared half all follow one idiom — a placeholder in a yml, its env name in
+`external.properties.template` — so the fix is *follow the module's own convention* rather than
+invent one ([[F2-253]]).
+
+### The claim, on the operator's own surface
+
+`external.properties.template`'s scheduler block read:
+
+> *"The four SLA/expiry clocks. Turning one off stops reminders and overdue escalations for that
+> module — which is a compliance gap on NCA/SAMA reviews, not merely a quiet inbox."*
+
+Every clause true. **And the four were exactly the four that were already ON** — the ones that could
+not produce that gap — while five that already were producing it went unmentioned, in the file
+`CLAUDE.md` calls the home of all runtime configuration.
+
+🔑🔑 **F2-198's shape on an operator surface: the enumeration is real, and its POPULATION is *the
+switches somebody had already wired*.** A reader of that file sees four scheduler switches, a
+sentence about NCA/SAMA compliance, and no reason to ask what else exists.
+
+### The claim, in the code
+
+Five javadocs read *"Off by default **in dev** — gated by `…` … Operators flip it on per-env."*
+Both clauses were false:
+
+- **"in dev"** says the default is a development convenience, which implies production enables it.
+  No packaged yml declared any of the five, so they were off in production too.
+- **"Operators flip it on per-env"** claims a mechanism. There was no placeholder in any yml and no
+  entry in the template, so an operator could reach these only by knowing a property name that
+  appears in no artefact they read.
+
+[[F2-184]]'s shape across five files, and [[F2-215]]'s two-of-N at five-of-ten: a reader who finds
+the same reassuring sentence in five sibling schedulers has no reason to doubt any of them.
+
+⚠ **One of the five was already recorded, precisely, in prose.** `RiskReviewService`'s own comment
+says *"the scheduler is off by default (`grc.risk.review-scheduler-enabled:false`, **set in no
+profile**) so it had never run"* and measures **24 risks past their review date and unflagged — 4 in
+org 1, 10 in org 2, 10 in org 3** ([[F2-317]]). So the platform knew about one member, wrote it
+down, and nothing asked the question of the other four or of the operator surface.
+
+### What each of the five does
+
+- **`sanctions`** — daily 04:00 refresh of every DAILY-cadence sanctions list, plus a 15-minute
+  SLA-breach sweep over `PENDING_REVIEW` hits firing `SANCTIONS_HIT_SLA_BREACHED` per tenant.
+  ⚠ [[F2-192]] recorded that `#runSlaSweep` had **no test at all** — *"the seam was built for tests
+  nobody wrote"* — so this one was untested and unreachable at once.
+- **`kri`** — daily 06:00 KRI evaluation cycle, deliberately the CCM cadence *"so an audit committee
+  meeting at 08:00 sees fresh numbers"*. Already noted by [[F2-193]].
+- **`risk.review`** — daily 06:30 overdue sweep. [[F2-317]]'s 24 rows.
+- **`approval-chain`** — 15-minute escalation of in-flight approval-chain instances past their SLA.
+- **`ccm`** — the 60-second continuous-control-monitoring tick. [[F2-194]] describes `LiveControlTests`
+  as driving *"a real runner, a 60-second scheduler tick"*, and [[F2-371]] fixed the consecutive-failure
+  escalation ladder that tick drives. With the gate unreachable the register only advances when
+  somebody presses **Run now**.
+
+### The fix
+
+**Behaviour-preserving by construction.** Each of the five is declared in `application.yml` as
+`${ENV_NAME:false}` and no profile overrides any of them, so the effective value is exactly what the
+`@Value` fallback already produced. What changes is that the switch now exists for somebody other
+than its author.
+
+⚠ **A placeholder, never a literal** — F2-456 established that `external.properties` overrides
+`${PLACEHOLDER}` names and **not** Spring property paths, so a literal `false` in the yml would be
+settable only by editing the jar. The five already-declared gates use the placeholder shape.
+
+⚠ **They stay OFF.** Enabling a sweep writes audit rows, raises domain events and flags records on a
+live tenant, so switching one on is an operator decision taken per environment and recorded — not a
+side effect of a discoverability fix ([[F2-188]]).
+
+⚠ The template's block now names all ten, splits them ON/OFF, and records why it used to say "four".
+The five javadocs are corrected, each **quoting the sentence it replaces** so the correction is
+auditable — which is also why the gate strips comments ([[F2-193]]).
+
+### The gate
+
+`config/SchedulerGateDiscoverabilityContractTest`, four legs over a population **derived
+structurally** — a boolean `@Value` gate in a class that also declares `@Scheduled` — never from a
+list of key names ([[F2-217]]):
+
+1. **Hard zero**: every scheduler gate's property is declared in a packaged yml.
+2. **Hard zero**: every one is declared as a placeholder *somewhere*, and that placeholder's env name
+   appears in the template.
+3. **Census**: the two halves must **partition** the boolean-gate population, plus floors and both
+   subtractions non-empty.
+4. **Self-test**: the detector fires on the shape it claims and on none of six it must not.
+
+⚙ `StartupResolutionContractTest.declaredProperties()` already owned *"load the packaged documents
+with Spring's own YAML loader"*. It returned the key set; this needs key → raw values, because a
+property declared as a literal in one profile and a placeholder in another is reachable and a key
+set cannot say so. So the walk became `declaredValues()` and the key set derives from it — **one
+walk, two readers** ([[F2-190]]); a second walk would be free to disagree about which files are
+packaged.
+
+⚠ The structural definition is also what excludes `grc.ccm.custom-sql.enabled` and
+`grc.ccm.ldap.enabled` **by construction rather than by exemption**: neither runner schedules
+anything, and whether a switch that executes operator-supplied SQL belongs in an operator template
+is a security decision, not a discoverability one.
+
+### The controls, and the two findings they produced about the gate
+
+**6 killed / 1 survived-by-design / 0 unexpected / 0 anchor-miss**, baseline and post-restore green.
+
+⚠⚠ **Control D refuted a claim I had written into the census leg.** It read *"a detector that stopped
+requiring `@Scheduled` would report a LARGER population, which no floor can see — so what catches it
+is that the excluded half must still have members."* **False**: `unscheduledGates()` computes the
+complement independently, so dropping the narrowing from `schedulerGates()` leaves it untouched and
+still non-empty. What actually killed the mutation was the **reachability** leg, and only because the
+widened population happens to contain `grc.errors.verbose` — a boolean gate declared as a literal,
+which legitimately needs no placeholder. 🔑 **That is luck rather than design: on a tree where every
+non-scheduler gate happened to be placeholder-declared, the narrowing could rot in silence.** Closed
+by asserting a **partition** — the two halves disjoint by key and together accounting for every
+boolean gate — which fires whatever the tree contains.
+
+⚠ **Control C fired somebody else's gate, and that is the honest reading.** Renaming the template
+entry made the yml's placeholder undocumented, which is exactly what F2-456's
+`everyPlaceholderTheYmlReadsIsDocumentedInTheTemplate` already asserts platform-wide. So the two
+legs **compose**: that class covers *declared-as-a-placeholder → documented*, and this one covers
+*declared as a placeholder at all* — the half control B killed, and the half that class cannot see.
+
+⚙ **Control G must SURVIVE and is run for that reason.** Reverting one corrected javadoc changes no
+assertion, because nothing here pins prose. That is deliberate: the claim is made true by the two
+hard zeros, not by a string check a later rewording would break ([[F2-197]]).
+
+### Instrument errors
+
+⚠⚠ **A leaf-name grep reported all seven candidates as "declared in dev and prod".** Every one of
+these keys ends `scheduler-enabled`, so `grep -l scheduler-enabled application*.yml` matches for all
+of them — [[F2-187]]'s *resolve per owner type* at a configuration key, and it answers in the
+**reassuring** direction (*declared* rather than *absent*). The full dotted path is the only key.
+
+⚠⚠ **My first `@Value`-versus-yml comparison reported 23 disagreements, nearly all noise.** A yml
+value of `${ENV:D}` is a **reference** whose effective default is `D`; comparing the raw placeholder
+text against the code's default reports every correctly-mirrored key as a disagreement. Resolve the
+placeholder first — the honest figure is that most remaining "disagreements" are a profile
+deliberately overriding the base, which is what profiles are for.
+
+⚠ **My "uncorrected claims remaining: 1" counter was wrong**, because one javadoc's *"until F2-462"*
+wraps across two lines and the literal phrase is not in the file. [[F2-216]]'s rule: a claim wraps, so
+assert a prose claim against **flowed** text, never a single-line phrase.
+
+⚠ Two recorded landmines walked into: a pointless empty heredoc hung the shell for its whole timeout
+and swallowed the commands chained behind it, and running `mvn` from the scratchpad gave
+`BUILD FAILURE` with **no `Tests run:` line** — the tell that nothing ran ([[F2-255]]).
+
+### Filed
+
+- **Whether any of the five should be ON** is an operator/owner decision per environment, and the
+  measured consequences are recorded above so it can be taken with the numbers to hand.
+- `grc.errors.verbose` is declared as a **literal** in dev, so it sits outside the placeholder
+  discipline. It is not a scheduler and so outside this gate's population; whether SEC-CFG-001's
+  switch should be operator-reachable is its own question.
+- The remaining `@Value` keys no packaged yml declares (`grc.change.cab-min-approvals`,
+  `grc.security.public-rate-limit.*`, `grc.evidence.max-file-size-mb`, `grc.bcm.comms.email.from`,
+  `grc.reporting.from`, `grc.ccm.custom-sql.enabled`, `grc.ccm.ldap.enabled`) — F2-456's filing,
+  narrowed by this slice to the non-scheduler remainder.
+
 ## F2-461 — the chain states "no `WITH NOCHECK`" eighteen times and left two constraints untrusted
 
 | Field | Value |
