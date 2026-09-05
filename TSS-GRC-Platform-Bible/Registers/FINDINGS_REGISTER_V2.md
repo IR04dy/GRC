@@ -15229,6 +15229,228 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-463 — a declared column width that the column does not have
+
+| Field | Value |
+|---|---|
+| **Id** | F2-463 |
+| **Title** | Eighteen entities declared a `@Column(length)` the column does not have — inert for DDL under `ddl-auto=none`, and read by three legs of `RequestSizeCapMirrorTest` as the column's real width |
+| **Severity** | P3 (latent — all eighteen columns are rendered by a closed dropdown today, so no cap is paired to a fictional width; what the fix buys is that the number stops being a fiction the mirror gates can certify against) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, after a native-`@Query` sweep came back clean: `@Column(length)` is inert for DDL here, so nothing made it agree with the column, and two gates read it as the truth |
+| **Fixed** | `e32ccb95`, merged `fix/f2-463-column-width-declaration` |
+| **Module** | platform-wide (18 entities across `ai_governance`, `aml`, `bcm`, `risk`, `scm`) |
+| **Migration** | none — the fix is the entity, not the column |
+
+### The population
+
+**2,388 explicit declarations, 2,370 agreeing with the migration chain, 18 disagreeing.** A 99.2%
+agreement rate is what makes the eighteen an outlier population rather than a systemic mess.
+
+| table.column | declared | real | direction |
+|---|---|---|---|
+| `scm.vendors.category` | 100 | 50 | wider |
+| `bcm.bcm_plans.plan_type` | 100 | 30 | wider |
+| `risk.risks.risk_level` | 20 | 8 | wider |
+| `bcm.bcm_plans.status` / `.version` | 50 | 20 | wider |
+| `bcm.bia_records.overall_impact` / `.status` | 50 | 20 | wider |
+| `bcm.critical_processes.criticality` | 50 | 20 | wider |
+| `scm.contracts.contract_type` | 50 | 30 | wider |
+| `scm.dependencies.dependency_type` | 50 | 30 | wider |
+| `scm.dependencies.status` | 30 | 20 | wider |
+| `scm.slas.measurement_frequency` / `.status` | 30 | 20 | wider |
+| `scm.supplier_incidents.incident_code` | 50 | 20 | wider |
+| `scm.vendor_assessments.assessment_type` | 50 | 30 | wider |
+| `scm.vendors.service_type` | 100 | 200 | narrower |
+| `ai_governance.ml_model_audit.status` | 20 | 30 | narrower |
+| `aml.sanctions_list_entry.severity` | 20 | 30 | narrower |
+
+🔑 **The migration chain, the dev database and the deployed database agree with each other on all
+eighteen.** The entity is the sole outlier every time, which is what settles the direction of the
+fix without a judgement call.
+
+### Why nothing made it agree
+
+`ddl-auto` is `none` in both runnable profiles, so Hibernate neither creates the column from the
+declaration nor validates the column against it. **The number creates nothing and validates
+nothing** — which is exactly why it could drift for as long as it liked.
+
+What reads it is `RequestSizeCapMirrorTest`:
+
+- `everyEnabledSizeCapEqualsTheColumnItGuards` compares a request `@Size(max)` against
+  `col.length()` (F2-185b);
+- `everyDeclaredFormCapFitsTheColumnItGuards` and `noFormCapExceedsTheColumnItUniquelyResolvesTo`
+  compare a frontend `maxLength` against it (F2-428).
+
+🔑🔑 **So a cap set to the declaration passes the gate whose whole purpose is preventing an
+overflow, and still overflows** — SQL Server 2628/8152, which F2-432 turned into a 400 naming the
+field, so the failure is legible and the cap is still wrong.
+
+⚠ **The three narrower ones fail the other way, and that direction matters more than it looks.** A
+form legitimately capping `scm.vendors.service_type` at the column's real 200 would be **refused**
+by the mirror gate against a declared 100 — a gate failing on correct code, the one failure a gate
+must never have ([[F2-214]]). Fixing only the wider direction would have left the other looking
+checked ([[F2-215]]).
+
+⚠ **Latent, and saying which matters** ([[F2-283]]): all eighteen columns are rendered by a closed
+dropdown today (`select` / `select-searchable`, no free-text `maxLength`), so no cap is paired to a
+fictional width and nothing is currently refused or overflowing. And no CHECK vocabulary exceeds its
+column either — measured per column, resolved by `parent_column_id`. This is a latent-hazard
+closure, not a defect discovery.
+
+### The fix is the entity, not the column
+
+Three artefacts agree against it, and widening eighteen columns would be a migration over two live
+databases ([[F2-183]]) to accommodate a number nothing enforces. Correcting the declaration is
+provably behaviour-neutral, and the gate asserts the premise rather than restating it: a leg reads
+both runnable profiles and fails if either stops saying `ddl-auto: none`.
+
+⚠ `risk.risks.risk_level` is `insertable = false, updatable = false` — a computed persisted column —
+so no cap could ever be mirrored to it meaningfully. Corrected anyway: the declaration is a fiction
+either way, and a reader has no way to tell which fictions are load-bearing.
+
+### The instrument, and the defect the widening exposed
+
+`MigrationVocabularies` already replayed `CREATE TABLE`, `ALTER … ADD` and `ALTER COLUMN` in version
+order to answer *is this column nullable?*. It captured the type and discarded the size. So the
+hermetic reader was one extra field on the same walk: `columnSpecs()` returns
+`ColumnSpec(nullable, width)` and **`columns()` is derived from it rather than walking again**
+([[F2-190]] — the shape [[F2-462]] used for `declaredValues()` / `declaredProperties()`; two walks
+would be free to disagree about which files are packaged and which declaration wins, and the
+disagreement would be invisible because each map looks complete on its own).
+
+⚠⚠ **That widening exposed a defect in the existing parser.** `ALTER TABLE t ADD a T, b T, c T;` is
+one statement adding three columns, and the house style puts each on its own line. The old pattern
+captured the first column and read its tail as `[^;\n]*`, which stops at the newline — so **43
+columns across 8 clauses were missing from `columns()` entirely**, including
+`platform.audit_log.prev_hash` / `.hash_alg` (V340's hash chain) and
+`cyber.cyber_frameworks.framework_code` / `.regulator` / `.reference_url` (V37).
+
+🔑 **It fails in the QUIET direction.** `NullableUniqueKeyFilterContractTest` ([[F2-433]]) asks
+`Boolean.TRUE.equals(table.get(c))`, and a column missing from the map answers **false** — so a
+unique key over a nullable column it could not see read as *not nullable*, i.e. as safe, in the gate
+whose entire subject is that SQL Server treats NULLs as equal for uniqueness. Still 8/8 after the
+widening, so nothing was actually mis-cleared; that hazard was latent too.
+
+🔑🔑 **It was found only because the new gate holds `namedUnknown` EXACTLY empty rather than skipping
+what it cannot resolve** — unresolved reads identically to clean ([[F2-206]]) — and it named all
+eight.
+
+### The gate
+
+`config/ColumnWidthDeclarationContractTest`, seven legs:
+
+1. **Hard zero** — a `@Column(length = n)` with `n != 255` on a mapped String field equals the width
+   the chain leaves on that column.
+2. **Census** — the ambiguous 255 population, measured and named.
+3. **Lookup self-test** — the entity→chain resolution reads a width from every declaration form
+   (bare and bracket-quoted `CREATE TABLE`, `VARCHAR` as well as `NVARCHAR`, a later `ALTER COLUMN`
+   winning, `MAX` as -1) and none from a type that carries no size.
+4. **Anti-vacuity** — both walks resolved a real population; `unloadable` is zero.
+5. **The premise** — no runnable profile lets Hibernate act on a declared width.
+6. **Boundary** — four corrections pinned by value, two per direction.
+7. **Publish** — `target/column-widths.txt`, asserted equal to what this run wrote rather than to
+   whatever the previous run left there ([[F2-265]]).
+
+The parser's own behaviour is asserted in `MigrationVocabulariesTest` rather than here ([[F2-190]]):
+two new legs pin the multi-column `ADD` and the derived-view property.
+
+⚠⚠ **`length()` answers 255 whether or not the author wrote it**, so reflection alone cannot tell a
+deliberate 255 from an absent one, and a gate demanding equality over the whole population would
+fail on 1,690 fields nobody has declared anything about. **255 is therefore the one value this gate
+is silent on, and leg 2 says so with a number**: of those 1,690, **58 sit over a column narrower
+than 255**, asserted exactly so a change forces a read rather than being absorbed by a tolerance
+([[F2-204]]). A hard zero over a population the instrument cannot see is the most reassuring
+possible artefact ([[F2-205]]).
+
+⚙ Census: **432 shipped entities · 4,086 mapped String fields · 2,396 judged · 1,690 silent-255**.
+The 432 matches the figure `CLAUDE.md` records independently, which is the corroboration.
+
+### The vein this started from, swept clean
+
+The slice began on **native `@Query`**: `StartupResolutionContractTest` ([[F2-443]]) resolves JPQL
+entity names and property paths, [[F2-454]] resolves named parameters and [[F2-455]] derived method
+names — and Hibernate passes native SQL through untouched, so a wrong table or column there fails at
+**call time** with a 500, invisible to the hermetic suite and to startup.
+
+Measured by compiling every one against the real schema with `SET NOEXEC ON`, which parses **and
+compiles** a batch — resolving every object and column name — and then does not run it, so the check
+is read-only by construction: **46 native queries across 429 repositories, 46 of 46 compile in dev.**
+Prod fails one, `ChangeRequestRepository#stampRatificationEscalation`, on
+`ratification_escalated_at` — added by **V345**, the first migration of the pending V345–V400 range,
+so that is the deployment gap and not a defect ([[F2-283]]'s recorded reading).
+
+⚙ The same sweep measured **dev-vs-prod width divergence at 3 columns of 4,319**, all three
+`cyber_frameworks` / `cyber_controls` — exactly [[F2-277]]'s V390, also pending — which corroborates
+that finding rather than being a new one.
+
+### The controls
+
+**7 killed / 0 survived / 0 anchor-miss**, baseline and post-restore green at 43 tests.
+
+One per half, each proving which leg sees it: a declaration reverted to a wider fiction and one
+reverted to a narrower one (the invariant plus the value pin, with the opposite consequence in each
+message); the multi-column `ADD` widening reverted (the parser's own test plus this gate's
+`namedUnknown` leg); `columns()` made an unfaithful view of `columnSpecs()` (the derived-view test —
+and it also fires three legs of `NullableUniqueKeyFilterContractTest`, which is the composition
+worth knowing); the width reader made to answer null always; and the `ddl-auto` premise reverted.
+
+⚠⚠ **Control E is the load-bearing one.** Pointing the entity walk at a package that does not exist
+fires the three floors and **NOT** the hard zero — a negative assertion over an empty population
+reports the same empty list whether the detector works or is dead ([[F2-235]], [[F2-455]]), which is
+the whole reason those floors exist rather than a decoration on them.
+
+⚠ Control A reported **ANCHOR-MISS** on its first run: I had guessed `@Column(name = "category",
+nullable = false, length = 50)` and the declaration carries no `nullable`. An anchor miss is a
+finding about coverage rather than an inconvenience to route around ([[F2-459]]) — corrected against
+the file, it kills.
+
+### My own errors, every one caught by running something
+
+⚠ **A charset default in my own reconnaissance writer.** `new PrintWriter(path)` uses the platform
+default, so the extract came out cp1252 and the Python reader died on byte 0x97 — [[F2-430]]'s
+landmine, self-inflicted, in the slice after it. Fixed at the writer, not the reader.
+
+⚠⚠ **`LIKE '%[column]%'` is a character class, so my CHECK lookup matched every constraint on the
+table.** It reported `risk.risks.risk_level` as having a vocabulary whose longest token
+(`UNDER_REVIEW`, 12) exceeds its 8-character column — **a complete, plausible, entirely false
+finding**, because that CHECK belongs to a different column. House rule 5's own trap, in a probe.
+Resolve the CHECK by `parent_column_id`; corrected, no vocabulary exceeds its column.
+
+⚠ **`sys.columns.max_length` is in bytes.** An inline check divided by 2 unconditionally and
+reported `aml.sanctions_list_entry.severity` (a `VARCHAR(30)`) as 15, making three artefacts appear
+to give three answers. [[F2-433]]'s recorded trap; the typed scripts had it right.
+
+⚠ **`grep -c $'\r$'` reported CRLF on a pure-LF file**, because Git Bash reads in text mode — so the
+new gate file read as correctly CRLF when it was LF throughout. [[F2-458]]'s rule: **the byte count
+is the only authority, and a pipeline is a worse instrument than a bare byte check.**
+
+⚠⚠ **An UNQUOTED heredoc let bash expand every backtick as command substitution before Python saw
+the payload**, so the controls paragraph landed reading *"the multi-column  widening reverted … and
+the  premise reverted"* — every identifier eaten. **And the script printed its own success line**,
+because the write did happen; only reading the result showed it. The recorded landmine says to use
+the Write/Edit tools for any payload carrying backticks or escapes, and a quoted delimiter
+(`<<'PYEOF'`) is the minimum. 🔑 **A mangled paragraph still reads like prose**, which is why the
+check has to be that the identifiers survived rather than that the write succeeded.
+
+⚠ **Two `sed -i` calls rewrote that file back to LF** after I had normalised it — the recorded
+`sed -i` landmine. Every touched file's endings were verified against `HEAD` afterwards; note that
+`core.autocrlf=true` stores LF and checks out CRLF, so a CRLF worktree file matching an LF blob is
+normal and not drift ([[F2-309]]).
+
+### Filed
+
+- **The 58 silent-255 fields over a narrower column.** Each is a field whose author never wrote a
+  width, so the fix is to write one — a sweep rather than a correction, and [[F2-188]]'s rule says
+  not to manufacture 58 of them inside a slice about something else.
+- **`application.yml` (the base profile) sets `ddl-auto: validate`** while both runnable profiles
+  override it to `none`. Nothing runs bare, so it is inert; whether the base should say `none` is a
+  configuration decision.
+- **`risk.risks.risk_level` is `NVARCHAR(8)` and `CRITICAL` is exactly 8 characters**, so the
+  register's own vocabulary fits with nothing spare. No writer can produce a longer token today
+  (every risk-level vocabulary in the tree tops out at `CRITICAL`), but a ninth character would be
+  an 8152 — an owner decision about whether that column should be widened.
+
 ## F2-462 — the operator's own file enumerated the schedulers that were already on
 
 | Field | Value |
