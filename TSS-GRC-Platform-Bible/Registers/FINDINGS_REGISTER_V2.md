@@ -15229,6 +15229,247 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-467 — the module documents what its dashboard computes and publishes what its request path does
+
+| Field | Value |
+|---|---|
+| **Id** | F2-467 |
+| **Title** | A `package-info.java` claims the module emits a trigger nothing emits — and three of the eight tokens are ENABLED live automation rules at 0 fires |
+| **Severity** | P2 (the artefact a developer reads before wiring an automation rule promises a capability the platform does not have; three rules were wired on the promise and sit inert in both databases) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, by asking F2-459's question of the other 66 `package-info.java` files. F2-459 built exactly this check and scoped it to the one module it was working in |
+| **Fixed** | `5e58637b`, merged `fix/f2-467-documented-trigger-claims` |
+| **Module** | `module/openbanking`, `module/regreporting`, `module/reginspect`, `module/dataclass`, `module/ai/lifecycle`, plus the gate in `config` |
+| **Migration** | none |
+
+### The mechanism
+
+F2-459 found that `module/sharia`'s `package-info.java`, under a heading reading *"Emits F7 audit
++ F8 trigger codes"*, named **three** tokens the module does not emit. It corrected that file and
+built a gate — `ShariaLifecycleTest#thePackageInfoEventListNamesOnlyTokensThisModuleEmits` — whose
+reasoning is right and whose population is **hard-coded to `module/sharia/package-info.java` and
+the `SHARIA_` prefix**.
+
+🔑 **F2-198's shape, after a filename, a three-entry allow-list, a module name, an `extends`
+clause, a field-name list inside a fix, a claim shape in a gate and an access modifier: here the
+narrowing is *the module the slice happened to be in*.**
+
+Asked of all 67, **five more modules claimed eight tokens the tree does not emit**:
+
+| module | claimed and absent | live rule |
+|---|---|---|
+| `openbanking` | `OB_API_ABUSE` | **AR-248 ENABLED, 0 fires** |
+| `openbanking` | `OB_CERT_EXPIRING` | **AR-249 ENABLED, 0 fires** |
+| `openbanking` | `OB_CONSENT_EXPIRED` | — |
+| `regreporting` | `REG_REPORT_FILING_DUE_SOON` | — |
+| `regreporting` | `REG_REPORT_FILING_OVERDUE` | — |
+| `reginspect` | `REG_DOCUMENT_REQUEST_OVERDUE` | — |
+| `dataclass` | `DATA_REVIEW_DUE` | **AR-289 ENABLED, 0 fires** |
+| `ai/lifecycle` | `MODEL_DRIFT_THRESHOLD_BREACHED` | — |
+
+⚠ All three rule rows are byte-identical in the dev and the deployed database. **F2-436 filed the
+rules**; what nothing recorded is that **the documentation is the cause, and it was still
+asserting.** A `package-info` is the artefact a developer reads before wiring a rule, so a token
+documented there reads as available — which is how a rule comes to exist for an event that does
+not.
+
+### 🔑🔑 The rule that predicts where this drifts
+
+Every token these five modules **do** emit is a state **transition** — `_REGISTERED`,
+`_TRANSITIONED`, `_SUBMITTED`, `_GRANTED`, `_REVOKED`, `_CLOSED`, `_RAISED`. Every token they
+claimed and did not emit is a **derived condition**: an expiry, a due date, an overdue clock, a
+threshold crossing, an abuse pattern.
+
+A transition has a natural publisher — the service method that performs it. A derived condition has
+none unless somebody writes a sweep, and **none of the five modules declares a `@Scheduled` method
+at all**. Every one of them has the *data*: `ObTppRepository#findByOrganisationIdAndCertExpiresAtBefore`
+and a `certExpiring30d` dashboard figure, `RegReportingService#countOverdue(today)`,
+`RegInspectService#isOverdue(dr)` denormalised onto `overdue_dr_count`,
+`data_asset.next_review_due`, `RecertificationRepository#findOverdue`.
+
+🔑 **So a module publishes what its request path does and documents what its dashboard computes,
+and the event list drifts precisely at the boundary between the two — always in the direction of
+promising more.** What the dashboard buys an operator is a number they must go and look at; what an
+F8 trigger would buy them is an escalation that arrives.
+
+### Three of the five described the scheduler, not just the token
+
+- `regreporting` — *"`REG_REPORT_FILING_DUE_SOON` — fired by F8 scheduler at T-7, T-3, T-1"* and
+  *"`REG_REPORT_FILING_OVERDUE` — fired by F8 scheduler the day after dueDate"*
+- `reginspect` — *"`REG_DOCUMENT_REQUEST_OVERDUE` (raised by F8 scheduler)"*
+- `openbanking` — *"`OB_CERT_EXPIRING` — 90 / 30 / 7-day reminders"*
+
+🔑 **F2-184 at its strongest: the claim answers the very question a reader would otherwise ask.**
+A bare token in a list invites *"is this wired?"*; a token whose text names the scheduler and its
+cadence answers it.
+
+### `ai/lifecycle` was wrong three ways in three lines
+
+> Sprint 11's `MlModelDriftObservation` captures raw drift. This module adds a configurable
+> `driftThresholdPct` per model. Observations crossing the threshold emit
+> `MODEL_DRIFT_THRESHOLD_BREACHED` which AR-275 reacts to.
+
+1. **`driftThresholdPct` does not exist.** Its only occurrence in the whole tree was that sentence;
+   `ai/governance` has a `drift_threshold` column under a different name, in a different module.
+2. **`MODEL_DRIFT_THRESHOLD_BREACHED` does not exist.** Its only occurrence in the whole tree was
+   that sentence. `MlModelDriftService` publishes `MODEL_DRIFT_OBSERVED` **on every record**, so
+   there is no threshold distinction at the event level at all.
+3. **AR-275 reacts to something else.** It exists and triggers on `MODEL_RETRAINING_PROPOSED`.
+
+The module holds no drift code of any kind — its only mention of drift is
+`RetrainingEvent.trigger`, where `DRIFT` is one of the reasons a human may record for a
+retraining. 🔑 **F2-459's own headline: a REAL rule citation is what makes such a claim harder to
+doubt than an invented one would have been.**
+
+### The fix is the claim, following F2-459's exemplar
+
+Each token is **moved out of the emitted list** into a paragraph that names it, says nothing
+publishes it, and records the measured consequence. ⚠ **Deleting it silently would be worse**: an
+absence reads as completeness (F2-197), and a rule already wired to the token would then have no
+explanation anywhere. `dataclass`'s count moved with its list, 10 → 9 — a count is a second
+artefact and its being right is what stops anybody checking the enumeration (F2-273).
+
+⚠ **Not fixed, deliberately** (F2-188). Publishing the events is a feature across five modules —
+a scheduler, an event and its routing each time; retiring the three rules is a write to a
+customer's database. F2-436 already filed both, and this slice adds the documentation half rather
+than pre-empting either.
+
+### The detector — six corrections, each of which changed an answer
+
+| correction | why |
+|---|---|
+| **section carries forward** | `<h2>F7 audit + F8 events</h2>` sits in its own block with the ten tokens in the paragraph beneath it, so a block-only rule dropped **`DATA_REVIEW_DUE`** — the enabled rule. **UNDER-reporting, the quiet direction** |
+| **block-level verb** | `ai/lifecycle` makes its claim in bare prose: no heading verb, no list |
+| **negation per block** | F2-459's corrected file names its three tokens *inside* the claiming section, so a verb-only rule reads the correction as the claim (F2-193) |
+| **composed prefixes** | `"DATA_FLOW_" + x` is emitted with no literal to find — F2-459's own subtraction, inherited, and it moves the platform-wide answer from 13 to 7 |
+| **`package-info` off the code side** | it is a Java file made entirely of comments, so counting it makes every claim its own evidence — **which is exactly why F2-436's census could not see any of this**, its shortlist requiring a trigger to be *"present in NO Java file"* |
+| **the token pattern** | `[A-Z][A-Z0-9]+(?:_…)` requires **two** alphanumerics before the first underscore, so `A_FIRED` never matched. Caught by my own self-test fixture; widening moved the emitted set 2,372 → 2,382 with the corpus answer **unchanged** |
+
+🔑 **The claim-scoped rule against a whole-file scan: 12 files / 21 tokens becomes 5 files / 8
+tokens.** Every one of the thirteen it drops was a detector artefact, and reading them is what
+separates the two:
+
+- **`privacy/subprocessor` `INCIDENT_REPORTED` — REFUTED.** It is a `SubprocessorEvent.eventType`
+  ledger value, caller-supplied through `SubprocessorEventService`'s
+  `ev.setEventType(req.eventType())`, so no literal exists **and it is reachable**. A whole-file
+  scan reported it and was wrong.
+- `change_mgmt`'s `BCM_PLAN` / `DEPENDS_ON` / `AUDIT_FINDING` are link-type enum values,
+  `opres`'s `IBS_MAPPING` / `MAPPING_TESTING` are phases, `sust/climate`'s `BOARD_MEMBER` /
+  `PLATFORM_ADMIN` / `RISK_MANAGER` are roles, `aml/sanctions`'s `SCREENING_SOURCE` is a column.
+
+### The gate
+
+`DocumentedTriggerEmissionContractTest` — a **hard zero with no exemption map**, safe by F2-214's
+test: correcting the sentence is always available and strictly more informative, so there is no
+correct code for it to fail on.
+
+⚠ **What it deliberately cannot see, said out loud** (F2-205). The comparison is **tree-wide**, so
+a module documenting a trigger some *other* module emits passes — the weaker reading, chosen
+because it cannot fail on a module that legitimately documents a shared platform event. It is also
+**one-directional**: a token a module emits and does not document is not reported. `openbanking`
+emits `OB_TPP_REGISTERED`, `OB_TPP_UPDATED`, `OB_TPP_TRANSITIONED`, `OB_INCIDENT_TRANSITIONED` and
+`OB_INCIDENT_SAMA_NOTIFIED` and lists none of them; that is a different question and is filed.
+
+⚠⚠ **Two legs assert that the subtractions are load-bearing rather than decoration, and both are
+driven by the real tree.** `aDisclosureIsNotAClaim` reads F2-459's **own corrected file** and
+requires its three tokens to read as disclosed and not as claimed — the strongest positive control
+available, and it lives in the repository. `aRuntimeComposedTriggerCountsAsEmitted` requires the
+set of documented tokens that pass *only* because of the composed-prefix subtraction to be
+**non-empty**, so if it ever empties the subtraction has become untested rather than unnecessary.
+
+### Verification
+
+- Gate **5/5**. Backend **5237/0/0**, exactly predicted (5,232 + 5 legs).
+- **Controls: 11 killed · 0 survived · 0 anchor-miss · 0 did-not-compile**, baseline and
+  post-restore green at 5.
+
+| control | fires |
+|---|---|
+| A–E each of the five claims restored | the hard zero **alone**, naming that module's tokens |
+| F the negation rule never matches | the hard zero **and both** the disclosure leg and the self-test |
+| G the composed-prefix subtraction dropped | the composed leg **and** the hard zero |
+| H the package-info corpus is empty | the hard zero's **anti-vacuity floor**, plus both other floors |
+| I the emitted set is empty | the emitted floor **and** the hard zero — over-reporting, the loud direction |
+| J a heading no longer carries its verb over its section | the **self-test alone** |
+| K the token pattern matches nothing | the self-test, the disclosure leg and every floor |
+
+🔑 **H is the load-bearing one, and re-running it alone is what made the sentence a measurement
+rather than a deduction.** I predicted it would fire "the floors only, never the hard zero"; it
+fires the hard-zero *method* — on its **anti-vacuity floor**, whose message reads *"No package-info
+reads as making an emission claim at all … the assertion below would then pass over nothing"* —
+while the offender assertion beneath it stays **empty and therefore satisfied**. That is precisely
+the argument for the floor living *inside* that method: with an empty corpus a negative assertion
+reports the same empty list whether the detector works or is dead (F2-235/F2-455), so the floor
+above it is the only thing that can separate the two. The floors sit above the largest **wrong**
+answer — zero files, zero emitted tokens, zero claiming files — rather than above zero.
+
+🔑 **J is the second.** Dropping the section rule is the mutation that would have dropped
+`DATA_REVIEW_DUE`, and on a **fixed** tree the hard zero cannot see it at all: there is nothing
+left to find, so only the self-test's synthetic corpus fires. A gate whose population is already
+clean is provable only against manufactured input.
+
+⚙ **A–E are five separate controls rather than one**, so each module's correction is shown to be
+carried by the gate individually — reverting all five at once could not say which claim shape each
+leg sees, and the five shapes differ (a `<ul>` under a claiming paragraph, a token inside a
+`<li>` naming two more, a bare-prose sentence, a count-bearing paragraph under an `<h2>`).
+
+### No live probe, and that is a calibration rather than a gap
+
+F2-434/F2-456/F2-460's standard. The fix is five sentences of documentation, so there is no
+behaviour to probe. What genuinely depended on the data — **which of the eight claims already has
+an automation rule behind it** — was measured **read-only** against both databases, and that is
+what separates three P2 rows from five documentation corrections.
+
+### Filed
+
+- **The five sweeps** (a scheduler, an event and its routing per module) and **the three inert
+  rules**. F2-436's filing stands: publishing is a feature, retiring is a data write, and
+  disclosing it *"has nowhere to land"* because the frontend has no client for
+  `GET /api/v1/automation/rules` at all — so no operator ever reads a rule's description either.
+- **`openbanking` emits five tokens its list does not name.** The gate is one-directional by
+  design; whether an event list should be exhaustive is a documentation convention rather than a
+  defect, so it is recorded rather than swept.
+- ⚙ **Swept CLEAN in the same firing, recorded so nobody re-runs them** (F2-216):
+  - **`parallelStream` / `CompletableFuture` / `ExecutorService` / `new Thread` — 0 sites in all of
+    `src/main/java`.** `TenantContext` is a `ThreadLocal`, so a parallel stream or an ad-hoc thread
+    inside a request would lose the tenant silently; the platform contains no such site.
+  - **A `@PreAuthorize` SpEL expression referencing `#name` the method does not declare** — the
+    recorded trap where SpEL throws and the endpoint answers **500, not 403** — is **0 of the 15
+    literal sites**. ⚠ Not a complete answer, and saying so is the point: **585 of 2,203 guard
+    annotations name a CONSTANT**, which a source scan cannot resolve (F2-439's rule), so a
+    reflective version of that question is still open.
+  - **`risk.kri_measurement` ties: 0 in both databases**, so the two implementations of *"the
+    latest measurement per KRI"* — `findFirst…OrderByMeasuredAtDesc` (four readers) and
+    `findLatestPerKriIn`'s `MAX` correlated subquery (the board pack and the KRI exports) — cannot
+    presently disagree. ⚠ Neither carries a tiebreaker and the `MAX` form returns *both* tied rows
+    into a `HashMap.put`, so the pick would be plan-dependent; latent, and the org-scope difference
+    between the two is already measured and documented in `BoardPackAggregateService`.
+  - **A repository javadoc claiming what its query does not do** — F2-196, F2-230 and F2-460 each
+    found one by hand — surfaced **14 candidates of which 13 are detector artefacts**: a `MAX`
+    aggregate needs no `ORDER BY`, *"INCLUDING soft-deleted"* is the opposite polarity to what the
+    scan tests, and a class-level javadoc is mis-attributed to the first method beneath it. The
+    survivor, `KriMeasurementRepository#findLatestPerKriIn`, is **correct** about "latest". A gate
+    there would need polarity, aggregate and attribution narrowings before it could stop
+    manufacturing findings (F2-192).
+
+### My own errors this slice, all caught by running something
+
+- ⚠⚠ **F2-444's landmine fired exactly as recorded and truncated a tracked file to 0 bytes.**
+  `🔑` written as two escapes is two unpaired surrogates, so the write raised
+  `UnicodeEncodeError` — and `io.open(p, "w")` **truncates on open**, so
+  `regreporting/package-info.java` was already empty by then. F2-444 prescribes *build the content,
+  write a TEMP file, assert the round-trip, then `os.replace`* and **I did not use it**. The file
+  was tracked, so `git checkout --` restored it; the script now uses `\U0001F511` and the
+  temp-and-replace pattern.
+- ⚠ **The heredoc escape-collapse fired again** on a `\\s` inside a `<<'PY'` payload. The
+  fail-before-write assert held, so nothing was written — the rule is to use the editing tools for
+  any payload carrying escapes, and it covers a quoted heredoc.
+- ⚠ **A guessed table name**: `risk.kri_measurements` does not exist; the entity says
+  `@Table(schema = "risk", name = "kri_measurement")`. Resolve from `@Table` / `sys.tables`, never
+  from the field name — the recurring error in this lineage.
+- ⚠ `str.format()` on an ODBC connection string ate the `{ODBC Driver 17 for SQL Server}` braces
+  and reported a missing driver.
+
 ## F2-466 — the failure nobody named, on the one lookup of four that did not name it
 
 | Field | Value |
