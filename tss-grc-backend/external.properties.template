@@ -157,13 +157,45 @@ NOTIFY_FROM_EMAIL=noreply@tss-grc.com
 # primary control, so turning it off degrades assurance rather than opening a
 # hole. This is the switch that did not work on 2026-08-02.
 #TENANT_WRITE_GUARD_ENABLED=true
-# The four SLA/expiry clocks. Turning one off stops reminders and overdue
-# escalations for that module — which is a compliance gap on NCA/SAMA reviews,
-# not merely a quiet inbox.
+# ── Scheduler gates: ten in total, and the two halves default differently ──
+#
+# Turning one of these off stops reminders and overdue escalations for that module —
+# which is a compliance gap on NCA/SAMA reviews, not merely a quiet inbox.
+#
+# ⚠ This block used to read "The four SLA/expiry clocks" and list only the four below.
+# The platform has ten scheduler gates; the four were exactly the ones already ON, so the
+# enumeration read as the whole population while five more sat OFF in every profile,
+# declared in no yml and named in no operator file (F2-462). Their javadocs said "off by
+# default in dev … operators flip it on per-env", and there was no per-env surface to flip.
+
+# ON by default. Uncomment only to stop something that is misbehaving, and record why.
 #VULN_SLA_SCHEDULER_ENABLED=true
 #CYBER_CAPA_SLA_SCHEDULER_ENABLED=true
 #CYBER_EVIDENCE_EXPIRY_SCHEDULER_ENABLED=true
 #WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED=true
+
+# OFF by default, and each writes to live tenant data when enabled — audit rows, domain
+# events, flagged records — so switching one on is an operator decision per environment.
+# Set to true to enable.
+#
+#   APPROVAL_CHAIN_SCHEDULER_ENABLED  15-min sweep escalating in-flight approval chains
+#                                     past their SLA.
+#   CCM_SCHEDULER_ENABLED             60-second tick running continuous-control tests on
+#                                     their cron. With it off the register only advances
+#                                     when somebody presses Run now.
+#   KRI_SCHEDULER_ENABLED             daily 06:00 KRI evaluation — the CCM cadence, so an
+#                                     08:00 audit committee sees fresh numbers.
+#   RISK_REVIEW_SCHEDULER_ENABLED     daily 06:30 sweep flagging risks past their review
+#                                     date. Measured while unreachable: 24 risks past
+#                                     review date and unflagged, across three tenants.
+#   SANCTIONS_SCHEDULER_ENABLED       daily 04:00 list refresh + 15-min SLA-breach sweep
+#                                     firing SANCTIONS_HIT_SLA_BREACHED per tenant.
+#
+#APPROVAL_CHAIN_SCHEDULER_ENABLED=false
+#CCM_SCHEDULER_ENABLED=false
+#KRI_SCHEDULER_ENABLED=false
+#RISK_REVIEW_SCHEDULER_ENABLED=false
+#SANCTIONS_SCHEDULER_ENABLED=false
 
 # ── Storage, schema and API surface ─────────────────────────────
 # Both keys set the SAME property (grc.storage.base-path) and either one works in

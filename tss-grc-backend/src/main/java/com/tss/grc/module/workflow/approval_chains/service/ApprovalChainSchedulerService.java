@@ -15,9 +15,15 @@ import java.util.List;
 /**
  * Sprint 13 — Background sweeper for approval-chain SLA breaches.
  *
- * <p>Off by default in dev — gated by
- * {@code grc.approval-chain.scheduler-enabled} so a developer running
- * the UI doesn't get a chatty DB. Operators flip it on per-env.
+ * <p>OFF in every packaged profile, gated by {@code grc.approval-chain.scheduler-enabled}.
+ * Declared in {@code application.yml} as a placeholder and named in
+ * {@code external.properties.template}, so an operator can turn it on per environment.
+ *
+ * <p>⚠ This paragraph read "Off by default in dev ... operators flip it on per-env"
+ * until F2-462, and both clauses were false: the property was declared in NO packaged yml,
+ * so it was off in production too, and there was no placeholder and no template entry for an
+ * operator to flip. Enabling it writes to live tenant data, so it stays OFF by default and
+ * switching it on is an operator decision taken per environment and recorded.
  *
  * <p>Algorithm per tick (every 15 min):
  * <ol>

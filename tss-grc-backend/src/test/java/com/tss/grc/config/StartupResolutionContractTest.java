@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -534,7 +535,21 @@ class StartupResolutionContractTest {
      * as the {@code Environment} will.
      */
     static Set<String> declaredProperties() throws IOException {
-        Set<String> keys = new TreeSet<>();
+        return new TreeSet<>(declaredValues().keySet());
+    }
+
+    /**
+     * The same walk, keeping the RAW values -- a key maps to every value the packaged
+     * documents give it, because a property declared as a literal in one profile and as a
+     * {@code ${PLACEHOLDER}} in another is reachable from {@code external.properties} and a
+     * key-set alone cannot say so (F2-462).
+     *
+     * <p>⚠ ONE walk with two readers rather than two walks: a second enumeration of "which
+     * files are packaged" would be free to disagree with this one, which is the drift this
+     * programme keeps recording (F2-190).
+     */
+    static Map<String, Set<String>> declaredValues() throws IOException {
+        Map<String, Set<String>> out = new TreeMap<>();
         YamlPropertySourceLoader yaml = new YamlPropertySourceLoader();
         List<Path> files;
         try (Stream<Path> s = Files.walk(RESOURCES, 1)) {
@@ -550,15 +565,23 @@ class StartupResolutionContractTest {
                 for (String line : Files.readAllLines(p)) {
                     String t = line.trim();
                     if (t.isEmpty() || t.startsWith("#") || !t.contains("=")) continue;
-                    keys.add(t.substring(0, t.indexOf('=')).trim());
+                    String k = t.substring(0, t.indexOf('=')).trim();
+                    out.computeIfAbsent(k, x -> new LinkedHashSet<>())
+                        .add(t.substring(t.indexOf('=') + 1).trim());
                 }
                 continue;
             }
             for (PropertySource<?> src : yaml.load(n, new FileSystemResource(p.toFile()))) {
-                if (src instanceof EnumerablePropertySource<?> e) keys.addAll(List.of(e.getPropertyNames()));
+                if (src instanceof EnumerablePropertySource<?> e) {
+                    for (String k : e.getPropertyNames()) {
+                        Object v = e.getProperty(k);
+                        out.computeIfAbsent(k, x -> new LinkedHashSet<>())
+                            .add(v == null ? "" : v.toString());
+                    }
+                }
             }
         }
-        return keys;
+        return out;
     }
 
     // ─────────────────────────── the legs ───────────────────────────
