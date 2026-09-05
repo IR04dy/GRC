@@ -318,6 +318,46 @@ grc:
     roi:
       discount-rate: ${GRC_BCM_ROI_DISCOUNT_RATE:8.00}
 
+  # Scheduler gates that were reachable from no artefact an operator reads (F2-462).
+  #
+  # Every one of these was already `false` -- the @Value fallback in the scheduler itself --
+  # and none of them appeared in any packaged yml, so there was no placeholder for
+  # external.properties to override and no entry in external.properties.template. The four
+  # SLA/expiry clocks beside them in that template were declared in dev AND prod, which is
+  # what made the enumeration read as the whole population.
+  #
+  # Declaring them here changes NOTHING at runtime: the effective value is still false in
+  # every profile. What it changes is that an operator can now turn one on.
+  #
+  # ⚠ Turning one on has a real effect on a live tenant -- these sweeps write audit rows,
+  # raise events and flag records -- so they stay OFF by default and enabling one is an
+  # operator decision, taken per environment and recorded.
+  approval-chain:
+    # 15-minute sweep escalating in-flight approval-chain instances past their SLA.
+    scheduler-enabled: ${APPROVAL_CHAIN_SCHEDULER_ENABLED:false}
+
+  ccm:
+    # 60-second tick running continuous-control tests on their configured cron. The CCM
+    # console's own copy states this cadence, so with the tick off the register only advances
+    # when somebody presses Run now.
+    scheduler-enabled: ${CCM_SCHEDULER_ENABLED:false}
+
+  kri:
+    # Daily 06:00 KRI evaluation cycle -- deliberately the CCM cadence, so an audit committee
+    # meeting at 08:00 sees fresh numbers.
+    scheduler-enabled: ${KRI_SCHEDULER_ENABLED:false}
+
+  risk:
+    # Daily 06:30 sweep flagging risks past their review date. Measured while it was
+    # unreachable: 24 risks past review date and unflagged, across three tenants (F2-317).
+    review-scheduler-enabled: ${RISK_REVIEW_SCHEDULER_ENABLED:false}
+
+  sanctions:
+    # Two ticks: a daily 04:00 refresh of every DAILY-cadence sanctions list, and a
+    # 15-minute SLA-breach sweep over PENDING_REVIEW hits that fires
+    # SANCTIONS_HIT_SLA_BREACHED per tenant.
+    scheduler-enabled: ${SANCTIONS_SCHEDULER_ENABLED:false}
+
   # Platform health checks
   # See docs/operations/sqlexpress-size-monitor.md for the runbook and
   # the F8 trigger DB_SIZE_THRESHOLD_BREACHED emitted on breach.
