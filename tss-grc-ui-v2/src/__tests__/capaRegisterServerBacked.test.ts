@@ -255,6 +255,23 @@ describe('F2-208 — the CAPA register is server-backed', () => {
 
   // ── F2-465 — the prose about the machine is held to the machine ─────────────────────
 
+  it('the dictionary corpus is measured', () => {
+    // ⚠ This floor sits OUTSIDE the per-dictionary loops on purpose. The first draft put it
+    // inside, where it guards the CONTENTS of each dictionary and cannot guard the EXISTENCE
+    // of the list: emptying DICTS made every hard zero below iterate zero times and pass
+    // vacuously, floors included, and the mutation harness was the only thing that saw it.
+    // F2-235/F2-455 — a negative assertion over an empty corpus reports the same empty list
+    // whether the walk works or is dead, so the floor has to sit above the largest WRONG
+    // answer, which here is zero dictionaries.
+    expect(DICTS.length, 'the dictionary list is empty — every prose leg below is vacuous')
+      .toBe(2);
+    for (const dict of DICTS) {
+      expect(existsSync(join(SRC, dict)), `${dict} does not resolve`).toBe(true);
+      expect(capaKeys(dict).length, `${dict}: no capa* keys parsed — the parse has rotted`)
+        .toBeGreaterThan(40);
+    }
+  });
+
   it('no capa label writes the machine out in prose', () => {
     // A state ladder in a translation string is a SECOND COPY of the vocabulary, and F2-196's
     // rule is that a second copy drifts from the one with a vote. This one drifted all the way:
@@ -328,9 +345,14 @@ describe('F2-208 — the CAPA register is server-backed', () => {
     expect(to).toBeGreaterThan(from);
     const derivation = lib.slice(from, to);
     for (const s of Object.keys(CAPA_ALLOWED)) {
-      expect(derivation, `the derivation names '${s}'. A state literal inside the code that `
-        + 'derives the order is the second copy the derivation exists to avoid.')
-        .not.toContain(`'${s}'`);
+      // The BARE token, not the quoted literal. Quoted would pass over an unquoted mention and
+      // would make the comment-stripping above decorative — which is what control F caught: the
+      // leg claimed the stripping was load-bearing while its own pattern could not see prose.
+      expect(new RegExp(`\\b${s}\\b`).test(derivation),
+        `the derivation names ${s}. A state inside the code that derives the order is the second `
+        + 'copy the derivation exists to avoid — and if this fires with the comments in, the '
+        + 'stripping above is what keeps the ⚠ note free to name all five.')
+        .toBe(false);
     }
   });
 
