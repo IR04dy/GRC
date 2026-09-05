@@ -15229,6 +15229,169 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-464 — a refusal that names a route the platform does not serve
+
+| Field | Value |
+|---|---|
+| **Id** | F2-464 |
+| **Title** | `TprmService`'s questionnaire-ownership refusal told the caller to POST to `/api/tprm/assessments/{id}/responses` — no `v1` segment, 404 on every verb — and nothing counted the routes the platform names in its own messages |
+| **Severity** | P3 (the refusal is correct and fires for a real population; what is wrong is the one thing it exists to say — where to go instead) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, from a native-`@Query` sweep's leftovers: a grep for `/api/` in main sources surfaced ~30 refusal messages citing a route, and nothing resolved any of them |
+| **Fixed** | `d70526ea`, merged `fix/f2-464-route-citation` |
+| **Module** | `module/tprm` (the member); platform-wide (the gate) |
+| **Migration** | none |
+
+### The defect
+
+`TprmService#requireScoreIsNotQuestionnaireOwned` refuses a manual `riskScore`/`riskRating` on a
+vendor assessment a questionnaire owns, and names the path that owns it:
+
+> Assessment 2 is scored by questionnaire template 1, so riskScore/riskRating are derived from the
+> responses (computedScorePct=17.31, rating=LOW). **Change an answer via POST
+> /api/tprm/assessments/2/responses**, or complete the assessment, to move the score.
+
+That path has **no `v1` segment** and routes nowhere. Probed live as `compliance` (never `admin`),
+read-only:
+
+| request | result |
+|---|---|
+| `GET /api/tprm/assessments/1/responses` | **404** |
+| `GET /api/v1/tprm/assessments/1/responses` | **200** |
+| `POST /api/tprm/assessments/1/responses` | **404** |
+| `DELETE /api/tprm/assessments/1/responses` | **404** |
+| `DELETE /api/v1/tprm/assessments/1/responses` | **405** — the path lives, the verb does not |
+
+🔑 **The refusal exists to send the caller somewhere, and the somewhere is a 404.** The guard itself
+is correct and fires for a real population: **7 of 19** vendor assessments carry a `template_id` in
+dev and prod. Confirmed by triggering it — `PUT /api/v1/tprm/assessments/2 {"riskScore":1.00}`
+answers **409** — and row 2 is unchanged afterwards (`17.31`, `LOW`), because the guard throws
+before any field copy, so the probe wrote nothing.
+
+⚠ **The correct path was one file away the whole time.** `QuestionnaireController`'s own javadoc has
+always read `/api/v1/tprm/assessments/:id/responses`. F2-215's two-of-N with the two artefacts being
+a controller's documentation and a sibling service's message. The missing `v1` is the exact error
+[[F2-202]] recorded when it guessed three endpoint paths from a schema name and all three were
+wrong, one of them by having no `v1` segment at all.
+
+### Why nothing saw it
+
+- `RequestMappingBindabilityContractTest` ([[F2-439]]) asks whether a mapping can **bind** — a
+  placeholder no `@PathVariable` satisfies, two handlers claiming one key.
+- `FrontendEndpointContractTest` ([[F2-170]]) asks whether every endpoint an **API client** calls
+  has a controller.
+
+Neither reads the routes the platform names in its own **messages**, and those are the strings an
+operator is told to act on. [[F2-243]] found one such citation wrong
+(`/api/sustainability/evidence/link` against the real `/api/sustainability/evidence-links`) and
+[[F2-302]] found a refusal naming a *mechanism* the register did not have — **both by hand, and
+nobody counted the population.** It is **37 citations in 27 files**.
+
+### The discriminator is the verb, and it is structural
+
+Measured over `src/main/java`: **354** string literals mention `/api/`, and **317** of them are
+route **declarations** — a `@RequestMapping` value, a `requestMatchers` pattern, a CORS matcher, an
+external system's base path (`props.getBaseUrl() + "/api/now/table/incident"`).
+
+🔑 **A declaration is a bare path; a citation carries an HTTP verb**, because it is telling a caller
+what to do. That is what separates *go here* from *this lives here*, and it is why the hard zero can
+ship with **no exemption map**: a correct path is always available, so there is no correct code for
+it to fail on ([[F2-214]]). Widening the pattern to bare paths makes the gate fail on every
+`@RequestMapping` in the platform — which is control **D**.
+
+### ⚠⚠ The instrument finding: a truncated citation resolves to a shorter REAL route
+
+`BcmService` cites the exercise-completion route through a nested ternary:
+
+```java
++ "took place. Supply executedDate, or use POST /api/v1/bcm/exercises/"
++ (id == null ? "{id}" : id) + "/complete, which stamps it from the server's clock "
+```
+
+Read flat, the **ternary's own string literal** breaks the message: the first part ends
+`/api/v1/bcm/exercises/`, which normalises to `/api/v1/bcm/exercises` — and that **is a real route**
+(`BcmController#createExercise`). So the scan resolves it and reports clean.
+
+🔑🔑 **A truncated citation never fails, it silently names something else** — the quiet direction,
+and it was found by reading the printed population rather than the count ([[F2-255]]: publish the
+names, not the number). The joiner therefore groups literals **by parenthesis depth**, so the nested
+literal is blanked and the gap between the two outer literals reads as one interpolation. Pinned by
+`aCitationInterpolatedThroughANestedExpressionIsReadWhole`, whose fixture carries the literal
+`BcmService` shape; control **B** reverts the depth grouping and fires that leg **alone** — the hard
+zero stays green, which is the finding restated as a control.
+
+⚙ The plain `"a" + id + "b"` interpolation is pinned in the same leg, because a concatenated value
+defeats a regex that only ever sees the first literal ([[F2-454]]).
+
+### One route resolver, two readers
+
+The mapped set comes from `RequestMappingBindabilityContractTest.mappings()`, widened to
+package-private, rather than a second walk of `target/classes`. Two resolvers would be free to
+disagree about which classes ship, how a class-level path joins a method-level one, and what an
+`ANY`-verb mapping means — and **the disagreement would be invisible, because each set looks
+complete on its own** ([[F2-190]]; the shape [[F2-455]] and [[F2-460]] used for F2-454's
+`namedPlaceholders`). The route count the gate floors against — **2,253 mappings over 1,681 distinct
+paths** — matches the figure F2-439 records independently, which is the corroboration.
+
+### ⚠ A control survived, and the leg's CLAIM was what was wrong
+
+Control **C** disables the comment stripping, and on the first run it **SURVIVED**. The mutated code
+is genuinely wrong, so this was not an equivalent mutant ([[F2-206]]) — the leg asserting the
+stripping was load-bearing was making a **false claim**:
+
+🔑 **the detector reads STRING LITERALS, so a comment can never produce a citation whether or not
+comments are stripped.** That is a *stronger* property than the stripping, and it is what makes the
+317 declarations and every javadoc route inventory invisible by construction. The stripping earns
+its place somewhere else entirely: a `;` or an unbalanced `(` inside a comment corrupts **statement
+boundaries and paren depth**, which splits a message that spans it — the same truncation the
+`BcmService` shape produces. The leg now asserts both halves, the second with a fixture carrying a
+semicolon inside a comment between two concatenated literals, and control C then kills it.
+
+⚠ **The answers on the live corpus do not move without the stripping** — measured, not assumed — so
+without that fixture it would have shipped as untested defence ([[F2-450]]'s rule, reached from the
+other side: there the fix was to make the quotation faithful, here it was to make the claim true).
+
+### Verification
+
+- **Live**, read-only, as `compliance`: the five-request table above, plus the 409 with the
+  corrected citation after the fix, plus row 2 unchanged.
+- **Controls: 6 killed · 0 survived · 0 anchor-miss**, baseline and post-restore green at 12/12.
+
+| control | fires |
+|---|---|
+| A the missing `v1` restored | `everyCitedRouteResolves`, `theCorrectedCitationIsPinned` |
+| B literals read flat, not by depth | `aCitationInterpolatedThroughANestedExpressionIsReadWhole` **only** |
+| C comment stripping disabled | `proseIsNotAClaimAndCannotBreakOne` |
+| D the verb dropped from the pattern | `everyCitedRouteResolves`, `noCitationNamesAPathUnderAVerbItDoesNotServe` |
+| E the source walk emptied | `theCorrectedCitationIsPinned`, `thePopulationIsMeasured` — **not** the hard zero |
+| F the route set emptied | `everyCitedRouteResolves`, `thePopulationIsMeasured` |
+
+🔑 **E is the load-bearing control.** A negative assertion over an empty corpus reports the same
+empty list whether the walk works or is dead ([[F2-235]], [[F2-455]]), so the hard zero cannot see
+it — only the floors and the value pin can. That is the whole reason those floors exist, and their
+numbers sit above the largest **wrong** answer (0 citations, 0 routes, 0 files) rather than above
+zero ([[F2-215]]).
+
+### What this gate cannot see
+
+Said out loud, because a hard zero over a population the instrument cannot see is the most
+reassuring possible artefact ([[F2-205]]):
+
+- a citation with **no verb** — indistinguishable from the 317 declarations, and a gate over those
+  would fail on correct code;
+- a route assembled at run time from a variable;
+- a claim about a **mechanism** rather than a route (*"which walks the machine and records who made
+  the change"*) — the shape [[F2-302]] found false on a register that has no state machine at all.
+
+### Filed
+
+- **The other 36 citations all resolve today**, so this is a one-member population plus a gate. The
+  natural next question is the mechanism half above, which is prose and not mechanically checkable.
+- `TprmService`'s message names the second remedy in prose (*"or complete the assessment"*) while
+  naming the first as a path; `POST /api/v1/tprm/assessments/{id}/complete` exists. Adding a second
+  citation is a wording improvement rather than a defect fix, so it was deliberately not made
+  ([[F2-188]]) — correcting a false claim and adding a new one are different changes.
+
 ## F2-463 — a declared column width that the column does not have
 
 | Field | Value |
