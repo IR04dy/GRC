@@ -15229,6 +15229,194 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-465 — the register described a workflow it does not have, beneath the lanes that show the one it does
+
+| Field | Value |
+|---|---|
+| **Id** | F2-465 |
+| **Title** | `capaWorkflowFootnote` named six CAPA stages — of which this register has one — and promised a 90-day post-closure check that fires `VERIFICATION_FAILED`, for a module with no `@Scheduled` method at all |
+| **Severity** | P3 (nothing is destroyed; what is wrong is a complete, confident description of a governance workflow an ISO 9001 §10.2 / IIA 2500 reviewer would ask to see evidence of) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, by asking F2-464's question of a different noun — *what does the platform tell an operator, in text, that is checkable?* Routes were F2-464; permissions and roles came back clean; numeric windows in the translation files did not |
+| **Fixed** | `25632073` + `c4db14c4` + the pinned-sentence leg, merged `fix/f2-465-capa-workflow-prose` |
+| **Module** | `tss-grc-ui-v2` (`lib/capa.ts`, `pages/capa/CapaPage.tsx`, both dictionaries) |
+| **Migration** | none |
+
+### The defect
+
+`/capa` is routed and sidebar-reachable. Its Workflow tab rendered, in both languages, directly
+beneath the kanban lanes:
+
+> Forward path: Identified → Implementing → Owner-tested (1LoD) → Independent-tested (2LoD) →
+> Audit signed-off (3LoD) → Closed. A 90-day post-closure check fires `VERIFICATION_FAILED` on
+> regression.
+
+`CapaTaskService.ALLOWED` is five states — `OPEN`, `IN_PROGRESS`, `AWAITING_VERIFICATION`,
+`CLOSED`, `CANCELLED`. So **of the six stages named, this register has one.** Measured over the
+whole backend: `VERIFICATION_FAILED` appears in **no Java source at all**, `module/capa` contains
+**no `@Scheduled` method**, and **no scheduler anywhere reads `CapaTaskRepository`** — so the
+90-day check is not a control that is off, it is a mechanism the module has in no form.
+
+🔑 **The lanes immediately above it are correct**, rendered from `Object.keys(CAPA_ALLOWED)` with
+labels from `CAPA_STATUS_LABEL`. So the card contradicted itself: five real lanes, then a sentence
+naming six different stages. F2-203's shape (an artefact that disagrees with itself on the same
+page), and F2-457's (two figures on one surface that cannot both be true).
+
+⚠⚠ **And the comment recording the fix that made the lanes correct sat fourteen lines above the
+surviving copy:**
+
+```
+// ⚠ Lanes are the machine's own key order, not a hand-written list. The old
+// version named six stages, three of which the server has no state for.
+```
+
+F2-215's two-of-N at its purest. [[F2-208]] measured that eight-state client machine, rewired the
+register, deleted the extra granularity, moved the lanes onto `CAPA_ALLOWED`, wrote that comment,
+and left the prose describing the machine it had just retired. `CapaStatus`'s own header says
+*"that gate exists because the eight-state version of this union outlived the register it was
+supposed to describe"* — and the **prose** version outlived it too.
+
+### Why three legs of one gate could not see it
+
+`capaRegisterServerBacked.test.ts` is F2-208's own honesty gate for this register, and it had
+three separate assertions any one of which would have caught this.
+
+| leg | why it was blind |
+|---|---|
+| `RETIRED_STATES` ban — forbids `VERIFICATION_FAILED` by name | scoped to `SURFACE`, four **code** files. The dictionaries are in none of them, so the token was banned four files away from where it sat. A **file list**. |
+| the prose leg over `capa*` keys | its filter is `/root cause\|effectiveness\|fishbone/i` — the vocabulary of the two tabs F2-208 was retiring. The English sentence uses none of those words. A **phrase list**. |
+| …and its Arabic half | the Arabic *does* say `فحص فاعلية` — an effectiveness check — and the filter's token is the **definite** `الفاعلية` where the string carried the bare `فاعلية`. A **definite article**. |
+
+🔑🔑 **A file list, a phrase list, and a definite article.** F2-198's shape three times over in one
+class, and the third is the sharpest: **the two halves of one bilingual filter had different
+reach**, so the language this platform treats as primary (house rule 7) was policed more weakly
+than the secondary one, in a leg written specifically to police prose.
+
+⚠ Note also that the leg's own comment states its narrowing **honestly and incompletely**:
+*"Scoped to this module's own keys, because other modules legitimately talk about root causes."*
+That is true of the **key** scope and says nothing about the **phrase** scope — so a reader is told
+about one narrowing and not the other, which is F2-184's shape inside a gate's documentation.
+
+### The fix: compose the sentence from the machine
+
+A state ladder written in a translation string is a **second copy of the vocabulary**, and F2-196's
+rule is that a second copy drifts from the one with a vote. This one drifted all the way. So the
+sentence is now COMPOSED:
+
+- `capaForwardPath()` — the working states in breadth-first distance order from the root, ignoring
+  the abandonment exit, ending at the completion exit.
+- `capaAbandonState()` — the terminal state **every** working state can reach directly, as against
+  the completion exit which only the last working state reaches. That asymmetry distinguishes the
+  two **without naming either**, which matters because a literal there would be the second copy the
+  derivation exists to avoid.
+- `capaRootState()` — the state nothing transitions into (F2-291's rule).
+
+`CapaPage` joins the labels from `CAPA_STATUS_LABEL`; two prose fragments per language remain.
+Rendered:
+
+> **Forward path: Open → In progress → Awaiting verification → Closed. Any unfinished state can
+> instead end as Cancelled.**
+>
+> **المسار الأمامي: مفتوحة → قيد التنفيذ → بانتظار التحقق → مغلقة. ويمكن أن تنتهي أي حالة غير منتهية إلى ملغاة.**
+
+⚠ **Distance order rather than a longest-path walk, because the longest path is NOT unique here**:
+`OPEN → IN_PROGRESS → AWAITING_VERIFICATION → CLOSED` and the same prefix ending at the
+abandonment exit are both length 4. Distance from the root is a total order only while the depths
+are distinct, so that is checked — and **both fail-safe branches return every real state instead**,
+which claims no order but can never name a state the register cannot store. Omission is safe here;
+commission is not, which is also why the back-edge is not described.
+
+### Verification
+
+- `tsc --noEmit` clean. Frontend **859/859** from inside `tss-grc-ui-v2` (F2-435 — `--root` from the
+  repo root collects a different config). Backend **5223/0/0**, unchanged and exactly predicted;
+  `CapaMachineParityTest` reads `lib/capa.ts` and still parses it 5/5.
+- **Controls: 9 killed · 0 survived · 0 anchor-miss**, baseline and post-restore green at 16.
+
+| control | fires |
+|---|---|
+| A the English sentence restored | ladder ban + token ban + composition |
+| B the **Arabic** sentence restored only | ladder ban + **effectiveness filter** + composition — **not** the token ban |
+| C B, with F2-208's filter reverted to the definite form | ladder ban + composition — the **effectiveness leg goes SILENT** |
+| D the page renders the key again | composition leg alone |
+| E a state literal put back into the derivation | derivation leg alone |
+| F comment stripping disabled | derivation leg (+ six pre-existing) |
+| G the abandonment exit no longer derived | value leg + composed-sentence leg |
+| H the dictionary corpus emptied | the **corpus floor only** — never a hard zero |
+| I a claim re-introduced into the surviving fragment | composed-sentence leg + effectiveness filter |
+
+🔑 **B versus C is the whole demonstration.** The same Arabic sentence is restored in both; the
+effectiveness leg fires in B and is silent in C. That is the widened token being load-bearing,
+stated as a measurement rather than as an argument.
+
+🔑 **A versus B is the second one.** Three legs fire in each and they are not the same three: the
+token ban is blind to the Arabic, where the state name is **translated** rather than quoted. So the
+ladder ban is the only one of the three that catches both languages, which is why it is the
+load-bearing leg.
+
+### ⚠⚠ Two holes the harness found in this slice's own gate
+
+**Control H SURVIVED on the first run.** The anti-vacuity floor sat **inside** the per-dictionary
+loop, where it guards each dictionary's CONTENTS and cannot guard the EXISTENCE of the list — so an
+empty `DICTS` made all three prose legs iterate zero times and pass vacuously, floors included.
+F2-235/F2-455's rule in a leg written after quoting it: 🔑 **a floor must sit above the largest
+WRONG answer, and here that answer is zero dictionaries.** Hoisted into its own leg.
+
+**Control F killed for six unrelated reasons and NOT the derivation leg**, whose comment claimed
+the stripping was load-bearing for it. It was not: the leg tested for a **quoted** state literal
+and the javadoc it was written to tolerate names the states unquoted, so the pattern could not see
+prose either way. F2-450's shape — the mutated code was wrong and the claim beside it was wronger.
+Switched to the **bare** token, which is both the stronger assertion and the one that makes the
+stripping demonstrably necessary.
+
+⚠ And a third, smaller one: `CapaPage` has **no render test** — `WorkflowTab` is not exported, and
+F2-360 recorded that extracting a tab for one is a page-structure decision of its own. So a leg
+composes the sentence the way the page does and pins the **output**, while the structural leg pins
+that the page still **calls** the derivation — because a leg exercising a primitive says nothing
+about whether the code under review calls it (F2-274). Control I is what makes that leg
+discriminate rather than stand as a guard (F2-225).
+
+### What was measured and came back clean
+
+Recorded so nobody re-runs them (F2-216). The slice began as F2-464's question asked of two other
+nouns:
+
+- **Permissions named in refusal messages.** The `change_mgmt` self-review refusals name
+  `CHANGE:APPROVE` for the waive and ratify routes and `CHANGE:WRITE` for the PIR and
+  condition-satisfaction routes; all four match the guard on the route the message is about, and
+  the CAB-decision refusal names `CHANGE:APPROVE` immediately below the check that tests for the
+  `CHANGE_APPROVE` authority. `IntakeService`'s is **derived** (`+ required +`), so it cannot drift.
+- **The 13 intake-promotion adapters' `requiredPermission()`.** All 13 agree with the target
+  register's own create-route guard. ⚠ But `everyPortDemandsAPermissionThePlatformActuallyUses`
+  only checks that the pair appears in **some** `@PreAuthorize` anywhere, while its own assertion
+  message says *"must demand the same permission the target module's own create endpoint
+  demands"* — F2-184's shape in a gate whose message quotes the trap it cannot detect. Currently
+  clean, so **filed** rather than fixed.
+- ⚠⚠ **Two of my own measurement errors, both loud.** A guard-resolution scan taking the last
+  `@PreAuthorize` in a 1400-character lookback reached into the **previous method's** annotation
+  and invented **three POST creates guarded by READ** — F2-424's fixed-window shape, and F2-453 had
+  already measured that population at 5, none of them these. And the adapter comparison keyed
+  services by **simple name**, conflating the two `AuditEngagementService` and two
+  `PolicyManagementService`-calling controllers (F2-278's twin trap). Both over-reported, which is
+  the safe direction.
+
+### Filed
+
+- The adapter gate's overclaiming message above.
+- `rlcKriSub` on `/risk-lifecycle` states *"Escalates to CRO if unresolved within 24h, then Risk
+  Committee, then Board within 30 days per CMA Art. 71"*, and `KriMeasurementService` has a
+  band-change event and **no time-based ladder to CRO, committee or board**. Three
+  `bcl*` keys on `/bcm-lifecycle` claim a **12-month BIA auto-expiry** and one of them is a
+  **toast shown at the moment of approval** — and no `plusMonths(12)`/`plusYears(1)` exists in
+  `module/bcm` at all. Both are the same class as this finding; ⚠ `/bcm-lifecycle` is already
+  inside [[F2-204]]'s `NO_SERVER_SURFACE` population and [[F2-205]]'s filed BCM packet, so working
+  there means touching a recorded owner decision.
+- A `CapaPage` render test, which needs `WorkflowTab` exported — F2-360's page-structure decision.
+- The generalisation this slice deliberately did **not** attempt: a gate over *every* numeric
+  window stated in the dictionaries. 63 English keys state one; most are descriptive, and deciding
+  which are claims about a server-enforced mechanism is a reading job per module, not a sweep
+  ([[F2-188]]).
+
 ## F2-464 — a refusal that names a route the platform does not serve
 
 | Field | Value |
