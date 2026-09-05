@@ -156,6 +156,17 @@ public class TprmService {
      * <p>Deliberately narrow: it fires only when the caller supplies a value that <em>differs</em>
      * from what is stored, so an ordinary round-trip PUT (read, change the findings text, send it
      * all back) still works.
+     *
+     * <p><b>F2-464 — the route it names has to exist.</b> The message cited
+     * {@code "/api/tprm/assessments/" + id + "/responses"}, which has <b>no {@code v1} segment</b>
+     * and routes nowhere: probed live, that path is 404 on GET, POST and DELETE while
+     * {@code /api/v1/tprm/assessments/{id}/responses} answers 200 and 405. So the one refusal
+     * whose whole job is to send the caller to the path that owns the score sent them to a 404 —
+     * and {@code QuestionnaireController}'s own javadoc, one file away, has always spelled the
+     * route correctly. Fires for a real population: 7 of 19 assessments carry a
+     * {@code template_id} in dev and prod. {@code RouteCitationContractTest} now resolves every
+     * verb-prefixed route citation in the platform's runtime messages against the mapped
+     * (verb, path) set.
      */
     private void requireScoreIsNotQuestionnaireOwned(VendorAssessment existing, VendorAssessment req) {
         if (existing.getTemplateId() == null) return; // manual assessment — free-form by design
@@ -170,7 +181,7 @@ public class TprmService {
                 + existing.getTemplateId() + ", so riskScore/riskRating are derived from the "
                 + "responses (computedScorePct=" + existing.getComputedScorePct() + ", rating="
                 + existing.getRiskRating() + "). Change an answer via POST "
-                + "/api/tprm/assessments/" + existing.getId() + "/responses, or complete the "
+                + "/api/v1/tprm/assessments/" + existing.getId() + "/responses, or complete the "
                 + "assessment, to move the score. Received riskScore=" + req.getRiskScore()
                 + ", riskRating=" + req.getRiskRating() + ".");
         }
