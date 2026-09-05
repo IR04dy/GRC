@@ -45,6 +45,7 @@ import { getErrorDisplayMessage } from '../../lib/apiError';
 import {
   useCapas, CAPA_STATUS_LABEL, CAPA_STATUS_TONE, CAPA_SEVERITY_TONE,
   CAPA_ALLOWED, CAPA_SOURCE_LABEL, agingBucket, daysUntilDue, isCapaOpen,
+  capaForwardPath, capaAbandonState,
   type Capa, type CapaStatus,
 } from '../../lib/capa';
 import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
@@ -412,6 +413,8 @@ function WorkflowTab({ items }: { items: Capa[] }) {
   // ⚠ Lanes are the machine's own key order, not a hand-written list. The old
   // version named six stages, three of which the server has no state for.
   const stages = Object.keys(CAPA_ALLOWED) as CapaStatus[];
+  const stageLabel = (s: CapaStatus) => CAPA_STATUS_LABEL[s][lang === 'ar' ? 'ar' : 'en'];
+  const abandon = capaAbandonState();
 
   return (
     <Card title={t('capaTabWorkflow')} Icon={Workflow}>
@@ -443,8 +446,19 @@ function WorkflowTab({ items }: { items: Capa[] }) {
           );
         })}
       </div>
+      {/*
+        F2-465: COMPOSED from the machine, never written beside it. `capaWorkflowFootnote`
+        was one sentence naming six stages — Identified, Implementing, Owner-tested (1LoD),
+        Independent-tested (2LoD), Audit signed-off (3LoD), Closed — of which this register
+        has one, plus "a 90-day post-closure check fires VERIFICATION_FAILED on regression"
+        for a module that carries no @Scheduled method at all. It rendered directly beneath
+        the lanes above, which have named the five real states since F2-208 moved them onto
+        CAPA_ALLOWED — so the card contradicted itself, and the comment recording that fix
+        sat fourteen lines above the surviving copy.
+      */}
       <div className="capa-footnote-plain capa-footnote--plain">
-        {t('capaWorkflowFootnote')}
+        {`${t('capaWorkflowForward')} ${capaForwardPath().map(stageLabel).join(' → ')}.`}
+        {abandon ? ` ${t('capaWorkflowCancel')} ${stageLabel(abandon)}.` : ''}
       </div>
     </Card>
   );

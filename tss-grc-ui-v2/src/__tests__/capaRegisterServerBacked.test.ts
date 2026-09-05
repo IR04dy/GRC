@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { CAPA_ALLOWED, capaForwardPath, capaAbandonState } from '../lib/capa';
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +49,36 @@ const RETIRED_STATES = [
   'IDENTIFIED', 'IMPLEMENTING', 'OWNER_TESTED', 'INDEPENDENT_TESTED',
   'AUDIT_SIGNED_OFF', 'VERIFICATION_FAILED',
 ];
+
+/**
+ * The dictionaries — NOT part of SURFACE, and that is F2-465's instrument finding.
+ *
+ * The leg below bans every RETIRED_STATES token across SURFACE, so `VERIFICATION_FAILED`
+ * was forbidden in four code files while sitting in `en.ts`, which is in none of them.
+ * The prose leg that DOES read these files was scoped to a phrase list drawn from the two
+ * tabs F2-208 retired (`root cause`, `effectiveness`, `fishbone`), and the retired sentence
+ * used none of those words in English. Its ARABIC half did say `فحص فاعلية` — an
+ * effectiveness check — and escaped for a third reason: the filter's token was the definite
+ * `الفاعلية` and the string carried the bare `فاعلية`, so the two halves of one bilingual
+ * filter had different reach. A file list, a phrase list, and a definite article.
+ */
+const DICTS = ['translations/en.ts', 'translations/ar.ts'];
+
+/**
+ * Every `capa*` key a dictionary declares. Comments are stripped first: this codebase
+ * explains a deletion by naming what was deleted, so a raw scan reads the epitaph as the
+ * corpse (F2-193) — and both retirement notes below name the retired key.
+ */
+function capaKeys(dict: string): { key: string; value: string }[] {
+  return [...strip(read(dict)).matchAll(/^ {2}(capa[A-Za-z0-9_]*):\s*'([^']*)'/gm)]
+    .map(m => ({ key: m[1], value: m[2] }));
+}
+
+/** A state ladder written in prose: the arrow the retired sentence joined its stages with. */
+const PROSE_LADDER = /→/;
+
+/** An UPPER_SNAKE token — the shape a state name takes when prose quotes one verbatim. */
+const SNAKE_TOKEN = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g;
 
 /**
  * Every `setSomething(...)` call's argument text, brace-balanced.
@@ -204,18 +235,102 @@ describe('F2-208 — the CAPA register is server-backed', () => {
     // `capaPageSub` promised "a documented root cause, verification gates, and effectiveness
     // check" — one of the three exists. Scoped to this module's own keys, because other modules
     // legitimately talk about root causes.
-    for (const dict of ['translations/en.ts', 'translations/ar.ts']) {
-      const src = read(dict);
-      const capaKeys = [...src.matchAll(/^ {2}(capa[A-Za-z0-9_]*):\s*'([^']*)'/gm)]
-        .map(m => ({ key: m[1], value: m[2] }));
-      expect(capaKeys.length, `${dict}: no capa* keys parsed — the parse has rotted`)
+    for (const dict of DICTS) {
+      const keys = capaKeys(dict);
+      expect(keys.length, `${dict}: no capa* keys parsed — the parse has rotted`)
         .toBeGreaterThan(40);
-      const claims = capaKeys.filter(k =>
-        /root cause|السبب الجذري|effectiveness|الفاعلية|fishbone|عظمة السمكة/i.test(k.value));
+      // ⚠ F2-465 widened two of these tokens. `الفاعلية` is the DEFINITE form, so it could not
+      // match the bare `فاعلية` in `capaWorkflowFootnote`'s "فحص فاعلية بعد 90 يوماً" — the two
+      // halves of one bilingual filter had different reach, and the Arabic half of the claim
+      // escaped for that reason alone. `effectiveness` → `effectiv` for the same asymmetry in
+      // the other direction. Measured: widened, they hit that one key and nothing else of 85.
+      const claims = keys.filter(k =>
+        /root cause|السبب الجذري|effectiv|فاعلية|fishbone|عظمة السمكة/i.test(k.value));
       expect(claims.map(c => `${c.key} = "${c.value}"`),
         `${dict}: a capa* label still describes root-cause analysis or an effectiveness re-test. `
         + 'Neither has a column; retiring a tab means retiring the sentence that advertised it.')
         .toEqual([]);
+    }
+  });
+
+  // ── F2-465 — the prose about the machine is held to the machine ─────────────────────
+
+  it('no capa label writes the machine out in prose', () => {
+    // A state ladder in a translation string is a SECOND COPY of the vocabulary, and F2-196's
+    // rule is that a second copy drifts from the one with a vote. This one drifted all the way:
+    // six stages, of which the register has one. Composing the sentence from CAPA_STATUS_LABEL
+    // is always available, so there is no correct code for this zero to fail on (F2-214).
+    for (const dict of DICTS) {
+      const keys = capaKeys(dict);
+      expect(keys.length, `${dict}: no capa* keys parsed — the parse has rotted`)
+        .toBeGreaterThan(40);
+      const ladders = keys.filter(k => PROSE_LADDER.test(k.value));
+      expect(ladders.map(k => `${k.key} = "${k.value}"`),
+        `${dict}: a capa* label writes the state machine out in prose. Compose it from `
+        + 'CAPA_STATUS_LABEL and capaForwardPath() instead — a sentence written beside the '
+        + 'machine is free to disagree with the lanes rendered directly above it, which is '
+        + 'exactly what capaWorkflowFootnote did.')
+        .toEqual([]);
+    }
+  });
+
+  it('no capa label names a token the register cannot store', () => {
+    // The vocabulary is DERIVED from the machine, never listed here: a second list is the
+    // defect this whole gate exists for. `LOW`/`HIGH`/`CORRECTIVE` are single words and so
+    // do not match SNAKE_TOKEN, which is why the severity and type labels are unaffected.
+    const vocabulary = new Set(Object.keys(CAPA_ALLOWED));
+    expect(vocabulary.size, 'the machine parsed to nothing — the import, not the label, is broken')
+      .toBeGreaterThan(3);
+    for (const dict of DICTS) {
+      const offenders: string[] = [];
+      for (const { key, value } of capaKeys(dict)) {
+        const bad = [...value.matchAll(SNAKE_TOKEN)]
+          .map(m => m[0]).filter(t => !vocabulary.has(t));
+        if (bad.length > 0) offenders.push(`${key} names ${[...new Set(bad)].join(', ')}`);
+      }
+      expect(offenders, `${dict}: a capa* label quotes a state token this register has no state `
+        + 'for. VERIFICATION_FAILED was banned across the four SURFACE files while sitting in '
+        + 'this dictionary, which is in none of them.')
+        .toEqual([]);
+    }
+  });
+
+  it('the workflow sentence is composed from the machine, not written beside it', () => {
+    // Assert the CALL SHAPE, never the bare token: an import line satisfies `toContain` and
+    // says nothing about whether the page calls anything (F2-194, F2-205).
+    const page = strip(read(PAGE));
+    expect(page, `${PAGE} no longer composes the workflow sentence from the machine. The stage `
+      + 'names must come from capaForwardPath() so the sentence and the lanes cannot disagree.')
+      .toMatch(/capaForwardPath\s*\(/);
+    for (const dict of DICTS) {
+      expect(capaKeys(dict).map(k => k.key),
+        `${dict}: capaWorkflowFootnote is back. It is the machine written out in prose.`)
+        .not.toContain('capaWorkflowFootnote');
+    }
+  });
+
+  it('the forward path is derived from the machine and names no state itself', () => {
+    expect(capaForwardPath()).toEqual(['OPEN', 'IN_PROGRESS', 'AWAITING_VERIFICATION', 'CLOSED']);
+    expect(capaAbandonState()).toBe('CANCELLED');
+
+    // Whatever the machine becomes, the sentence can only ever name states it declares.
+    const vocabulary = new Set(Object.keys(CAPA_ALLOWED));
+    for (const s of capaForwardPath()) expect(vocabulary.has(s)).toBe(true);
+
+    // …and "derived" is structural, not a claim: the three functions contain no state literal,
+    // so there is nothing in them to drift. Comment-stripped, because the javadoc explaining
+    // the tie-break legitimately names all five (F2-193).
+    const lib = strip(read(LIB));
+    const from = lib.indexOf('function capaRootState(');
+    const to = lib.indexOf('export const CAPA_STATUS_LABEL');
+    expect(from, 'capaRootState not found — the slice, not the code, is broken')
+      .toBeGreaterThan(-1);
+    expect(to).toBeGreaterThan(from);
+    const derivation = lib.slice(from, to);
+    for (const s of Object.keys(CAPA_ALLOWED)) {
+      expect(derivation, `the derivation names '${s}'. A state literal inside the code that `
+        + 'derives the order is the second copy the derivation exists to avoid.')
+        .not.toContain(`'${s}'`);
     }
   });
 
@@ -248,5 +363,38 @@ describe('F2-208 — the CAPA register is server-backed', () => {
     expect(strip(tricky)).toContain('const live = 1;');
     expect(strip(tricky)).toContain('const also = 2;');
     expect(strip(tricky)).not.toContain('gone');
+
+    // ── F2-465's detectors, fed the shapes they exist to catch ──────────────────────────
+    const retiredEn = 'Forward path: Identified → Implementing → Owner-tested (1LoD) → '
+      + 'Independent-tested (2LoD) → Audit signed-off (3LoD) → Closed. A 90-day post-closure '
+      + 'check fires VERIFICATION_FAILED on regression.';
+    const retiredAr = 'المسار الأمامي: مُحدّدة → قيد التنفيذ → اختبار المالك → اختبار مستقل → '
+      + 'اعتماد المراجعة → مغلقة. فحص فاعلية بعد 90 يوماً من الإغلاق يحوّلها إلى فشل التحقّق '
+      + 'عند التراجع.';
+
+    // The ladder ban is the only one of the three that catches BOTH languages, which is why
+    // it is the load-bearing leg: the token ban is blind to the Arabic, where the state name
+    // is translated rather than quoted.
+    expect(PROSE_LADDER.test(retiredEn)).toBe(true);
+    expect(PROSE_LADDER.test(retiredAr)).toBe(true);
+    expect(PROSE_LADDER.test('Any unfinished state can instead end as Cancelled.')).toBe(false);
+
+    const vocabulary = new Set(Object.keys(CAPA_ALLOWED));
+    const snakeOf = (s: string) =>
+      [...s.matchAll(SNAKE_TOKEN)].map(m => m[0]).filter(t => !vocabulary.has(t));
+    expect(snakeOf(retiredEn)).toEqual(['VERIFICATION_FAILED']);
+    expect(snakeOf(retiredAr)).toEqual([]);
+    // A label naming a REAL state must not trip it, or the gate fails on correct code (F2-214).
+    expect(snakeOf('Moves to AWAITING_VERIFICATION on submit.')).toEqual([]);
+    // …and a bare severity word is not an UPPER_SNAKE token at all — the reason the severity
+    // and type labels are outside this population by construction rather than by exemption.
+    expect(snakeOf('CRITICAL items first.')).toEqual([]);
+
+    // F2-208's filter, as F2-465 widened it: the definite `الفاعلية` could not match this.
+    const widened = /root cause|السبب الجذري|effectiv|فاعلية|fishbone|عظمة السمكة/i;
+    expect(widened.test(retiredAr), 'the widened Arabic token must catch the bare form').toBe(true);
+    expect(/الفاعلية/.test(retiredAr), 'the definite form is why the Arabic half escaped')
+      .toBe(false);
+    expect(widened.test('المسار الأمامي:')).toBe(false);
   });
 });

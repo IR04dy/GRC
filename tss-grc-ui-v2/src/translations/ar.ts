@@ -4814,7 +4814,12 @@ export const ar = {
   capaEmptyBody:                'عدّل خانة البحث أو مرشّح النوع أو الحالة أعلاه.',
   capaAgingOverdue:            'مُتأخّرة',
   capaDaysSuffix:              'يوم',
-  capaWorkflowFootnote:        'المسار الأمامي: مُحدّدة → قيد التنفيذ → اختبار المالك → اختبار مستقل → اعتماد المراجعة → مغلقة. فحص فاعلية بعد 90 يوماً من الإغلاق يحوّلها إلى فشل التحقّق عند التراجع.',
+  // F2-465 — `capaWorkflowFootnote` retired; see the English dictionary for why. The Arabic
+  // half escaped F2-208's own text leg for a second reason: that filter's token is the
+  // definite `الفاعلية` and this string carried the bare `فاعلية`, so the two halves of one
+  // bilingual filter had different reach.
+  capaWorkflowForward:         'المسار الأمامي:',
+  capaWorkflowCancel:          'ويمكن أن تنتهي أي حالة غير منتهية إلى',
   actionSave:                  'حفظ',
 
   // DD-43
