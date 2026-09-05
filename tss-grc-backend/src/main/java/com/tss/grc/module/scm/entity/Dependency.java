@@ -35,7 +35,7 @@ public class Dependency {
     @Column(name = "vendor_id")
     private Long vendorId;
 
-    @Column(name = "dependency_type", length = 50)
+    @Column(name = "dependency_type", length = 30)
     private String dependencyType;
 
     @Column(name = "dependency_level", length = 20)
@@ -47,7 +47,7 @@ public class Dependency {
     @Column(name = "alternative_vendor_id")
     private Long alternativeVendorId;
 
-    @Column(name = "status", length = 30)
+    @Column(name = "status", length = 20)
     private String status = "ACTIVE";
 
     @Column(name = "impact_analysis", columnDefinition = "NVARCHAR(MAX)")

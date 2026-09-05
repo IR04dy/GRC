@@ -75,7 +75,7 @@ public class SanctionsListEntry {
     private String listingReasonAr;
 
     /** STRONG_MATCH_REQUIRED | REVIEW_REQUIRED */
-    @Column(name = "severity", nullable = false, length = 20)
+    @Column(name = "severity", nullable = false, length = 30)
     private String severity = "REVIEW_REQUIRED";
 
     @Column(name = "created_by_user_id")

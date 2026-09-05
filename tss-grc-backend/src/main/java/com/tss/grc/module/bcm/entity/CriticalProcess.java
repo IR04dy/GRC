@@ -30,7 +30,7 @@ public class CriticalProcess {
     @Column(name = "owner_id")
     private Long ownerId;
 
-    @Column(name = "criticality", length = 50)
+    @Column(name = "criticality", length = 20)
     private String criticality = "HIGH";
 
     @Column(name = "is_deleted", nullable = false)

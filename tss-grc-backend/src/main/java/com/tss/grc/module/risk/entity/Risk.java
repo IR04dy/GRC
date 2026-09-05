@@ -67,7 +67,7 @@ public class Risk extends BaseEntity {
     private Integer residualScore;
 
     // computed persisted column — read-only
-    @Column(name = "risk_level", insertable = false, updatable = false, length = 20)
+    @Column(name = "risk_level", insertable = false, updatable = false, length = 8)
     private String riskLevel;
 
     @Column(name = "identified_date")

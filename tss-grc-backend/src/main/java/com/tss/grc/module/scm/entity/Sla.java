@@ -42,7 +42,7 @@ public class Sla {
     @Column(name = "unit", length = 50)
     private String unit;
 
-    @Column(name = "measurement_frequency", length = 30)
+    @Column(name = "measurement_frequency", length = 20)
     private String measurementFrequency;
 
     @Column(name = "current_value", precision = 10, scale = 2)
@@ -62,7 +62,7 @@ public class Sla {
     // into ScmService and never used (F2-204's NO_SERVER_SURFACE shape, 14 live rows in dev and
     // prod). Deleting the initialiser would leave a NOT NULL column with no writer to fill it, which
     // is the one hazard F2-238 flagged for that fix shape.
-    @Column(name = "status", length = 30)
+    @Column(name = "status", length = 20)
     private String status = "NOT_MEASURED";
 
     @Column(name = "last_measured_at")

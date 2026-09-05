@@ -23,7 +23,7 @@ public class SupplierIncident {
     @Column(name = "organisation_id", nullable = false)
     private Long organisationId;
 
-    @Column(name = "incident_code", length = 50)
+    @Column(name = "incident_code", length = 20)
     private String incidentCode;
 
     @Column(name = "vendor_id", nullable = false)

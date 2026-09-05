@@ -28,7 +28,7 @@ public class VendorAssessment {
     @Column(name = "vendor_id", nullable = false)
     private Long vendorId;
 
-    @Column(name = "assessment_type", length = 50)
+    @Column(name = "assessment_type", length = 30)
     private String assessmentType = "INITIAL";   // legal: CK_scm_assess_type admits INITIAL
 
     @Column(name = "assessment_date")

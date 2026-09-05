@@ -384,9 +384,16 @@ public final class MigrationVocabularies {
         "^\\s*\\[?(\\w+)\\]?\\s+" + SQL_TYPE + "\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern NOT_A_COLUMN = Pattern.compile(
         "^\\s*(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|INDEX)\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ALTER_ADD_COLUMN = Pattern.compile(
-        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ADD\\s+\\[?(\\w+)\\]?\\s+"
-        + SQL_TYPE + "\\b([^;\\n]*)", Pattern.CASE_INSENSITIVE);
+    /**
+     * The head of an {@code ALTER TABLE ... ADD} clause. The columns are parsed out of the clause
+     * BODY rather than by this pattern, because {@code ADD a T, b T, c T;} is one statement adding
+     * three columns — a pattern that captures only the first (and whose tail stops at the newline
+     * the house style puts between them) silently drops the rest, and a column missing from this
+     * map is a column every reader of it is blind to. F2-463 found eight that way, including
+     * {@code platform.audit_log.prev_hash} and {@code cyber.cyber_frameworks.framework_code}.
+     */
+    private static final Pattern ALTER_ADD_HEAD = Pattern.compile(
+        "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ADD\\s+", Pattern.CASE_INSENSITIVE);
     private static final Pattern ALTER_COLUMN = Pattern.compile(
         "ALTER\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?\\s+ALTER\\s+COLUMN\\s+"
         + "\\[?(\\w+)\\]?\\s+" + SQL_TYPE + "\\b([^;\\n]*)", Pattern.CASE_INSENSITIVE);
@@ -405,10 +412,85 @@ public final class MigrationVocabularies {
         "DROP\\s+INDEX\\s+(?:IF\\s+EXISTS\\s+)?\\[?(\\w+)\\]?\\s+ON\\s+"
         + "(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
 
+    private static Map<String, Map<String, ColumnSpec>> specCache;
     private static Map<String, Map<String, Boolean>> columnCache;
     private static List<UniqueKey> uniqueKeyCache;
 
     record Ev(int pos, boolean add, String key, UniqueKey value) {}
+
+    /**
+     * What a declaration says about one column: whether it is nullable, and — for a text type —
+     * how wide it is.
+     *
+     * @param width the number in {@code NVARCHAR(n)}, {@code -1} for {@code MAX}, and {@code null}
+     *              where the declaration carries no parenthesised size at all (every non-text type,
+     *              and a bare {@code VARCHAR}).
+     */
+    public record ColumnSpec(boolean nullable, Integer width) {}
+
+    /** The parenthesised size that follows a type name, if the declaration gives one. */
+    private static final Pattern WIDTH = Pattern.compile(
+        "\\s*\\(\\s*(MAX|\\d+)\\s*\\)", Pattern.CASE_INSENSITIVE);
+
+    private static Integer widthOf(String afterType) {
+        if (afterType == null) return null;
+        Matcher m = WIDTH.matcher(afterType);
+        if (!m.lookingAt()) return null;
+        return m.group(1).equalsIgnoreCase("MAX") ? -1 : Integer.parseInt(m.group(1));
+    }
+
+    /**
+     * {@code schema.table -> column -> what the chain declares}, replayed in version order.
+     *
+     * <p>This is the one walk; {@link #columns()} is a second reader over its result rather than a
+     * second walk, because two walks would be free to disagree about which files are packaged and
+     * which declaration wins (F2-190).
+     */
+    public static synchronized Map<String, Map<String, ColumnSpec>> columnSpecs() {
+        if (specCache == null) {
+            Map<String, Map<String, ColumnSpec>> out = new LinkedHashMap<>();
+            for (Path f : migrationFiles()) {
+                String src = stripComments(read(f));
+                Matcher ct = CREATE_TABLE.matcher(src);
+                while (ct.find()) {
+                    String body = balanced(src, ct.end() - 1);
+                    if (body == null) continue;
+                    Map<String, ColumnSpec> cols = out.computeIfAbsent(
+                        qualify(ct.group(1), ct.group(2)), k -> new LinkedHashMap<>());
+                    for (String line : body.split("\n")) {
+                        if (NOT_A_COLUMN.matcher(line).find()) continue;
+                        Matcher cd = COLUMN_DECL.matcher(line);
+                        if (cd.find()) {
+                            cols.put(cd.group(1).toLowerCase(), new ColumnSpec(
+                                isNullable(line), widthOf(line.substring(cd.end()))));
+                        }
+                    }
+                }
+                Matcher add = ALTER_ADD_HEAD.matcher(src);
+                while (add.find()) {
+                    Map<String, ColumnSpec> cols = out.computeIfAbsent(
+                        qualify(add.group(1), add.group(2)), k -> new LinkedHashMap<>());
+                    for (String item : addedColumns(src, add.end())) {
+                        if (NOT_A_COLUMN.matcher(item).find()) continue;
+                        Matcher cd = COLUMN_DECL.matcher(item);
+                        if (cd.find()) {
+                            cols.put(cd.group(1).toLowerCase(), new ColumnSpec(
+                                isNullable(item), widthOf(item.substring(cd.end()))));
+                        }
+                    }
+                }
+                Matcher alt = ALTER_COLUMN.matcher(src);
+                while (alt.find()) {
+                    out.computeIfAbsent(qualify(alt.group(1), alt.group(2)),
+                            k -> new LinkedHashMap<>())
+                        .put(alt.group(3).toLowerCase(),
+                             new ColumnSpec(isNullable(alt.group(4)), widthOf(alt.group(4))));
+                }
+            }
+            specCache = out;
+        }
+        return specCache;
+    }
 
     /**
      * {@code schema.table -> column -> is the column NULLABLE}, over the whole chain.
@@ -420,28 +502,11 @@ public final class MigrationVocabularies {
     public static synchronized Map<String, Map<String, Boolean>> columns() {
         if (columnCache == null) {
             Map<String, Map<String, Boolean>> out = new LinkedHashMap<>();
-            for (Path f : migrationFiles()) {
-                String src = stripComments(read(f));
-                Matcher ct = CREATE_TABLE.matcher(src);
-                while (ct.find()) {
-                    String body = balanced(src, ct.end() - 1);
-                    if (body == null) continue;
-                    Map<String, Boolean> cols = out.computeIfAbsent(
-                        qualify(ct.group(1), ct.group(2)), k -> new LinkedHashMap<>());
-                    for (String line : body.split("\n")) {
-                        if (NOT_A_COLUMN.matcher(line).find()) continue;
-                        Matcher cd = COLUMN_DECL.matcher(line);
-                        if (cd.find()) cols.put(cd.group(1).toLowerCase(), isNullable(line));
-                    }
-                }
-                for (Matcher m : List.of(ALTER_ADD_COLUMN.matcher(src), ALTER_COLUMN.matcher(src))) {
-                    while (m.find()) {
-                        out.computeIfAbsent(qualify(m.group(1), m.group(2)),
-                                k -> new LinkedHashMap<>())
-                            .put(m.group(3).toLowerCase(), isNullable(m.group(4)));
-                    }
-                }
-            }
+            columnSpecs().forEach((table, cols) -> {
+                Map<String, Boolean> nullable = new LinkedHashMap<>();
+                cols.forEach((c, spec) -> nullable.put(c, spec.nullable()));
+                out.put(table, nullable);
+            });
             columnCache = out;
         }
         return columnCache;
@@ -576,6 +641,49 @@ public final class MigrationVocabularies {
             last = m.group(1) == null ? m.group(2) : m.group(1) + "." + m.group(2);
         }
         return last;
+    }
+
+    /**
+     * The comma-separated items of one {@code ALTER TABLE ... ADD} clause, starting at {@code from}
+     * (just past the {@code ADD}).
+     *
+     * <p>Split at paren depth 0, so {@code DECIMAL(18,2)} stays one item, and bounded by the first
+     * depth-0 {@code ;} — or, where a migration ends the batch without one, by the next {@code GO}.
+     * Comments are already blanked by the caller, so a trailing {@code -- NCA / SAMA} cannot be
+     * mistaken for a column.
+     */
+    private static List<String> addedColumns(String src, int from) {
+        int depth = 0;
+        int end = src.length();
+        for (int i = from; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            else if (c == ';' && depth == 0) { end = i; break; }
+            else if (depth == 0 && (c == 'G' || c == 'g') && i + 1 < src.length()
+                     && (src.charAt(i + 1) == 'O' || src.charAt(i + 1) == 'o')
+                     && (i == 0 || src.charAt(i - 1) == '\n')
+                     && (i + 2 >= src.length() || !Character.isLetterOrDigit(src.charAt(i + 2)))) {
+                end = i;
+                break;
+            }
+        }
+        List<String> items = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        depth = 0;
+        for (int i = from; i < end; i++) {
+            char c = src.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            if (c == ',' && depth == 0) {
+                items.add(cur.toString());
+                cur.setLength(0);
+            } else {
+                cur.append(c);
+            }
+        }
+        items.add(cur.toString());
+        return items;
     }
 
     private static String balanced(String src, int open) {
