@@ -41,8 +41,17 @@
  *   <li>{@code REG_INSPECTION_TRANSITIONED}</li>
  *   <li>{@code REG_DOCUMENT_REQUEST_OPENED}</li>
  *   <li>{@code REG_DOCUMENT_REQUEST_SUBMITTED}</li>
- *   <li>{@code REG_DOCUMENT_REQUEST_OVERDUE} (raised by F8 scheduler)</li>
  *   <li>{@code REG_INSPECTION_CLOSED}</li>
  * </ul>
+ *
+ * <p><b>F2-467 — one token was removed from that list because nothing emits it.</b>
+ * It previously named {@code REG_DOCUMENT_REQUEST_OVERDUE} "(raised by F8 scheduler)",
+ * and this module declares <b>no {@code @Scheduled} method at all</b>. The condition is
+ * computed on demand by {@code RegInspectService#isOverdue(dr)} and denormalised onto
+ * {@code overdue_dr_count} whenever a document request is mutated — so an overdue
+ * regulator document request is counted on the dashboard and escalates to nobody.
+ *
+ * <p>F2-386 filed the other half of the same gap from the code side: an overdue sweep
+ * defined with no scheduler caller. Writing the publisher is a feature and is filed.
  */
 package com.tss.grc.module.reginspect;

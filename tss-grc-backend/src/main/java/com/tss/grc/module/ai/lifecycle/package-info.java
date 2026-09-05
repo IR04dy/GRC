@@ -40,11 +40,22 @@
  *   DUE → IN_REVIEW → RECERTIFIED|RECERTIFIED_WITH_CONDITIONS|REVOKED
  * </pre>
  *
- * <h2>Drift gate</h2>
+ * <h2>Drift — what this module does and does not do</h2>
  *
- * <p>Sprint 11's {@code MlModelDriftObservation} captures raw drift.
- * This module adds a configurable {@code driftThresholdPct} per model.
- * Observations crossing the threshold emit
- * {@code MODEL_DRIFT_THRESHOLD_BREACHED} which AR-275 reacts to.
+ * <p>{@code MlModelDriftObservation} in {@code module/ai/governance} captures raw drift
+ * and {@code MlModelDriftService} publishes {@code MODEL_DRIFT_OBSERVED} <b>on every
+ * record</b>. There is no threshold-crossing event, and this module holds no drift code
+ * of any kind — its only mention of drift is {@code RetrainingEvent.trigger}, where
+ * {@code DRIFT} is one of the reasons a human may record for a retraining.
+ *
+ * <p><b>F2-467 — this section previously described a drift gate that does not
+ * exist</b>, and was wrong three ways in three lines: it said this module "adds a
+ * configurable {@code driftThresholdPct} per model" (no such field exists anywhere;
+ * {@code ai/governance} has a {@code drift_threshold} column under another name), that
+ * observations crossing it "emit {@code MODEL_DRIFT_THRESHOLD_BREACHED}" (that token's
+ * only occurrence in the tree was the sentence itself), and that <b>AR-275 reacts to
+ * it</b> — AR-275 exists and triggers on {@code MODEL_RETRAINING_PROPOSED}.
+ * 🔑 A real rule citation is what made the claim harder to doubt than an
+ * invented one would have been.
  */
 package com.tss.grc.module.ai.lifecycle;
