@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CAPA_ALLOWED, capaForwardPath, capaAbandonState } from '../lib/capa';
+import { CAPA_ALLOWED, CAPA_STATUS_LABEL, capaForwardPath, capaAbandonState } from '../lib/capa';
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
@@ -353,6 +353,35 @@ describe('F2-208 — the CAPA register is server-backed', () => {
         + 'copy the derivation exists to avoid — and if this fires with the comments in, the '
         + 'stripping above is what keeps the ⚠ note free to name all five.')
         .toBe(false);
+    }
+  });
+
+  it('the sentence an operator reads names only states this register has', () => {
+    // ⚠ `CapaPage` has no render test — `WorkflowTab` is not exported, and F2-360 recorded that
+    // extracting a tab for one is a page-structure decision of its own. So this composes the
+    // sentence the way the page does and pins the OUTPUT, which is the artefact that was wrong;
+    // the structural leg above pins that the page still CALLS the derivation (F2-274 — a leg
+    // exercising a primitive says nothing about whether the code under review calls it).
+    for (const [dict, lang, expected] of [
+      ['translations/en.ts', 'en',
+        'Forward path: Open → In progress → Awaiting verification → Closed. '
+        + 'Any unfinished state can instead end as Cancelled.'],
+      ['translations/ar.ts', 'ar',
+        'المسار الأمامي: مفتوحة → قيد التنفيذ → بانتظار التحقق → مغلقة. '
+        + 'ويمكن أن تنتهي أي حالة غير منتهية إلى ملغاة.'],
+    ] as const) {
+      const value = (k: string) => {
+        const hit = capaKeys(dict).find(x => x.key === k);
+        expect(hit, `${dict} declares no ${k}`).toBeDefined();
+        return (hit as { value: string }).value;
+      };
+      const label = (s: string) =>
+        CAPA_STATUS_LABEL[s as keyof typeof CAPA_STATUS_LABEL][lang];
+      const abandon = capaAbandonState();
+      const sentence =
+        `${value('capaWorkflowForward')} ${capaForwardPath().map(label).join(' → ')}.`
+        + (abandon ? ` ${value('capaWorkflowCancel')} ${label(abandon)}.` : '');
+      expect(sentence, `${dict}: the rendered workflow sentence changed`).toBe(expected);
     }
   });
 
