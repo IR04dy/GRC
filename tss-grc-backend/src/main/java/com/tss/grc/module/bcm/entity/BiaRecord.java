@@ -84,10 +84,10 @@ public class BiaRecord {
     @Column(name = "mtpd_hours")
     private Integer mtpdHours;
 
-    @Column(name = "overall_impact", length = 50)
+    @Column(name = "overall_impact", length = 20)
     private String overallImpact;
 
-    @Column(name = "status", length = 50)
+    @Column(name = "status", length = 20)
     private String status = "DRAFT";
 
     @Column(name = "linked_risk_id")

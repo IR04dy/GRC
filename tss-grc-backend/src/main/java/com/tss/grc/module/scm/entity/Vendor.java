@@ -29,7 +29,7 @@ public class Vendor {
     @Column(name = "name_ar", length = 255)
     private String nameAr;
 
-    @Column(name = "category", length = 100)
+    @Column(name = "category", length = 50)
     private String category = "OTHER";
 
     @Column(name = "criticality", length = 20)
@@ -38,7 +38,7 @@ public class Vendor {
     @Column(name = "country", length = 100)
     private String country;
 
-    @Column(name = "service_type", length = 100)
+    @Column(name = "service_type", length = 200)
     private String serviceType;
 
     @Column(name = "risk_level", length = 20)

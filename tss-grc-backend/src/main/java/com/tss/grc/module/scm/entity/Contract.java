@@ -37,7 +37,7 @@ public class Contract {
     @Column(name = "title_ar", length = 255)
     private String titleAr;
 
-    @Column(name = "contract_type", length = 50)
+    @Column(name = "contract_type", length = 30)
     private String contractType;
 
     @Column(name = "start_date")

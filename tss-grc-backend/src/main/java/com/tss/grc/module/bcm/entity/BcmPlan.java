@@ -28,10 +28,10 @@ public class BcmPlan {
     @Column(name = "plan_name_ar", length = 255)
     private String planNameAr;
 
-    @Column(name = "plan_type", length = 100)
+    @Column(name = "plan_type", length = 30)
     private String planType;
 
-    @Column(name = "version", length = 50)
+    @Column(name = "version", length = 20)
     private String version;
 
     /**
@@ -62,7 +62,7 @@ public class BcmPlan {
      * initialiser was pure residue on create and a refusal on update. The column is NOT NULL and
      * the create writes it — do not restore it.
      */
-    @Column(name = "status", nullable = false, length = 50)
+    @Column(name = "status", nullable = false, length = 20)
     private String status;
 
     @Column(name = "next_review_date")

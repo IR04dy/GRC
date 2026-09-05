@@ -62,7 +62,7 @@ public class MlModelAudit extends BaseEntity {
     private String findingsAr;
 
     /** PASSED/PASSED_WITH_CONDITIONS/FAILED/REMEDIATED. */
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 30)
     private String status;
 
     @Column(name = "metrics_json", columnDefinition = "NVARCHAR(MAX)")

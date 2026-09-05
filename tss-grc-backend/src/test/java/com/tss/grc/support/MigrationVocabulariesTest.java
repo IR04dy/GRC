@@ -178,6 +178,50 @@ class MigrationVocabulariesTest {
         assertThat(MigrationVocabularies.vocabularyOn("scm", "no_such_table", "status")).isEmpty();
     }
 
+    @Test
+    @DisplayName("every column of a multi-column ALTER ... ADD is parsed, not just the first")
+    void aMultiColumnAddDeclaresEveryColumn() {
+        // F2-463. `ALTER TABLE t ADD a T, b T, c T;` is one statement adding three columns, and the
+        // house style puts each on its own line. A pattern that captures the first column and reads
+        // its tail as `[^;\n]*` drops the rest -- 43 columns across 8 clauses -- and a column
+        // missing from this map is one every reader of it is blind to. It fails in the QUIET
+        // direction: NullableUniqueKeyFilterContractTest asks Boolean.TRUE.equals(table.get(c)),
+        // and a missing column answers false, so a unique key over a nullable column it could not
+        // see read as safe.
+        var auditLog = MigrationVocabularies.columnSpecs().get("platform.audit_log");
+        assertThat(auditLog).as("V340 adds four columns in one ADD clause")
+            .containsKeys("row_hash", "prev_hash", "hash_alg", "sealed_at");
+        assertThat(auditLog.get("prev_hash").width())
+            .as("the second column of the clause, which the single-column form dropped")
+            .isEqualTo(64);
+
+        // The same clause mixes text and non-text; a type with no parenthesised size has no width.
+        assertThat(auditLog.get("sealed_at").width())
+            .as("DATETIME2 carries no width").isNull();
+
+        // Nullability travels per item, not per clause.
+        assertThat(auditLog.get("hash_alg")).isNotNull();
+        assertThat(auditLog.get("hash_alg").nullable()).isTrue();
+
+        // V37 adds nine columns to cyber.cyber_frameworks in one clause, the last of them text.
+        var frameworks = MigrationVocabularies.columnSpecs().get("cyber.cyber_frameworks");
+        assertThat(frameworks.get("reference_url").width())
+            .as("the ninth column of a nine-column ADD").isEqualTo(500);
+        assertThat(frameworks.get("framework_code").width()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("columns() is a second reader over columnSpecs(), never a second walk")
+    void theNullabilityViewIsDerivedFromTheOneWalk() {
+        // Two walks would be free to disagree about which files are packaged and which declaration
+        // wins (F2-190), and the disagreement would be invisible: each map would look complete.
+        assertThat(MigrationVocabularies.columns().keySet())
+            .isEqualTo(MigrationVocabularies.columnSpecs().keySet());
+        MigrationVocabularies.columnSpecs().forEach((table, specs) ->
+            assertThat(MigrationVocabularies.columns().get(table).keySet())
+                .as("%s", table).isEqualTo(specs.keySet()));
+    }
+
     private static MigrationVocabularies.Range named(
             List<MigrationVocabularies.Range> all, String constraint) {
         return all.stream().filter(r -> r.constraint().equalsIgnoreCase(constraint)).findFirst()
