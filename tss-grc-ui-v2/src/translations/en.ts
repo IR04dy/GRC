@@ -4870,7 +4870,12 @@ export const en = {
   capaEmptyBody:                'Adjust the search box, type filter or status filter above.',
   capaAgingOverdue:            'Overdue',
   capaDaysSuffix:              'days',
-  capaWorkflowFootnote:        'Forward path: Identified → Implementing → Owner-tested (1LoD) → Independent-tested (2LoD) → Audit signed-off (3LoD) → Closed. A 90-day post-closure check fires VERIFICATION_FAILED on regression.',
+  // F2-465 — `capaWorkflowFootnote` retired. It wrote the machine out in prose beside the
+  // machine, and drifted: six stages named, one of them a state this register has, plus a
+  // scheduled post-closure check `module/capa` has no method for. The stage names are
+  // composed from CAPA_STATUS_LABEL now, so only these two fragments are prose.
+  capaWorkflowForward:         'Forward path:',
+  capaWorkflowCancel:          'Any unfinished state can instead end as',
   actionSave:                  'Save',
 
   // DD-43: PA triggers

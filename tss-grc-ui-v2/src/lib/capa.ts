@@ -184,6 +184,75 @@ export function isCapaOpen(c: Capa): boolean {
   return !CAPA_TERMINAL.includes(c.status);
 }
 
+/**
+ * DERIVED — the state nothing transitions INTO.
+ *
+ * F2-291's rule: an initial state is a property of the machine, not a second literal
+ * beside it. ⚠ It can legitimately be ABSENT — a machine with a back-edge to its own
+ * root has no such state, which is what F2-292 measured on the disclosure register —
+ * so this returns null rather than guessing, and every caller handles that.
+ */
+function capaRootState(): CapaStatus | null {
+  const states = Object.keys(CAPA_ALLOWED) as CapaStatus[];
+  const targets = new Set<CapaStatus>(states.flatMap(s => [...CAPA_ALLOWED[s]]));
+  const roots = states.filter(s => !targets.has(s));
+  return roots.length === 1 ? roots[0] : null;
+}
+
+/**
+ * DERIVED — the abandonment exit: the terminal state EVERY working state can reach
+ * directly, as against the completion exit, which only the last working state reaches.
+ *
+ * That asymmetry is what distinguishes the two without naming either, which matters
+ * because a literal here would be the second copy of the vocabulary F2-196 warns about.
+ * Null when the machine has no such state, or more than one.
+ */
+export function capaAbandonState(): CapaStatus | null {
+  const working = (Object.keys(CAPA_ALLOWED) as CapaStatus[])
+    .filter(s => CAPA_ALLOWED[s].length > 0);
+  if (working.length === 0) return null;
+  const universal = CAPA_TERMINAL.filter(t => working.every(s => CAPA_ALLOWED[s].includes(t)));
+  return universal.length === 1 ? universal[0] : null;
+}
+
+/**
+ * DERIVED — the forward path: the working states in breadth-first distance order from
+ * the root, ignoring the abandonment exit, ending at the completion exit.
+ *
+ * This exists so the workflow sentence the register renders is COMPOSED from the machine
+ * rather than written beside it. F2-465: the prose named six stages — Identified,
+ * Implementing, Owner-tested (1LoD), Independent-tested (2LoD), Audit signed-off (3LoD),
+ * Closed — of which this register has one, and promised "a 90-day post-closure check
+ * fires VERIFICATION_FAILED on regression" when `module/capa` carries no @Scheduled
+ * method at all. It sat fourteen lines under the comment recording that the LANES had
+ * been moved onto the machine for exactly that reason.
+ *
+ * ⚠ Distance order is used rather than a longest-path walk because the longest path is
+ * NOT unique here: OPEN→IN_PROGRESS→AWAITING_VERIFICATION→CLOSED and the same prefix
+ * ending at CANCELLED are both length 4. Distance from the root is a total order only
+ * while the depths are distinct, so that is checked — and both fail-safe branches return
+ * every real state instead, which claims no order but can never name a state the
+ * register cannot store.
+ */
+export function capaForwardPath(): readonly CapaStatus[] {
+  const states = Object.keys(CAPA_ALLOWED) as CapaStatus[];
+  const root = capaRootState();
+  if (!root) return states;
+  const abandon = capaAbandonState();
+  const depth = new Map<CapaStatus, number>([[root, 0]]);
+  const queue: CapaStatus[] = [root];
+  while (queue.length > 0) {
+    const s = queue.shift() as CapaStatus;
+    for (const next of CAPA_ALLOWED[s]) {
+      if (next === abandon || depth.has(next)) continue;
+      depth.set(next, (depth.get(s) as number) + 1);
+      queue.push(next);
+    }
+  }
+  if (new Set(depth.values()).size !== depth.size) return states;
+  return [...depth.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]);
+}
+
 export const CAPA_STATUS_LABEL: Record<CapaStatus, { en: string; ar: string }> = {
   OPEN:                  { en: 'Open',                  ar: 'مفتوحة' },
   IN_PROGRESS:           { en: 'In progress',           ar: 'قيد التنفيذ' },
