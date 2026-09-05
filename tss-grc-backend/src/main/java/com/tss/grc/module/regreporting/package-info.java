@@ -56,12 +56,22 @@
  * <ul>
  *   <li>{@code REG_REPORT_OBLIGATION_CREATED}</li>
  *   <li>{@code REG_REPORT_FILING_SCHEDULED} — auto-generation for next cycle</li>
- *   <li>{@code REG_REPORT_FILING_DUE_SOON} — fired by F8 scheduler at T-7, T-3, T-1</li>
  *   <li>{@code REG_REPORT_FILING_STATE_CHANGED}</li>
  *   <li>{@code REG_REPORT_FILING_SUBMITTED}</li>
  *   <li>{@code REG_REPORT_FILING_REJECTED}</li>
- *   <li>{@code REG_REPORT_FILING_OVERDUE} — fired by F8 scheduler the day after dueDate</li>
  *   <li>{@code REG_REPORT_FILING_CLOSED}</li>
  * </ul>
+ *
+ * <p><b>F2-467 — two tokens were removed from that list because nothing emits
+ * them.</b> It previously named {@code REG_REPORT_FILING_DUE_SOON} "fired by F8
+ * scheduler at T-7, T-3, T-1" and {@code REG_REPORT_FILING_OVERDUE} "fired by F8
+ * scheduler the day after dueDate". 🔑 Both sentences name the mechanism that
+ * fires them, and <b>this module declares no {@code @Scheduled} method at all</b> —
+ * which is what made the claim credible rather than checkable.
+ *
+ * <p>The overdue condition is computed on demand instead, by
+ * {@code RegReportingService#countOverdue(today)} for the dashboard. So a SAMA/CMA
+ * filing that has passed its due date is <i>visible</i> to whoever opens the screen and
+ * <i>escalates to nobody</i>. Writing the sweep is a feature and is filed.
  */
 package com.tss.grc.module.regreporting;

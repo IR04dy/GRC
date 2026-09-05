@@ -69,11 +69,28 @@
  * <ul>
  *   <li>{@code OB_TPP_ONBOARDED}</li>
  *   <li>{@code OB_TPP_SUSPENDED} / {@code OB_TPP_REVOKED} / {@code OB_TPP_REINSTATED}</li>
- *   <li>{@code OB_CONSENT_GRANTED} / {@code OB_CONSENT_REVOKED} / {@code OB_CONSENT_EXPIRED}</li>
+ *   <li>{@code OB_CONSENT_GRANTED} / {@code OB_CONSENT_REVOKED}</li>
  *   <li>{@code OB_CONSENT_BULK_REVOCATION} — ≥100 revokes in 1h, fraud signal</li>
- *   <li>{@code OB_API_ABUSE} — rate-limit / scope-creep / after-hours pattern</li>
  *   <li>{@code OB_INCIDENT_RAISED} / {@code OB_INCIDENT_RESOLVED}</li>
- *   <li>{@code OB_CERT_EXPIRING} — 90 / 30 / 7-day reminders</li>
  * </ul>
+ *
+ * <p><b>F2-467 — three tokens were removed from that list because nothing emits
+ * them.</b> It previously named {@code OB_CONSENT_EXPIRED}, {@code OB_API_ABUSE}
+ * ("rate-limit / scope-creep / after-hours pattern") and {@code OB_CERT_EXPIRING}
+ * ("90 / 30 / 7-day reminders"). Measured against every string literal in
+ * {@code src/main/java}, no code path publishes any of the three, and this module
+ * declares <b>no {@code @Scheduled} method at all</b> — so the two whose text
+ * describes a cadence could not have a publisher.
+ *
+ * <p>The condition is derivable and only the publisher is missing: certificate expiry
+ * has {@code ObTppRepository#findByOrganisationIdAndCertExpiresAtBefore} behind it and
+ * is rendered as the {@code certExpiring30d} dashboard figure. What that buys an
+ * operator is a number they must go and look at; what an F8 trigger would buy them is
+ * an escalation that arrives.
+ *
+ * <p>⚠ Two automation rules are already wired to the promise — <b>AR-248 on
+ * {@code OB_API_ABUSE} and AR-249 on {@code OB_CERT_EXPIRING}, both ENABLED with a
+ * fire count of 0 in the dev and the deployed database</b>. Publishing the events is a
+ * feature and retiring the rules is a write to a customer's database; both are filed.
  */
 package com.tss.grc.module.openbanking;

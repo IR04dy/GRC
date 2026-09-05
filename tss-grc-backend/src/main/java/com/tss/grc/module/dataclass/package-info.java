@@ -59,11 +59,23 @@
  *
  * <h2>F7 audit + F8 events</h2>
  *
- * <p>10 triggers: {@code DATA_ASSET_REGISTERED},
+ * <p>9 triggers: {@code DATA_ASSET_REGISTERED},
  * {@code DATA_ASSET_CLASSIFIED}, {@code DATA_ASSET_APPROVED},
  * {@code DATA_ASSET_RECLASSIFIED_UP}, {@code DATA_FLOW_PROPOSED},
  * {@code DATA_FLOW_APPROVED}, {@code DATA_FLOW_CROSS_BORDER_DETECTED},
- * {@code DATA_EXCEPTION_REQUESTED}, {@code DATA_EXCEPTION_APPROVED},
- * {@code DATA_REVIEW_DUE}.
+ * {@code DATA_EXCEPTION_REQUESTED}, {@code DATA_EXCEPTION_APPROVED}.
+ *
+ * <p><b>F2-467 — the tenth was removed because nothing emits it, and the count
+ * moved with it.</b> The list previously ended {@code DATA_REVIEW_DUE} and said
+ * "10 triggers"; a count is a second artefact, and its being right is what stops
+ * anybody checking the list (F2-273). Measured against every string literal in
+ * {@code src/main/java}, no code path publishes it, and this module declares
+ * <b>no {@code @Scheduled} method at all</b>.
+ *
+ * <p>{@code data_asset.next_review_due} is stored and rendered, so the review clock is
+ * <i>recorded</i> and never <i>fires</i>. ⚠ <b>AR-289 is wired to the promise —
+ * ENABLED with a fire count of 0 in the dev and the deployed database.</b> Publishing
+ * the event is a feature and retiring the rule is a write to a customer's database;
+ * both are filed.
  */
 package com.tss.grc.module.dataclass;
