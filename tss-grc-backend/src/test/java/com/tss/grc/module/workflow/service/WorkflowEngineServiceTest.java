@@ -305,6 +305,47 @@ class WorkflowEngineServiceTest {
      * exists in production; this pins the refusal so a future off-request caller fails loudly
      * instead of writing an unattributed row into the trail.
      */
+    /**
+     * F2-466 - eight lines above this lookup, the refusal path resolves a WorkflowState by the
+     * SAME finder with a graceful {@code .orElse("state#" + id)} fallback, written so the refusal
+     * could not itself fail. The happy path's lookup was bare, so a transition row pointing at a
+     * state that does not exist answered an opaque 500 - {@link java.util.NoSuchElementException}
+     * maps to no {@code @ExceptionHandler} - on the engine 14 modules adopt. F2-215's two-of-N at
+     * its tightest: one method, one repository, one finder, eight lines apart.
+     *
+     * <p>Latent by construction rather than by luck: {@code workflow.transitions} carries no FK on
+     * {@code to_state_id} (only {@code pk_transitions}) and nothing in the platform deletes a
+     * state - no delete route, no repository delete call - so only a migration could dangle this
+     * reference. Asserted anyway, which makes the hazard ABSENT rather than latent (F2-213), and
+     * the message names the dangling id because a broken machine an operator cannot see is worse
+     * than one they can.
+     */
+    @Test
+    void executeTransition_toAStateThatDoesNotExist_namesTheDanglingReference() {
+        WorkflowInstance i = instance(S_DRAFT, ORG_ID);
+        WorkflowTransition tr = transition(500L, S_DRAFT, S_REVIEW, "submit");
+        when(instanceRepo.findById(INST_ID)).thenReturn(Optional.of(i));
+        when(transitionRepo.findByDefinitionIdAndFromStateIdAndActionCode(DEF_ID, S_DRAFT, "submit"))
+            .thenReturn(Optional.of(tr));
+        when(stateRepo.findById(S_REVIEW)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.executeTransition(INST_ID, "submit", "dangling"))
+            .as("a transition whose destination state is missing must say WHICH id dangles")
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("points at state")
+            .hasMessageContaining(String.valueOf(500L))
+            .hasMessageContaining(String.valueOf(S_REVIEW));
+
+        assertThatThrownBy(() -> service.executeTransition(INST_ID, "submit", "dangling"))
+            .as("and specifically NOT NoSuchElementException, which no handler maps")
+            .isNotInstanceOf(java.util.NoSuchElementException.class);
+
+        // The instance is mutated in memory two lines before the lookup, so nothing may be
+        // persisted and no action-log row may be written for a transition that did not happen.
+        verify(instanceRepo, never()).save(any(WorkflowInstance.class));
+        verify(logRepo, never()).save(any());
+    }
+
     @Test
     void executeTransition_withNoPrincipal_refusesRatherThanLoggingAnUnattributedRow() {
         SecurityContextHolder.clearContext();

@@ -173,7 +173,17 @@ public class NdiSubmissionPackageService {
         Preflight pf = preflight(p.getCycleId());
         if (!pf.canFinalize)
             throw new IllegalStateException("Pre-flight failed: " + String.join("; ", pf.blockers));
-        NdiAssessmentCycle cycle = cycles.findByIdAndOrganisationId(p.getCycleId(), org()).orElseThrow();
+        // F2-466 - get(), create() and regenerate() all name this failure; this was the fourth
+        // of four lookups in the class and the only bare one: it read `.orElseThrow()` with no
+        // argument, so a package whose cycle has since been soft-deleted answered an opaque 500
+        // - NoSuchElementException maps to no handler - where its two siblings answer a clean
+        // 404 naming the cycle.
+        //
+        // preflight() above cannot refuse it: its only BLOCKER is criticalNoCapa, everything else
+        // is a warning, and every child query returns empty for a soft-deleted cycle - so
+        // canFinalize passes VACUOUSLY and this is the line that fails.
+        NdiAssessmentCycle cycle = cycles.findByIdAndOrganisationId(p.getCycleId(), org())
+            .orElseThrow(() -> new EntityNotFoundException("Cycle not found: " + p.getCycleId()));
         regenerateSnapshotInPlace(p, cycle);
         p.setStatus("READY");
         p.setReviewedAt(LocalDateTime.now());

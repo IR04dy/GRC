@@ -191,7 +191,20 @@ public class WorkflowEngineService {
         i.setCurrentStateId(tr.getToStateId());
         i.setLastTransitionAt(LocalDateTime.now());
 
-        WorkflowState toState = stateRepo.findById(tr.getToStateId()).orElseThrow();
+        // F2-466 - eight lines above, the refusal path resolves a WorkflowState by the same
+        // finder with a graceful `.orElse("state#" + id)` fallback, written so the refusal could
+        // not itself fail. This one was bare, so a transition row pointing at a state that does
+        // not exist answered an opaque 500 on the engine 14 modules adopt.
+        //
+        // Latent by construction rather than by luck: workflow.transitions carries no FK on
+        // to_state_id (only pk_transitions), and nothing in the platform deletes a state - there
+        // is no delete route and no repository delete call - so the machine is seeded by V114 and
+        // only a migration could dangle this reference. The message names the dangling id anyway,
+        // because a broken machine an operator cannot see is worse than one they can.
+        WorkflowState toState = stateRepo.findById(tr.getToStateId())
+            .orElseThrow(() -> new IllegalStateException(
+                "Workflow transition " + tr.getId() + " points at state " + tr.getToStateId()
+                    + ", which does not exist"));
         if (Boolean.TRUE.equals(toState.getIsTerminal())) {
             i.setCompletedAt(LocalDateTime.now());
         }
