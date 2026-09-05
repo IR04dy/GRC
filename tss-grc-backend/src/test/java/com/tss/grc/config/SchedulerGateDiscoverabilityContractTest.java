@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -134,6 +135,16 @@ class SchedulerGateDiscoverabilityContractTest {
         return out;
     }
 
+    /** Every boolean gate in the tree, narrowed by nothing — the partition's denominator. */
+    static Set<String> allBooleanGateKeys() throws IOException {
+        Set<String> out = new TreeSet<>();
+        for (Path p : javaSources()) {
+            String code = GuardExpressions.stripComments(Files.readString(p));
+            for (Matcher m = BOOLEAN_GATE.matcher(code); m.find(); ) out.add(m.group(1));
+        }
+        return out;
+    }
+
     // ─────────────────────────── the legs ───────────────────────────
 
     @Test
@@ -203,9 +214,38 @@ class SchedulerGateDiscoverabilityContractTest {
                 + "nothing rather than over a reachable population (F2-205, F2-235).")
             .hasSizeGreaterThanOrEqualTo(GATES);
 
-        // Both subtractions asserted non-empty. A detector that stopped requiring @Scheduled would
-        // report a LARGER population, which no floor can see — so what catches it is that the
-        // excluded half must still have members.
+        // ⚠⚠ The two halves must PARTITION the boolean-gate population: disjoint, and together
+        // everything. A floor cannot see a dropped @Scheduled narrowing, because that makes the
+        // population LARGER — and neither can the non-emptiness assertions below, because the
+        // complement is computed independently and stays non-empty whatever this half does.
+        //
+        // ⚠ The control harness is what established that. My first draft claimed the
+        // non-emptiness assertion caught it; the mutation was in fact killed by the
+        // reachability leg, and only because the widened population happens to contain
+        // grc.errors.verbose — a gate declared as a literal, which legitimately needs no
+        // placeholder. That is luck: on a tree where every non-scheduler gate happened to be
+        // placeholder-declared, the narrowing could rot in silence.
+        Set<String> scheduled = new TreeSet<>();
+        for (Gate g : gates) scheduled.add(g.key());
+        Set<String> unscheduled = new TreeSet<>();
+        for (Gate g : unscheduledGates()) unscheduled.add(g.key());
+
+        Set<String> both = new TreeSet<>(scheduled);
+        both.retainAll(unscheduled);
+        assertThat(both)
+            .as("""
+                A key cannot be both gated-beside-a-scheduler and not. If these overlap, the
+                @Scheduled narrowing has stopped narrowing — and the population the two hard
+                zeros above run over is no longer the scheduler population.""")
+            .isEmpty();
+
+        Set<String> union = new TreeSet<>(scheduled);
+        union.addAll(unscheduled);
+        assertThat(union)
+            .as("the two halves must together account for every boolean @Value gate in the "
+                + "tree; a key in neither means one of the two walks has stopped matching")
+            .hasSameSizeAs(allBooleanGateKeys());
+
         assertThat(unscheduledGates())
             .as("""
                 Boolean @Value gates in classes that schedule nothing. This must not be empty: it is
