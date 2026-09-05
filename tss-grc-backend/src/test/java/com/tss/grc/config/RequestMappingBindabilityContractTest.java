@@ -90,8 +90,15 @@ class RequestMappingBindabilityContractTest {
     /** {@code {name}} or {@code {name:regex}} — the regex form is legal in a Spring path. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}:]+)(?::[^}]*)?\\}");
 
-    private record Mapping(String verb, String path, String owner,
-                           Set<String> needs, Set<String> supplies, boolean catchAll) {}
+    /**
+     * ⚠ Package-private for {@code RouteCitationContractTest} (F2-464), which resolves the routes
+     * named in the platform's runtime refusal messages against this same set. A second route
+     * resolver would be free to disagree with this one about which classes are shipped, how a
+     * class-level and a method-level path join, or what an {@code ANY}-verb mapping means — and
+     * the disagreement would be invisible, because each map looks complete on its own (F2-190).
+     */
+    record Mapping(String verb, String path, String owner,
+                   Set<String> needs, Set<String> supplies, boolean catchAll) {}
 
     private static long topLevelClassFiles() {
         try (Stream<Path> f = Files.walk(CLASSES)) {
@@ -125,7 +132,8 @@ class RequestMappingBindabilityContractTest {
     }
 
     /** Every (verb, path) a controller claims, with what its path needs and its parameters supply. */
-    private static List<Mapping> mappings() {
+    /** ⚠ Package-private — see {@link Mapping}. One walk, two readers (F2-190). */
+    static List<Mapping> mappings() {
         List<Mapping> out = new ArrayList<>();
         for (Class<?> c : shippedClasses()) {
             if (AnnotatedElementUtils.findMergedAnnotation(c, RestController.class) == null
