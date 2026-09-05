@@ -15229,6 +15229,208 @@ question of the register the refutation had walked into is what found the P1.
 
 ---
 
+## F2-466 — the failure nobody named, on the one lookup of four that did not name it
+
+| Field | Value |
+|---|---|
+| **Id** | F2-466 |
+| **Title** | A bare `Optional.orElseThrow()` throws `NoSuchElementException`, which no `@ExceptionHandler` maps — so three repository lookups answered an opaque 500, and one of them was the fourth of four in a class where the other three named the cycle |
+| **Severity** | P2 (a governance register's finalise step answers "An unexpected error occurred" with the class stripped in production, where its own siblings answer a 404 naming the record) |
+| **Status** | ✅ CLOSED 2026-09-05 |
+| **Found** | 2026-09-05, by asking F2-227's question of the remaining opaque-500 mechanisms — F2-339's own note said to. Two candidates were measured: `@Async` on a non-void return type (**a clean sweep: 1 site, `void`**) and the empty-Optional family (not clean) |
+| **Fixed** | `1d45ceb0`, merged `fix/f2-466-unnamed-optional-failure` |
+| **Module** | `module/ndi/submission`, `module/workflow`, `module/policy`, plus the gate in `config` |
+| **Migration** | none |
+
+### The mechanism
+
+`Optional.orElseThrow()` with **no argument** throws `java.util.NoSuchElementException`, a plain
+`RuntimeException`. `GlobalExceptionHandler` declares **32** `@ExceptionHandler` methods and none
+of them is for that type, so a bare `orElseThrow()` falls to `@ExceptionHandler(Exception.class)`
+and answers **500** — *"An unexpected error occurred"*, with the class and root cause stripped in
+production by SEC-CFG-001.
+
+This is the **sixth member** of the opaque-500 family, after F2-227 (optimistic lock → 409),
+F2-339 (`NoResultException` → 404), F2-348 (`DateTimeParseException` → 400), F2-349 (upload size
+→ 413) and F2-448 (sort property → 400). 🔑 **F2-339's own closing note said to ask F2-227's
+question of the others, and this is the mechanism that was left.**
+
+### The defect
+
+`NdiSubmissionPackageService` resolves its assessment cycle **four times**:
+
+| method | how it fails |
+|---|---|
+| `get(id)` | `EntityNotFoundException("Submission package not found: " + id)` → 404 |
+| `create(cycleId, …)` | `EntityNotFoundException("Cycle not found: " + cycleId)` → 404 |
+| `regenerate(id)` | `EntityNotFoundException("Cycle not found: " + p.getCycleId())` → 404 |
+| **`finalize(id)`** | **bare `.orElseThrow()` → 500** |
+
+🔑🔑 **F2-215's two-of-N at N=4 — in one class, on one finder, resolving one reference.** Three
+of four name the failure and the fourth is the register's DRAFT → READY step, the transition that
+readies an NDMO submission package for approval.
+
+⚠ **Live-reachable, not latent.** `NdiAssessmentCycle` carries `@Where(clause = "is_deleted = 0")`
+and `DELETE /api/ndi/cycles/{id}` soft-deletes, so the package's `cycle_id` becomes a dangling
+reference the moment somebody deletes the cycle. And the guard standing in front of the lookup
+**cannot refuse it**: `preflight()`'s only *blocker* is `criticalGapsWithoutCapa` — every other
+finding is a *warning* — and every child query (`gaps`, `compliance`, `maturity`, `evidence`)
+returns an empty list for a deleted cycle, so `blockers.isEmpty()` is true and `canFinalize`
+passes **vacuously**. The next line is the caller's first symptom.
+
+🔑 **The vacuity is asserted in its own test leg**, so a future reader who tightens `preflight`
+does not conclude it closed this, and one reading `finalize`'s guard chain can see why the line
+after it is the one that fails.
+
+### The other two, read rather than counted
+
+F2-182's rule — reachability is a dataflow question, and a scan says where to look:
+
+- **`PolicyManagementService#newVersion` is provably non-empty.** The `.max(PolicyVersions.LATEST)`
+  is over `existing`, and `if (existing.isEmpty()) throw new EntityNotFoundException(...)` is
+  **four lines above**. Named anyway — with the same exception the empty case already throws, so
+  the two branches of one condition agree — because the invariant belongs in the message rather
+  than in the next reader noticing the check.
+- **`WorkflowEngineService#executeTransition` is latent by construction.**
+  `workflow.transitions` carries **no foreign key** on `to_state_id` (only `pk_transitions`), and
+  nothing in the platform deletes a `WorkflowState` — no delete route in `module/workflow`, no
+  repository delete call anywhere — so the machine is seeded by V114 and only a migration could
+  dangle that reference. Closed anyway, which makes the hazard **absent rather than latent**
+  (F2-213), with the message naming the dangling id.
+
+⚠⚠ **And that third site is the tightest two-of-N in the slice: the same method resolves a
+`WorkflowState` by the same finder TWICE, eight lines apart.** The refusal path (F2-304's) reads
+`stateRepo.findById(i.getCurrentStateId()).map(WorkflowState::getCode).orElse("state#" + id)` — a
+graceful **fallback**, written specifically so the refusal could not itself fail, with a comment
+saying *"The lookups sit inside orElseThrow, so they run only on the refusal path."* The happy
+path's lookup, eight lines below, was bare. **One method, one repository, one finder, two
+opposite treatments** — on the engine 14 modules adopt.
+
+⚠ Note also what the mutation harness proved about the fix: reverting the NDI line produced an
+**ambiguous anchor**, because the fix made `finalize` byte-identical to `regenerate`. That is
+evidence the fix is faithful to its sibling rather than merely similar to it (F2-459 — an anchor
+miss is a finding about coverage, not an inconvenience to route around).
+
+### Why the population is exactly three
+
+Four spellings end in `NoSuchElementException`, and all four were measured over
+**1,898 source files** with comments stripped in one left-to-right alternation (F2-198/F2-211):
+
+| spelling | count | verdict |
+|---|---|---|
+| bare `.orElseThrow()` | **3** | 1 live, 1 unreachable, 1 latent — this finding |
+| `.orElseThrow(NoSuchElementException…)` | 0 | absent |
+| `.iterator().next()` | 3 | all guarded |
+| `.get()` on an Optional local | 39 | all guarded |
+
+The 42 dereferences were checked **mechanically** rather than by trusting F2-415's recorded clean
+sweep (F2-221 — re-derive a filing before executing it), and all 42 are guarded by an
+`isPresent()`/`isEmpty()`/size test or a ternary that tests the same variable.
+
+⚠ **Two of the 42 first read as unguarded because the window was nine lines**: `EvidenceAdapter`'s
+`found.isEmpty()` early return sits **10** lines above its `found.get()` and
+`ChangeWorkflowService`'s `workflow.isEmpty()` sits **22** lines above. 🔑 **That over-reports,
+which is the loud direction** — a window too narrow would otherwise return a *smaller* population,
+and a smaller population reads exactly like a cleaner tree (F2-422).
+
+### The gate
+
+`UnnamedOptionalFailureContractTest` — a **hard zero with no exemption map**, safe by F2-214's
+test: a named exception is always available and strictly more informative, so there is no correct
+code for the leg to fail on.
+
+⚠ Scoped to `src/main/java` on purpose, and said out loud: in a test an unexpected empty **is**
+the failure and the stack trace is immediate, so a bare `orElseThrow()` there is defensible.
+
+⚠⚠ **The premise is asserted as its own leg.** `noSuchElementExceptionIsDeliberatelyUnmapped`
+requires that no handler for that type exists — because mapping it would be *wrong*, not a
+shortcut: the type cannot distinguish `Iterator.next()` on an exhausted iterator (a genuine
+server bug a 404 would hide) from `Optional.orElseThrow()` (not found). **F2-348 drew exactly
+this line** when it handled `DateTimeParseException` and deliberately left `DateTimeException`
+alone. Asserting it means adding a handler is a decision somebody takes on purpose rather than a
+change that quietly retires the hard zero's rationale.
+
+⚙ It reuses `RouteCitationContractTest.stripComments` rather than hand-rolling a second character
+scanner (F2-190) — package-private, same package, offsets and newlines preserved.
+
+### Verification
+
+- Backend **5232/0/0**, unchanged elsewhere and **exactly predicted** (5223 + 5 gate legs + 3 NDI
+  + 1 workflow). `NdiSubmissionPackageService` had **no test of any kind** before this (F2-248 —
+  a path with no test is not a path somebody decided was safe), and it is the live site.
+- **Controls: 8 killed · 0 survived · 0 anchor-miss · 0 did-not-compile**, baseline and
+  post-restore green at 24.
+
+| control | fires |
+|---|---|
+| A the NDI fix reverted | hard zero + the NDI leg + the stripping leg |
+| B the workflow fix reverted | hard zero + the workflow leg |
+| C the policy fix reverted | **the hard zero ALONE** |
+| D the retired expression no longer quoted | the stripping leg alone |
+| E the gate reads raw source | the hard zero (on the quotation) |
+| F a handler for `NoSuchElementException` added | the premise leg alone |
+| G the source walk returns nothing | **the floors only — never the hard zero** |
+| H the detector stops matching | the self-test (+ the stripping leg) |
+
+🔑 **C is the load-bearing one.** The policy site is *provably unreachable*, so no behaviour test
+can reach it and the gate is the only thing carrying it — which is the whole argument for a
+structural leg beside three behavioural ones.
+
+🔑 **G is the second.** A negative assertion over an empty corpus reports the same empty list
+whether the detector works or is dead (F2-235/F2-455), so the floors sit above the largest
+*wrong* answer — zero files, zero matches — rather than above zero.
+
+🔑 **H is the third.** A rotted detector must fail loudly: narrowing `BARE` so it matches nothing
+fires the self-test and leaves the hard zero green, which is exactly the failure mode a hard zero
+cannot see by itself.
+
+⚙ **A versus B** is worth reading too: three legs against two, and not the same three. Reverting
+the NDI line also fires the stripping leg, because with a bare form back in the code the *stripped*
+source matches as well — so that leg is not only about the comment.
+
+### No live probe, and that is a calibration rather than a gap
+
+F2-434/F2-456/F2-460's standard. The empty case is precisely what a mocked repository expresses,
+so the behaviour is fully assertable hermetically; what a unit test cannot see is whether the
+empty case is *reachable in a real database*, and that was established structurally — the
+`@Where` clause, the soft-delete route, and `preflight`'s vacuity, all read from the source.
+Planting a cycle and a package and then soft-deleting the cycle would write to a database that is
+to be left exactly as it is.
+
+### ⚠⚠ A concurrent session’s untracked file entered the docs commit
+
+`git add -A` staged `reports/user-experience-audit-2026-09-05.md` — **176 lines written at
+17:18 by another session**, against `bca50906`, the commit this slice branched from. The tree
+was clean when the slice began, so the file appeared *during* it, and the commit then carried
+four artefacts while its message asserted three.
+
+🔑 **F2-74’s sibling-session hazard in a new form.** There, another session’s dev backend
+loaded this tree’s `target/classes` and hot-restarted into unfinished code; here, another
+session’s untracked artefact entered this session’s history. The common cause is a shared
+worktree, and the common mistake is treating a state observed at the *start* of a slice as a
+property of the slice.
+
+⚠ **A clean `git status` at the start is not a statement about the end**, and `-A` is the one
+flag that turns somebody else’s work-in-progress into your history without naming it.
+Corrected with `git reset --soft HEAD~1` plus `git restore --staged <path>`, which returns the
+file to untracked rather than deleting another session’s work — the state it was found in.
+Stage the paths you wrote, by name.
+
+### Filed
+
+- **`@Async` on a non-void, non-`Future` return type** — Spring's `AsyncExecutionInterceptor`
+  returns `null` immediately for any other return type, so the caller silently gets nothing.
+  Measured and **clean**: 1 `@Async` site in the platform and it returns `void`. Recorded so
+  nobody re-runs it (F2-216).
+- `workflow.transitions` has **no foreign key** on `to_state_id`, `from_state_id` or
+  `definition_id` — the machine's own references are soft. Harmless today (nothing deletes a
+  state, and the seed is a migration), and adding them is a schema change over two live databases
+  whose scope is the whole engine rather than this lookup (F2-183's rule), so it is an **owner
+  decision**.
+- `preflight()`'s vacuity is now *asserted* rather than fixed: whether a submission package whose
+  cycle has been deleted should be refused by preflight with a named blocker — rather than by the
+  cycle lookup — is a product decision about what the NDMO pre-flight report is for.
+
 ## F2-465 — the register described a workflow it does not have, beneath the lanes that show the one it does
 
 | Field | Value |
