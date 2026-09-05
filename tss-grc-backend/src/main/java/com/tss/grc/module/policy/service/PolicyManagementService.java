@@ -675,7 +675,11 @@ public class PolicyManagementService {
         // PM-H2: latest by NUMERIC version, not the lexical list order (get(0)).
         PolicyDocument latest = existing.stream()
             .max(PolicyVersions.LATEST)
-            .orElseThrow();
+            // F2-466 - provably non-empty, because the isEmpty() refusal is four lines above.
+            // Named anyway: the invariant belongs in the message rather than in the next reader
+            // noticing the check, and the same exception the empty case already throws is the
+            // one that keeps the two branches of one condition agreeing.
+            .orElseThrow(() -> new EntityNotFoundException("Policy code not found: " + policyCode));
         if (docs.findByOrganisationIdAndPolicyCodeAndVersion(o, policyCode, newVersion).isPresent())
             throw new IllegalArgumentException("Version already exists: " + policyCode + " v" + newVersion);
         PolicyDocument next = new PolicyDocument();
