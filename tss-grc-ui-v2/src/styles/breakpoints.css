@@ -37,6 +37,29 @@
   [dir="rtl"] .sb { --sb-translate-closed: 100%; }
   .sb.sb-open { transform: translateX(0); }
 
+  /* JRN-02 — collapse the shell to one track once the sidebar leaves the flow.
+   *
+   * `position: fixed` above makes .sb an absolutely-positioned box, so it stops
+   * being a grid item and takes no part in auto-placement. shell.css's
+   * `.grc-shell { grid-template-columns: var(--sidebar-w) 1fr }` therefore keeps
+   * two tracks while .grc-main is the ONLY in-flow child left, so .grc-main
+   * auto-places into the FIRST track — the 280px --sidebar-w one — and the 1fr
+   * track is left empty. At a 390px viewport that computes to `280px 110px`:
+   * the 280px main column, the 110px of dead space, and (because direction:rtl
+   * flips the flow, putting track 1 on the right) the Arabic x=110 offset. All
+   * three of the audit's measurements, one cause.
+   *
+   * ⚠ The audit blamed `shell.css:7` for holding a hardcoded `280px 110px`
+   * desktop grid. It does not — that pair is `var(--sidebar-w) 1fr` COMPUTED at
+   * 390px — and the wrong mechanism points a reader at editing the desktop
+   * template, which would break every viewport above 767px instead.
+   *
+   * One track, not `display: block`, because .rail-layout below does the same
+   * thing the same way, and because a single `1fr` is safe only given
+   * `.grc-main { min-width: 0 }` (shell.css:9), which clamps the track's
+   * automatic minimum to 0 so wide page content cannot stretch it. */
+  .grc-shell { grid-template-columns: 1fr; }
+
   /* Hamburger button — show only on mobile */
   .sb-hamburger {
     display: inline-flex !important;
