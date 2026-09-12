@@ -169,6 +169,56 @@ Convention for new migrations: write them **idempotent** with self-checks that `
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
 Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V400 are pending** the
 next jar — 56 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+⚠⚠ **SEVEN APPLIED MIGRATIONS HAVE DRIFTED FROM THEIR RECORDED CHECKSUM, SO AN
+IN-PLACE JAR UPGRADE OF THE EXISTING DEPLOYED SERVER FAILS AT STARTUP** (measured 2026-09-12,
+read-only). `application-prod.yml` sets `validate-on-migrate: true`, so Flyway validates every
+already-applied migration BEFORE migrating — and **7 of the 53 rows in
+`[platform].[flyway_schema_history]` no longer match their file**: `V302` (edited by
+`3ec99eeb`) plus `V315`, `V316`, `V338`, `V339`, `V340`, `V341` (all by `d853685b`), both
+commits dated **2026-08-06**, four days after the last install (**2026-08-02 14:23**). So
+nothing has validated since the edits: the breakage is live and untested rather than something
+that already passed. 🔑 **The rule was documented in this repo and broken anyway** —
+`docs/database/15-migration-versioning-strategy.md:131`: *"Never modify an applied migration
+— only add new migrations"*.
+⚠⚠ **It does NOT block the procedure `external.properties.template` documents, and saying
+which you are doing is the whole of it.** That procedure restores a backup and baselines at the
+head the backup carries (`FLYWAY_BASELINE_VERSION`, currently 399); the seven then sit BELOW
+the baseline, get no history rows, and are never validated. The blocker is specific to dropping
+a new jar onto the server that already holds those 53 rows — which is the reading the sentence
+above (*"pending the next jar"*) describes. 🔑 **Two documents describe two different
+deployment paths and only one of them is blocked.**
+⚠ **The instrument is trustworthy because of its DISTRIBUTION, not because it found
+something**: a calculator reproducing Flyway's CRC32 (each line's UTF-8 bytes through
+`BufferedReader#readLine`, which treats LF, CR and CRLF alike and excludes the terminator)
+matches **45 of 52** recorded checksums, and for each of the 7 it reproduces the recorded value
+**from the file's content at the commit that created it** — 7 for 7. A single mismatch would
+have been indistinguishable from a wrong calculator (F2-235).
+⚙ **`flyway repair` is the remedy and it is HONEST here, which was checked rather than
+assumed**: all seven edits are strictly *narrowing* guards (`IF OBJECT_ID('x') IS NOT NULL AND
+…`, plus one `BEGIN/END` wrap on V302) that no-op on a fresh install and change nothing where
+the table exists — and on the deployed server those tables did exist, since the migrations
+succeeded there. So the current files' effect on that database is identical to what ran, and
+re-recording the checksums asserts nothing false. ⚠ There is **no `flyway-maven-plugin`** here
+(`flyway-core` 10.15.0 is a runtime dependency only), so repair means the Flyway CLI or a
+one-off runner — **not** a permanent `FlywayMigrationStrategy` that repairs on every boot,
+which would silently bless every future edit to an applied migration and retire the protection
+entirely. **Not done here**: repair WRITES to a customer database (house rule 6).
+🔑 **And the same two commits left three files carrying a LONE CR** — `V121`, `V233`, `V302`
+— because the patch script wrote `GO` + CR + comment where it meant `GO` + CRLF + comment (the
+diff shows `-GO` becoming `+GO-- ⚠ F2-77 …`: it dropped the LF). A CR not followed by LF makes
+git REFUSE CRLF normalisation, so those files are stored verbatim and every later diff of them
+is a whole-file diff — `3ec99eeb` reads as 153 and 167 changed lines for what are, measured
+CR-insensitively, a 1-line and a 10-line edit. ⚠⚠ **The post-condition every patch script in
+this programme carries is blind to it**: stripping CRLF and looking for a surviving LF reads
+CR-CR-LF as *pure CRLF, 0 bare LF*, which is how `docs_jrn03.py` put 16 of them into a 1.9 MB
+governance document on 2026-09-12. Gated now by `ScannableSourceContractTest`'s lone-CR census
+(the three NAMED, because the remedy for each would be to edit an applied migration — F2-461's
+V265 precedent) and by `GovernanceDocumentIntegrityTest`'s hard zero over every repo `.md`,
+which is the population `ScannableSourceContractTest`'s ROOTS cannot see and the one a script of
+my own hit. ⚙ Flyway's own parser is unaffected — `readLine` treats a lone CR as a terminator,
+so `GO` really is alone on its line and V302 applied successfully; and normalising all three
+would be checksum-invariant for the same reason. **They are exempt because of the RULE, not
+because the fix would break validation.**
 
 ### Default dev credentials
 
