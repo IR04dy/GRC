@@ -99,7 +99,7 @@ export function WorkflowHubPage() {
       <PageHeader
         title={isAr ? 'مركز المهام والمعالجات' : 'Workflow Hub'}
         sub={isAr
-          ? `${counts.available} معالج جاهز للاستخدام من إجمالي ${counts.total} عملية`
+          ? `${counts.available} معالج جاهز للاستخدام من إجمالي ${counts.total} عملية — ${counts.partial} جزئي، ${counts.planned} قيد التخطيط`
           : `${counts.available} of ${counts.total} workflows shipped — ${counts.partial} partial, ${counts.planned} on backlog`}
         eyebrow={isAr ? 'كتالوج المعالجات' : 'Wizards catalog'}
         actions={

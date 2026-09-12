@@ -93,7 +93,15 @@ export const WORKFLOWS: WorkflowDef[] = [
     descEn: 'Quarterly (90-day) owner attestation — SAMA + NCA ECC §1-3 expectation. Wired via the V115 attestation cycle.',
     descAr: 'إقرار دوري ربع سنوي من المالك — متطلب من البنك المركزي السعودي والهيئة الوطنية للأمن السيبراني.',
     route: '/buyer-gap',
-    status: 'AVAILABLE',
+    // JRN-04: PARTIAL, not AVAILABLE. The destination card (`BuyerGapPage`,
+    // "§5.1 ERM — Risk Owner Attestation") offers a SWEEP that flags risks past
+    // `next_attestation_date` and emits RISK_ATTESTATION_OVERDUE — a supervisor
+    // action. The owner-facing attestation it advertises has a server half
+    // (`POST /api/v1/risk/risks/{id}/attestations`) and no screen, which
+    // `apiClientMethodReachability.test.ts:106` already records verbatim as
+    // "HOLE: risk attestation cannot be recorded — yet its overdue SWEEP is wired".
+    // Two artefacts, one question, and nothing was comparing them.
+    status: 'PARTIAL',
     Icon: ShieldCheck,
     steps: 1,
     anchor: 'NCA ECC §1-3',
@@ -171,7 +179,15 @@ export const WORKFLOWS: WorkflowDef[] = [
     descEn: 'Generate an AAR from a closed crisis event — auto-stitches sitreps + decisions + regulator filings.',
     descAr: 'توليد تقرير ما بعد الحدث من حدث أزمة مغلق — تجميع تلقائي للتقارير والقرارات والإشعارات.',
     route: '/buyer-gap',
-    status: 'AVAILABLE',
+    // JRN-04: PARTIAL, not AVAILABLE, and strictly worse than the attestation
+    // entry above — that one at least has a button. The destination card
+    // ("Tier-4 — NCEMA After-Action Reports") is a read-only list of the five most
+    // recent AARs whose own empty state says "Generate one from any closed crisis
+    // event", and `aar.generate` has ZERO call sites in the product, recorded at
+    // `apiClientMethodReachability.test.ts:191`. So the first step of this
+    // 7-step journey has no screen anywhere and there is nowhere to repoint the
+    // route to — which is what settles flip-versus-repoint by measurement.
+    status: 'PARTIAL',
     Icon: FileCheck2,
     steps: 7,
     anchor: 'NCEMA',
