@@ -18,6 +18,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { riskApi, ApiError, type RiskResponse } from '../../lib/api';
+import { isDemoId } from '../../lib/demoIds';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -89,11 +90,19 @@ export function RiskDetailPage() {
     try {
       setRisk(await riskApi.get(Number(id)));
     } catch (e) {
-      // Demo-mode fallback: when no JWT is present (or the backend is
-      // unreachable), fall back to MOCK_RISKS so the detail page renders.
-      const fallback = MOCK_RISKS.find(r => r.id === Number(id));
-      if (fallback) setRisk(fallback);
-      else setError(e instanceof ApiError ? e.message : 'Failed to load');
+      // F2-169 — a fabricated record only for a fabricated id. `isDemoId` is true exactly when the
+      // URL id came from the demo corpus, so an unauthenticated walk-through still resolves while a
+      // real record whose fetch FAILED now says so instead of quietly becoming an invented one.
+      //
+      // JRN-01: the guard is the lone outlier of five primary-record fallbacks — ControlDetailPage,
+      // DpiaDetailPage, FindingDetailPage and VendorDetailPage all carry it. This page relied on
+      // `demoRows()` shifting MOCK_RISKS to DEMO_ID_BASE + n instead, so the hazard was absent
+      // because of another file rather than because this one checks (F2-182).
+      if (isDemoId(Number(id))) {
+        const fallback = MOCK_RISKS.find(r => r.id === Number(id));
+        if (fallback) { setRisk(fallback); setLoading(false); return; }
+      }
+      setError(e instanceof ApiError ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
     }
