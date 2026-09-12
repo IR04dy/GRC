@@ -20,7 +20,7 @@ import {
   dashboardApi, riskApi, complianceApi, calendarApi,
   type DashboardStats, type TrendPoint,
 } from '../../lib/api';
-import { isAuthenticated } from '../../lib/auth';
+import { getUser, isAuthenticated } from '../../lib/auth';
 import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
 import '../../styles/pages/executive-dashboard.css';
 
@@ -189,11 +189,54 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
     return Math.max(0, Math.min(100, Math.round(compl - critPenalty - highPenalty - incPenalty - tasksPenalty)));
   }, [stats]);
 
-  // Mock 30-day delta — replace with real /api/v1/dashboard/posture-history
-  // when the backend lands that endpoint. Sign-only for now, magnitude is
-  // derived from the current posture so the chip moves coherently.
-  const deltaPct = posture >= 75 ? +2 : posture >= 60 ? -1 : -4;
+  // JRN-03 — this used to invent the 30-day delta it displays:
+  //   const deltaPct = posture >= 75 ? +2 : posture >= 60 ? -1 : -4;
+  // under a comment saying the magnitude was "derived from the current posture
+  // so the chip moves coherently" — a figure constructed to LOOK measured.
+  // F2-195's rule: a trend chip is a SECOND, independent claim, because it
+  // asserts a prior period, and asserting one the platform never recorded is a
+  // fabrication whatever the sign happens to be.
+  //
+  // It is not merely unwired, it is not derivable TODAY: no store of the
+  // executive posture composite exists, /api/v1/dashboard/posture-history
+  // occurs nowhere in either tree but that retired comment, and one of
+  // posture's own inputs (complianceScore) has no historical form at all.
+  //
+  // So it renders ABSENT rather than being deleted — UX-008's em-dash with a
+  // bilingual reason on title AND aria-label (F2-209). Deleting the chip would
+  // remove the question instead of answering it, and a green chip would be
+  // worse again: an invented figure invites a question, an invented all-clear
+  // closes one (F2-197 / F2-457). Hence tone="neutral", never a tone that
+  // reads as health.
+  const postureDeltaHint = isAr
+    ? 'لا يوجد سجل تاريخي لمؤشّر الحوكمة الشامل، فلا يمكن حساب التغيّر خلال 30 يوماً.'
+    : 'No posture history is stored, so a 30-day change cannot be computed.';
 
+  // JRN-03 — the hero used to greet every user of every tenant by one
+  // hard-coded name: {isAr ? 'أيمن' : 'Aymen'}, the only occurrence of either
+  // string in this source tree (the backend has none). F2-207's invented-person
+  // family at its sharpest: not an officer inside a demo corpus, but the
+  // signed-in user's own name, fabricated, on the first screen after sign-in.
+  //
+  // The session carries a username and no display name (UserInfo is
+  // userId/username/organisationId/roles), so a login id is the most the client
+  // can honestly greet by — and with NO session there is no name and none is
+  // substituted. Deliberately no `?? 'You'`-style fallback: that exact shape is
+  // a recorded defect (F2-248), and production holds a row whose author is the
+  // literal string 'You'.
+  const who = getUser()?.username ?? null;
+
+  // ⚠ The two Arabic branches below are IDENTICAL ON PURPOSE — do not "fix" it.
+  // Arabic greets in two parts of the day where English greets in three:
+  // صباح الخير until noon, مساء الخير from noon onward, covering both English's
+  // afternoon and evening. Collapsing the English side or inventing a third
+  // Arabic greeting would make the primary language read unnaturally (house
+  // rule 7). What the h < 18 test buys is the English distinction only.
+  //
+  // ⚠ Both this and todayLabel below follow the VIEWER's device clock rather
+  // than Asia/Riyadh, and that is right for a greeting: it greets the person
+  // reading the screen, wherever they are. Whether the DATE label should show
+  // the tenant's regulatory day instead is a product question, filed.
   const greeting = (() => {
     const h = new Date().getHours();
     if (h < 12) return isAr ? 'صباح الخير' : 'Good morning';
@@ -230,10 +273,10 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
           letterSpacing: 'var(--tracking-tight)',
           lineHeight: 1.15,
         }}>
-          {greeting}{isAr ? '، ' : ', '}
-          <span style={{ color: 'var(--primary-700)' }}>
-            {isAr ? 'أيمن' : 'Aymen'}
-          </span>
+          {greeting}{who ? (isAr ? '، ' : ', ') : ''}
+          {who && (
+            <span style={{ color: 'var(--primary-700)' }}>{who}</span>
+          )}
         </h1>
         <div className="exec-hero-meta" style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 6 }}>
           <div style={{
@@ -261,9 +304,8 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
           aria-label={`${isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC posture score'}: ${posture} / 100`}
           bands={ragBands()}
         />
-        <Badge tone={deltaPct >= 0 ? 'success' : 'danger'}>
-          {deltaPct >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-          {deltaPct >= 0 ? '+' : ''}{deltaPct}% {isAr ? '/ 30 يوم' : 'vs 30d'}
+        <Badge tone="neutral" title={postureDeltaHint} ariaLabel={postureDeltaHint}>
+          — {isAr ? '/ 30 يوم' : 'vs 30d'}
         </Badge>
       </div>
     </div>
@@ -276,7 +318,11 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
 //   • Icon + label + delta chip
 //   • Big value
 //   • Microbar showing breakdown (severity / status / regulator)
-//   • Sparkline (30 sample stub — backend trend endpoint TODO)
+//   • Sparkline — a REAL 12-week weekly series from GET /api/v1/dashboard/kpi-trend
+//     (fetched at the top of this file for risks / incidents / findings). This
+//     line used to read "30 sample stub — backend trend endpoint TODO"; the
+//     endpoint landed, and a comment calling live data a stub invites the next
+//     reader to replace something that is already real.
 //   • Click → drill into the matching module
 
 interface KpiTileProps {
@@ -286,6 +332,19 @@ interface KpiTileProps {
   to: string;
   tone: 'primary' | 'warning' | 'danger' | 'success' | 'info';
   spark?: number[];
+  /**
+   * Period-over-period change. MUST be derived from a real series — never
+   * typed in. Three tiles carried literal values (-2, +3, +1) until JRN-03;
+   * two of those tiles fetch a real 12-week series and rendered it as the
+   * sparkline directly beside the invented chip, so the tile disagreed with
+   * its own graph (F2-197).
+   *
+   * Left optional rather than removed because it IS derivable for the tiles
+   * that carry `spark`: the series is already fetched and already drawn. What
+   * that needs is a decision about the period and its bilingual label, which
+   * is why it is filed rather than done here — and a tile with no real series
+   * (Compliance score) must simply not pass one.
+   */
   delta?: { value: number; tone: 'success' | 'danger' };
   /** Bottom microbar — stacked colored segments. */
   segments?: Array<{ value: number; color: string; label: string }>;
@@ -331,7 +390,12 @@ function KpiTile({ Icon, label, value, to, tone, spark, delta, segments }: KpiTi
         </div>
         {delta && (
           <Badge tone={delta.tone}>
-            {delta.tone === 'success' ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+            {/* The arrow follows the delta's own SIGN. It used to follow its TONE,
+                which are independent — so a rise that is good rendered a DOWN
+                arrow beside a plus sign. Live on the Compliance-score tile, whose
+                chip was { value: +3, tone: 'success' }: "↓ +3". Tone still drives
+                the colour, because whether a rise is good is per-metric. */}
+            {delta.value >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
             {delta.value >= 0 ? '+' : ''}{delta.value}
           </Badge>
         )}
@@ -414,7 +478,6 @@ function ExecutiveKpiRow({ stats, riskTrend, incidentTrend, findingsTrend }: {
       to: '/risk?status=open',
       tone: stats.openCriticalRisks > 0 ? 'danger' : 'warning',
       spark: riskTrend,
-      delta: { value: -2, tone: 'success' },
       segments: [
         { value: stats.openCriticalRisks ?? 0, color: 'var(--danger)',  label: isAr ? 'حرجة' : 'Critical' },
         { value: stats.openHighRisks ?? 0,     color: 'var(--warning)', label: isAr ? 'عالية' : 'High' },
@@ -428,7 +491,6 @@ function ExecutiveKpiRow({ stats, riskTrend, incidentTrend, findingsTrend }: {
       value: `${stats.complianceScore ?? 0}%`,
       to: '/compliance',
       tone: 'primary',
-      delta: { value: +3, tone: 'success' },
     },
     {
       Icon: AlertOctagon,
@@ -437,7 +499,6 @@ function ExecutiveKpiRow({ stats, riskTrend, incidentTrend, findingsTrend }: {
       to: '/incidents?status=open',
       tone: (stats.openIncidents ?? 0) > 0 ? 'danger' : 'success',
       spark: incidentTrend,
-      delta: stats.openIncidents > 0 ? { value: +1, tone: 'danger' } : undefined,
     },
     {
       Icon: FileWarning,

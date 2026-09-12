@@ -284,4 +284,65 @@ describe('F2-195 — no KPI tile asserts a metric nothing computes', () => {
       + `dash as a string, so the empty state carries its explanation:\n  ${sites.join('\n  ')}`)
       .toBeLessThanOrEqual(HAND_ROLLED_DASH_BASELINE);
   });
+
+  /*
+   * ── JRN-03 ────────────────────────────────────────────────────────────────
+   * A literal trend passed as an object PROPERTY, not as a `<Kpi>` prop.
+   *
+   * The LITERAL_TREND kind above is real and its POPULATION is `trend={{…}}` on
+   * a `<Kpi>` tag. `ExecutiveDashboard` builds its own `KpiTile` and passes the
+   * same claim as `delta: { value: -2, tone: 'success' }` inside a TS array, so
+   * it sat outside this gate by construction — the shape this register keeps
+   * recording (F2-198), here narrowed by a prop SPELLING.
+   *
+   * Three such chips were live: `-2` on Open risks, `+3` on Compliance score and
+   * `+1` on Active incidents. 🔑 The first and third tiles fetch a REAL 12-week
+   * series from `/api/v1/dashboard/kpi-trend` and render it as the sparkline
+   * directly beside the invented chip — so each tile disagreed with its own
+   * graph (F2-197), which is worse than a figure with no provenance at all.
+   *
+   * Hard zero, no exemption map: a trend must be DERIVED from a series, and
+   * where no series exists the prop is simply omitted — both alternatives are
+   * always available, so there is no correct code for this leg to fail on
+   * (F2-214). The conditional form is covered too, because the invented value
+   * survives the ternary that gates it.
+   */
+  const LITERAL_DELTA_PROP =
+    /\b(?:delta|trend)\s*:\s*(?:[^,{}]*\?\s*)?\{\s*value\s*:\s*[+-]?\d+(?:\.\d+)?/g;
+
+  it('no tile passes a hand-typed trend as an object property', () => {
+    const offenders: string[] = [];
+    for (const abs of walk(SRC)) {
+      const rel = abs.slice(process.cwd().length + 1).replace(/\\/g, '/');
+      const src = readFileSync(abs, 'utf-8');
+      for (const m of src.matchAll(LITERAL_DELTA_PROP)) {
+        offenders.push(`${rel}:${src.slice(0, m.index).split('\n').length}  ${m[0].replace(/\s+/g, ' ')}`);
+      }
+    }
+    expect(offenders, 'a period-over-period change is typed in rather than derived. A trend is a '
+      + 'SECOND, independent claim: it asserts a prior period. Derive it from a real series, or omit '
+      + 'the prop — never type the number:\n  ' + offenders.join('\n  ')).toEqual([]);
+  });
+
+  it('...and that detector fires on the shapes it is for, and not on derived ones', () => {
+    const mustFlag = [
+      "delta: { value: -2, tone: 'success' },",
+      "delta: { value: +3, tone: 'success' },",
+      "delta: stats.openIncidents > 0 ? { value: +1, tone: 'danger' } : undefined,",
+      "trend: { value: 4.2, dir: 'up' },",
+    ];
+    for (const s of mustFlag) {
+      expect([...s.matchAll(LITERAL_DELTA_PROP)].length, `should flag: ${s}`).toBe(1);
+    }
+    const mustNotFlag = [
+      'delta: deriveDelta(riskTrend),',
+      "delta: { value: last - first, tone: last <= first ? 'success' : 'danger' },",
+      'delta: series.length >= 2 ? { value: series.at(-1)! - series[0], tone } : undefined,',
+      'delta,',
+      'const delta = { value: n };',
+    ];
+    for (const s of mustNotFlag) {
+      expect([...s.matchAll(LITERAL_DELTA_PROP)].length, `should NOT flag: ${s}`).toBe(0);
+    }
+  });
 });
