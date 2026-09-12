@@ -2346,3 +2346,21 @@ tr:hover .row-actions { opacity: 1; }
   line-height: 1.45;
 }
 .demo-data-notice svg { flex: 0 0 auto; opacity: .8; }
+
+/* JRN-09 — a styled intake radio chip wrapping a real <input type="radio">.
+   The input carries the grouping, the checked state and arrow-key navigation;
+   it is visually hidden rather than `display:none`, because a hidden input is
+   not focusable and would take the keyboard model away again. The focus ring
+   therefore has to land on the chip, which is what :has(:focus-visible) does. */
+.intake-radio > input[type="radio"] {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden; white-space: nowrap;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  border: 0;
+}
+.intake-radio:has(> input[type="radio"]:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
