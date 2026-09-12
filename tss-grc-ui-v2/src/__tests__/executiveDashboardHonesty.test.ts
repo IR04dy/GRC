@@ -89,6 +89,14 @@ describe('JRN-03 — the executive dashboard asserts only what it measured', () 
       'a string fallback was added after `getUser()?.username`. With no session there is no '
         + 'name and none may be substituted — F2-248, where `?? \'You\'` reached production.',
     ).toBe(false);
+
+    // ...and the separator goes with the name. Dropping the name while leaving the
+    // comma renders "Good morning, " with nothing after it — the visible residue of
+    // a name that is not there, which is how a removal announces itself as a bug.
+    expect(
+      /\{who \? \(isAr \? '، ' : ', '\) : ''\}/.test(code),
+      'the greeting separator is no longer conditional on there being a name.',
+    ).toBe(true);
   });
 
   it('the 30-day posture chip renders as absent, with a reason, and never as health', () => {
