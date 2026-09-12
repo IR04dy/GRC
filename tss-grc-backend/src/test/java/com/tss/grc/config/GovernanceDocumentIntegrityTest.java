@@ -345,4 +345,65 @@ class GovernanceDocumentIntegrityTest {
                         DEAD_BRANCH, DEAD_BRANCH_SHA)
                 .isEmpty();
     }
+
+    /**
+     * F2-77 / JRN-03 — a governance document whose diffs are unreadable is a governance document
+     * nobody reviews.
+     *
+     * <p>🔑 A CR not followed by LF makes git REFUSE CRLF normalisation, so the blob is stored
+     * verbatim and differs from its normalised predecessor on every line. A patch script of mine
+     * wrote 16 of them into {@code UNIFIED_IMPLEMENTATION_PLAN.md} on 2026-09-12 and a four-anchor
+     * edit arrived as <b>4,139 insertions / 4,123 deletions</b> — in the 1.9 MB document that
+     * governs this whole programme. Nothing failed; the only tell was the diffstat.
+     *
+     * <p>⚠⚠ <b>This lives here rather than in {@link ScannableSourceContractTest} because that
+     * class's ROOTS are the two SOURCE trees, and every governance document in this repo is outside
+     * them</b> — so the gate that owns the byte-level question could not have caught the instance
+     * that prompted it. Its detector is reused rather than copied (F2-190). A hard zero with no
+     * exemption map is safe here in a way it is not there: a document is not an applied migration,
+     * so correcting one is always available (F2-214).
+     */
+    @Test
+    @DisplayName("no governance document contains a lone CR — git then refuses to normalise it")
+    void noGovernanceDocumentContainsALoneCarriageReturn() {
+        Assumptions.assumeTrue(Files.isDirectory(ROOT), "repo root not reachable");
+
+        List<Path> corpus = allRepoMarkdown();
+        // A collapsed walk must never read as a clean one (F2-69). Measured 2026-09-12: 362.
+        assertThat(corpus.size())
+                .as("the markdown walk found %d documents; it should find ~360. A walk that stopped "
+                        + "resolving reports a SMALLER population, which is indistinguishable from "
+                        + "a corpus with nothing wrong in it.", corpus.size())
+                .isGreaterThan(250);
+
+        List<String> offenders = new ArrayList<>();
+        for (Path p : corpus) {
+            byte[] data;
+            try {
+                data = Files.readAllBytes(p);
+            } catch (IOException e) {
+                continue; // F2-408: tolerate a file removed mid-walk
+            }
+            List<Integer> hits = ScannableSourceContractTest.loneCarriageReturns(data);
+            if (hits.isEmpty()) {
+                continue;
+            }
+            int first = hits.get(0);
+            int line = 1;
+            for (int i = 0; i < first; i++) {
+                if ((data[i] & 0xFF) == 0x0A) {
+                    line++;
+                }
+            }
+            offenders.add(String.format("%s:%d — %d lone CR(s)", rel(p), line, hits.size()));
+        }
+
+        assertThat(offenders)
+                .as("these documents hold a CR that is not part of a CRLF, so git stores them "
+                        + "verbatim and every later diff of them is a whole-file diff. Normalise "
+                        + "CRLF->LF, then CR->LF, then LF->CRLF. ⚠ The post-condition most patch "
+                        + "scripts here carry — no bare LF after stripping CRLF — reads CR-CR-LF as "
+                        + "clean, so it cannot catch this.")
+                .isEmpty();
+    }
 }
