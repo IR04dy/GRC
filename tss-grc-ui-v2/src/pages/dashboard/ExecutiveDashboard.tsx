@@ -684,6 +684,8 @@ function AttentionStrip() {
         if (!['CRITICAL', 'HIGH'].includes(sev)) continue;
         if (['CLOSED', 'MITIGATED', 'ACCEPTED'].includes((r.status ?? '').toUpperCase())) continue;
         items.push({
+          kind: 'risk',
+          id: r.id,
           titleEn: `${r.riskCode ?? 'Risk'} — ${r.titleEn ?? ''}`.trim(),
           titleAr: `${r.riskCode ?? ''} — ${r.titleAr || r.titleEn || ''}`.trim(),
           sev: sev === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
@@ -694,7 +696,14 @@ function AttentionStrip() {
         const sev = (f.severity ?? '').toUpperCase();
         if (!['CRITICAL', 'HIGH'].includes(sev)) continue;
         if ((f.status ?? '').toUpperCase() === 'CLOSED') continue;
+        // ⚠ `titleAr: f.title` is the honest maximum here, not a mapping shortcut:
+        // `compliance.findings` (`AuditFinding`) declares a single `title` column and no
+        // reference code at all, so there is no Arabic title to read and no code to show
+        // (the wire nominates, the entity adjudicates — F2-211). House rule 7 is owed by
+        // that register, not by this component; filed.
         items.push({
+          kind: 'finding',
+          id: f.id,
           titleEn: f.title, titleAr: f.title,
           sev: sev === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
           age: ageLabel(f.dueDate),
@@ -761,7 +770,45 @@ function AttentionStrip() {
   );
 }
 
-type AttentionItem = { titleEn: string; titleAr: string; sev: 'CRITICAL' | 'HIGH' | 'MEDIUM'; age: string };
+/**
+ * One row of "Needs decision".
+ *
+ * JRN-08 — `kind` and `id` are what make the row LINKABLE, and the list mixes two record types so
+ * it needs both. The mapping used to keep `riskCode`, `titleEn` and `createdAt` and discard `r.id`,
+ * which is why the list was not merely un-linked but un-linkable.
+ *
+ * ⚠ `MEDIUM` is gone rather than styled: both pushes filter to CRITICAL/HIGH and map to one of the
+ * two, so no MEDIUM row could ever be produced — and `AttentionList`'s badge is a TWO-way branch
+ * over the union, so a MEDIUM row would have rendered the literal "MEDIUM" in English and "عالي"
+ * (HIGH) in Arabic. Latent, never reachable, and unrepresentable now rather than latent (F2-213).
+ */
+type AttentionItem = {
+  kind: 'risk' | 'finding';
+  id: number;
+  titleEn: string;
+  titleAr: string;
+  sev: 'CRITICAL' | 'HIGH';
+  age: string;
+};
+
+/**
+ * Where a decision row goes.
+ *
+ * A Record keyed by the union rather than a ternary, so a third record type is a COMPILE error
+ * rather than a row that silently renders without a destination — which is the defect this closes.
+ * Both routes are resolved from `App.tsx` (`/risk/:id` is singular; `/findings/:id` is plural) and
+ * a gate re-resolves them, because a plausible path string is worth nothing until something
+ * resolves it (F2-464).
+ */
+const ATTENTION_ROUTE: Record<AttentionItem['kind'], string> = {
+  risk: '/risk',
+  finding: '/findings',
+};
+
+/** The destination for a decision row. Exported so a gate can resolve it without a render. */
+export function attentionHref(kind: AttentionItem['kind'], id: number): string {
+  return `${ATTENTION_ROUTE[kind]}/${id}`;
+}
 type DeadlineItem = { titleEn: string; titleAr: string; days: number; regulator: string };
 
 /** "2d" / "5w" since a timestamp; em dash when there is no date to age from. */
@@ -771,16 +818,22 @@ function ageLabel(iso?: string | null): string {
   return days < 14 ? `${days}d` : `${Math.round(days / 7)}w`;
 }
 
-function AttentionList({ items }: { items: Array<{ titleEn: string; titleAr: string; sev: 'CRITICAL' | 'HIGH' | 'MEDIUM'; age: string }> }) {
+// ⚠ The parameter type is `AttentionItem[]`, not a fresh inline shape. It used to RE-DECLARE the
+// identical four fields, so adding `id` to the type alone would have compiled and changed nothing:
+// `decisions` is a variable reference rather than an object literal, so TypeScript's
+// excess-property check never fires (F2-211's mechanism) and the renderer still could not read
+// `it.id`. Two copies of one shape with nobody maintaining the agreement (F2-177).
+function AttentionList({ items }: { items: AttentionItem[] }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {items.map((it, i) => (
-        <div key={i} style={{
+        <Link key={`${it.kind}-${it.id}`} to={attentionHref(it.kind, it.id)} style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '10px 0',
           borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none',
+          textDecoration: 'none', color: 'inherit',
         }}>
           <Badge tone={it.sev === 'CRITICAL' ? 'danger' : 'warning'}>
             {isAr ? (it.sev === 'CRITICAL' ? 'حرج' : 'عالي') : it.sev}
@@ -791,7 +844,7 @@ function AttentionList({ items }: { items: Array<{ titleEn: string; titleAr: str
           <span className="text-2xs text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
             {it.age}
           </span>
-        </div>
+        </Link>
       ))}
     </div>
   );
