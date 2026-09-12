@@ -15,6 +15,7 @@ import { Badge } from '../ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import type { IntakeKind } from '../../lib/intake';
 import { INTAKE_CATALOG } from '../../lib/intake';
+import { roleLabel } from '../../lib/roleLabels';
 
 interface HrsdProcess {
   kind: IntakeKind;
@@ -71,7 +72,7 @@ export function HrsdProcessInitiation() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--ink-3)' }}>
                 <span>{t('hrsdProcessReference')}: <span className="mono">{meta.reference}</span></span>
                 <span>·</span>
-                <span>{t('hrsdProcessAssignee')}: <span className="mono">{meta.defaultAssignee}</span></span>
+                <span>{t('hrsdProcessAssignee')}: <span>{roleLabel(meta.defaultAssignee, lang)}</span></span>
                 <span>·</span>
                 <span>SLA: <span className="mono">{slaLabel}</span></span>
               </div>

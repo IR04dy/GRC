@@ -14,6 +14,7 @@ import {
   useIntake, INTAKE_CATALOG, type IntakeKind,
 } from '../../lib/intake';
 import { INTAKE_FORM_FIELDS } from '../../lib/intakeForms';
+import { roleLabel } from '../../lib/roleLabels';
 import { IntakeFormRenderer } from '../../components/intake/IntakeFormRenderer';
 import { computeChangeRisk, type ChangeRiskBreakdown } from '../../lib/changeRisk';
 import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
@@ -129,7 +130,7 @@ export function IntakeFormPage() {
               {t('intakeFormAckHeading')}
             </h2>
             <p style={{ marginTop: 8, fontSize: 14, color: 'var(--ink-2)', maxWidth: 520, lineHeight: 1.6 }}>
-              {t('intakeFormAckBody').replace('{assignee}', catalog.defaultAssignee)}
+              {t('intakeFormAckBody').replace('{assignee}', roleLabel(catalog.defaultAssignee, lang))}
             </p>
           </div>
 
@@ -192,7 +193,7 @@ export function IntakeFormPage() {
           background: 'var(--info-bg)', padding: 12, borderRadius: 'var(--r-sm)',
           fontSize: 12, color: 'var(--ink-2)', marginBottom: 16, lineHeight: 1.5,
         }}>
-          {t('intakeFormReroutingHint').replace('{assignee}', catalog.defaultAssignee).replace('{ref}', catalog.reference)}
+          {t('intakeFormReroutingHint').replace('{assignee}', roleLabel(catalog.defaultAssignee, lang)).replace('{ref}', catalog.reference)}
         </div>
         {/* DD-73: live change-risk preview rendered above the form when
             the user is filling a CHANGE_REQUEST. Recomputes on every change
