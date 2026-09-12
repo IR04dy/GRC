@@ -125,8 +125,8 @@ export function RrpDashboardPage() {
         : 'SAMA mandatory annual Recovery & Resolution Plan.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الاستعادة والحلّ · المرحلة ١٧'
-                                : 'RRP · Sprint 17'}
+        eyebrow={lang === 'ar' ? 'الاستعادة والحلّ'
+                                : 'RRP'}
         title={lang === 'ar' ? 'لوحة الاستعادة والحلّ' : 'RRP Dashboard'}
         sub={lang === 'ar'
           ? 'الخطّة السنوية الإلزامية لساما — الوظائف الحيوية، خيارات الاستعادة، ومؤشّرات الإنذار'

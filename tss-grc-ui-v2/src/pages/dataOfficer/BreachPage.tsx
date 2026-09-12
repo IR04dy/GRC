@@ -158,7 +158,7 @@ export function BreachPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={ar ? 'إبلاغ الخروقات · المرحلة ٣٣' : 'Breach Notification · Sprint 33'}
+        eyebrow={ar ? 'إبلاغ الخروقات' : 'Breach Notification'}
         title={ar ? 'سجل خروقات البيانات الشخصية' : 'Personal Data Breach Register'}
         sub={ar
           ? 'مادة ٢٠ من نظام حماية البيانات — إبلاغ سدايا خلال ٧٢ ساعة من اكتشاف الخرق (ساعة العدّ التنازلي لكل خرق)'

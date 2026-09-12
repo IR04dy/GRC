@@ -1261,7 +1261,7 @@ export const en = {
 
   // Audit engagement milestone timeline — Sprint 4.
   engMilestoneTitle:       'Engagement timeline — milestones with live SLA',
-  engMilestoneSub:         'Each milestone is anchored to the previous one and tracked under the Sprint 4 SLA engine. The current milestone shows a live countdown using the Saudi business calendar.',
+  engMilestoneSub:         'Each milestone is anchored to the previous one and tracked under the SLA engine. The current milestone shows a live countdown using the Saudi business calendar.',
   engRemainingShort:       '{n}d to next milestone',
   engBreachedShort:        'Overdue by {n}d',
   engHijriLabel:           'Hijri:',
@@ -1307,7 +1307,7 @@ export const en = {
   approvalsTitle:          'Approval Inbox',
   approvalsSub:            'Cross-module approval queue · single inbox for every domain',
   approvalsEyebrow:        'Approval Engine',
-  approvalsPageSub:        'Single queue for every parallel, sequential, or conditional approval the platform raises. Each request carries a Saudi regulator citation and a live SLA countdown driven by the Sprint 4 SLA engine.',
+  approvalsPageSub:        'Single queue for every parallel, sequential, or conditional approval the platform raises. Each request carries a Saudi regulator citation and a live SLA countdown driven by the platform SLA engine.',
   approvalsWorkflowSubmissionsLink: 'Workflow submissions',
   approvalsKpiPending:     'Pending',
   approvalsShowMine:         'Only mine',
@@ -1334,7 +1334,7 @@ export const en = {
   approvalActDelegate:     'Delegate',
 
   // Sprint 13 — Multi-step Workflow Approval Chains
-  approvalChainEyebrow:           'Approval Chains · Sprint 13',
+  approvalChainEyebrow:           'Approval Chains',
   approvalChainTitle:             'Approval chains',
   approvalChainSub:                'Configurable multi-step approval ladders',
   approvalChainPageSub:           'Configure the multi-step approval ladders enforced before any CAPA closure, cross-border data transfer, or material change can be finalised. Anchored on SAMA Corporate Governance §5.3, NCA ECC-2 control 1-3-2, and PDPL Article 32.',
@@ -6203,7 +6203,7 @@ export const en = {
 
   // ─── Sprint 13 — Sanctions Screening engine ──────────────────────
   sanctionsSidebar:                  'Sanctions screening',
-  sanctionsEyebrow:                  'AML / CFT · Sprint 13',
+  sanctionsEyebrow:                  'AML / CFT',
   sanctionsDashboardTitle:           'Sanctions screening dashboard',
   sanctionsDashboardSub:             'Real-time screening against OFAC SDN, UN, EU, SAMA local terror, and the KSA National watchlist',
   sanctionsListsTitle:               'Sanctions lists',
@@ -6251,7 +6251,7 @@ export const en = {
   'dataclass.flows':                   'Data flows',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
-  'complaints.eyebrow':                'Consumer Protection · Sprint 13',
+  'complaints.eyebrow':                'Consumer Protection',
   'complaints.submit':                 'Submit a complaint',
   'complaints.trackingCode':           'Tracking code',
   'complaints.trackMyComplaint':       'Track my complaint',

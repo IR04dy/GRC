@@ -152,8 +152,8 @@ export function ObDashboardPage() {
         : 'TPP register, customer consents, API incidents, and SAMA-deadline obligations.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة · المرحلة ١٩'
-                                : 'Open Banking · Sprint 19'}
+        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة'
+                                : 'Open Banking'}
         title={lang === 'ar' ? 'لوحة المصرفية المفتوحة'
                               : 'Open Banking Compliance Dashboard'}
         sub={lang === 'ar'

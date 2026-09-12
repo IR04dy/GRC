@@ -140,8 +140,8 @@ export function OpResAssessmentsPage() {
         : 'Annual and ad-hoc self-assessments under SAMA Op-Res 2024.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الصمود التشغيلي · المرحلة ١٤'
-                                : 'Operational Resilience · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'الصمود التشغيلي'
+                                : 'Operational Resilience'}
         title={lang === 'ar' ? 'تقييمات الصمود التشغيلي'
                               : 'Op-Res Assessments'}
         sub={lang === 'ar' ? 'سجل التقييمات السنوية والمؤقّتة'

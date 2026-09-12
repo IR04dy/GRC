@@ -167,7 +167,7 @@ export function OutsourcingArrangementsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'حوكمة الإسناد · المرحلة ٣٠' : 'Outsourcing · Sprint 30'}
+        eyebrow={lang === 'ar' ? 'حوكمة الإسناد' : 'Outsourcing'}
         title={lang === 'ar' ? 'سجل ترتيبات الإسناد' : 'Outsourcing Arrangements'}
         sub={lang === 'ar'
           ? 'تنظيم ساما للإسناد §٣-§٨ — كل ترتيب يحمل تقييم مخاطر وموافقة المجلس وإخطار ساما (للجوهري)'

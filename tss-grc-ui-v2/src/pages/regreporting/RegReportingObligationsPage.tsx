@@ -215,8 +215,8 @@ export function RegReportingObligationsPage() {
         : 'Master list of every recurring statutory return.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تقويم البلاغات · المرحلة ١٦'
-                                : 'Reporting Calendar · Sprint 16'}
+        eyebrow={lang === 'ar' ? 'تقويم البلاغات'
+                                : 'Reporting Calendar'}
         title={lang === 'ar' ? 'كتالوج التقارير' : 'Obligation Catalog'}
         sub={lang === 'ar'
           ? 'إضافة وتعديل التقارير الرقابية المتكرّرة'

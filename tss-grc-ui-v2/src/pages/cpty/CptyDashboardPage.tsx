@@ -157,8 +157,8 @@ export function CptyDashboardPage() {
         : 'Counterparty register, credit ratings, large-exposure limits.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الائتمان · المرحلة ١٨'
-                                : 'Credit Risk · Sprint 18'}
+        eyebrow={lang === 'ar' ? 'الائتمان'
+                                : 'Credit Risk'}
         title={lang === 'ar' ? 'لوحة الأطراف المقابلة'
                               : 'Counterparty Registry Dashboard'}
         sub={lang === 'ar'

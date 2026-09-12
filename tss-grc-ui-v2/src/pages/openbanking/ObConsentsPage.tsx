@@ -226,8 +226,8 @@ export function ObConsentsPage() {
         : 'Every active and historical customer consent across every TPP.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة · المرحلة ١٩'
-                                : 'Open Banking · Sprint 19'}
+        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة'
+                                : 'Open Banking'}
         title={lang === 'ar' ? 'الموافقات' : 'Consents'}
         sub={lang === 'ar'
           ? 'سجل موافقات العملاء على وصول مزوّدي الخدمة'

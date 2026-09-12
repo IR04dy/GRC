@@ -128,8 +128,8 @@ export function RegInspectDashboardPage() {
         : 'Workspace for SAMA / NCA / CMA / SDAIA on-site inspections.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'التفتيش الرقابي · المرحلة ١٥'
-                                : 'Regulatory Inspection · Sprint 15'}
+        eyebrow={lang === 'ar' ? 'التفتيش الرقابي'
+                                : 'Regulatory Inspection'}
         title={lang === 'ar' ? 'لوحة التفتيش الرقابي'
                               : 'Regulatory Inspection Dashboard'}
         sub={lang === 'ar'

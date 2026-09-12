@@ -16,8 +16,8 @@ export function ComingSoonBadge() {
 export function ComingSoonPage({
   titleEn = 'Coming soon',
   titleAr = 'قريباً',
-  descriptionEn = 'This workspace is on the Sprint 5 roadmap. Talk to your TSS account team if you need it sooner.',
-  descriptionAr = 'مساحة العمل هذه ضمن خارطة طريق المرحلة الخامسة. تواصل مع فريق حسابك في TSS إذا كنت بحاجة إليها قبل ذلك.',
+  descriptionEn = 'This workspace is on the product roadmap. Talk to your TSS account team if you need it sooner.',
+  descriptionAr = 'مساحة العمل هذه ضمن خارطة طريق المنتج. تواصل مع فريق حسابك في TSS إذا كنت بحاجة إليها قبل ذلك.',
 }: {
   titleEn?: string; titleAr?: string;
   descriptionEn?: string; descriptionAr?: string;

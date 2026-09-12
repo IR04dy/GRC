@@ -86,7 +86,7 @@ export function ConsentPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'الموافقات · المرحلة ٣٣' : 'Consent · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'الموافقات' : 'Consent'}
         title={ar ? 'سجل الموافقات' : 'Consent Registry'}
         sub={ar ? 'مادة ٥-٦ — موافقة بغرض محدّد · تتبع المنح والسحب' : 'PDPL Art. 5-6 — purpose-bound · grant + withdrawal trace'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'موافقة جديدة' : 'New consent')}</Button>}
@@ -165,7 +165,7 @@ export function DpiaPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'تقييم الأثر · المرحلة ٣٣' : 'DPIA · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'تقييم الأثر' : 'DPIA'}
         title={ar ? 'سجل تقييمات أثر حماية البيانات' : 'DPIA Register'}
         sub={ar ? 'مادة ٢٥ — تقييم الأثر للمعالجة عالية المخاطر · رأي مسؤول الحماية' : 'PDPL Art. 25 — Impact assessment for high-risk processing · DPO opinion log'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'تقييم جديد' : 'New DPIA')}</Button>}
@@ -273,7 +273,7 @@ export function NoticePage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'إشعارات الخصوصية · المرحلة ٣٣' : 'Privacy Notices · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'إشعارات الخصوصية' : 'Privacy Notices'}
         title={ar ? 'إدارة إشعارات الخصوصية' : 'Privacy Notice Manager'}
         sub={ar ? 'مادة ١٢ — نسخ ثنائية اللغة لكل قناة · تتبع تغيّر النسخة' : 'PDPL Art. 12 — bilingual versioned notices per channel'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'إشعار جديد' : 'New notice')}</Button>}
@@ -394,7 +394,7 @@ export function RetentionPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'الاحتفاظ والتخلّص · المرحلة ٣٣' : 'Retention & Disposal · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'الاحتفاظ والتخلّص' : 'Retention & Disposal'}
         title={ar ? 'جدول الاحتفاظ والتخلّص' : 'Retention & Disposal Schedule'}
         sub={ar ? 'مادة ١٨ — مدد الاحتفاظ لكل فئة · أدلة التخلّص المشفّرة' : 'PDPL Art. 18 — Per-category retention windows · cryptographic disposal evidence'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'قاعدة جديدة' : 'New rule')}</Button>}
@@ -524,7 +524,7 @@ export function NdrPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'السجل الوطني للبيانات · المرحلة ٣٣' : 'NDR · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'السجل الوطني للبيانات' : 'NDR'}
         title={ar ? 'تقديم السجل الوطني للبيانات (NDR)' : 'National Data Register submissions'}
         sub={ar ? 'تقديم سنوي إلى سدايا · بوابة معايير NDMO' : 'Annual SDAIA submission · NDMO standards gateway'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'دورة جديدة' : 'New cycle')}</Button>}
@@ -624,7 +624,7 @@ export function CatalogPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'دليل البيانات · المرحلة ٣٣' : 'Catalog · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'دليل البيانات' : 'Catalog'}
         title={ar ? 'دليل البيانات والنَّسَب' : 'Data Catalog + Lineage'}
         sub={ar ? 'مجال إدارة البيانات في NDMO · ملاك ووصاة وحراس' : 'NDMO Data Management — owners, stewards, custodians'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'مجموعة بيانات' : 'New dataset')}</Button>}
@@ -739,7 +739,7 @@ export function QualityPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'جودة البيانات · المرحلة ٣٣' : 'Quality · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'جودة البيانات' : 'Quality'}
         title={ar ? 'بطاقات جودة البيانات' : 'Data Quality Scorecards'}
         sub={ar ? 'مجال جودة البيانات في NDMO · ٧ أبعاد · بطاقات أداء ربعية' : 'NDMO DQM · 7 dimensions · quarterly scorecards'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'قاعدة جودة' : 'New rule')}</Button>}
@@ -886,7 +886,7 @@ export function EthicsPage() {
   ];
   return (
     <Shell>
-      <PageHeader eyebrow={ar ? 'لجنة الأخلاقيات · المرحلة ٣٣' : 'Ethics · Sprint 33'}
+      <PageHeader eyebrow={ar ? 'لجنة الأخلاقيات' : 'Ethics'}
         title={ar ? 'لجنة أخلاقيات البيانات والذكاء الاصطناعي' : 'Data & AI Ethics Committee'}
         sub={ar ? 'أخلاقيات الذكاء الاصطناعي في سدايا + أخلاقيات البيانات في NDMO · سجل رأي اللجنة' : 'SDAIA AI Ethics + NDMO Data Ethics · committee opinion log'}
         actions={<Button variant="primary" Icon={Plus} onClick={() => setShowNew(s => !s)}>{showNew ? (ar ? 'إغلاق' : 'Cancel') : (ar ? 'مراجعة جديدة' : 'New review')}</Button>}

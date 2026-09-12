@@ -143,8 +143,8 @@ export function CptyCounterpartiesPage() {
                           : 'Every credit counterparty active or otherwise.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الائتمان · المرحلة ١٨'
-                                : 'Credit Risk · Sprint 18'}
+        eyebrow={lang === 'ar' ? 'الائتمان'
+                                : 'Credit Risk'}
         title={lang === 'ar' ? 'الأطراف المقابلة' : 'Counterparties'}
         sub={lang === 'ar' ? 'سجل الأطراف الائتمانية'
                             : 'Credit counterparty register'}

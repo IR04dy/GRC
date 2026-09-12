@@ -181,8 +181,8 @@ export function ShariaNcEventsPage() {
       sub={lang === 'ar' ? 'سجل المخالفات الشرعية وتطهير الدخل غير الشرعي.'
                           : 'Sharia non-compliance events and SNCI purification ledger.'}>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'المخالفات الشرعية' : 'Sharia non-compliance events'}
         sub={lang === 'ar' ? 'تتبّع الدخل غير الشرعي وتطهيره ضمن مهلة 90 يوماً'
                             : 'Track SNCI through to charitable purification within 90 days'}

@@ -110,7 +110,7 @@ export function FraudCaseDetailPage() {
         : 'Fraud case detail — investigation, outcome and closure per SAMA 2018 framework.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال · المرحلة ١٤' : 'Fraud Risk · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال' : 'Fraud Risk'}
         title={caseData
           ? `${caseData.externalReference} — ${lang === 'ar' ? caseData.subjectAr : caseData.subjectEn}`
           : '…'}

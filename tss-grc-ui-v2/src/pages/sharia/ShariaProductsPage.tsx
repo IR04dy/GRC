@@ -137,8 +137,8 @@ export function ShariaProductsPage() {
       sub={lang === 'ar' ? 'مسار اعتماد المنتجات الإسلامية من التقديم إلى الإطلاق.'
                           : 'Islamic product pipeline from submission through to launch.'}>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'اعتماد المنتجات' : 'Product Approvals'}
         sub={lang === 'ar'
           ? 'لا يُطلَق منتج إسلامي بدون موافقة نهائية من الهيئة الشرعية (ساما §4.2 + أيوفي GSIFI 3)'

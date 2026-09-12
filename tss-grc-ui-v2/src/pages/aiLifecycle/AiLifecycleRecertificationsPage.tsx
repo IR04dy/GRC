@@ -146,7 +146,7 @@ export function AiLifecycleRecertificationsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء · المرحلة ٣١' : 'AI Lifecycle · Sprint 31'}
+        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء' : 'AI Lifecycle'}
         title={lang === 'ar' ? 'إعادة اعتماد النماذج' : 'Model Recertifications'}
         sub={lang === 'ar'
           ? 'دورة الاعتماد السنوية (سدايا §6.4) — كل نموذج إنتاجي يُعاد اعتماده كل ١٢-٢٤ شهراً'

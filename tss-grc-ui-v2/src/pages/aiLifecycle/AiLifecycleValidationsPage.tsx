@@ -147,7 +147,7 @@ export function AiLifecycleValidationsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء · المرحلة ٣١' : 'AI Lifecycle · Sprint 31'}
+        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء' : 'AI Lifecycle'}
         title={lang === 'ar' ? 'تحقّقات النماذج' : 'Model Validations'}
         sub={lang === 'ar'
           ? 'مبادئ سدايا لأخلاقيات الذكاء + SR 11-7 للتحقّق المستقل — كل تحقّق يحمل قياس عدالة وحالة'

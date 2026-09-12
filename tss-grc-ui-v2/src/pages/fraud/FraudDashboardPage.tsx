@@ -115,7 +115,7 @@ export function FraudDashboardPage() {
         : 'SAMA Anti-Fraud Framework 2018 — Art.4-9.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال · المرحلة ١٤' : 'Fraud Risk · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال' : 'Fraud Risk'}
         title={lang === 'ar' ? 'لوحة مخاطر الاحتيال' : 'Fraud Risk Dashboard'}
         sub={lang === 'ar'
           ? 'بحسب إطار مكافحة الاحتيال 2018 (ساما)'

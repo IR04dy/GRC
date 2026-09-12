@@ -44,6 +44,33 @@ import { join, posix, sep } from 'node:path';
  */
 const TOKENS = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
 
+/**
+ * Every string/template literal in `src`, with its 1-based line, comments excluded.
+ *
+ * <p>A second reader of {@link TOKENS} rather than a second alternation, for the reason this
+ * file's own header gives: the stripping mistake has happened four times in this programme, and
+ * two copies of the rule would be free to disagree about what a comment is. Here the two readers
+ * answer opposite questions — {@link stripComments} keeps the code and drops the comments, this
+ * keeps the literals — and a shared alternation is what makes them consistent by construction.
+ *
+ * <p>⚠ Product COPY lives in literals; a comment naming an internal sprint or ticket is
+ * developer-facing and true. A scan that cannot tell the two apart reads the epitaph as the corpse
+ * (F2-193) — and for a copy gate that error is loud rather than quiet, because this codebase
+ * carries hundreds of such comments.
+ */
+export function stringLiterals(src: string): { line: number; text: string }[] {
+  const out: { line: number; text: string }[] = [];
+  for (const m of src.matchAll(TOKENS)) {
+    const raw = m[0];
+    if (raw[0] !== "'" && raw[0] !== '"' && raw[0] !== '`') continue;
+    const at = m.index ?? 0;
+    let line = 1;
+    for (let i = 0; i < at; i++) if (src.charCodeAt(i) === 10) line++;
+    out.push({ line, text: raw.slice(1, -1) });
+  }
+  return out;
+}
+
 /** Source with comments removed and string/template contents preserved. */
 export function stripComments(src: string): string {
   return src.replace(TOKENS, m => (m[0] === '/' ? '' : m));

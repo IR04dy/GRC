@@ -155,8 +155,8 @@ export function ObTppsPage() {
         : 'Open-banking TPPs — KYB onboarding, suspension, revocation.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة · المرحلة ١٩'
-                                : 'Open Banking · Sprint 19'}
+        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة'
+                                : 'Open Banking'}
         title={lang === 'ar' ? 'سجل المزوّدين' : 'TPP register'}
         sub={lang === 'ar' ? 'كل مزوّدي الخدمة الذين يصلون إلى واجهاتنا'
                             : 'Every TPP that touches our APIs'}

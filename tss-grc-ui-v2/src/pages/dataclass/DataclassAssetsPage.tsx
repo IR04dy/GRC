@@ -197,7 +197,7 @@ export function DataclassAssetsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تصنيف البيانات · المرحلة ٣٢' : 'Data Classification · Sprint 32'}
+        eyebrow={lang === 'ar' ? 'تصنيف البيانات' : 'Data Classification'}
         title={lang === 'ar' ? 'سجل أصول البيانات' : 'Data Assets Register'}
         sub={lang === 'ar'
           ? 'سياسة التصنيف NDMO — كل أصل بتصنيف ومالك ومدة احتفاظ ومرجع تقييم الأثر'

@@ -143,7 +143,7 @@ export function AiLifecycleRetrainingsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء · المرحلة ٣١' : 'AI Lifecycle · Sprint 31'}
+        eyebrow={lang === 'ar' ? 'دورة حياة الذكاء' : 'AI Lifecycle'}
         title={lang === 'ar' ? 'إعادة تدريب النماذج' : 'Model Retraining'}
         sub={lang === 'ar'
           ? 'دورات إعادة التدريب — تشغيل من انحراف أو جدولة، اعتماد، نشر، وتراجع عند الفشل'

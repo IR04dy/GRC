@@ -32,7 +32,7 @@ export function DataOfficerDashboardPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'المسؤول التنفيذي للبيانات · المرحلة ٣٣' : 'Data Officer · Sprint 33'}
+        eyebrow={lang === 'ar' ? 'المسؤول التنفيذي للبيانات' : 'Data Officer'}
         title={lang === 'ar' ? 'مركز قيادة مسؤول البيانات' : 'Data Officer Command Centre'}
         sub={lang === 'ar'
           ? 'نظام حماية البيانات الشخصية + معايير NDMO + سدايا — كل ما يحتاجه المسؤول التنفيذي للبيانات في مكان واحد'

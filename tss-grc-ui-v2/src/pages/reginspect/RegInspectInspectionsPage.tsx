@@ -156,8 +156,8 @@ export function RegInspectInspectionsPage() {
         : 'All on-site regulatory inspection workspaces'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'التفتيش الرقابي · المرحلة ١٥'
-                                : 'Regulatory Inspection · Sprint 15'}
+        eyebrow={lang === 'ar' ? 'التفتيش الرقابي'
+                                : 'Regulatory Inspection'}
         title={lang === 'ar' ? 'ورش التفتيش الرقابي' : 'Inspection Workspaces'}
         sub={lang === 'ar' ? 'سجل كل ورش التفتيش' : 'Register of all inspections'}
         actions={

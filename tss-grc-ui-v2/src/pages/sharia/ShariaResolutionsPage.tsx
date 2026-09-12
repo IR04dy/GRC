@@ -142,8 +142,8 @@ export function ShariaResolutionsPage() {
       sub={lang === 'ar' ? 'سجل فتاوى الهيئة الشرعية بمسارها من المسوّدة إلى النفاذ.'
                           : 'SSB fatwa register from draft through to active.'}>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'القرارات الشرعية' : 'SSB Resolutions'}
         sub={lang === 'ar' ? 'فتاوى مكتوبة بدليل من القرآن والسنّة والإجماع والقياس'
                             : 'Documented fatwas with Quran / Sunnah / Ijma / Qiyas evidence'}

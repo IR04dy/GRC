@@ -44,7 +44,7 @@ export function ApprovalChainInstanceDetailPage() {
       <Shell title={t('approvalChainDetailTitle', 'Approval chain')}
              sub={t('approvalChainDetailSub', 'Action timeline')}>
         <PageHeader
-          eyebrow={t('approvalChainEyebrow', 'Approval Chains · Sprint 13')}
+          eyebrow={t('approvalChainEyebrow', 'Approval Chains')}
           title={t('approvalChainDetailTitle', 'Approval chain')}
           sub={t('approvalChainNotFound', 'No chain instance found at this address.')}
           actions={<Link to="/workflows/chains/templates"><span className="btn btn--secondary btn--sm" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><ArrowLeft size={14} />{t('approvalChainBackToTemplates', 'Back to templates')}</span></Link>}
@@ -76,7 +76,7 @@ export function ApprovalChainInstanceDetailPage() {
   return (
     <Shell title={t('approvalChainDetailTitle', 'Approval chain')} sub={template.templateCode}>
       <PageHeader
-        eyebrow={t('approvalChainEyebrow', 'Approval Chains · Sprint 13')}
+        eyebrow={t('approvalChainEyebrow', 'Approval Chains')}
         title={title ?? template.templateCode}
         sub={template.templateCode + ' · ' + (instance.sourceEntityType ?? '') +
           (instance.sourceEntityId ? ' #' + instance.sourceEntityId : '')}

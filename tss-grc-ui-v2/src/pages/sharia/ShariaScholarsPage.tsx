@@ -156,8 +156,8 @@ export function ShariaScholarsPage() {
                           : 'SSB member register with credentials and terms.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'أعضاء الهيئة الشرعية' : 'SSB Scholars'}
         sub={lang === 'ar' ? 'كل عضو في الهيئة الشرعية المعتمد لدى ساما'
                             : 'Every SAMA-approved SSB member'}

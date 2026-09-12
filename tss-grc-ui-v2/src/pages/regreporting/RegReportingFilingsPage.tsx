@@ -123,8 +123,8 @@ export function RegReportingFilingsPage() {
         : 'Every filing cycle across every regulator.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تقويم البلاغات · المرحلة ١٦'
-                                : 'Reporting Calendar · Sprint 16'}
+        eyebrow={lang === 'ar' ? 'تقويم البلاغات'
+                                : 'Reporting Calendar'}
         title={lang === 'ar' ? 'سجل التقديمات' : 'Filings Register'}
         sub={lang === 'ar' ? 'مرتّب حسب تاريخ الاستحقاق'
                             : 'Sorted by due date'}

@@ -190,7 +190,7 @@ export function CoiRegisterPage() {
         : 'Conflict of Interest Register — annual declarations and recusals per SAMA CG Art.18 + CMA CG Art.41–43.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الأخلاقيات والسلوك · المرحلة ١٣' : 'Ethics & Conduct · Sprint 13'}
+        eyebrow={lang === 'ar' ? 'الأخلاقيات والسلوك' : 'Ethics & Conduct'}
         title={t('coi.title')}
         sub={lang === 'ar'
           ? `${declaredTotal} إقرار مُسلَّم من إجمالي ${targetTotal || '—'} مستهدف`

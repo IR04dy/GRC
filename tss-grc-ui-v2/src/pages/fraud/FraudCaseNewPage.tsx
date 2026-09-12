@@ -128,7 +128,7 @@ export function FraudCaseNewPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'مخاطر الاحتيال · المرحلة ١٤' : 'Fraud Risk · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'مخاطر الاحتيال' : 'Fraud Risk'}
         title={lang === 'ar' ? 'فتح قضية احتيال' : 'Open a fraud case'}
         sub={lang === 'ar'
           ? 'تسجيل قضية جديدة وفقاً لإطار مكافحة الاحتيال 2018 (ساما)'

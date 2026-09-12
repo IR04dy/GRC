@@ -146,8 +146,8 @@ export function ShariaAuditFindingsPage() {
       sub={lang === 'ar' ? 'نتائج المراجعة الشرعية بمراحل المعالجة والتحقّق والإغلاق.'
                           : 'Internal Sharia Audit findings with remediation, verification, closure.'}>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'نتائج المراجعة الشرعية' : 'Sharia Audit Findings'}
         sub={lang === 'ar' ? 'كل نتيجة من نتائج المراجعة الشرعية الدورية'
                             : 'Every finding raised by the Internal Sharia Audit cycle'}

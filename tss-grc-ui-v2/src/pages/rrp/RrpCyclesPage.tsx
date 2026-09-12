@@ -136,8 +136,8 @@ export function RrpCyclesPage() {
         : 'Annual RRP cycle register.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الاستعادة والحلّ · المرحلة ١٧'
-                                : 'RRP · Sprint 17'}
+        eyebrow={lang === 'ar' ? 'الاستعادة والحلّ'
+                                : 'RRP'}
         title={lang === 'ar' ? 'دورات الخطّة' : 'RRP Cycles'}
         sub={lang === 'ar' ? 'سجل كل دورات خطّة الاستعادة والحلّ'
                             : 'Register of all RRP cycles'}

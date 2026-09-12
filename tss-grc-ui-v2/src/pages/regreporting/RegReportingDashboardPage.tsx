@@ -134,8 +134,8 @@ export function RegReportingDashboardPage() {
         : 'Track every mandatory SAMA, NCA, CMA, ZATCA, and SDAIA return.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تقويم البلاغات · المرحلة ١٦'
-                                : 'Reporting Calendar · Sprint 16'}
+        eyebrow={lang === 'ar' ? 'تقويم البلاغات'
+                                : 'Reporting Calendar'}
         title={lang === 'ar' ? 'لوحة تقويم البلاغات'
                               : 'Reporting Calendar Dashboard'}
         sub={lang === 'ar'

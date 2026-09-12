@@ -185,7 +185,7 @@ export function CoiCampaignDetailPage() {
         : 'Annual declaration cycle — all submitted declarations and review outcomes.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تضارب المصالح · المرحلة ١٣' : 'COI Register · Sprint 13'}
+        eyebrow={lang === 'ar' ? 'تضارب المصالح' : 'COI Register'}
         title={campaign ? (lang === 'ar' ? campaign.titleAr : campaign.titleEn) : '…'}
         sub={campaign ? `${campaign.code} · FY ${campaign.fiscalYear}` : undefined}
         actions={(

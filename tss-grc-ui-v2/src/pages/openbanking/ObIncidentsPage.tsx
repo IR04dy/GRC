@@ -223,8 +223,8 @@ export function ObIncidentsPage() {
         : 'API + consent incidents tied to TPPs and the SAMA OBF framework.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة · المرحلة ١٩'
-                                : 'Open Banking · Sprint 19'}
+        eyebrow={lang === 'ar' ? 'المصرفية المفتوحة'
+                                : 'Open Banking'}
         title={lang === 'ar' ? 'الحوادث' : 'Incidents'}
         sub={lang === 'ar'
           ? 'سجل حوادث الواجهات + الموافقات + الشهادات'

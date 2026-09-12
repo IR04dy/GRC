@@ -157,7 +157,7 @@ export function DsrPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={ar ? 'حقوق أصحاب البيانات · المرحلة ٣٣' : 'DSR · Sprint 33'}
+        eyebrow={ar ? 'حقوق أصحاب البيانات' : 'DSR'}
         title={ar ? 'طلبات حقوق أصحاب البيانات' : 'Data Subject Rights Requests'}
         sub={ar
           ? 'مادة ٩-١٤ من نظام حماية البيانات الشخصية — ٣٠ يوماً للرد (ساعة المهلة لكل طلب)'

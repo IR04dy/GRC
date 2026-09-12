@@ -107,8 +107,8 @@ export function OpResDashboardPage() {
         : 'SAMA Operational Resilience Framework 2024 — 5 pillars × 5 maturity levels.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الصمود التشغيلي · المرحلة ١٤'
-                                : 'Operational Resilience · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'الصمود التشغيلي'
+                                : 'Operational Resilience'}
         title={lang === 'ar' ? 'لوحة الصمود التشغيلي'
                               : 'Operational Resilience Dashboard'}
         sub={lang === 'ar' ? 'بحسب إطار الصمود التشغيلي 2024 لدى ساما'

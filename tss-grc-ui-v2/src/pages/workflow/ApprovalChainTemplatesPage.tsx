@@ -44,7 +44,7 @@ export function ApprovalChainTemplatesPage() {
     <Shell title={t('approvalChainTitle', 'Approval chains')}
            sub={t('approvalChainSub', 'Configurable multi-step approval ladders')}>
       <PageHeader
-        eyebrow={t('approvalChainEyebrow', 'Approval Chains · Sprint 13')}
+        eyebrow={t('approvalChainEyebrow', 'Approval Chains')}
         title={t('approvalChainTitle', 'Approval chains')}
         sub={t('approvalChainPageSub', 'Configure the multi-step approval ladders enforced before any CAPA closure, cross-border data transfer, or material change can be finalised. Anchored on SAMA Corporate Governance §5.3, NCA ECC-2 control 1-3-2, and PDPL Article 32.')}
         actions={

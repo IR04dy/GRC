@@ -174,7 +174,7 @@ export function DataclassFlowsPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'تدفّقات البيانات · المرحلة ٣٢' : 'Data Flows · Sprint 32'}
+        eyebrow={lang === 'ar' ? 'تدفّقات البيانات' : 'Data Flows'}
         title={lang === 'ar' ? 'سجل تدفّقات البيانات' : 'Data Flows Register'}
         sub={lang === 'ar'
           ? 'بوّابة نقل البيانات عبر الحدود (مادة ٧ من نظام حماية البيانات الشخصية)'

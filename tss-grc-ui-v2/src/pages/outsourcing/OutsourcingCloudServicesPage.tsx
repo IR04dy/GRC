@@ -222,7 +222,7 @@ export function OutsourcingCloudServicesPage() {
   return (
     <Shell>
       <PageHeader
-        eyebrow={lang === 'ar' ? 'خدمات السحابة · المرحلة ٣٠' : 'Cloud Services · Sprint 30'}
+        eyebrow={lang === 'ar' ? 'خدمات السحابة' : 'Cloud Services'}
         title={lang === 'ar' ? 'سجل خدمات السحابة' : 'Cloud Services Register'}
         sub={lang === 'ar'
           ? 'إطار ساما لخوسبة البيانات السحابية — التصنيف T1-T4 يحدّد بوّابة الإقامة (T3/T4 → داخل المملكة)'

@@ -189,7 +189,7 @@ export function FraudCasesPage() {
         : 'Fraud case register — detection, investigation, and closure per SAMA Anti-Fraud Framework.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال · المرحلة ١٤' : 'Fraud Risk · Sprint 14'}
+        eyebrow={lang === 'ar' ? 'مكافحة الاحتيال' : 'Fraud Risk'}
         title={lang === 'ar' ? 'قضايا الاحتيال' : 'Fraud Cases'}
         sub={page
           ? (lang === 'ar'

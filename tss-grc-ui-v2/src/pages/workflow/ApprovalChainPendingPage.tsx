@@ -72,7 +72,7 @@ export function ApprovalChainPendingPage() {
     <Shell title={t('approvalChainPendingTitle', 'My pending approvals')}
            sub={t('approvalChainPendingSub', 'Approval-chain rungs assigned to me')}>
       <PageHeader
-        eyebrow={t('approvalChainEyebrow', 'Approval Chains · Sprint 13')}
+        eyebrow={t('approvalChainEyebrow', 'Approval Chains')}
         title={t('approvalChainPendingTitle', 'My pending approvals')}
         sub={t('approvalChainPendingPageSub', 'Every in-flight chain rung waiting on me. Sorted by SLA pressure — the topmost is closest to breaching the configured turnaround. Sourced from the GET /api/v1/workflow/chains/pending-for-me endpoint.')}
         actions={

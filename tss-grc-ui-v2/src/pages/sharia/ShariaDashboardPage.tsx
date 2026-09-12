@@ -157,8 +157,8 @@ export function ShariaDashboardPage() {
         : 'SSB register, resolutions, internal Sharia audit, and SNCI purification.'}
     >
       <PageHeader
-        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية · المرحلة ٢٠'
-                                : 'Sharia Governance · Sprint 20'}
+        eyebrow={lang === 'ar' ? 'الحوكمة الشرعية'
+                                : 'Sharia Governance'}
         title={lang === 'ar' ? 'لوحة الحوكمة الشرعية'
                               : 'Sharia Governance Dashboard'}
         sub={lang === 'ar'
