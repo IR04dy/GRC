@@ -56,7 +56,15 @@ function loadDict(lang: Lang): Promise<Dictionary> {
   return dictPromises[lang]!;
 }
 
-function readStoredLang(): Lang {
+/**
+ * The stored language, read straight from `localStorage` with no React involved.
+ *
+ * ⚠ Exported for `ErrorBoundary`, which is mounted ABOVE this provider (App.tsx) and therefore
+ * has no context to read. It needs the same answer this provider seeds itself from, so this is
+ * one declaration with two readers — a second copy of the key and of the Arabic-primary default
+ * would be free to drift from this one, and nobody would be maintaining the agreement (F2-217).
+ */
+export function readStoredLang(): Lang {
   // Arabic-primary platform: default first load to 'ar' (RTL) unless the user
   // explicitly chose English in a previous session.
   try {

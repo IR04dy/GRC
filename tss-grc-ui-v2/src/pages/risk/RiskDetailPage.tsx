@@ -102,7 +102,7 @@ export function RiskDetailPage() {
         const fallback = MOCK_RISKS.find(r => r.id === Number(id));
         if (fallback) { setRisk(fallback); setLoading(false); return; }
       }
-      setError(e instanceof ApiError ? e.message : 'Failed to load');
+      setError(e instanceof ApiError ? e.message : t('riskDetailLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -332,7 +332,7 @@ export function RiskDetailPage() {
   }
   if (error || !risk) {
     return <Shell title={t('modRisk')} sub="ISO 31000 + COSO ERM">
-      <div className="risk-detail-error">{error ?? 'Not found'}</div>
+      <div className="risk-detail-error">{error ?? t('riskDetailNotFound')}</div>
     </Shell>;
   }
 

@@ -839,6 +839,8 @@ export const ar = {
 
   riskLoading: 'جارٍ تحميل المخاطر…',
   riskLoadError: 'تعذّر تحميل المخاطر. حاول مرة أخرى، أو تواصل مع مسؤول النظام إذا استمرت المشكلة.',
+  riskDetailLoadFailed: 'تعذّر تحميل هذه المخاطرة.',
+  riskDetailNotFound: 'لم يتم العثور على هذه المخاطرة.',
 
   riskAxisImpact: 'الأثر',
   riskAxisLikelihood: 'الاحتمالية',

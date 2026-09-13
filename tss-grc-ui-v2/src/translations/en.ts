@@ -846,6 +846,8 @@ export const en = {
 
   riskLoading: 'Loading risks…',
   riskLoadError: 'We couldn’t load your risks. Try again, or contact your administrator if it persists.',
+  riskDetailLoadFailed: 'We couldn’t load this risk.',
+  riskDetailNotFound: 'Risk not found.',
 
   riskAxisImpact: 'Impact',
   riskAxisLikelihood: 'Likelihood',

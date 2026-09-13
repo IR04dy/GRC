@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertOctagon, RefreshCw } from 'lucide-react';
+import { readStoredLang } from '../../lib/i18n';
 
 /**
  * App-root error boundary.
@@ -43,6 +44,45 @@ const RELOAD_GUARD_KEY = 'grc.chunkReloadAt';
 /** Don't auto-reload more than once per this window — if a reload didn't fix
  *  it (chunk genuinely gone), show the card instead of looping forever. */
 const RELOAD_GUARD_MS = 10_000;
+
+/**
+ * ⚠⚠ The card's copy is INLINE and bilingual, which is deliberate rather than an oversight of
+ * house rule 7's dictionary convention. THREE independent reasons, any one of which settles it:
+ *
+ *  1. This boundary is mounted ABOVE `I18nProvider` (App.tsx), so there is no i18n context to
+ *     read — `useI18n()` throws "must be used inside <I18nProvider>". Mounting it INSIDE the
+ *     provider instead would mean a crash in `ThemeProvider` or `I18nProvider` itself renders a
+ *     white screen, which is the one condition this component exists to prevent.
+ *  2. It is a CLASS component, because `getDerivedStateFromError` / `componentDidCatch` have no
+ *     hook equivalent — so it could not call a hook even if the context were in scope.
+ *  3. 🔑 The sharpest: `t()` resolves against a dictionary fetched as a SEPARATE CHUNK
+ *     (PERF-FE-002), and a failed chunk fetch is precisely one of the crashes this card handles
+ *     (see `CHUNK_ERROR_RE` above). A card whose own text depends on that fetch renders raw keys
+ *     exactly when it is needed most.
+ *
+ * So do NOT "fix" this by moving the strings into `translations/`. `__tests__/crashCardBilingual`
+ * pins all three reasons, in both directions.
+ */
+const COPY = {
+  en: {
+    dir: 'ltr' as const,
+    title: 'Something broke on this page',
+    /*
+     * ⚠ This sentence read "The page state has been preserved — click reload to start a fresh
+     * session" until JRN-12, one line above the `window.location.reload()` that DISCARDS exactly
+     * that state — and it contradicted itself inside its own second clause. F2-184 at the one
+     * moment a user is reading a screen for guidance, so the wording states the loss plainly.
+     */
+    body: 'We couldn’t finish rendering this view. Anything you had not saved is lost — reloading starts a fresh session.',
+    reload: 'Reload',
+  },
+  ar: {
+    dir: 'rtl' as const,
+    title: 'تعذّر عرض هذه الصفحة',
+    body: 'تعذّر إكمال عرض هذه الشاشة. أي تغييرات لم تُحفظ ستُفقد — وإعادة التحميل تبدأ جلسة جديدة.',
+    reload: 'إعادة التحميل',
+  },
+} as const;
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { err: null, recovering: false };
@@ -89,21 +129,25 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
     if (!this.state.err) return this.props.children;
 
+    // Read at RENDER time, not at construction: the language can be switched while the app is
+    // running, and this component is never remounted in between.
+    const copy = COPY[readStoredLang()];
+
+    // `dir` is set explicitly rather than inherited. `I18nProvider` sets it on <html> from an
+    // effect, so a crash in the provider itself — or in anything above it — leaves the document
+    // at the LTR default and would render the Arabic card left-to-right.
     return (
-      <div className="error-boundary-card" role="alert">
+      <div className="error-boundary-card" role="alert" dir={copy.dir}>
         <AlertOctagon size={36} strokeWidth={1.8} />
-        <h2>Something broke on this page</h2>
-        <p>
-          We couldn’t finish rendering this view. The page state has been preserved —
-          click reload to start a fresh session.
-        </p>
+        <h2>{copy.title}</h2>
+        <p>{copy.body}</p>
         {this.state.err.message && (
           <pre className="error-boundary-detail">{this.state.err.message}</pre>
         )}
         <button type="button"
                 className="btn btn-primary"
                 onClick={() => window.location.reload()}>
-          <RefreshCw size={16} strokeWidth={2} /> Reload
+          <RefreshCw size={16} strokeWidth={2} /> {copy.reload}
         </button>
       </div>
     );
