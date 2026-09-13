@@ -18,7 +18,8 @@
 //   5. Risk-control linkage — which controls mitigate this risk, what their
 //      CCM coverage is, and what evidence was last collected.
 
-import { ApiError, treatmentPlanApi, TREATMENT_ALLOWED, type TreatmentPlanDto } from './api';
+import { ApiError, riskApi, treatmentPlanApi, TREATMENT_ALLOWED, type TreatmentPlanDto } from './api';
+import { isAuthenticated } from './auth';
 import { MOCK_RISKS } from '../pages/risk/mockRisks';
 import type { RiskResponse } from './api';
 // F2-202: the `platformPersistence` import that used to sit here is gone with the file.
@@ -177,12 +178,71 @@ const KRI_BREACH_KEY = 'grc.risk.kribreach.v1';
 const ACCEPT_KEY = 'grc.risk.accept.v1';
 const EVENT = 'grc.risk.lifecycle.changed';
 
+// ─── Risk register — SERVER-BACKED (JRN-11) ───────────────────────────
+//
+// JRN-11: this module and `RiskLifecyclePage` resolved every risk out of `MOCK_RISKS` — eight
+// reads across the two files. The page's selector was itself seeded from the corpus
+// (`MOCK_RISKS[0].id`), so `riskId` was always a DEMO id (900000001 after the `demoIds` shift)
+// and `plansForRisk(riskId)`, which filters the real server-hydrated register, could never
+// match. The page showed a fabricated risk beside a permanently empty plan list, and the real
+// fetch it did perform is what made that emptiness look like a tenant with no data.
+//
+// ⚠ The demo split is deliberately NOT copied from `RiskRegisterPage`. Its
+// `if (!isAuthenticated())` branch is the right shape, but its `catch` substitutes the corpus
+// too, and a silent mock fallback on an error path is the load-bearing decoy F2-158 measured
+// and F2-169 removed. Here: no session → the corpus, disclosed; a session → the server,
+// and a failed fetch is REPORTED — the way this module already reports a failed
+// treatment-plan fetch (F2-204).
+
+let _risks: RiskResponse[] = [];
+let _risksHydrated = false;
+let _risksLoadFailed = false;
+let _risksDemo = false;
+let _risksPromise: Promise<void> | null = null;
+
+/** Fetch the risk register. Safe to call repeatedly unless `force`. */
+export function hydrateRisks(force = false): Promise<void> {
+  if (_risksPromise && !force) return _risksPromise;
+  _risksLoadFailed = false;
+  if (!isAuthenticated()) {
+    _risks = MOCK_RISKS;
+    _risksDemo = true;
+    _risksHydrated = true;
+    _risksPromise = Promise.resolve();
+    emit();
+    return _risksPromise;
+  }
+  _risksDemo = false;
+  _risksPromise = riskApi.list(undefined, 0, 200)
+    .then(page => { _risks = page.content ?? []; _risksHydrated = true; emit(); })
+    .catch(e => {
+      // No corpus on this path. An empty register and an unreachable one are different facts,
+      // and only the caller can state the difference — `risksLoadFailed()` is what it asks.
+      // A 403 is neither: the module is not licensed here, which reads as nothing to show.
+      _risks = [];
+      if (!(e instanceof ApiError) || e.status !== 403) _risksLoadFailed = true;
+      console.warn('[riskLifecycle] risk-register fetch failed:', e);
+      _risksHydrated = true;
+      emit();
+    });
+  return _risksPromise;
+}
+
+export function areRisksHydrated(): boolean { return _risksHydrated; }
+export function risksLoadFailed(): boolean { return _risksLoadFailed; }
+/** True when the rows on screen are the demo corpus, so the caller can disclose it. */
+export function risksAreDemo(): boolean { return _risksDemo; }
+export function loadRisks(): RiskResponse[] { return _risks; }
+export function riskById(id: number): RiskResponse | undefined {
+  return _risks.find(r => r.id === id);
+}
+
 // ─── Seeded data per risk (deterministic) ───────────────────────────────────
 
 /** Default control linkages computed deterministically per risk id. */
 export function controlsForRisk(riskId: number): ControlLinkage[] {
   // Deterministic mapping from risk id to controls based on category seed.
-  const risk = MOCK_RISKS.find(r => r.id === riskId);
+  const risk = riskById(riskId);
   if (!risk) return [];
   const cat = risk.categoryNameEn ?? '';
   const linkages: ControlLinkage[] = [];
@@ -367,13 +427,22 @@ export async function transitionPlan(
 
 // ─── Persistence: KRI breach events ─────────────────────────────────────────
 
+/**
+ * JRN-11: `SEED_BREACHES` is keyed to `MOCK_RISKS[0].id`, a demo id, so a signed-in tenant with
+ * an empty breach store was shown a fabricated KRI breach hanging off a risk its own register
+ * does not contain. It is demo data, so it is served on the demo path only.
+ */
+function breachSeed(): KriBreachEvent[] {
+  return isAuthenticated() ? [] : SEED_BREACHES;
+}
+
 export function loadBreachEvents(): KriBreachEvent[] {
-  if (typeof window === 'undefined') return SEED_BREACHES;
+  if (typeof window === 'undefined') return breachSeed();
   try {
     const raw = window.localStorage.getItem(KRI_BREACH_KEY);
-    if (!raw) return SEED_BREACHES;
+    if (!raw) return breachSeed();
     return JSON.parse(raw) as KriBreachEvent[];
-  } catch { return SEED_BREACHES; }
+  } catch { return breachSeed(); }
 }
 
 export function breachesForRisk(riskId: number): KriBreachEvent[] {
@@ -642,7 +711,7 @@ export function aggregateRiskLifecycle(): RiskLifecycleStats {
     .filter(p => p.status === 'APPROVED' || p.status === 'IN_PROGRESS' || p.status === 'COMPLETED')
     .reduce((acc, p) => acc + p.costSarK, 0);
   return {
-    risksTotal: MOCK_RISKS.length,
+    risksTotal: _risks.length,
     risksWithOpenBreach,
     risksWithApprovedTreatment,
     risksAwaitingAcceptance,
@@ -651,6 +720,3 @@ export function aggregateRiskLifecycle(): RiskLifecycleStats {
   };
 }
 
-export function pickRiskById(id: number): RiskResponse | undefined {
-  return MOCK_RISKS.find(r => r.id === id);
-}

@@ -893,6 +893,7 @@ export const en = {
   // F2-98: the substitution a SIGNED-IN user can hit — an empty register, or the API failing.
   // Deliberately does not say "sign in": the reader already has a session.
   demoDataSubstituted:'Sample data — your own records could not be loaded',
+  demoNoticeRisks:     'sample risks; the register shown is not this tenant’s own',
   demoNoticeKris:      'sample KRIs; live thresholds and readings are unavailable',
   demoNoticeAppetite:  'sample appetite statements; live exposure tracking is unavailable',
   demoNoticeAml:       'sample AML alerts',

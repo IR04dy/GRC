@@ -56,8 +56,11 @@ describe('W2-1b — mock imports outside tests are ratcheted, not free', () => {
    * authorisation and mass-assignment ratchets. F2-15 is the row that drives the number down; this
    * test only guarantees it cannot drift up while that work is pending.
    */
-  const BASELINE_MOCK_IMPORTS = 33;
-  const BASELINE_MOCK_FILES = 27;
+  // Re-measured 2026-09-13 with JRN-11, which removed `RiskLifecyclePage`'s corpus import:
+  // 26 imports across 22 files, not the 33/27 first recorded. A ratchet left slack above the
+  // real number permits the next regression silently, so it moves down with the population.
+  const BASELINE_MOCK_IMPORTS = 26;
+  const BASELINE_MOCK_FILES = 22;
 
   function mockImports() {
     const hits: { path: string; module: string }[] = [];

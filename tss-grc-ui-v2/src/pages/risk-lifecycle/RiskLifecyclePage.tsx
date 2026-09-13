@@ -8,11 +8,13 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ApiError } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
+import { DemoDataNotice } from '../../components/ui/DemoDataNotice';
 import { useI18n } from '../../lib/i18n';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 import { useToast } from '../../lib/toast';
-import { MOCK_RISKS } from '../risk/mockRisks';
-import { loadTreatmentPlans, plansForRisk, transitionPlan, createTreatmentPlan, hydrateTreatmentPlans, treatmentPlansLoadFailed, nextTreatmentStatuses, treatmentStatusLabel, breachesForRisk, fireBreach, escalateBreach, resolveBreach, acceptancesForRisk, saveAcceptance, transitionAcceptance, controlsForRisk, runMonteCarlo, aggregateRiskLifecycle, subscribeRiskLifecycle, BREACH_STATUS_LABEL, BREACH_STATUS_TONE, type KriBreachEvent, type MonteCarloResult } from '../../lib/riskLifecycle';
+import { hydrateRisks, loadRisks, riskById, areRisksHydrated, risksLoadFailed, risksAreDemo,
+  loadTreatmentPlans, plansForRisk, transitionPlan, createTreatmentPlan, hydrateTreatmentPlans, treatmentPlansLoadFailed, nextTreatmentStatuses, treatmentStatusLabel, breachesForRisk, fireBreach, escalateBreach, resolveBreach, acceptancesForRisk, saveAcceptance, transitionAcceptance, controlsForRisk, runMonteCarlo, aggregateRiskLifecycle, subscribeRiskLifecycle, BREACH_STATUS_LABEL, BREACH_STATUS_TONE, type KriBreachEvent, type MonteCarloResult } from '../../lib/riskLifecycle';
 import { formatHijri } from '../../lib/sla';
 import { Activity as ActivityIcon } from 'lucide-react';
 import { ActivityFeedDrawer } from '../../components/lifecycle/ActivityFeedDrawer';
@@ -37,7 +39,11 @@ import '../../styles/pages/risk-lifecycle.css';
 export function RiskLifecyclePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [riskId, setRiskId] = useState<number>(MOCK_RISKS[0]?.id ?? 1);
+  // JRN-11: this was `useState<number>(MOCK_RISKS[0]?.id ?? 1)` — seeded from the DEMO corpus,
+  // so `riskId` was a demo id (900000001 after the `demoIds` shift) for every user, and
+  // `plansForRisk(riskId)` over the real server-hydrated register could never match. `null`
+  // means "nothing picked yet"; the first row of whatever register actually loads fills it.
+  const [riskId, setRiskId] = useState<number | null>(null);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
 
   /**
@@ -56,12 +62,19 @@ export function RiskLifecyclePage() {
     }
   }
 
-  // Load the real register once; nothing seeds it, so an empty tenant reads as empty.
-  useEffect(() => { void hydrateTreatmentPlans(); }, []);
-  const risk = useMemo(() => MOCK_RISKS.find(r => r.id === riskId), [riskId]);
-
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribeRiskLifecycle(() => setTick(t => t + 1)), []);
+
+  // Load both real registers once; nothing seeds either, so an empty tenant reads as empty.
+  useEffect(() => { void hydrateTreatmentPlans(); void hydrateRisks(); }, []);
+
+  // JRN-11: the risk itself now comes from the register, not from the corpus. `selectedId`
+  // falls back to the first row THAT LOADED rather than to a fabricated id, which is what makes
+  // the plan, breach, acceptance and control lookups below able to match at all.
+  const risks = useMemo(() => loadRisks(), [_tick]);
+  const selectedId = riskId ?? risks[0]?.id ?? null;
+  const risk = useMemo(
+    () => (selectedId == null ? undefined : riskById(selectedId)), [selectedId, _tick]);
 
   // Sprint 4 §2.7 — also react when the backend pushes a treatment-plan
   // transition from ANOTHER user. F2-327: a broadcast means the server's copy
@@ -71,12 +84,44 @@ export function RiskLifecyclePage() {
   useRealtimeOrgEvent('changed.treatment_plan', () => { void hydrateTreatmentPlans(true).then(() => setTick(t => t + 1)); });
 
   const stats = useMemo(() => aggregateRiskLifecycle(), [_tick]);
-  const plans = useMemo(() => plansForRisk(riskId), [riskId, _tick]);
-  const breaches = useMemo(() => breachesForRisk(riskId), [riskId, _tick]);
-  const accepts = useMemo(() => acceptancesForRisk(riskId), [riskId, _tick]);
-  const controls = useMemo(() => controlsForRisk(riskId), [riskId]);
+  const plans = useMemo(() => (selectedId == null ? [] : plansForRisk(selectedId)), [selectedId, _tick]);
+  const breaches = useMemo(() => (selectedId == null ? [] : breachesForRisk(selectedId)), [selectedId, _tick]);
+  const accepts = useMemo(() => (selectedId == null ? [] : acceptancesForRisk(selectedId)), [selectedId, _tick]);
+  const controls = useMemo(() => (selectedId == null ? [] : controlsForRisk(selectedId)), [selectedId, _tick]);
 
-  if (!risk) return <Shell title={t('rlcTitle')} sub=""><div /></Shell>;
+  // JRN-11: this was `return <Shell ...><div /></Shell>` — one blank page standing for three
+  // different facts. Still loading, failed to load, and "this tenant has no risks" are not the
+  // same thing, and a blank div asserts the third while meaning any of them.
+  if (!risk) {
+    const loading = !areRisksHydrated();
+    const failed = risksLoadFailed();
+    return (
+      <Shell title={t('rlcTitle')} sub={t('rlcSub')}>
+        <PageHeader eyebrow={t('rlcEyebrow')} title={t('rlcTitle')} sub={t('rlcPageSub')} />
+        <Card title={failed
+          ? (lang === 'ar' ? 'تعذّر تحميل سجلّ المخاطر' : 'The risk register could not be loaded')
+          : (lang === 'ar' ? 'سجلّ المخاطر' : 'Risk register')}>
+          <InlineEmpty>
+            {loading
+              ? (lang === 'ar' ? 'جارٍ تحميل سجلّ المخاطر…' : 'Loading the risk register…')
+              : failed
+                ? (lang === 'ar'
+                    ? 'فشل تحميل سجلّ المخاطر من الخادم، فلا يمكن عرض دورة الحياة — أعد المحاولة.'
+                    : 'The risk register failed to load from the server, so the lifecycle cannot be shown — retry.')
+                : (lang === 'ar'
+                    ? 'لا توجد مخاطر في السجلّ. أنشئ خطرًا في سجلّ المخاطر لتتبّع دورة حياته.'
+                    : 'The register holds no risks. Create one in the risk register to track its lifecycle.')}
+          </InlineEmpty>
+          {failed && (
+            <Button size="sm" variant="secondary" onClick={() => void hydrateRisks(true)}>
+              {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+            </Button>
+          )}
+        </Card>
+      </Shell>
+    );
+  }
+  const activeRiskId = risk.id;
   const title = lang === 'ar' && risk.titleAr ? risk.titleAr : risk.titleEn;
 
   return (
@@ -101,6 +146,9 @@ export function RiskLifecyclePage() {
         title={t('rlcTitle')}
         sub={t('rlcPageSub')}
       />
+      {/* JRN-11: the register on screen is the demo corpus, and every figure below is derived
+          from it — including the KPI strip. Say so. */}
+      {risksAreDemo() && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeRisks" />}
 
       <div className="kpi-grid rlc-kpi-strip">
         <Kpi Icon={AlertTriangle}    label={t('rlcKpiTotal')}        value={String(stats.risksTotal)}                tone="primary" to="/risk" />
@@ -195,8 +243,8 @@ export function RiskLifecyclePage() {
       <div className="rlc-section">
       <Card title={t('rlcPickRisk')} Icon={AlertTriangle}>
         <div className="rlc-picker-row">
-          {MOCK_RISKS.slice(0, 12).map(r => {
-            const isOn = r.id === riskId;
+          {risks.slice(0, 12).map(r => {
+            const isOn = r.id === selectedId;
             const titleR = lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn;
             return (
               <button key={r.id} onClick={() => setRiskId(r.id)}
@@ -238,11 +286,11 @@ export function RiskLifecyclePage() {
       </div>
 
       {/* Workflow cards */}
-      <MonteCarloCard riskId={riskId} risk={risk} />
-      <KriBreachCard riskId={riskId} breaches={breaches}
+      <MonteCarloCard riskId={activeRiskId} risk={risk} />
+      <KriBreachCard riskId={activeRiskId} breaches={breaches}
         onFire={() => {
           fireBreach({
-            riskId, kriCode: 'KRI-NEW-' + Date.now().toString().slice(-4),
+            riskId: activeRiskId, kriCode: 'KRI-NEW-' + Date.now().toString().slice(-4),
             kriNameEn: 'Sample KRI breach', kriNameAr: 'مؤشّر تجريبي',
             thresholdValue: 5, actualValue: 7.8,
             direction: 'UP_BAD', currentOwner: 'KRI Owner',
@@ -259,10 +307,10 @@ export function RiskLifecyclePage() {
           resolveBreach(b.id, 'Root cause addressed via control improvement', 'تمّت معالجة السبب الجذري عبر تحسين الضوابط');
           toast.success(t('rlcResolvedToast'));
         }} />
-      <TreatmentCard riskId={riskId} plans={plans}
+      <TreatmentCard riskId={activeRiskId} plans={plans}
         /* F2-204: the server mints the reference — this minted `TP-<year>-<4 chars>` itself. */
         onCreate={() => void runPlan(
-          () => createTreatmentPlan(riskId, 'MITIGATE',
+          () => createTreatmentPlan(activeRiskId, 'MITIGATE',
             'New treatment plan — fill in details before submission.',
             'خطة معالجة جديدة — أكمل التفاصيل قبل التقديم.', 0),
           t('rlcTreatmentCreatedToast'))}
@@ -278,12 +326,12 @@ export function RiskLifecyclePage() {
         onReject={(p) => void runPlan(() => transitionPlan(p.id, 'REJECTED'), t('rlcRejectedToast'))}
         onProgress={(p) => void runPlan(() => transitionPlan(p.id, 'IN_PROGRESS'),
                                         treatmentStatusLabel('IN_PROGRESS', lang))} />
-      <AcceptanceCard riskId={riskId} risk={risk} accepts={accepts}
+      <AcceptanceCard riskId={activeRiskId} risk={risk} accepts={accepts}
         onCreate={() => {
           const id = `ACC-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
           const expiry = new Date(Date.now() + 365 * 86_400_000);
           saveAcceptance({
-            id, riskId,
+            id, riskId: activeRiskId,
             rationaleEn: 'Mitigation cost exceeds expected residual loss; controls already at industry best-practice maturity.',
             rationaleAr: 'تكلفة التخفيف تتجاوز الخسارة المتوقّعة المتبقّية؛ الضوابط بالفعل بمستوى نضج أفضل ممارسات الصناعة.',
             residualScore: risk.inherentScore - 4,
