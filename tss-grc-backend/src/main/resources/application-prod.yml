@@ -97,10 +97,30 @@ logging:
     org.hibernate.SQL: ERROR
     org.flywaydb: INFO
   file:
-    # Linux default; on Windows set LOGGING_FILE_NAME=C:/tss-grc/logs/application.log
+    # DEP-4 — this knob is LIVE as of the same commit, and was decoration before it.
+    # logback-spring.xml hard-coded <file>/var/log/tss-grc/application.json</file>, and a
+    # custom logback config is delegated to instead of Boot's base.xml, so nothing read the
+    # LOG_FILE system property Boot sets from this line. On Windows that Linux path resolved
+    # DRIVE-RELATIVE (<drive>:\var\log\tss-grc\) and succeeded silently.
+    #
+    # Linux default; on Windows set LOGGING_FILE_NAME=C:/tss-grc/logs/application.log —
+    # external.properties.template ships exactly that, and DEPLOYMENT.md §5 greps it.
+    # ⚠ The file holds JSON, one object per line, whatever the extension says.
     name: ${LOGGING_FILE_NAME:/var/log/tss-grc/application.log}
   logback:
     rollingpolicy:
+      # DEP-4 — live for the same reason: Boot publishes these three as the
+      # LOGBACK_ROLLINGPOLICY_* system properties and JSON_FILE now reads them. They used to
+      # match the appender's literals by coincidence, which is exactly what made them look
+      # wired.
+      #
+      # Deliberately LITERALS rather than ${PLACEHOLDER}s. F2-149's rule is about controls an
+      # operator must be able to throw without a rebuild (a kill switch, a scheduler); these
+      # are sizing values, and no artefact claims they are overridable — `external.properties`
+      # overrides placeholders, not property paths, so a bare path here would be the inert-knob
+      # defect again. If they should become operator-settable, the placeholder and its
+      # external.properties.template entry land in one commit, or
+      # ExternalConfigOverrideContractTest fails the build.
       max-file-size: 50MB
       max-history: 30
       total-size-cap: 1GB

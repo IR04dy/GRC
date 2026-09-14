@@ -1016,7 +1016,14 @@ file down: `icacls ...\external.properties /inheritance:r /grant:r "Administrato
   <workingdirectory>D:\Deployment\tss-grc\app</workingdirectory>
   <startmode>Automatic</startmode>
   <logpath>D:\Deployment\tss-grc\logs</logpath>
-  <log mode="roll"></log>
+  <!-- DEP-4 — was `<log mode="roll"></log>`. `roll` caps by size using WinSW's own built-in
+       defaults, so the cap is a property of the binary rather than of this bundle;
+       `roll-by-size` is the mode that reads these two children (under `roll` they are ignored).
+       sizeThreshold is in KB. See DEPLOYMENT.md §4 for the full reasoning. -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
   <onfailure action="restart" delay="10 sec"/>
 </service>
 ```
@@ -1040,7 +1047,12 @@ JPA warm-up).
   <startmode>Automatic</startmode>
   <stoptimeout>15 sec</stoptimeout>
   <logpath>D:\Deployment\tss-grc\nginx\logs</logpath>
-  <log mode="roll"></log>
+  <!-- DEP-4 — same change as §10.6 above; `roll-by-size` is the mode that reads these
+       children. sizeThreshold is in KB. -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
   <onfailure action="restart" delay="10 sec"/>
 </service>
 ```

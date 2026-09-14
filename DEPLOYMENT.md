@@ -238,12 +238,27 @@ WinSW convention: `<name>.exe` (a renamed copy of the WinSW binary) +
   <workingdirectory>C:\tss-grc\app</workingdirectory>
   <startmode>Automatic</startmode>
   <logpath>C:\tss-grc\logs</logpath>
-  <log mode="roll"></log>
+  <!-- DEP-4 — this was `<log mode="roll"></log>`. `roll` is ALREADY a size-based rolling
+       appender; what it is not is one whose cap you can read. Its thresholds are WinSW's own
+       built-in defaults, so the cap this service runs under is whatever the WinSW build you
+       copied in decided — which is a fact about the binary, not about this bundle.
+       `roll-by-size` is the mode that parses the two children below; under plain `roll` they
+       are IGNORED, so writing them there would ship a knob that reads as a setting and is not
+       one. sizeThreshold is in KB: 10 MB per file, 8 kept, so this capture is bounded at
+       ~80 MB. Stated here, it survives a WinSW upgrade changing its defaults. -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
   <onfailure action="restart" delay="10 sec"/>
 </service>
 ```
 
 (`workingdirectory` matters: `external.properties` is resolved relative to it.)
+
+⚠ This `logpath` is the same directory the application's own rolling JSON file lands in once
+`LOGGING_FILE_NAME` is set (see §5) — WinSW's capture of the service's stdout and the appender's
+own file are two different files, and only the second is the one the Flyway check greps.
 
 **nginx** — copy WinSW to `C:\tss-grc\nginx\nginx-service.exe` and create
 `C:\tss-grc\nginx\nginx-service.xml`. nginx needs a graceful stop
@@ -261,7 +276,13 @@ WinSW convention: `<name>.exe` (a renamed copy of the WinSW binary) +
   <startmode>Automatic</startmode>
   <stoptimeout>15 sec</stoptimeout>
   <logpath>C:\tss-grc\nginx\logs</logpath>
-  <log mode="roll"></log>
+  <!-- DEP-4 — same change as the backend service above, and for the same reason: `roll` caps
+       by size using WinSW's built-in defaults, `roll-by-size` is the mode that reads these two
+       children. sizeThreshold is in KB. -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
   <onfailure action="restart" delay="10 sec"/>
 </service>
 ```
@@ -296,6 +317,17 @@ curl.exe -s http://127.0.0.1:8090/actuator/health          # {"status":"UP"}
 # Flyway must say it BASELINED, not migrated — expect this exact line on
 # first boot: "Successfully baselined schema with version: 292"
 # (and on every later boot: "Schema [platform] is up to date. No migration necessary.")
+#
+# ⚠ DEP-4 — this file holds JSON, one object per line, whatever the extension says: the prod
+# logback appender uses the Logstash encoder, and `.log` is simply what LOGGING_FILE_NAME is
+# set to. The grep below still matches, because the Flyway message sits inside the "message"
+# field of each object.
+#
+# ⚠ The path is honoured as of DEP-4 and was not before it. The appender hard-coded a Linux
+# absolute path, so on Windows it resolved DRIVE-RELATIVE (<drive>:\var\log\tss-grc\) and
+# succeeded silently — this file did not exist, and the only logs in C:\tss-grc\logs were
+# WinSW's capture of the service's stdout. If this Select-String finds nothing, check that
+# LOGGING_FILE_NAME is set in external.properties before concluding Flyway did not run.
 Select-String -Path C:\tss-grc\logs\application.log -Pattern "baselined|No migration necessary"
 
 # API login smoke test   — application port: :8084 fresh install / :8090 existing box

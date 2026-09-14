@@ -4,7 +4,8 @@
 
   - dev profile: human-readable console output (default Spring Boot pattern).
   - prod profile: JSON structured logs (Logstash encoder) → easy to ship into
-    Loki / ELK / CloudWatch. Plus rolling file appender to /var/log/tss-grc/.
+    Loki / ELK / CloudWatch. Plus a rolling file appender whose path and caps
+    come from `logging.*` in application-prod.yml — see JSON_FILE below.
 -->
 <configuration>
 
@@ -53,13 +54,44 @@
       </encoder>
     </appender>
 
+    <!--
+      DEP-4 — every value below used to be a literal, which made four operator-facing
+      knobs decoration.
+
+      A custom logback-spring.xml is delegated to INSTEAD of Boot's base.xml, so
+      `org/springframework/boot/logging/logback/file-appender.xml` — the only file that
+      reads ${LOG_FILE} and ${LOGBACK_ROLLINGPOLICY_*} — is never included. Boot still
+      SETS those system properties (from `logging.file.name` and
+      `logging.logback.rollingpolicy.*`) before applying this file, precisely so a custom
+      config can use them. Nothing here did, so:
+
+        • application-prod.yml's `logging.file.name: ${LOGGING_FILE_NAME:…}` affected nothing,
+        • external.properties.template's LOGGING_FILE_NAME entry affected nothing,
+        • and the three `logging.logback.rollingpolicy.*` values affected nothing — they
+          matched the literals below by coincidence, which is what made them look wired.
+
+      The Windows consequence was the sharp one. LOGGING_FILE_NAME=C:/tss-grc/logs/application.log
+      was ignored, and Logback resolved the Linux absolute path DRIVE-RELATIVE: the JSON landed
+      at <drive>:\var\log\tss-grc\application.json and succeeded silently, because FileAppender
+      creates missing parent directories. DEPLOYMENT.md's first-boot Flyway check greps
+      C:\tss-grc\logs\application.log — a file that could not exist. The only logs where the
+      runbook points were WinSW's stdout capture of JSON_CONSOLE.
+
+      Reading the properties here is what makes those two yml blocks govern this appender.
+      The defaults mirror application-prod.yml so a reader sees one set of numbers, and they
+      are reachable only if this appender is ever used with no `logging.file.name` set (Boot
+      publishes the ROLLINGPOLICY properties only when a log file is configured).
+
+      ⚠ The file the runbook greps is now JSON, one object per line — Select-String still
+      matches, because the Flyway message is inside the "message" field.
+    -->
     <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-      <file>/var/log/tss-grc/application.json</file>
+      <file>${LOG_FILE:-/var/log/tss-grc/application.log}</file>
       <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-        <fileNamePattern>/var/log/tss-grc/application.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
-        <maxFileSize>50MB</maxFileSize>
-        <maxHistory>30</maxHistory>
-        <totalSizeCap>1GB</totalSizeCap>
+        <fileNamePattern>${LOGBACK_ROLLINGPOLICY_FILE_NAME_PATTERN:-${LOG_FILE:-/var/log/tss-grc/application.log}.%d{yyyy-MM-dd}.%i.gz}</fileNamePattern>
+        <maxFileSize>${LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-50MB}</maxFileSize>
+        <maxHistory>${LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-30}</maxHistory>
+        <totalSizeCap>${LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP:-1GB}</totalSizeCap>
       </rollingPolicy>
       <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
         <providers>
