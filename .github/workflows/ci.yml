@@ -77,10 +77,21 @@ jobs:
       - name: Vitest (route reachability + demo-fallback ratchets)
         run: npx vitest run
 
-      # `vite build` succeeds today; `tsc -b` still has cosmetic noise (unused
-      # imports, ~45 errors). Track separately — don't fail CI on it yet.
-      - name: Vite build
-        run: npx vite build
+      # DEP-5 — this step was `npx vite build`, under the comment "`vite build` succeeds
+      # today; `tsc -b` still has cosmetic noise (unused imports, ~45 errors). Track
+      # separately — don't fail CI on it yet." That was true when it was written and had not
+      # been re-checked for five weeks. Measured 2026-09-06 and again 2026-09-14: `tsc -b`
+      # exits 0 with no output. F2-36's recorded blocker is discharged.
+      #
+      # The gap it left was asymmetric with the release path. `package.json` is
+      # `"build": "tsc -b && vite build"`, so the documented RELEASE build gated on types
+      # while CI did not — a type error merged to master kept CI green and made every
+      # subsequent release build fail, found at deploy time by the operator rather than at
+      # merge time by the author. Types are load-bearing here: dozens of closed findings cite
+      # "tsc clean" as a verification leg, and F2-211's own words are that once a DTO stops
+      # declaring a field "`tsc` already refuses" it.
+      - name: Build (tsc -b + vite build)
+        run: npm run build
 
       - name: Upload build artifact
         if: always()

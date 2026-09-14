@@ -41,6 +41,30 @@ Browser ──► nginx :80          (serves the React UI + proxies /api and /ws
               └──  Actuator :8090      (localhost only — never exposed)
 ```
 
+> ### ⚠ DEP-6 — there are TWO port topologies, and this file documents the one you are
+> ### probably *not* standing on
+>
+> The diagram above is the **bundle convention**: `deploy/external.properties` ships
+> `SERVER_PORT=8084` / `SERVER_SSL_ENABLED=false`, and `application-prod.yml` defaults
+> `MANAGEMENT_SERVER_PORT` to `8090`. Every port in §4 below follows it.
+>
+> **The existing deployment does not.** `D:\Deployment\tss-grc\app\external.properties`
+> carries `SERVER_PORT=8090` and `MANAGEMENT_SERVER_PORT=8091` (read 2026-09-14; the file
+> is dated 2026-08-02), which is also what `CLAUDE.md` states. So on the live box, **:8090 is
+> the application, not actuator** — an operator who runs §4's health check there gets a 404
+> from the API and concludes the app is down.
+>
+> | | bundle / fresh install | existing box (`D:\Deployment\tss-grc`) |
+> |---|---|---|
+> | application | `:8084` | **`:8090`** |
+> | actuator / management | `:8090` | **`:8091`** |
+> | nginx | `:80` | `:80` |
+>
+> The packaged **defaults** are neither: `application-prod.yml` reads `${SERVER_PORT:8443}`
+> with `${SERVER_SSL_ENABLED:true}`, so an `external.properties` that omits both starts on
+> HTTPS `:8443` and fails fast on the empty keystore. Both property files set them; do not
+> rely on the default.
+
 ---
 
 ## 0. What you carry to the server
@@ -259,10 +283,14 @@ still running (`C:\tss-grc\nginx\nginx.exe -s stop -p C:\tss-grc\nginx`,
 ignore errors) and that nothing else owns port 80 — on Windows Server, IIS
 often does (`Stop-Service W3SVC; Set-Service W3SVC -StartupType Manual`).
 
-First-boot verification (backend takes ~60–90 s):
+First-boot verification (backend takes ~60–90 s).
+
+⚠ **Ports below are the bundle convention** (app `:8084`, actuator `:8090`) — see the DEP-6 box
+under *Topology*. On the existing `D:\Deployment\tss-grc` box the pair is app `:8090`, actuator
+`:8091`, so substitute before running any of these there.
 
 ```powershell
-# wait for UP
+# wait for UP   — actuator port: :8090 fresh install / :8091 existing box
 curl.exe -s http://127.0.0.1:8090/actuator/health          # {"status":"UP"}
 
 # Flyway must say it BASELINED, not migrated — expect this exact line on
@@ -270,7 +298,7 @@ curl.exe -s http://127.0.0.1:8090/actuator/health          # {"status":"UP"}
 # (and on every later boot: "Schema [platform] is up to date. No migration necessary.")
 Select-String -Path C:\tss-grc\logs\application.log -Pattern "baselined|No migration necessary"
 
-# API login smoke test
+# API login smoke test   — application port: :8084 fresh install / :8090 existing box
 curl.exe -s -X POST http://127.0.0.1:8084/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"Admin@12345\"}"
 # expect a JSON body containing accessToken
 ```
@@ -284,7 +312,11 @@ packaged in *this artifact*, the head applied to *this database*, and the list i
 
 ```powershell
 # From a checkout of the commit you deployed. Exit 0 = match, 1 = mismatch, 2 = unreachable.
-py TSS-GRC-Platform-Bible\Appendix\scripts\deployment_identity.py --url http://127.0.0.1:8091 --expect-commit (git rev-parse HEAD)
+# ⚠ --url takes the ACTUATOR port: :8090 on a fresh install, :8091 on the existing box. This
+# line read :8091 while every other port in this section read the fresh-install pair — it was
+# the one line that had been updated for the live box, and it is why DEP-6 read as three
+# mutually inconsistent numbers rather than as two coherent topologies.
+py TSS-GRC-Platform-Bible\Appendix\scripts\deployment_identity.py --url http://127.0.0.1:8090 --expect-commit (git rev-parse HEAD)
 ```
 
 A non-empty `pending` list is the deployment gap stated as fact: those migrations apply on the next

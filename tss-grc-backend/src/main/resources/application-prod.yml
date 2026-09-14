@@ -35,9 +35,24 @@ spring:
     locations: classpath:db/migration/sqlserver
     # baseline-on-migrate: a fresh empty DB is migrated from V1 onwards.
     # For an EXISTING DB (restored backup / Python-bootstrapped) set
-    # FLYWAY_BASELINE_VERSION to the newest migration already present (e.g. 292)
-    # so Flyway records a baseline and only applies newer versions.
-    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    # FLYWAY_BASELINE_ON_MIGRATE=true and FLYWAY_BASELINE_VERSION to the newest
+    # migration already present (e.g. 292) so Flyway records a baseline and only
+    # applies newer versions. Both deployment property files do exactly that.
+    #
+    # DEP-3 — the PACKAGED DEFAULT is `false`, and it used to be `true`. The default
+    # is the case where nobody set the property, and failing OPEN there is the one
+    # documented corruption mode this platform has: DEPLOYMENT.md's own top-of-file
+    # warning is "set the baseline lower and Flyway replays every migration above it
+    # against objects that already exist, and the startup dies part-way with the
+    # schema half-modified" — and with baseline-version defaulting to 0 below, an
+    # unset pair means baseline at 0 and replay EVERYTHING.
+    #
+    # With `false`, a non-empty schema carrying no history table makes Flyway refuse
+    # BEFORE writing anything: a loud no-op instead of a half-migrated database. The
+    # two paths that matter are both unchanged — a genuinely empty database still
+    # migrates from V1 (baseline-on-migrate only applies to a NON-empty schema), and
+    # every documented restore sets the property explicitly.
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
     baseline-version: ${FLYWAY_BASELINE_VERSION:0}
     # The emptiness check that triggers baseline-on-migrate runs against the
     # DEFAULT schema. The platform's data lives in named schemas (platform, iam,
