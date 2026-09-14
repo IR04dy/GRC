@@ -339,13 +339,16 @@ export function EvidencePage() {
     finally { setBusy(false); setConfirmDel(null); }
   }
 
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = items.denied || requests.denied || reviews.denied;
   const isDemo = items.isDemo;
   const frameworks = Array.from(new Set(items.data.map(i => i.frameworkCode).filter(Boolean))) as string[];
 
   return (
     <Shell title={t('evidenceTitle')} sub="Evidence Catalog">
       <PageHeader
-        eyebrow={t('evidenceEyebrow')} title={t('evidenceTitle')} sub={t('evidenceSub')}
+        eyebrow={t('evidenceEyebrow')} title={t('evidenceTitle')} sub={t('evidenceSub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="EVIDENCE" />

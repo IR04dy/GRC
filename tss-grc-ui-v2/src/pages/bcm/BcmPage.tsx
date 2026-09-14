@@ -448,6 +448,9 @@ export function BcmPage() {
   }
   const showNewButton = tab !== 'overview';
 
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = plans.denied || procs.denied || bia.denied || exercises.denied;
   const isDemo = plans.isDemo;
 
   // Sprint 4 §2.7 — live BCM dashboard
@@ -455,7 +458,7 @@ export function BcmPage() {
     kinds: ['changed.bcm_plan', 'changed.bcm_invocation', 'changed.bcm_exercise'],
     onRefresh: () => { plans.reload(); exercises.reload(); },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !isDenied,
   });
 
   // T1.1 (BCM consolidation, audit headline finding): this page surfaces the
@@ -487,12 +490,12 @@ export function BcmPage() {
         </div>
       </div>
       <PageHeader
-        eyebrow={t('bcmEyebrow')} title={t('bcmTitle')} sub={t('bcmSub')}
+        eyebrow={t('bcmEyebrow')} title={t('bcmTitle')} sub={t('bcmSub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="BCM" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !isDenied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>

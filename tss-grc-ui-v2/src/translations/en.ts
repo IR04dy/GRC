@@ -890,6 +890,10 @@ export const en = {
   comingSoon: 'Coming next',
   comingSoonSub: 'This view will follow once we agree on the design language.',
   demoMode: 'Demo mode · using sample data',
+  // JRN-13 — a 403 is not a demo tenant. Said plainly, and said as the reason the table is
+  // empty, because the previous answer was a full register of fabricated rows.
+  accessDenied: 'You do not have permission to view this register',
+  accessDeniedSub: 'Nothing is shown because your role does not grant read access here — not because the register is empty.',
   // F2-169 — a failed load must say so. It used to be answered with fabricated rows.
   loadFailed: 'Could not load this list — the request failed. Nothing here is sample data.',
   // F2-98: the substitution a SIGNED-IN user can hit — an empty register, or the API failing.

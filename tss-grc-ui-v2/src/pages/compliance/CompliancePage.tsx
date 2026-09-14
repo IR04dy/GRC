@@ -757,6 +757,10 @@ export function CompliancePage() {
   // C-7 — demo/sample-data transparency: true when ANY register fell back to
   // mock data (no auth, API error, or empty backend), not just controls — so a
   // single live register can no longer mask sample data shown on other tabs.
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = controls.denied || assessments.denied || findings.denied || changes.denied
+    || engagements.denied;
   const isDemo = controls.isDemo || assessments.isDemo || findings.isDemo
     || changes.isDemo || engagements.isDemo;
 
@@ -765,18 +769,18 @@ export function CompliancePage() {
     kinds: ['changed.compliance_assessment', 'changed.audit_finding', 'changed.regulatory_change', 'changed.audit_engagement'],
     onRefresh: () => { findings.reload(); assessments.reload(); changes.reload(); engagements.reload(); },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !isDenied,
   });
 
   return (
     <Shell title={t('modCompliance')} sub="ISO 27001 · NCA · SDAIA · SAMA">
       <PageHeader
-        eyebrow={t('complianceEyebrow')} title={t('complianceTitle')} sub={t('complianceSub')}
+        eyebrow={t('complianceEyebrow')} title={t('complianceTitle')} sub={t('complianceSub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="COMPLIANCE" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !isDenied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter}
               onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
               {t('actionFilter')}

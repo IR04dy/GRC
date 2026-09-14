@@ -538,18 +538,18 @@ export function IncidentsPage() {
     kinds: ['changed.incident', 'changed.cyber_incident'],
     onRefresh: () => { incidents.reload(); },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !incidents.denied,
   });
 
   return (
     <Shell title={t('incidentsTitleHeader')} sub={t('incidentsSub')}>
       <PageHeader
-        eyebrow={t('incidentsEyebrow')} title={t('incidentsTitle')} sub={t('incidentsSub')}
+        eyebrow={t('incidentsEyebrow')} title={t('incidentsTitle')} sub={t('incidentsSub')} denied={incidents.denied}
         actions={
           <>
             <RaiseRequestButton sourceModule="INCIDENT" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !incidents.denied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>

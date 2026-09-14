@@ -3,9 +3,10 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { useI18n } from '../../lib/i18n';
+import { AccessDeniedNotice } from '../ui/AccessDeniedNotice';
 
 export function PageHeader({
-  eyebrow, title, sub, badges, actions, backTo,
+  eyebrow, title, sub, badges, actions, backTo, denied,
 }: {
   eyebrow?: string;
   title: string;
@@ -19,31 +20,44 @@ export function PageHeader({
    *  left of the header — the single back-affordance across detail pages (DT7).
    *  Pass a route to navigate there, or '' to go back in history. */
   backTo?: string;
+  /**
+   * JRN-13 — at least one register behind this page answered **403**.
+   *
+   * <p>Rendered here rather than by each page for the reason {@link DemoDataNotice}
+   * records about the four hand-rolled demo badges: nine pages deciding placement
+   * and wording separately is nine chances to drift, and the two that drifted last
+   * time shipped an English-only sentence into an Arabic-primary product. One
+   * placement — directly under the header, above whatever empty table follows.
+   */
+  denied?: boolean;
 }) {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   return (
-    <div className="page-header">
-      <div className="page-header-lead">
-        {backTo !== undefined && (
-          <Button
-            variant="ghost"
-            Icon={ArrowLeft}
-            onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
-            aria-label={t('back') ?? 'Back'}
-            style={{ transform: lang === 'ar' ? 'scaleX(-1)' : undefined, flexShrink: 0 }}
-          />
-        )}
-        <div style={{ minWidth: 0 }}>
-          {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-          <div className="page-title-row">
-            <h2 className="page-title">{title}</h2>
-            {badges}
+    <>
+      <div className="page-header">
+        <div className="page-header-lead">
+          {backTo !== undefined && (
+            <Button
+              variant="ghost"
+              Icon={ArrowLeft}
+              onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
+              aria-label={t('back') ?? 'Back'}
+              style={{ transform: lang === 'ar' ? 'scaleX(-1)' : undefined, flexShrink: 0 }}
+            />
+          )}
+          <div style={{ minWidth: 0 }}>
+            {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+            <div className="page-title-row">
+              <h2 className="page-title">{title}</h2>
+              {badges}
+            </div>
+            {sub && <p className="page-sub">{sub}</p>}
           </div>
-          {sub && <p className="page-sub">{sub}</p>}
         </div>
+        {actions && <div className="page-actions">{actions}</div>}
       </div>
-      {actions && <div className="page-actions">{actions}</div>}
-    </div>
+      {denied && <AccessDeniedNotice />}
+    </>
   );
 }

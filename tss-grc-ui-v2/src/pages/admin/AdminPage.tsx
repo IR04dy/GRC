@@ -211,7 +211,7 @@ export function AdminPage() {
   return (
     <Shell title={t('adminTitle')} sub="Platform Administration">
       <PageHeader
-        eyebrow={t('adminEyebrow')} title={t('adminTitle')} sub={t('adminSub')}
+        eyebrow={t('adminEyebrow')} title={t('adminTitle')} sub={t('adminSub')} denied={users.denied}
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}

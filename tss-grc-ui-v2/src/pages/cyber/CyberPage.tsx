@@ -519,6 +519,11 @@ export function CyberPage() {
   }, [controls.data]);
   const actionPlans    = useApiList<CyberActionPlanDto>(() => cyberApi.actionPlans(0, 200), ACTION_PLANS);
 
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = controls.denied || subControls.denied || assessments.denied || vulns.denied
+    || exceptions.denied || cyberIncidents.denied || assets.denied || cyberEvidence.denied
+    || actionPlans.denied;
   const isDemo = controls.isDemo || vulns.isDemo;
 
   // Sprint 4 §2.7 — keep this dashboard's lists live. When any cyber-domain
@@ -534,7 +539,7 @@ export function CyberPage() {
       actionPlans.reload();
     },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !isDenied,
   });
 
   // Data-driven dropdowns — built per render so they reflect the latest list
@@ -1159,13 +1164,13 @@ export function CyberPage() {
   return (
     <Shell title={t('modCyber')} sub="NCA ECC · ISO 27001:2022">
       <PageHeader
-        eyebrow={t('cyberEyebrow')} title={t('cyberTitle')} sub={t('cyberSub')}
+        eyebrow={t('cyberEyebrow')} title={t('cyberTitle')} sub={t('cyberSub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="CYBER" />
             <PatchRequestButton />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !isDenied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>

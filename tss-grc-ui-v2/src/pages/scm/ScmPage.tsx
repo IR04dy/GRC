@@ -759,12 +759,16 @@ export function ScmPage() {
   const expiringContracts = stats?.expiringContracts ?? 0;
 
   const focusOnboarding = onboarding.data.find(o => o.status === 'IN_PROGRESS') ?? onboarding.data[0];
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = vendors.denied || onboarding.denied || assessments.denied
+    || dependencies.denied || contracts.denied || incidents.denied;
   const isDemo = vendors.isDemo;
 
   return (
     <Shell title="Supply Chain" sub={t('scmEyebrow')}>
       <PageHeader
-        eyebrow={t('scmEyebrow')} title={t('scmTitle')} sub={t('scmSub')}
+        eyebrow={t('scmEyebrow')} title={t('scmTitle')} sub={t('scmSub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="SCM" />

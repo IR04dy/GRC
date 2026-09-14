@@ -97,3 +97,71 @@ describe('useApiList — what a register shows when the backend is down', () => 
     expect(result.current.error).toBeNull();  // not signed in is not a failure
   });
 });
+
+/**
+ * JRN-13 — the one failure that must not be answered with invented rows.
+ *
+ * <p>The block above pins, deliberately, that a *broken* backend still shows the demo corpus: "never
+ * look broken on a fresh tenant" is a product decision and W2-1b recorded it for the owner rather
+ * than overriding it. None of that reasoning reaches a **403**. A denial is the platform working
+ * correctly, the rows it substituted were fabricated, and the badge it raised — *"Demo mode · using
+ * sample data"* — told a denied analyst they were looking at a demo tenant rather than at a
+ * permission boundary. `error` carried the truth the whole time and **0 of the 9 real consumers
+ * read it**, so the fix had to change what the hook *returns*, not only what it records.
+ *
+ * <p>These tests are the fence around that narrowing: 403 and only 403 leaves the substitution
+ * contract, and the four paths the block above pins must keep passing unchanged — which they do,
+ * because none of them is a 403. If a later edit widens this to "any error", the 503 and network
+ * cases up there go red and say so.
+ */
+describe('useApiList — a 403 is a permission boundary, not a demo tenant', () => {
+  beforeEach(() => { vi.spyOn(auth, 'isAuthenticated').mockReturnValue(true); });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('shows zero rows and raises denied — no fabricated register, no demo badge', async () => {
+    const fetcher = vi.fn().mockRejectedValue(new ApiError(403, 'Forbidden'));
+    const { result } = renderHook(() => useApiList<Row>(fetcher, MOCK));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.denied).toBe(true);
+    expect(result.current.data).toEqual([]);      // ← the whole point: nothing invented on screen
+    expect(result.current.isDemo).toBe(false);    // ← and not dressed up as a demo tenant
+    expect(result.current.error).toBe('Forbidden');
+  });
+
+  it('leaves every other failure on the substitution contract', async () => {
+    for (const err of [new ApiError(503, 'Service Unavailable'), new ApiError(500, 'Server Error'),
+                       new ApiError(401, 'Unauthorized'), new Error('boom')]) {
+      const { result } = renderHook(() => useApiList<Row>(vi.fn().mockRejectedValue(err), MOCK));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.denied, `${err} must not be treated as a denial`).toBe(false);
+      expect(result.current.isDemo).toBe(true);
+      expect(result.current.data).toEqual(MOCK);
+    }
+  });
+
+  it('a successful load is not denied, and denied clears when a reload succeeds', async () => {
+    const fetcher = vi.fn()
+      .mockRejectedValueOnce(new ApiError(403, 'Forbidden'))
+      .mockResolvedValue({ content: LIVE });
+    const { result } = renderHook(() => useApiList<Row>(fetcher, MOCK));
+
+    await waitFor(() => expect(result.current.denied).toBe(true));
+    result.current.reload();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // A permission that was granted between loads must not leave a stale denial banner up.
+    expect(result.current.denied).toBe(false);
+    expect(result.current.data).toEqual(LIVE);
+  });
+
+  it('an unauthenticated visitor is demo, never denied — no call was made to be refused', async () => {
+    vi.spyOn(auth, 'isAuthenticated').mockReturnValue(false);
+    const { result } = renderHook(() => useApiList<Row>(vi.fn(), MOCK));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.denied).toBe(false);
+    expect(result.current.isDemo).toBe(true);
+  });
+});

@@ -386,6 +386,9 @@ export function PrivacyPage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
+  // JRN-13 — a 403 is a permission boundary, not a demo tenant. Every register on the
+  // page, not just the one the demo badge happens to read.
+  const isDenied = dsrs.denied || breaches.denied || ropa.denied;
   const isDemo = dsrs.isDemo;
   // F2-196: was an inclusion list `{PENDING, IN_PROGRESS, NEW}` and so answered 9 where 12
   // are open — it dropped `OPEN`, the status the intake promotion adapter writes, so a DSR
@@ -398,18 +401,18 @@ export function PrivacyPage() {
     kinds: ['changed.dsr_case', 'changed.data_breach', 'changed.processing_activity'],
     onRefresh: () => { dsrs.reload(); breaches.reload(); ropa.reload(); },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !isDenied,
   });
 
   return (
     <Shell title={t('modPdpl')} sub="Saudi PDPL · ISO 27701">
       <PageHeader
-        eyebrow={t('privacyEyebrow')} title={t('privacyTitle')} sub={t('privacySub')}
+        eyebrow={t('privacyEyebrow')} title={t('privacyTitle')} sub={t('privacySub')} denied={isDenied}
         actions={
           <>
             <RaiseRequestButton sourceModule="PRIVACY" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !isDenied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>

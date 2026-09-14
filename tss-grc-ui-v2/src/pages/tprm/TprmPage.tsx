@@ -202,18 +202,18 @@ export function TprmPage() {
     kinds: ['changed.vendor', 'changed.vendor_assessment', 'changed.supplier_incident'],
     onRefresh: () => { vendors.reload(); },
     waitMs: 600,
-    enabled: !isDemo,
+    enabled: !isDemo && !vendors.denied,
   });
 
   return (
     <Shell title={t('modThirdParty')} sub="ISO 27036">
       <PageHeader
-        eyebrow={t('tprmEyebrow')} title={t('tprmTitle')} sub={t('tprmSub')}
+        eyebrow={t('tprmEyebrow')} title={t('tprmTitle')} sub={t('tprmSub')} denied={vendors.denied}
         actions={
           <>
             <RaiseRequestButton sourceModule="TPRM" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} />}
+            {!isDemo && !vendors.denied && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>

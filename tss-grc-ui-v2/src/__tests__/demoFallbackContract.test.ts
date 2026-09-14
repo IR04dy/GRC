@@ -260,17 +260,82 @@ describe('W2-1b — a demo substitution is never silent', () => {
       .toEqual([]);
   });
 
-  it('the hook still documents both substitution paths', () => {
+  it('the hook still documents both substitution paths — and the one that is not', () => {
     const hook = ALL.find(f => f.path === 'lib/useApiResource.ts');
     expect(hook, 'useApiResource.ts moved — this contract test needs repointing').toBeDefined();
     const body = hook!.body;
-    // Path 1: the API threw.
-    expect(body).toMatch(/catch\s*\([\s\S]{0,200}setDemo\(true\)/);
+    // Path 1: the API threw, and it was NOT a denial.
+    //
+    // ⚠ This read `/catch\s*\([\s\S]{0,200}setDemo\(true\)/` — a *distance* from the `catch (` to the
+    // substitution. JRN-13 put a four-line branch and a three-line comment between them and the
+    // guard went red without anything it guards having changed. Proximity is not the contract; the
+    // else-arm is, so that is what it reads now.
+    expect(body).toMatch(/\} else \{\s*setData\(mock\);\s*setDemo\(true\);/);
     // Path 2: the API succeeded and returned nothing. This is the one worth naming out loud,
     // because a genuinely empty register — a fresh tenant, or one whose rows were deleted —
     // shows demo data instead of its own empty state.
     expect(body).toMatch(/list\.length === 0[\s\S]{0,160}setDemo\(true\)/);
     expect(body).toMatch(/isDemo/);
+  });
+
+  /**
+   * JRN-13 — the fourth outcome, which used to be indistinguishable from the first three.
+   *
+   * <p>A **403** took the same branch as a 500: substitute the page's corpus, raise `isDemo`, render
+   * *"Demo mode · using sample data"*. So a narrow analyst opening a module their role denies got a
+   * populated, plausible, un-writable register and a badge that reads as a demo tenant rather than
+   * as a permission boundary. `error` held the truth on that path all along and **0 of the 9 real
+   * consumers read it** — which is why this had to change what the hook *returns* and not only what
+   * it records.
+   *
+   * <p>The asymmetry is deliberate and is the thing to keep: 5xx and network failures still get the
+   * corpus, because "never look broken when the backend is down" is a real decision W2-1b recorded
+   * for the owner rather than overrode. A denial is not an accident, so it is the one failure that
+   * must not be answered with invented data.
+   */
+  it('a 403 substitutes nothing — a denial is not dressed up as a demo tenant', () => {
+    const body = ALL.find(f => f.path === 'lib/useApiResource.ts')!.body;
+    expect(body, 'the hook no longer distinguishes a denial from an outage').toMatch(/status === 403/);
+    // Zero rows is the assertion that matters: an `isDemo: false` that still handed back `mock`
+    // would be the same lie with the badge taken off.
+    expect(body).toMatch(/status === 403[\s\S]{0,400}setData\(\[\]\)/);
+    expect(body).toMatch(/status === 403[\s\S]{0,400}setDenied\(true\)/);
+    // ...and the corpus is reachable only from the else-arm, never from the denial.
+    const catchArm = body.slice(body.indexOf('} catch'));
+    const deniedArm = catchArm.slice(catchArm.indexOf('403'), catchArm.indexOf('} else'));
+    expect(deniedArm, 'the denied branch still reaches for the mock corpus').not.toMatch(/\bmock\b/);
+  });
+
+  /**
+   * The sibling of the `isDemo` guard above, and for the same reason. A hook that returns `denied`
+   * changes nothing on screen unless the page reads it — which is exactly how `error`, set on this
+   * path since the hook was written, stayed invisible in all nine consumers for the product's whole
+   * life. A hard zero with no allow-list: every consumer was wired in the same commit.
+   */
+  it('every page consuming useApiList/useApiResource surfaces denied', () => {
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const { path, body } of ALL) {
+      if (IS_TEST(path)) continue;
+      if (path === 'lib/useApiResource.ts') continue;              // the hook itself
+      const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      if (!/useApi(List|Resource)\s*[<(]/.test(codeOnly)) continue;
+      scanned++;
+      // ⚠ A bare `/\bdenied\b/` is the wrong test and was this guard's first draft: it is satisfied
+      // by the `enabled: !isDemo && !x.denied` that stops the page polling a register it cannot
+      // read, which puts nothing on screen at all. Disclosure is what this certifies, so it looks
+      // for the prop that renders the banner — or for a page that renders the notice itself.
+      if (!/denied=\{/.test(codeOnly) && !/AccessDeniedNotice/.test(codeOnly)) offenders.push(path);
+    }
+    // Anti-vacuity: 9 real consumers were measured. A scan that finds none would be green for the
+    // wrong reason — the failure mode that let four backend regex scans under-count this month.
+    expect(scanned, 'the useApiList consumer scan found nothing — it has stopped working')
+      .toBeGreaterThanOrEqual(9);
+    expect(offenders,
+      'These pages load a register that can answer 403 and never say so, which renders as an empty '
+      + 'table with no reason given. Pass the flag: `<PageHeader denied={…} …>` (JRN-13):\n  '
+      + offenders.join('\n  '))
+      .toEqual([]);
   });
 });
 

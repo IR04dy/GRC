@@ -2364,3 +2364,22 @@ tr:hover .row-actions { opacity: 1; }
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* ── JRN-13: AccessDeniedNotice ──────────────────────────────────────────────
+   Sibling of .demo-data-notice, in danger tone rather than warning. A denial is
+   not degraded service, and it must not read like the "sample data" badge it
+   used to be shown as. Logical properties so it mirrors in RTL unchanged. */
+.access-denied-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-end: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r-md);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.access-denied-notice svg { flex: 0 0 auto; opacity: .8; }
