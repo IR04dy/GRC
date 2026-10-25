@@ -422,6 +422,17 @@ schtasks /Create /TN "TSS GRC DB backup" /SC DAILY /ST 02:00 /RU SYSTEM /TR "sql
 
 ## 8. Updating the app later (release loop)
 
+⚠ **Paths and ports below are the bundle convention** (`C:\tss-grc`, app `:8084`,
+actuator `:8090`) — see the DEP-6 box in §4. On the **existing** box the root is
+`D:\Deployment\tss-grc` and the pair is app `:8090` / actuator `:8091`. Substitute
+both, or step 4 checks a port nothing is listening on and reads as "unreachable"
+rather than as "wrong build".
+
+⚠ `PROJECT_CHRONICLE.md` §12.3 carries a **second copy** of this procedure, written
+for the existing box. This section is the canonical one; that one now points here.
+
+### 1 — Build
+
 On the build machine:
 
 ```bash
@@ -430,18 +441,88 @@ cd tss-grc-backend && mvn clean package    # JAVA_HOME must be JDK 17
 cd ../tss-grc-ui-v2 && npm run build
 ```
 
+### 2 — Back up the database BEFORE the swap
+
+```powershell
+sqlcmd -S localhost\SQLEXPRESS -E -Q "BACKUP DATABASE TSS_GRC TO DISK = N'C:\tss-grc\backup\TSS_GRC_pre-upgrade.bak' WITH INIT, CHECKSUM"
+```
+
+⚠⚠ **The §7.3 nightly is NOT this backup.** It exists and it is scheduled — and it is
+up to **24 hours stale**, so restoring it after a failed update rolls the platform back
+to yesterday and loses a day of governance records (risk decisions, approvals, evidence,
+audit-log rows). Take a fresh one inside the maintenance window and keep it until step 4
+passes. 🔑 Flyway migrations are **forward-only**: restoring the jar does not undo a
+migration that has already applied, which is the whole reason this step exists.
+
+Also copy the jar you are replacing, and the `dist` it was built with — step 5 needs both.
+
+### 3 — Swap
+
 On the server:
 
 ```powershell
 Stop-Service TssGrcBackend
 Copy-Item <new>.jar C:\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar -Force
 Remove-Item C:\tss-grc\ui\* -Recurse -Force; Copy-Item <new-dist>\* C:\tss-grc\ui\ -Recurse
-Start-Service TssGrcBackend     # Flyway auto-applies any migration > V292
+Start-Service TssGrcBackend     # Flyway applies every migration above the recorded baseline
 ```
 
-No manual SQL: any new `V293+__*.sql` in the jar applies itself at startup
-(that's why the restored DB was baselined at 292). `external.properties` is
-never touched by a redeploy — your configuration survives every upgrade.
+No manual SQL: any migration in the jar above the recorded baseline applies itself at
+startup (that is what `FLYWAY_BASELINE_VERSION` records). `external.properties` is never
+touched by a redeploy — your configuration survives every upgrade.
+
+⚠ **Scale, on a FRESH install from the 2026-09-03 bundle.** The backup it ships
+(`deploy/TSS_GRC_2026-07-11.bak`) is baselined at **V292** and the packaged chain head is
+**V400**, so first boot applies **108** migrations (V293…V400) — not "a migration or two".
+Expect minutes, not seconds, and do not conclude the service has hung.
+
+### 4 — Verify, BEFORE you tell anyone the release is out
+
+🔑 **The swap is not the release; this step is.** `Start-Service` succeeds whether or not
+the new jar is running: WinSW's `<onfailure action="restart" delay="10 sec"/>` restarts a
+jar that dies at Flyway, and nginx keeps serving the UI whatever the backend is doing.
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8090/actuator/health   # ACTUATOR port — :8091 on the existing box
+```
+
+```powershell
+# From a checkout of the commit you deployed. Exit 0 = match, 1 = mismatch, 2 = unreachable.
+py TSS-GRC-Platform-Bible\Appendix\scripts\deployment_identity.py --url http://127.0.0.1:8090 --expect-commit (git rev-parse HEAD)
+```
+
+This is the same script §4 runs on first boot, and it is the only thing that distinguishes
+*"the service started"* from *"the service is running the build you just shipped"*. Read
+three things from it:
+
+- **`build.commit`** must equal the commit you deployed. ⚠ `build.commit = unknown` means
+  the jar was built without the flag and **cannot** be identified — treat that as a
+  **failed** check, not a pass.
+- **`pending`** must be **empty**. A non-empty list is the deployment gap stated as fact:
+  those migrations have *not* applied, so the schema is not the one this jar expects.
+- **`/actuator/health`** must be `UP`. ⚠ It is bound to **loopback**, so run this on the
+  server — it is deliberately not reachable through nginx.
+
+⚠ Nothing external reports a failure here: actuator is loopback-only and `SENTRY_DSN` is
+empty by default. If you skip this step, a failed update presents as "the site is half up"
+and is found by a user.
+
+### 5 — Roll back, if step 4 fails
+
+Executable only because step 2 exists.
+
+```powershell
+Stop-Service TssGrcBackend
+Copy-Item <previous>.jar C:\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar -Force
+Remove-Item C:\tss-grc\ui\* -Recurse -Force; Copy-Item <previous-dist>\* C:\tss-grc\ui\ -Recurse
+Start-Service TssGrcBackend
+```
+
+⚠⚠ **Restoring the jar is sufficient ONLY if no migration applied.** Read `pending` and the
+Flyway lines in the log first. If a migration **has** applied, the old jar now meets a newer
+schema and the rollback is *restore the step-2 backup as well*. Where the failure is a data
+problem rather than a broken jar, prefer rolling **forward** with a corrective migration —
+migrations are forward-only by design. Re-run step 4 after any rollback.
 
 ---
 
@@ -453,6 +534,7 @@ never touched by a redeploy — your configuration survives every upgrade.
 | Service dies at boot, log says *"JWT_SECRET appears to be a placeholder"* | Set a real ≥32-char `JWT_SECRET` in `external.properties` (must not contain `change-this`/`placeholder`) |
 | Flyway runs V1/V2 and fails with *"Invalid column name"* | It's checking the wrong (empty) schema — the packaged default `FLYWAY_DEFAULT_SCHEMA=platform` handles this; don't override it to `dbo` |
 | Flyway tries to run V3…V292 and fails | `FLYWAY_BASELINE_VERSION=292` missing/changed — the restored DB already has those objects |
+| **An UPDATE fails at startup** — Flyway reports a checksum mismatch, or a migration errors mid-chain | ⚠ **The service restart-loops rather than staying down** (`<onfailure action="restart" delay="10 sec"/>`) while nginx keeps serving the old UI and `/api` 502s, so the symptom is *"the site is half up"*, not *"the service is stopped"* — read the Flyway lines in the log, never the service state. **Checksum mismatch:** `validate-on-migrate: true` validates every already-applied migration *before* migrating, so one edited migration file blocks the whole chain. Measured 2026-09-12 on the existing box: **7 of its 53 history rows drifted** (V302, V315, V316, V338, V339, V340, V341) because two commits edited applied migrations. `flyway repair` re-records the checksums and is the remedy — it **writes to the database**, so it is an owner decision, not a step to take mid-incident. ⚠ A **fresh** install is unaffected: it applies those files as new and records matching checksums. **Mid-chain failure:** the schema is half-modified — restore the step-2 backup and fix the migration; do not re-run `Start-Service` and hope. ⚠ Nothing alerts either way (actuator is loopback-only, `SENTRY_DSN` empty by default), so §8 step 4 is the only thing that catches this |
 | Boot fails: *"Schema-validation: wrong column type … is_deleted"* | `HIBERNATE_DDL_AUTO` was set to `validate` — the long-lived DB mixes `smallint`/`bit`; leave it unset (`none`) until types are reconciled |
 | `/actuator/health` DOWN but the app works | An optional-infrastructure probe (LDAP `localhost:389` / SMTP) — packaged default disables both; re-enable via `LDAP_HEALTH_ENABLED` / `MAIL_HEALTH_ENABLED` only when real servers exist |
 | A raw Spring key in `external.properties` doesn't take effect | Profile-specific packaged values beat base-level imports — use the `UPPER_CASE` placeholder name instead (those always win); if no placeholder exists for that key, ask for one to be added |

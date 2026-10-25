@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Working tree: `D:\AYMAN\GRC` — remote `github.com/Ayman-Server/Claude-GRC-2` (branch `master`).
 
+⚠⚠ **`remote.origin.fetch` IS NARROWED TO `+refs/heads/master:refs/remotes/origin/master` IN THIS CLONE, SO `git branch -r` MEASURES THE REFSPEC RATHER THAN THE REMOTE** (measured 2026-09-16). It lists only `origin/master` and `origin/HEAD` while `git ls-remote --heads origin` returns many real branches, and `git rev-parse --abbrev-ref '@{u}'` on a feature branch fails for the same reason. 🔑 **Both read exactly like *"this branch has never been pushed"***, so a slice that HAS pushed can conclude it has not — and re-push, or report the work as unshipped — while a reader can conclude the remote holds one branch. Ask the remote (`git ls-remote --heads origin`), or widen the refspec for the question you are asking; never infer a remote's branch list, or a branch's push state, from `git branch -r` here.
+
 - **`PROJECT_CHRONICLE.md`** — the master reference: business + functional reference for
   every module/screen/API, installation, configuration, operations, the full
   troubleshooting encyclopedia, all 28 developer landmines, and the complete

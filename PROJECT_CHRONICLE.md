@@ -1152,20 +1152,41 @@ server → `{"status":"UP"}`.
 
 ### 12.3 Updating the application
 
+⚠⚠ **`DEPLOYMENT.md` §8 is the canonical release loop and this is the second copy.** The
+two differ only in **topology**: §8 is written for the bundle convention (`C:\tss-grc`,
+app `:8084`, actuator `:8090`), this one for the **existing** box (`D:\Deployment\tss-grc`,
+app `:8090`, actuator `:8091`). Confusing the two is a recorded defect class (DEP-6) — take
+the *sequence* from §8 and the *paths* from here.
+
 ```powershell
 # build on the dev machine:
 #   backend: mvn -o clean package          → target\tss-grc-platform-0.1.0-SNAPSHOT.jar
 #   frontend: npx vite build               → tss-grc-ui-v2\dist
+
+# 1. BACK UP FIRST — migrations are forward-only, so the jar alone cannot roll one back.
+sqlcmd -S localhost -U sa -P <pw> -Q "BACKUP DATABASE TSS_GRC TO DISK='D:\Backups\TSS_GRC_pre-upgrade.bak' WITH INIT, COMPRESSION"
+
+# 2. Swap.
 Stop-Service TssGrcBackend
 Copy-Item <new>.jar D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar -Force
 Remove-Item D:\Deployment\tss-grc\ui\* -Recurse -Force
 Copy-Item <dist>\* D:\Deployment\tss-grc\ui\ -Recurse
-Start-Service TssGrcBackend      # Flyway auto-applies any migration > baseline
+Start-Service TssGrcBackend      # Flyway applies every migration above the recorded baseline
+
+# 3. VERIFY — from a checkout of the commit you deployed. Exit 0 = match, 1 = mismatch, 2 = unreachable.
+Invoke-RestMethod http://127.0.0.1:8091/actuator/health
+py TSS-GRC-Platform-Bible\Appendix\scripts\deployment_identity.py --url http://127.0.0.1:8091 --expect-commit (git rev-parse HEAD)
 ```
 
+🔑 **`Start-Service` succeeding is not the release.** WinSW restarts a jar that dies at
+Flyway and nginx keeps serving the old UI, so a failed update presents as *"the site is
+half up"*. `build.commit` must equal the deployed commit — **`unknown` is a failed check,
+not a pass** — and `pending` must be **empty**.
+
 UI-only changes don't need the backend restart — replace `ui\` and hard-refresh.
-Rollback = restore the previous jar (+ DB backup if a migration must be undone —
-migrations are forward-only, so prefer roll-forward fixes).
+Rollback = restore the previous jar **and, if any migration applied, the step-1 backup**
+(migrations are forward-only, so prefer roll-forward fixes). Re-run the verify step after
+any rollback.
 
 ### 12.4 Backups
 
@@ -1177,6 +1198,16 @@ Schedule nightly via Task Scheduler; also back up `FILE_STORAGE_PATH` (uploaded
 evidence binaries) and `external.properties`. SQL **Express** caps a database at
 10 GB — the platform's DB-size monitor warns as it approaches; plan a Standard
 upgrade when needed.
+
+⚠⚠ **The nightly is NOT a pre-upgrade backup.** It is up to **24 hours stale**, so
+restoring it after a failed update loses a day of governance records. §12.3 step 1 takes a
+fresh one inside the maintenance window; that is the one a rollback restores.
+
+⚠ **There are two backup commands in this platform's documentation and they differ.**
+`DEPLOYMENT.md` §7.3 schedules `sqlcmd -S localhost\SQLEXPRESS -E` (Windows auth) writing
+to `C:\tss-grc\backup\`; this one uses `-U sa -P` (SQL auth) writing to `D:\Backups\`.
+Both are correct **for their own topology** — the same DEP-6 split as §12.3 — so use the
+one matching the box you are standing on rather than assuming one supersedes the other.
 
 ### 12.5 Scheduled jobs inside the app (no action needed, listed for awareness)
 Hourly assignment expiry · nightly SoD detective scan (02:30 UTC) · 30-min
