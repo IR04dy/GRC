@@ -116,7 +116,11 @@ describe('PolicyAiDraftTab', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Review/i }));
-    await waitFor(() => expect(getPolicyDraft).toHaveBeenCalledWith(42));
+    await waitFor(() => {
+      expect(getPolicyDraft).toHaveBeenCalledWith(42);
+      expect(screen.getByText('ECC-1-1')).toBeTruthy();
+      expect(screen.getByText(/Cybersecurity Strategy/)).toBeTruthy();
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /Accept into Policy Register/i }));
     fireEvent.click(screen.getByRole('button', { name: /Create DRAFT Policy/i }));

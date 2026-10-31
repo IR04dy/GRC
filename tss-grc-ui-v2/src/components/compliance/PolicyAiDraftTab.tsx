@@ -648,6 +648,55 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
                     onChange={e => setEditNote(e.target.value)}
                   />
                 </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>
+                    {isAr ? 'الضوابط المستشهد بها في المسودة (Citations)' : 'Cited tenant controls (Citations)'}
+                  </label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minHeight: 32, alignItems: 'center', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2, rgba(0,0,0,0.02))' }}>
+                    {editControlIds.length === 0 ? (
+                      <span style={{ fontSize: 12, color: 'var(--ink-3, #888)' }}>
+                        {isAr ? 'لم يتم الاستشهاد بضوابط محددة' : 'No specific controls cited'}
+                      </span>
+                    ) : (
+                      editControlIds.map(cid => {
+                        const ctl = controls.find(c => c.id === cid);
+                        return (
+                          <span
+                            key={cid}
+                            className="badge badge-primary"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                            title={ctl ? (isAr && ctl.nameAr ? ctl.nameAr : ctl.nameEn) : undefined}
+                          >
+                            <span className="mono font-semibold">{ctl ? ctl.code : `#${cid}`}</span>
+                            {ctl && <span>· {ctl.nameEn}</span>}
+                            {activeDraft.status === 'GENERATED' && (
+                              <button
+                                type="button"
+                                onClick={() => setEditControlIds(prev => prev.filter(x => x !== cid))}
+                                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginLeft: 2, display: 'inline-flex' }}
+                                title={isAr ? 'إزالة الاستشهاد' : 'Remove citation'}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {((activeDraft.edited ?? activeDraft.generated)?.assumptions?.length ?? 0) > 0 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>{isAr ? 'الافتراضات التنظيمية والأسس المرجعية' : 'Regulatory assumptions & baseline scope'}</label>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--ink-2)' }}>
+                      {(activeDraft.edited ?? activeDraft.generated)!.assumptions.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <InlineEmpty>
