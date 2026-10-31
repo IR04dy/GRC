@@ -12,6 +12,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { Modal } from '../../components/ui/Modal';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { PolicyAiDraftTab } from '../../components/compliance/PolicyAiDraftTab';
 import { ApiError, reportingApi, frameworkApi, type FrameworkPolicyRowDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -29,7 +30,7 @@ import {
   type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl, type ControlCatalogItem, type FrameworkOption,
 } from '../../lib/policy';
 
-type PolicyTab = 'overview' | 'documents' | 'exceptions' | 'attestations';
+type PolicyTab = 'overview' | 'documents' | 'ai-drafts' | 'exceptions' | 'attestations';
 
 /**
  * Policy Management — bound to V79 backend (policy.documents,
@@ -46,6 +47,7 @@ export function PolicyManagementPage() {
   const tabs: { id: PolicyTab; labelEn: string; labelAr: string }[] = [
     { id: 'overview',     labelEn: 'Overview',     labelAr: 'نظرة عامة' },
     { id: 'documents',    labelEn: 'Documents',    labelAr: 'المستندات' },
+    { id: 'ai-drafts',    labelEn: 'AI Drafting',  labelAr: 'الصياغة الذكية' },
     { id: 'exceptions',   labelEn: 'Exceptions',   labelAr: 'الاستثناءات' },
     { id: 'attestations', labelEn: 'Attestations', labelAr: 'الإقرارات' },
   ];
@@ -75,6 +77,7 @@ export function PolicyManagementPage() {
 
       {tab === 'overview'     && <OverviewTab onNavigate={setTab} />}
       {tab === 'documents'    && <DocumentsTab />}
+      {tab === 'ai-drafts'    && <PolicyAiDraftTab onAccepted={() => setTab('documents')} />}
       {tab === 'exceptions'   && <ExceptionsTab />}
       {tab === 'attestations' && <AttestationsTab />}
     </Shell>

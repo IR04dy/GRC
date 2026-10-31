@@ -269,6 +269,7 @@ platform,flyway_schema_history,INTENTIONAL_TECHNICAL,exceptions-file,ABSENT,53,0
 platform,help_topic,OPERATING,generated,30,30,1,0,0,1,1,0,0,mapped and carrying data
 platform,integration_external_link,OPERATING,generated,8,7,1,0,0,1,0,0,0,mapped and carrying data
 platform,issues,OPERATING,generated,13,13,1,0,0,3,1,0,0,mapped and carrying data
+platform,llm_call_log,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,lookup_tables,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
 platform,nafath_transaction,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,notifications,OPERATING,generated,427,398,1,0,0,2,0,1,0,mapped and carrying data
@@ -286,6 +287,7 @@ platform,tenable_recast_log,DORMANT,exceptions-file,0,0,1,0,0,1,0,0,0,Connector 
 platform,three_lines_role_mapping,OPERATING,generated,25,25,1,0,0,1,1,0,0,mapped and carrying data
 platform,translations,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
 platform,web_push_subscription,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+policy,ai_drafts,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 policy,attestations,OPERATING,generated,18,18,1,0,0,1,1,1,1,mapped and carrying data
 policy,document_control_links,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
 policy,document_framework_mappings,OPERATING,generated,15,15,1,0,0,2,1,0,0,mapped and carrying data

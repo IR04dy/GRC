@@ -33,6 +33,8 @@ public interface ControlRepository extends JpaRepository<Control, Long> {
 
     java.util.List<Control> findByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
 
+    java.util.List<Control> findByOrganisationIdAndIdIn(Long organisationId, java.util.Collection<Long> ids);
+
     /** C-12 — batch-resolve free-text control codes (e.g. a policy's
      *  {@code relatedControls} "1-1-1, 2-3-1") to real control rows for
      *  read-side FK linking, without altering the stored free-text. */
