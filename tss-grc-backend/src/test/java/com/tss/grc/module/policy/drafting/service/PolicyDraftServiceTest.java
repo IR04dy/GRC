@@ -317,5 +317,20 @@ class PolicyDraftServiceTest {
         PolicyDraftResponse rejected = service.rejectDraft(702L, new RejectPolicyDraftRequest("Scope superseded"));
         assertThat(rejected.status()).isEqualTo("REJECTED");
         assertThat(rejected.reviewerNote()).isEqualTo("Scope superseded");
+
+        // Delete path
+        PolicyAiDraft deletable = new PolicyAiDraft();
+        deletable.setId(703L);
+        deletable.setOrganisationId(1L);
+        deletable.setExternalId("AID-2026-DEL");
+        deletable.setIsDeleted(false);
+        when(draftRepo.findByIdAndOrganisationId(703L, 1L)).thenReturn(Optional.of(deletable));
+
+        service.deleteDraft(703L);
+        assertThat(deletable.getIsDeleted()).isTrue();
+        assertThat(deletable.getDeletedBy()).isEqualTo(77L);
+        assertThat(deletable.getDeletedAt()).isNotNull();
+        verify(draftRepo).save(deletable);
+        verify(audit).log(eq("POLICY_AI_DRAFT_DELETED"), eq("PolicyAiDraft"), eq(703L), any());
     }
 }

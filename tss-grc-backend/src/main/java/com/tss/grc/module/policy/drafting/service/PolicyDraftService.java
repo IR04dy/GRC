@@ -354,6 +354,29 @@ public class PolicyDraftService {
         return resp;
     }
 
+    @Transactional
+    public void deleteDraft(Long id) {
+        Long orgId = CurrentActor.organisationId();
+        String actor = CurrentActor.requireUsername("deleting an AI policy draft");
+        Long userId = CurrentActor.userId();
+        PolicyAiDraft draft = draftRepo.findByIdAndOrganisationId(id, orgId)
+            .orElseThrow(() -> new EntityNotFoundException("AI policy draft not found: " + id));
+
+        draft.softDelete(userId);
+        draftRepo.save(draft);
+
+        audit.log("POLICY_AI_DRAFT_DELETED", "PolicyAiDraft", draft.getId(),
+            "Soft-deleted AI policy draft " + draft.getExternalId() + " by " + actor);
+
+        if (broadcaster != null) {
+            broadcaster.broadcastOrgEvent(orgId, "policy.ai_draft", Map.of(
+                "draftId", draft.getId(),
+                "externalId", draft.getExternalId(),
+                "status", "DELETED"
+            ));
+        }
+    }
+
     static String composeBilingualMarkdown(
         String titleEn,
         String contentMdEn,

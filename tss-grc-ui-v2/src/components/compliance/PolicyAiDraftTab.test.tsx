@@ -14,6 +14,12 @@ const requestPolicyDraft = vi.fn();
 const updatePolicyDraft = vi.fn();
 const acceptPolicyDraft = vi.fn();
 const rejectPolicyDraft = vi.fn();
+const deletePolicyDraft = vi.fn();
+const exportPolicyDraftPdf = vi.fn();
+
+vi.mock('../../lib/policyDraftPrint', () => ({
+  exportPolicyDraftPdf: (...a: unknown[]) => exportPolicyDraftPdf(...a),
+}));
 
 vi.mock('../../lib/policyDrafts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/policyDrafts')>();
@@ -26,6 +32,7 @@ vi.mock('../../lib/policyDrafts', async (importOriginal) => {
     updatePolicyDraft: (...a: unknown[]) => updatePolicyDraft(...a),
     acceptPolicyDraft: (...a: unknown[]) => acceptPolicyDraft(...a),
     rejectPolicyDraft: (...a: unknown[]) => rejectPolicyDraft(...a),
+    deletePolicyDraft: (...a: unknown[]) => deletePolicyDraft(...a),
   };
 });
 
@@ -104,14 +111,16 @@ describe('PolicyAiDraftTab', () => {
     acceptPolicyDraft.mockResolvedValue(sampleDraft({ status: 'ACCEPTED', acceptedPolicyId: 88 }));
     requestPolicyDraft.mockResolvedValue(sampleDraft({ id: 43, externalId: 'AID-2026-0043', status: 'REQUESTED' }));
     rejectPolicyDraft.mockResolvedValue(sampleDraft({ status: 'REJECTED' }));
+    deletePolicyDraft.mockResolvedValue(undefined);
   });
 
-  it('renders gateway status, reviews bilingual draft, and accepts into Policy Register', async () => {
+  it('renders studio, reviews bilingual draft, and accepts into Policy Register without top live model label', async () => {
     const onAccepted = vi.fn();
     mount(onAccepted);
 
     await waitFor(() => {
-      expect(screen.getByText(/LIVE · GEMINI/i)).toBeTruthy();
+      // Live model label at top must be removed per user requirement
+      expect(screen.queryByText(/LIVE · GEMINI/i)).toBeNull();
       expect(screen.getByText('Cloud Security Policy')).toBeTruthy();
     });
 
@@ -132,6 +141,36 @@ describe('PolicyAiDraftTab', () => {
         version: '1.0',
       }));
       expect(onAccepted).toHaveBeenCalled();
+    });
+  });
+
+  it('allows downloading draft as PDF and deleting it with confirmation', async () => {
+    mount();
+    await waitFor(() => expect(screen.getByText('Cloud Security Policy')).toBeTruthy());
+
+    // 1. Download PDF directly from table action
+    const downloadBtn = screen.getByTitle(/Download PDF/i);
+    fireEvent.click(downloadBtn);
+    expect(exportPolicyDraftPdf).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 42 }),
+      'bilingual',
+      expect.any(Array)
+    );
+
+    // 2. Open review and trigger download PDF from modal
+    fireEvent.click(screen.getByRole('button', { name: /Review/i }));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /Download PDF/i }).length).toBe(2));
+    const modalDownloadBtn = screen.getAllByRole('button', { name: /Download PDF/i })[1];
+    fireEvent.click(modalDownloadBtn);
+    expect(exportPolicyDraftPdf).toHaveBeenCalledTimes(2);
+
+    // 3. Delete draft from modal with confirmation
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/i }));
+    await waitFor(() => expect(screen.getByText(/Are you sure you want to delete policy draft/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Delete/i }));
+    await waitFor(() => {
+      expect(deletePolicyDraft).toHaveBeenCalledWith(42);
     });
   });
 

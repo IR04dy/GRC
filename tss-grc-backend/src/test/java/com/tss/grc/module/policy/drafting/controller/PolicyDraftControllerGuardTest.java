@@ -37,6 +37,8 @@ class PolicyDraftControllerGuardTest {
 
         Method rejM = assertGuard("rejectDraft", "hasPermission('COMPLIANCE','WRITE')", Long.class, RejectPolicyDraftRequest.class);
         assertHasValidBody(rejM);
+
+        assertGuard("deleteDraft", "hasPermission('COMPLIANCE','DELETE') or hasPermission('COMPLIANCE','WRITE')", Long.class);
     }
 
     private static Method assertGuard(String name, String expectedSpel, Class<?>... params) throws Exception {

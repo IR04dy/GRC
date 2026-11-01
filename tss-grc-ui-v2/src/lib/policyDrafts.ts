@@ -130,6 +130,10 @@ export function rejectPolicyDraft(id: number, body: RejectPolicyDraftRequest) {
   return api.post<PolicyDraftResponse>(`${BASE}/${id}/reject`, body);
 }
 
+export function deletePolicyDraft(id: number) {
+  return api.delete<void>(`${BASE}/${id}`);
+}
+
 export function draftStatusTone(s: PolicyDraftStatus): BadgeTone {
   switch (s) {
     case 'REQUESTED':  return 'neutral';

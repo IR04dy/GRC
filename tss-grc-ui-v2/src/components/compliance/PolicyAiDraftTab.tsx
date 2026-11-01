@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Sparkles, RefreshCw, Eye, CheckCircle2, XCircle, Save, AlertTriangle } from 'lucide-react';
+import { Sparkles, RefreshCw, Eye, CheckCircle2, XCircle, Save, AlertTriangle, Trash2, Download } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -18,6 +18,7 @@ import {
 } from '../../lib/policy';
 import {
   acceptPolicyDraft,
+  deletePolicyDraft,
   draftStatusLabel,
   draftStatusTone,
   getPolicyDraft,
@@ -31,6 +32,7 @@ import {
   type PolicyDraftResponse,
   type PolicyDraftStatus,
 } from '../../lib/policyDrafts';
+import { exportPolicyDraftPdf } from '../../lib/policyDraftPrint';
 
 const CATEGORIES = [
   'INFORMATION_SECURITY',
@@ -112,6 +114,9 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
   const [showReject, setShowReject] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  const [draftToDelete, setDraftToDelete] = useState<PolicyDraftResponse | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -310,6 +315,24 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
     }
   }
 
+  async function onConfirmDelete() {
+    if (!draftToDelete) return;
+    setDeleting(true);
+    try {
+      await deletePolicyDraft(draftToDelete.id);
+      toast.success(isAr ? 'تم حذف مسودة السياسة بنجاح' : 'AI policy draft deleted');
+      if (activeDraft?.id === draftToDelete.id) {
+        setActiveDraft(null);
+      }
+      setDraftToDelete(null);
+      await reload(true);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to delete policy draft');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function toggleId(list: number[], id: number, setter: (v: number[]) => void) {
     setter(list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
   }
@@ -321,13 +344,6 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
         Icon={Sparkles}
         action={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {gateway && (
-              <Badge tone={!gateway.enabled ? 'danger' : gateway.mode === 'LIVE' ? 'success' : 'info'}>
-                {!gateway.enabled
-                  ? (isAr ? 'معطّل' : 'LLM Disabled')
-                  : `${gateway.mode} · ${gateway.provider} (${gateway.model})`}
-              </Badge>
-            )}
             <Button size="sm" variant="ghost" Icon={RefreshCw} onClick={() => void reload()}>
               {isAr ? 'تحديث' : 'Refresh'}
             </Button>
@@ -402,9 +418,28 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
                     <td className="mono text-xs">{d.provider ? `${d.provider}/${d.model ?? ''}` : '—'}</td>
                     <td className="text-xs">{d.requestedBy}</td>
                     <td style={{ textAlign: 'end' }}>
-                      <Button size="sm" variant="secondary" Icon={Eye} onClick={() => void openReview(d.id)}>
-                        {isAr ? 'مراجعة' : 'Review'}
-                      </Button>
+                      <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                        {(d.generated || d.edited) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            Icon={Download}
+                            onClick={() => exportPolicyDraftPdf(d, 'bilingual', controls)}
+                            title={isAr ? 'تحميل كملف PDF' : 'Download PDF'}
+                          />
+                        )}
+                        <Button size="sm" variant="secondary" Icon={Eye} onClick={() => void openReview(d.id)}>
+                          {isAr ? 'مراجعة' : 'Review'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          Icon={Trash2}
+                          onClick={() => setDraftToDelete(d)}
+                          title={isAr ? 'حذف المسودة' : 'Delete draft'}
+                          style={{ color: 'var(--danger)' }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -513,14 +548,33 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
         footer={
           activeDraft && (
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 8, flexWrap: 'wrap' }}>
-              <div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {(activeDraft.status === 'GENERATED' || activeDraft.status === 'FAILED') && (
                   <Button variant="danger" size="sm" Icon={XCircle} onClick={() => setShowReject(true)}>
                     {isAr ? 'رفض المسودة' : 'Reject'}
                   </Button>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  Icon={Trash2}
+                  onClick={() => setDraftToDelete(activeDraft)}
+                  style={{ color: 'var(--danger)' }}
+                >
+                  {isAr ? 'حذف' : 'Delete'}
+                </Button>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {(activeDraft.generated || activeDraft.edited) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    Icon={Download}
+                    onClick={() => exportPolicyDraftPdf(activeDraft, 'bilingual', controls)}
+                  >
+                    {isAr ? 'تحميل كملف PDF' : 'Download PDF'}
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setActiveDraft(null)}>
                   {isAr ? 'إغلاق' : 'Close'}
                 </Button>
@@ -767,6 +821,35 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
             onChange={e => setRejectNote(e.target.value)}
             placeholder={isAr ? 'اذكر سبب عدم مناسبة المسودة…' : 'State why this generated draft is rejected…'}
           />
+        </div>
+      </Modal>
+
+      {/* 5. Delete Confirmation Modal */}
+      <Modal
+        open={draftToDelete !== null}
+        title={isAr ? 'تأكيد حذف مسودة السياسة' : 'Delete AI Policy Draft'}
+        onClose={() => setDraftToDelete(null)}
+        size="sm"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button variant="ghost" onClick={() => setDraftToDelete(null)}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              variant="danger"
+              Icon={Trash2}
+              disabled={deleting}
+              onClick={() => void onConfirmDelete()}
+            >
+              {deleting ? '…' : (isAr ? 'تأكيد الحذف' : 'Confirm Delete')}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          {isAr
+            ? `هل أنت متأكد من رغبتك في حذف مسودة السياسة (${draftToDelete?.externalId})؟ لا يمكن التراجع عن هذا الإجراء.`
+            : `Are you sure you want to delete policy draft "${draftToDelete?.externalId}"? This action cannot be undone.`}
         </div>
       </Modal>
     </div>
