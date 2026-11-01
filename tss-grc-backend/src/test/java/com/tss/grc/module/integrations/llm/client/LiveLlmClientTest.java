@@ -282,4 +282,54 @@ class LiveLlmClientTest {
         assertThat(resp.model()).isEqualTo("gemini-1.5-flash");
         assertThat(resp.content()).isEqualTo("{\"titleEn\":\"Fallback Gemini Policy\"}");
     }
+
+    @Test
+    void secondaryGeminiFallsBackToTertiaryGlmWhenPrimaryAndSecondaryFail() {
+        LlmProperties props = new LlmProperties();
+        props.setMode(LlmProperties.Mode.LIVE);
+        props.setProvider(LlmProperties.Provider.OPENAI);
+        props.setFallbackProvider(LlmProperties.Provider.GEMINI);
+        props.setTertiaryProvider(LlmProperties.Provider.GLM);
+        props.setOpenaiApiKey("sk-test-openai");
+        props.setGeminiApiKey("gemini-test-key");
+        props.setGlmApiKey("glm-test-key-999");
+        props.setGlmBaseUrl("https://api.z.ai/api/paas/v4");
+        props.setGlmModel("glm-4-flash");
+        props.setMaxRetries(0);
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+
+        // 1. Primary OpenAI fails
+        server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+            .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body("{\"error\":\"quota_exceeded\"}"));
+
+        // 2. Secondary Gemini fails (e.g. 404 deprecated model)
+        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).body("{\"error\":\"model_not_found\"}"));
+
+        // 3. Tertiary GLM (Z.ai) succeeds
+        server.expect(requestTo("https://api.z.ai/api/paas/v4/chat/completions"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("Authorization", "Bearer glm-test-key-999"))
+            .andRespond(withSuccess("""
+                {
+                  "choices": [{
+                    "message": { "role": "assistant", "content": "{\\"titleEn\\":\\"GLM Policy from Z.ai\\"}" },
+                    "finish_reason": "stop"
+                  }],
+                  "usage": { "prompt_tokens": 150, "completion_tokens": 80 }
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        LlmResponse resp = client.complete(sampleReq());
+        server.verify();
+
+        assertThat(resp.provider()).isEqualTo("GLM");
+        assertThat(resp.model()).isEqualTo("glm-4-flash");
+        assertThat(resp.content()).isEqualTo("{\"titleEn\":\"GLM Policy from Z.ai\"}");
+        assertThat(resp.inputTokens()).isEqualTo(150);
+        assertThat(resp.outputTokens()).isEqualTo(80);
+    }
 }

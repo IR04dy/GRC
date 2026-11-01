@@ -34,6 +34,7 @@ public class LlmProperties {
     public enum Provider {
         OPENAI,
         GEMINI,
+        GLM,
         LOCAL_OPENAI,
         OPENAI_COMPATIBLE,
         AZURE_OPENAI,
@@ -53,11 +54,17 @@ public class LlmProperties {
     /** Secondary fallback provider when primary fails or lacks credentials. Defaults to GEMINI. */
     private Provider fallbackProvider = Provider.GEMINI;
 
+    /** Tertiary fallback provider when secondary fails. Defaults to GLM. */
+    private Provider tertiaryProvider = Provider.GLM;
+
     /** OpenAI official REST API base URL. */
     private String openaiBaseUrl = "https://api.openai.com/v1";
 
     /** Google Gemini REST API base URL. */
     private String geminiBaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+
+    /** GLM (Z.ai / Zhipu AI) OpenAI-compatible REST API base URL. */
+    private String glmBaseUrl = "https://api.z.ai/api/paas/v4";
 
     /** Anthropic Messages API base URL. */
     private String anthropicBaseUrl = "https://api.anthropic.com/v1";
@@ -77,6 +84,9 @@ public class LlmProperties {
     /** Dedicated Gemini model (defaults to gemini-1.5-flash). */
     private String geminiModel = "gemini-1.5-flash";
 
+    /** Dedicated GLM model (defaults to glm-4-flash). */
+    private String glmModel = "glm-4-flash";
+
     /** Generic API key for OpenAI-compatible / Azure / Anthropic / authenticated local endpoints. */
     private String apiKey = "";
 
@@ -85,6 +95,9 @@ public class LlmProperties {
 
     /** Dedicated Gemini API key (preferred when provider=GEMINI; falls back to apiKey). */
     private String geminiApiKey = "";
+
+    /** Dedicated GLM API key (preferred when provider=GLM; falls back to apiKey). */
+    private String glmApiKey = "";
 
     /** Dedicated Anthropic API key (preferred when provider=ANTHROPIC; falls back to apiKey). */
     private String anthropicApiKey = "";
@@ -113,6 +126,7 @@ public class LlmProperties {
         return switch (p) {
             case OPENAI -> firstNonBlank(openaiApiKey, apiKey);
             case GEMINI -> firstNonBlank(geminiApiKey, apiKey);
+            case GLM -> firstNonBlank(glmApiKey, apiKey);
             case ANTHROPIC -> firstNonBlank(anthropicApiKey, apiKey);
             case AZURE_OPENAI -> firstNonBlank(azureApiKey, apiKey);
             case OPENAI_COMPATIBLE -> firstNonBlank(openaiApiKey, apiKey);
@@ -136,9 +150,11 @@ public class LlmProperties {
         return !resolveApiKey(p).isEmpty();
     }
 
-    /** True when either the primary provider or the fallback provider has credentials. */
+    /** True when any configured provider in the fallback chain has credentials. */
     public boolean hasRequiredCredentials() {
-        return hasRequiredCredentials(provider) || hasRequiredCredentials(fallbackProvider);
+        return hasRequiredCredentials(provider)
+            || hasRequiredCredentials(fallbackProvider)
+            || hasRequiredCredentials(tertiaryProvider);
     }
 
     /** Resolve the effective model identifier for the given provider. */
@@ -147,6 +163,7 @@ public class LlmProperties {
         return switch (p) {
             case OPENAI -> firstNonBlank(openaiModel, model);
             case GEMINI -> firstNonBlank(geminiModel, "gemini-1.5-flash");
+            case GLM -> firstNonBlank(glmModel, "glm-4-flash");
             default -> model;
         };
     }

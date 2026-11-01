@@ -309,23 +309,27 @@ grc:
         backoff-multiplier: 2.0
       timeout-ms: 5000
 
-    # LLM gateway — local (Ollama / vLLM / LM Studio) + hosted (OpenAI / Gemini / Azure / Anthropic)
+    # LLM gateway — local (Ollama / vLLM / LM Studio) + hosted (OpenAI / Gemini / GLM / Azure / Anthropic)
     llm:
       enabled: ${LLM_ENABLED:true}
       mode: ${LLM_MODE:STUB}                                          # STUB (deterministic offline) | LIVE
-      provider: ${LLM_PROVIDER:OPENAI}                                # Primary: OPENAI | GEMINI | LOCAL_OPENAI | OPENAI_COMPATIBLE | AZURE_OPENAI | ANTHROPIC
-      fallback-provider: ${LLM_FALLBACK_PROVIDER:GEMINI}             # Secondary fallback provider: GEMINI | NONE
+      provider: ${LLM_PROVIDER:OPENAI}                                # Primary: OPENAI | GEMINI | GLM | LOCAL_OPENAI | OPENAI_COMPATIBLE | AZURE_OPENAI | ANTHROPIC
+      fallback-provider: ${LLM_FALLBACK_PROVIDER:GEMINI}             # Secondary fallback provider: GEMINI | GLM | NONE
+      tertiary-provider: ${LLM_TERTIARY_PROVIDER:GLM}                 # Tertiary fallback provider: GLM | NONE
       base-url: ${LLM_BASE_URL:http://localhost:11434/v1}
       openai-base-url: ${LLM_OPENAI_BASE_URL:https://api.openai.com/v1}
       gemini-base-url: ${LLM_GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      glm-base-url: ${LLM_GLM_BASE_URL:https://api.z.ai/api/paas/v4}
       anthropic-base-url: ${LLM_ANTHROPIC_BASE_URL:https://api.anthropic.com/v1}
       azure-api-version: ${LLM_AZURE_API_VERSION:2024-10-21}
       model: ${LLM_MODEL:gpt-4o-mini}
       openai-model: ${LLM_OPENAI_MODEL:gpt-4o-mini}
       gemini-model: ${LLM_GEMINI_MODEL:gemini-1.5-flash}
+      glm-model: ${LLM_GLM_MODEL:glm-4-flash}
       api-key: ${LLM_API_KEY:}
       openai-api-key: ${OPENAI_API_KEY:${LLM_OPENAI_API_KEY:}}
       gemini-api-key: ${GEMINI_API_KEY:${LLM_GEMINI_API_KEY:}}
+      glm-api-key: ${GLM_API_KEY:${LLM_GLM_API_KEY:}}
       anthropic-api-key: ${ANTHROPIC_API_KEY:${LLM_ANTHROPIC_API_KEY:}}
       azure-api-key: ${AZURE_OPENAI_API_KEY:}
       timeout-seconds: ${LLM_TIMEOUT_SECONDS:120}

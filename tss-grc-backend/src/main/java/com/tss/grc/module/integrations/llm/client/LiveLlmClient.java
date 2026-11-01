@@ -61,37 +61,41 @@ public class LiveLlmClient implements LlmClient {
 
     @Override
     public LlmResponse complete(LlmRequest request) {
-        LlmProperties.Provider primary = props.getProvider();
-        LlmProperties.Provider fallback = props.getFallbackProvider();
+        List<LlmProperties.Provider> chain = new java.util.ArrayList<>();
+        if (props.getProvider() != null && props.getProvider() != LlmProperties.Provider.NONE) {
+            chain.add(props.getProvider());
+        }
+        if (props.getFallbackProvider() != null && props.getFallbackProvider() != LlmProperties.Provider.NONE
+                && !chain.contains(props.getFallbackProvider())) {
+            chain.add(props.getFallbackProvider());
+        }
+        if (props.getTertiaryProvider() != null && props.getTertiaryProvider() != LlmProperties.Provider.NONE
+                && !chain.contains(props.getTertiaryProvider())) {
+            chain.add(props.getTertiaryProvider());
+        }
 
-        // 1. Try primary provider if credentials exist or LOCAL_OPENAI
-        if (props.hasRequiredCredentials(primary)) {
+        Exception lastException = null;
+        for (LlmProperties.Provider p : chain) {
+            if (!props.hasRequiredCredentials(p)) {
+                log.debug("[LLM] Skipping provider {} (no API credentials)", p);
+                continue;
+            }
             try {
-                return executeProvider(primary, request);
+                return executeProvider(p, request);
             } catch (Exception ex) {
-                log.warn("[LLM] Primary provider {} failed ({}). Attempting fallback provider {}...",
-                    primary, ex.getMessage(), fallback);
-                if (fallback != null && fallback != LlmProperties.Provider.NONE
-                        && fallback != primary && props.hasRequiredCredentials(fallback)) {
-                    log.info("[LLM] Routing request to fallback provider {}...", fallback);
-                    return executeProvider(fallback, request);
-                }
-                if (ex instanceof LlmGatewayException gex) throw gex;
-                throw new LlmGatewayException("PRIMARY_FAILED",
-                    "LLM primary provider " + primary + " failed: " + ex.getMessage(), ex);
+                lastException = ex;
+                log.warn("[LLM] Provider {} failed ({}). Checking next fallback in chain...", p, ex.getMessage());
             }
         }
 
-        // 2. If primary has no key, but fallback does, use fallback directly
-        if (fallback != null && fallback != LlmProperties.Provider.NONE
-                && props.hasRequiredCredentials(fallback)) {
-            log.info("[LLM] Primary provider {} credentials missing; routing to fallback provider {}",
-                primary, fallback);
-            return executeProvider(fallback, request);
+        if (lastException != null) {
+            if (lastException instanceof LlmGatewayException gex) throw gex;
+            throw new LlmGatewayException("CHAIN_FAILED",
+                "All LLM providers in fallback chain failed: " + lastException.getMessage(), lastException);
         }
 
         throw new LlmGatewayException("CREDENTIALS_MISSING",
-            "Neither primary provider " + primary + " nor fallback provider " + fallback + " has valid API credentials configured.");
+            "No LLM provider in fallback chain (" + chain + ") has valid API credentials configured.");
     }
 
     private LlmResponse executeProvider(LlmProperties.Provider p, LlmRequest request) {
@@ -99,6 +103,7 @@ public class LiveLlmClient implements LlmClient {
         return switch (p) {
             case OPENAI -> callOpenAi(request, start);
             case GEMINI -> callGemini(request, start);
+            case GLM -> callGlm(request, start);
             case LOCAL_OPENAI, OPENAI_COMPATIBLE -> callOpenAiCompatible(request, start, false);
             case AZURE_OPENAI -> callOpenAiCompatible(request, start, true);
             case ANTHROPIC -> callAnthropic(request, start);
@@ -166,6 +171,71 @@ public class LiveLlmClient implements LlmClient {
         return new LlmResponse(
             text,
             "OPENAI",
+            resolvedModel,
+            inTok,
+            outTok,
+            Math.max(1L, System.currentTimeMillis() - startMs),
+            finishReason
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private LlmResponse callGlm(LlmRequest req, long startMs) {
+        String apiKey = props.resolveApiKey(LlmProperties.Provider.GLM);
+        String base = stripTrailingSlash(props.getGlmBaseUrl());
+        String model = props.resolveModel(LlmProperties.Provider.GLM);
+        String uri = base + "/chat/completions";
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        List<Map<String, String>> messages = (req.systemPrompt() != null && !req.systemPrompt().isBlank())
+            ? List.of(
+                Map.of("role", "system", "content", req.systemPrompt()),
+                Map.of("role", "user", "content", req.userPrompt()))
+            : List.of(Map.of("role", "user", "content", req.userPrompt()));
+        body.put("messages", messages);
+        body.put("temperature", req.temperature() != null ? req.temperature() : props.getTemperature());
+        body.put("max_tokens", req.maxOutputTokens() != null ? req.maxOutputTokens() : props.getMaxOutputTokens());
+
+        Map<String, Object> raw = withRetry("GLM", () -> http.post()
+            .uri(uri)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(Map.class));
+
+        if (raw == null) {
+            throw new LlmGatewayException("EMPTY_RESPONSE", "GLM returned an empty response body.");
+        }
+
+        String text = "";
+        String finishReason = "stop";
+        if (raw.get("choices") instanceof List<?> choices && !choices.isEmpty()
+                && choices.get(0) instanceof Map<?, ?> firstChoice) {
+            if (firstChoice.get("finish_reason") != null) {
+                finishReason = String.valueOf(firstChoice.get("finish_reason"));
+            }
+            if (firstChoice.get("message") instanceof Map<?, ?> msg && msg.get("content") != null) {
+                text = String.valueOf(msg.get("content"));
+            }
+        }
+        if (text.isBlank()) {
+            throw new LlmGatewayException("EMPTY_CONTENT", "GLM response contained no message content.");
+        }
+
+        String resolvedModel = raw.get("model") != null ? String.valueOf(raw.get("model")) : model;
+        int inTok = estimateTokens(req.systemPrompt()) + estimateTokens(req.userPrompt());
+        int outTok = estimateTokens(text);
+        if (raw.get("usage") instanceof Map<?, ?> usage) {
+            inTok = intOrDefault(usage.get("prompt_tokens"), inTok);
+            outTok = intOrDefault(usage.get("completion_tokens"), outTok);
+        }
+
+        return new LlmResponse(
+            text,
+            "GLM",
             resolvedModel,
             inTok,
             outTok,

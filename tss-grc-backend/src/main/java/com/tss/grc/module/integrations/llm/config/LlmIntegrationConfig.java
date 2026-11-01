@@ -29,15 +29,14 @@ public class LlmIntegrationConfig {
 
     @PostConstruct
     void announce() {
-        log.info("[LLM] gateway enabled={} mode={} primaryProvider={} fallbackProvider={} primaryModel={}",
-            props.isEnabled(), props.getMode(), props.getProvider(), props.getFallbackProvider(),
+        log.info("[LLM] gateway enabled={} mode={} primaryProvider={} fallbackProvider={} tertiaryProvider={} primaryModel={}",
+            props.isEnabled(), props.getMode(), props.getProvider(), props.getFallbackProvider(), props.getTertiaryProvider(),
             props.resolveModel(props.getProvider()));
         if (props.isEnabled()
                 && props.getMode() == LlmProperties.Mode.LIVE
                 && !props.hasRequiredCredentials()) {
-            log.warn("[LLM] enabled=true mode=LIVE primaryProvider={} fallbackProvider={} but no valid API key is configured. "
-                + "Inference calls will fail until OPENAI_API_KEY / GEMINI_API_KEY is configured.",
-                props.getProvider(), props.getFallbackProvider());
+            log.warn("[LLM] enabled=true mode=LIVE but no valid API key is configured in fallback chain. "
+                + "Inference calls will fail until OPENAI_API_KEY / GEMINI_API_KEY / GLM_API_KEY is configured.");
         }
     }
 
