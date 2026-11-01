@@ -318,7 +318,7 @@ grc:
       gemini-base-url: ${LLM_GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
       anthropic-base-url: ${LLM_ANTHROPIC_BASE_URL:https://api.anthropic.com/v1}
       azure-api-version: ${LLM_AZURE_API_VERSION:2024-10-21}
-      model: ${LLM_MODEL:gemini-2.5-flash}
+      model: ${LLM_MODEL:gemini-1.5-flash}
       api-key: ${LLM_API_KEY:}
       gemini-api-key: ${GEMINI_API_KEY:}
       anthropic-api-key: ${ANTHROPIC_API_KEY:}

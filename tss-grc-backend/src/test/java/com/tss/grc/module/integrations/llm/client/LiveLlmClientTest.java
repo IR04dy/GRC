@@ -45,14 +45,14 @@ class LiveLlmClientTest {
         props.setMode(LlmProperties.Mode.LIVE);
         props.setProvider(LlmProperties.Provider.GEMINI);
         props.setGeminiBaseUrl("https://generativelanguage.googleapis.com/v1beta");
-        props.setModel("gemini-2.5-flash");
+        props.setModel("gemini-1.5-flash");
         props.setGeminiApiKey("gem-test-key-123");
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         LiveLlmClient client = new LiveLlmClient(props, builder.build());
 
-        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"))
+        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("x-goog-api-key", "gem-test-key-123"))
             .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
@@ -73,7 +73,7 @@ class LiveLlmClientTest {
         server.verify();
 
         assertThat(resp.provider()).isEqualTo("GEMINI");
-        assertThat(resp.model()).isEqualTo("gemini-2.5-flash");
+        assertThat(resp.model()).isEqualTo("gemini-1.5-flash");
         assertThat(resp.content()).isEqualTo("{\"titleEn\":\"Access Policy\"}");
         assertThat(resp.inputTokens()).isEqualTo(420);
         assertThat(resp.outputTokens()).isEqualTo(180);

@@ -57,7 +57,7 @@ public class LlmProperties {
     private String azureApiVersion = "2024-10-21";
 
     /** Model identifier or Azure deployment name. */
-    private String model = "gemini-2.5-flash";
+    private String model = "gemini-1.5-flash";
 
     /** Generic API key for OpenAI-compatible / Azure / Anthropic / authenticated local endpoints. */
     private String apiKey = "";
