@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ai.entity.AiSuggestion;
 import com.tss.grc.module.ai.repository.AiSuggestionRepository;
+import com.tss.grc.module.integrations.llm.dto.LlmRequest;
+import com.tss.grc.module.integrations.llm.dto.LlmResponse;
+import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -17,12 +20,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * AI-assisted features (Saudi GRC implementation prompt §27).
+ * AI-assisted features (Saudi GRC implementation prompt §27 / V116).
  *
- * <p>Five heuristic generators, each persisted as an {@link AiSuggestion}
- * draft so a human can accept or reject the suggestion before it changes
- * any real record. The shape is identical to an LLM-backed implementation —
- * swap the private generator methods later without touching the API.
+ * <p>Persists each AI generation as an {@link AiSuggestion} draft so a human can
+ * accept or reject the suggestion before it mutates any real record.
+ * Powered by {@link LlmGatewayService} with automatic fallback to deterministic
+ * heuristics whenever the LLM gateway is unconfigured, disabled, or unavailable.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,11 +34,9 @@ public class AiSuggestionService {
     private static final Logger log = LoggerFactory.getLogger(AiSuggestionService.class);
 
     private final AiSuggestionRepository repo;
-    private final AuditLogService        audit;
-    // QUAL-ESG-008: inject the shared, fully-configured Spring ObjectMapper bean
-    // (JavaTime module etc.) rather than a per-instance vanilla `new ObjectMapper()`,
-    // which would throw on Java-8 date payloads.
-    private final ObjectMapper           mapper;
+    private final AuditLogService audit;
+    private final ObjectMapper mapper;
+    private final LlmGatewayService llmGateway;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -73,8 +74,68 @@ public class AiSuggestionService {
     // ══════════════════════════════════════════════════════════════════
     // §27 #1 — Risk description draft
     // ══════════════════════════════════════════════════════════════════
-    @Transactional
+
     public AiSuggestion suggestRiskDescription(RiskDescriptionInput in) {
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are an expert enterprise risk management (ERM) analyst specializing in Saudi regulatory compliance (NCA ECC, SAMA CSF/OPRES, PDPL).
+                    Analyze the risk title, category, and inherent score. Return ONLY a JSON object with this exact structure:
+                    {
+                      "descriptionEn": "Risk statement in English following the format 'Risk that [event] occurs due to [causes], resulting in [impacts]'.",
+                      "descriptionAr": "صياغة دقيقة واحترافية لبيان الخطر باللغة العربية تشمل الحدث والسبب والأثر.",
+                      "causes": [
+                        "Cause 1 in English",
+                        "Cause 2 in English",
+                        "Cause 3 in English",
+                        "Cause 4 in English"
+                      ],
+                      "consequences": [
+                        "Consequence 1 in English",
+                        "Consequence 2 in English",
+                        "Consequence 3 in English",
+                        "Consequence 4 in English"
+                      ],
+                      "confidence": 85
+                    }
+                    Ensure the causes and consequences cite relevant Saudi regulatory aspects (e.g. PDPL Article 20 for privacy/cyber, SAMA OPRES for banking/operational risks) where appropriate.
+                    """;
+
+                String userPrompt = "Risk Title: " + safe(in.titleEn())
+                    + "\nCategory: " + safe(in.categoryCode())
+                    + "\nInherent Likelihood (1-5): " + in.inherentLikelihood()
+                    + "\nInherent Impact (1-5): " + in.inherentImpact();
+
+                LlmRequest req = new LlmRequest(
+                    "RISK_DESCRIPTION",
+                    "prompt-risk-description",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    1200,
+                    0.3,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("causes") && output.containsKey("consequences")) {
+                        BigDecimal conf = extractConfidence(output, 85);
+                        String rationale = "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") grounded in Saudi ERM & regulatory context.";
+                        return persist("RISK_DESCRIPTION", "Risk", in.riskId(), in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM risk description suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackRiskDescription(in, "Heuristic expansion using title + category.");
+    }
+
+    private AiSuggestion fallbackRiskDescription(RiskDescriptionInput in, String note) {
         String desc = "Risk that " + safe(in.titleEn) + " materialises, leading to operational, "
                     + "reputational, and regulatory impacts on the organisation.";
 
@@ -103,19 +164,68 @@ public class AiSuggestionService {
         output.put("consequences", consequences);
         int conf = 55 + Math.min(20, (in.titleEn == null ? 0 : in.titleEn.length() / 5));
         return persist("RISK_DESCRIPTION", "Risk", in.riskId(), in, output,
-            BigDecimal.valueOf(conf),
-            "Heuristic expansion using title + category. Replace with LLM-backed version when AI gateway is wired.");
+            BigDecimal.valueOf(conf), note);
     }
 
     // ══════════════════════════════════════════════════════════════════
     // §27 #3 — BIA RTO/RPO recommendation
     // ══════════════════════════════════════════════════════════════════
-    @Transactional
+
     public AiSuggestion suggestBiaRtoRpo(BiaRecommendationInput in) {
-        // Mapping derived from typical Saudi service tiers + NCEMA expectations.
-        // CRITICAL service in Tier-1 → RTO ≤ 4h, RPO ≤ 15min.
-        // ESSENTIAL service in Tier-2 → RTO ≤ 24h, RPO ≤ 4h.
-        // IMPORTANT / Tier-3 → RTO ≤ 72h, RPO ≤ 24h.
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are a business continuity (BCM) advisor specializing in Saudi resilience standards (NCEMA 7000, ISO 22301, SAMA BCM Framework).
+                    Recommend target Recovery Time Objective (RTO) and Recovery Point Objective (RPO) based on service criticality and tier.
+                    Return ONLY a JSON object with this exact structure:
+                    {
+                      "rtoMinutes": 240,
+                      "rpoMinutes": 15,
+                      "rtoHumanEn": "4 hours",
+                      "rpoHumanEn": "15 minutes",
+                      "rtoHumanAr": "4 ساعات",
+                      "rpoHumanAr": "15 دقيقة",
+                      "mtpdMinutes": 720,
+                      "rationale": "Justification citing NCEMA 7000 or SAMA resilience expectations.",
+                      "confidence": 80
+                    }
+                    """;
+
+                String userPrompt = "Service Title: " + safe(in.serviceTitle())
+                    + "\nCriticality: " + safe(in.criticality())
+                    + "\nTier: " + safe(in.tier());
+
+                LlmRequest req = new LlmRequest(
+                    "BIA_RTO_RPO",
+                    "prompt-bia-rto-rpo",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    800,
+                    0.2,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("rtoMinutes") && output.containsKey("rpoMinutes")) {
+                        BigDecimal conf = extractConfidence(output, 80);
+                        String rationale = extractRationale(output,
+                            "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") based on NCEMA/SAMA resilience guidelines.");
+                        return persist("BIA_RTO_RPO", "Service", in.serviceId(), in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM BIA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackBiaRtoRpo(in);
+    }
+
+    private AiSuggestion fallbackBiaRtoRpo(BiaRecommendationInput in) {
         String crit = String.valueOf(in.criticality()).toUpperCase(Locale.ROOT);
         String tier = String.valueOf(in.tier()).toUpperCase(Locale.ROOT);
         int rtoMinutes, rpoMinutes;
@@ -137,7 +247,7 @@ public class AiSuggestionService {
         output.put("rpoHumanEn", humanDuration(rpoMinutes));
         output.put("rtoHumanAr", humanDurationAr(rtoMinutes));
         output.put("rpoHumanAr", humanDurationAr(rpoMinutes));
-        output.put("mtpdMinutes", rtoMinutes * 3);  // Max tolerable period of disruption rule-of-thumb
+        output.put("mtpdMinutes", rtoMinutes * 3);
         return persist("BIA_RTO_RPO", "Service", in.serviceId(), in, output,
             BigDecimal.valueOf(70), rationale);
     }
@@ -145,8 +255,67 @@ public class AiSuggestionService {
     // ══════════════════════════════════════════════════════════════════
     // §27 #8 — Evidence quality review
     // ══════════════════════════════════════════════════════════════════
-    @Transactional
+
     public AiSuggestion reviewEvidenceQuality(EvidenceQualityInput in) {
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are a senior compliance auditor evaluating evidence defensibility for Saudi regulators (NCA, SAMA, SDAIA).
+                    Evaluate evidence attributes (age, digital signature, control linkage, artifact type).
+                    Return ONLY a JSON object with this exact structure:
+                    {
+                      "qualityScore": 85,
+                      "verdict": "ACCEPTABLE",
+                      "strengths": [
+                        "Strength 1 in English",
+                        "Strength 2 in English"
+                      ],
+                      "issues": [
+                        "Issue or gap 1 in English"
+                      ],
+                      "rationale": "Audit defensibility rationale.",
+                      "confidence": 85
+                    }
+                    verdict must be one of: 'ACCEPTABLE' (score >= 75), 'NEEDS_IMPROVEMENT' (50..74), or 'INSUFFICIENT' (< 50).
+                    """;
+
+                String userPrompt = "Evidence Title: " + safe(in.evidenceTitle())
+                    + "\nType: " + safe(in.evidenceType())
+                    + "\nControl Code: " + safe(in.controlCode())
+                    + "\nAge (Days): " + in.ageDays()
+                    + "\nDigitally Signed: " + in.hasSignature();
+
+                LlmRequest req = new LlmRequest(
+                    "EVIDENCE_QUALITY",
+                    "prompt-evidence-quality",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    800,
+                    0.2,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("qualityScore") && output.containsKey("verdict")) {
+                        BigDecimal conf = extractConfidence(output, 85);
+                        String rationale = extractRationale(output,
+                            "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") based on regulator evidentiary criteria.");
+                        return persist("EVIDENCE_QUALITY", "EvidenceItem", in.evidenceId(), in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM evidence quality review unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackEvidenceQuality(in);
+    }
+
+    private AiSuggestion fallbackEvidenceQuality(EvidenceQualityInput in) {
         List<String> issues = new ArrayList<>();
         List<String> strengths = new ArrayList<>();
         int score = 60;
@@ -193,9 +362,59 @@ public class AiSuggestionService {
     // ══════════════════════════════════════════════════════════════════
     // §27 #13 — Incident root-cause draft
     // ══════════════════════════════════════════════════════════════════
-    @Transactional
+
     public AiSuggestion draftIncidentRootCause(IncidentRootCauseInput in) {
-        // 5-Whys-style narrative built from inputs.
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are an incident response and crisis management expert specializing in 5-Whys root cause analysis aligned with NCA ECC and NIST 800-61.
+                    Synthesize the crisis event metadata, trigger source, and timeline highlights.
+                    Return ONLY a JSON object with this exact structure:
+                    {
+                      "rootCauseDraftEn": "Detailed 5-Whys narrative in English synthesizing timeline highlights, control bypass, detection lag, and containment runbook execution.",
+                      "rootCauseDraftAr": "تحليل أولي متكامل للسبب الجذري باللغة العربية يلخص مجريات الحادث والعوامل المسببة والإجراءات التصحيحية الموصى بها.",
+                      "categoriesToPick": ["PEOPLE", "PROCESS", "TECHNOLOGY", "SUPPLIER", "EXTERNAL"],
+                      "rationale": "RCA synthesis methodology notes.",
+                      "confidence": 75
+                    }
+                    """;
+
+                String userPrompt = "Incident Title: " + safe(in.title())
+                    + "\nSeverity (1-5): " + in.severity()
+                    + "\nTrigger Source: " + safe(in.triggerSource())
+                    + "\nSitRep Highlights: " + (in.sitRepHighlights() != null ? String.join("; ", in.sitRepHighlights()) : "None");
+
+                LlmRequest req = new LlmRequest(
+                    "INCIDENT_ROOT_CAUSE",
+                    "prompt-incident-rca",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    1200,
+                    0.3,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("rootCauseDraftEn")) {
+                        BigDecimal conf = extractConfidence(output, 75);
+                        String rationale = extractRationale(output,
+                            "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") synthesizing incident sitreps and NCA ECC expectations.");
+                        return persist("INCIDENT_ROOT_CAUSE", "CrisisEvent", in.crisisEventId(), in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM incident RCA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackIncidentRootCause(in);
+    }
+
+    private AiSuggestion fallbackIncidentRootCause(IncidentRootCauseInput in) {
         StringBuilder narrative = new StringBuilder();
         narrative.append("Event: ").append(safe(in.title())).append(".\n\n");
         narrative.append("Apparent trigger: ").append(safe(in.triggerSource())).append(".\n\n");
@@ -225,7 +444,7 @@ public class AiSuggestionService {
             "هذه مسودة آلية للسبب الجذري بناءً على بيانات الحدث؛ يجب على فريق الأزمة مراجعتها قبل اعتمادها.");
         output.put("categoriesToPick", List.of("PEOPLE","PROCESS","TECHNOLOGY","SUPPLIER","EXTERNAL"));
         int conf = 50;
-        if (in.severity() != null && in.severity() >= 4) conf -= 10; // major crises need real RCA
+        if (in.severity() != null && in.severity() >= 4) conf -= 10;
         if (in.sitRepHighlights() != null) conf += Math.min(20, in.sitRepHighlights().size() * 4);
 
         return persist("INCIDENT_ROOT_CAUSE", "CrisisEvent", in.crisisEventId(), in, output,
@@ -236,8 +455,61 @@ public class AiSuggestionService {
     // ══════════════════════════════════════════════════════════════════
     // §27 #11 — Board summary drafting
     // ══════════════════════════════════════════════════════════════════
-    @Transactional
+
     public AiSuggestion draftBoardSummary(BoardSummaryInput in) {
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are an executive GRC advisor drafting the briefing for the Board Audit & Risk Committee.
+                    Synthesize the enterprise posture indicators. Return ONLY a JSON object with this exact structure:
+                    {
+                      "summaryEn": "Executive narrative in English summarizing overall posture, high risks, overdue CAPAs, and 3 recommended board decisions.",
+                      "summaryAr": "ملخص تنفيذي باللغة العربية موجه لمجلس الإدارة ولجنة المراجعة والمخاطر يوضح الموقف العام والتوصيات.",
+                      "tone": "STEADY",
+                      "rationale": "Assessment derived from operational risk indicators.",
+                      "confidence": 85
+                    }
+                    tone must be one of: 'DELIVER ATTENTION' (if open high risks > 10 or compliance < 70%), 'STEADY' (if open high risks > 5 or compliance < 85%), or 'HEALTHY'.
+                    """;
+
+                String userPrompt = "Open High Risks: " + nullSafe(in.openHighRisks())
+                    + "\nOverdue CAPAs: " + nullSafe(in.overdueCapa())
+                    + "\nNCA Compliance: " + nullSafe(in.ncaCompliancePct()) + "%"
+                    + "\nPDPL Compliance: " + nullSafe(in.pdplCompliancePct()) + "%"
+                    + "\nBCM Readiness: " + nullSafe(in.bcmReadinessScore()) + "%"
+                    + "\nActive Incidents: " + nullSafe(in.activeIncidents());
+
+                LlmRequest req = new LlmRequest(
+                    "BOARD_SUMMARY",
+                    "prompt-board-summary",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    1200,
+                    0.3,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("summaryEn") && output.containsKey("tone")) {
+                        BigDecimal conf = extractConfidence(output, 85);
+                        String rationale = extractRationale(output,
+                            "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") synthesizing executive indicators.");
+                        return persist("BOARD_SUMMARY", "Dashboard", null, in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM board summary draft unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackBoardSummary(in);
+    }
+
+    private AiSuggestion fallbackBoardSummary(BoardSummaryInput in) {
         int high = nullSafe(in.openHighRisks());
         int overdue = nullSafe(in.overdueCapa());
         int nca = nullSafe(in.ncaCompliancePct());
@@ -272,34 +544,85 @@ public class AiSuggestionService {
         output.put("tone", tone);
         return persist("BOARD_SUMMARY", "Dashboard", null, in, output,
             BigDecimal.valueOf(80),
-            "Thresholded rollup over six dashboard inputs. Replace with LLM gateway for free-form summary.");
+            "Thresholded rollup over six dashboard inputs.");
     }
 
     // ══════════════════════════════════════════════════════════════════
     // §27 #12 — Workflow-submission review hint (PR #23)
     // ══════════════════════════════════════════════════════════════════
-    //
-    // PRs #11-22 built the §7 wizard surface end-to-end (catalog → wizards
-    // → persistence → register → detail → audit → F8 automation). This
-    // heuristic adds AI guidance per submission: when a reviewer opens
-    // /workflows/submissions/:id, the frontend calls this to draft what
-    // they should check + which controls to spot-verify + which Saudi
-    // regulator citation matters.
-    //
-    // Output shape (consumed by WorkflowSubmissionDetailPage):
-    //   { headlineEn, headlineAr, checklistEn[], checklistAr[],
-    //     regulatorCitation, suggestedDecision }
 
-    @Transactional
     public AiSuggestion suggestWorkflowSubmissionReview(WorkflowSubmissionReviewInput in) {
+        Long orgId = org();
+        if (orgId != null && llmGateway != null) {
+            try {
+                String systemPrompt = """
+                    You are a senior regulatory compliance officer reviewing a workflow submission before formal executive approval.
+                    Analyze workflow ID, module, regulatory anchor, title, and summary.
+                    Return ONLY a JSON object with this exact structure:
+                    {
+                      "headlineEn": "English headline summarizing the key regulatory gating question.",
+                      "headlineAr": "عنوان تنفيذي باللغة العربية يلخص السؤال الرقابي الأساسي.",
+                      "checklistEn": [
+                        "Checklist verification item 1 in English",
+                        "Checklist verification item 2 in English",
+                        "Checklist verification item 3 in English"
+                      ],
+                      "checklistAr": [
+                        "بند تحقق 1 باللغة العربية",
+                        "بند تحقق 2 باللغة العربية",
+                        "بند تحقق 3 باللغة العربية"
+                      ],
+                      "regulatorCitation": "Applicable regulator citation (e.g. PDPL Art 20, NCA ECC-1:2018 §3.2, ISO 22301 §9.3)",
+                      "suggestedDecision": "APPROVE",
+                      "rationale": "Evaluation justification.",
+                      "confidence": 80
+                    }
+                    suggestedDecision must be 'APPROVE', 'REVIEW', or 'CLOSE'.
+                    """;
+
+                String userPrompt = "Workflow ID: " + safe(in.workflowId())
+                    + "\nModule: " + safe(in.workflowModule())
+                    + "\nStatus: " + safe(in.status())
+                    + "\nRegulatory Anchor: " + safe(in.regulatoryAnchor())
+                    + "\nTitle: " + safe(in.titleEn())
+                    + "\nSummary: " + safe(in.summaryEn());
+
+                LlmRequest req = new LlmRequest(
+                    "WORKFLOW_SUBMISSION_REVIEW",
+                    "prompt-workflow-review",
+                    "1.0.0",
+                    systemPrompt,
+                    userPrompt,
+                    true,
+                    1000,
+                    0.2,
+                    List.of()
+                );
+
+                LlmResponse resp = llmGateway.complete(orgId, req);
+                if (resp != null && resp.content() != null && !resp.content().isBlank()) {
+                    Map<String, Object> output = parseJsonMap(resp.content());
+                    if (output.containsKey("checklistEn") && output.containsKey("suggestedDecision")) {
+                        BigDecimal conf = extractConfidence(output, 80);
+                        String rationale = extractRationale(output,
+                            "Generated by LLM (" + resp.provider() + " / " + resp.model() + ") based on workflow regulatory context.");
+                        return persist("WORKFLOW_SUBMISSION_REVIEW", "WorkflowSubmission", in.submissionId(),
+                            in, output, conf, rationale);
+                    }
+                }
+            } catch (Exception ex) {
+                log.info("LLM workflow review suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+            }
+        }
+        return fallbackWorkflowSubmissionReview(in);
+    }
+
+    private AiSuggestion fallbackWorkflowSubmissionReview(WorkflowSubmissionReviewInput in) {
         String workflowId = safe(in.workflowId()).toLowerCase(Locale.ROOT);
         String module     = safe(in.workflowModule()).toUpperCase(Locale.ROOT);
         String status     = safe(in.status()).toUpperCase(Locale.ROOT);
         String anchor     = safe(in.regulatoryAnchor());
 
-        // Per-wizard tailored checklists, keyed off the specific regulator
-        // expectations for that wizard. First matcher wins; otherwise the
-        // generic fallback applies — preserving the original ladder order.
         ReviewTemplate tpl = REVIEW_TEMPLATES.stream()
             .filter(t -> t.matches(workflowId, module))
             .findFirst()
@@ -309,9 +632,8 @@ public class AiSuggestionService {
         String suggestedDecision = tpl.suggestedDecision();
         int conf = tpl.conf();
 
-        // Status-dependent suggestion.
-        if ("REJECTED".equals(status))        suggestedDecision = "CLOSE";
-        else if ("APPROVED".equals(status))   suggestedDecision = "CLOSE";
+        if ("REJECTED".equals(status))          suggestedDecision = "CLOSE";
+        else if ("APPROVED".equals(status))     suggestedDecision = "CLOSE";
         else if ("UNDER_REVIEW".equals(status)) suggestedDecision = "APPROVE";
 
         Map<String, Object> output = new LinkedHashMap<>();
@@ -324,16 +646,13 @@ public class AiSuggestionService {
 
         return persist("WORKFLOW_SUBMISSION_REVIEW", "WorkflowSubmission", in.submissionId(),
             in, output, BigDecimal.valueOf(conf),
-            "Per-wizard heuristic checklist keyed off workflowId + module + status + anchor. "
-            + "Swap for an LLM-backed reviewer assistant when the AI gateway is wired.");
+            "Per-wizard heuristic checklist keyed off workflowId + module + status + anchor.");
     }
 
-    /** Static content for one wizard's review hint (default suggestedDecision before status override). */
     private record ReviewTemplate(String headlineEn, String headlineAr,
                                   List<String> checklistEn, List<String> checklistAr,
                                   String suggestedDecision, int conf) {}
 
-    /** Pairs a (workflowId-prefix / module) predicate with the content it yields. */
     private record ReviewMatcher(java.util.function.BiPredicate<String, String> predicate,
                                  ReviewTemplate template) {
         boolean matches(String workflowId, String module) {
@@ -341,7 +660,6 @@ public class AiSuggestionService {
         }
     }
 
-    /** Generic fallback — every submission deserves at least these. */
     private static final ReviewTemplate GENERIC_REVIEW_TEMPLATE = new ReviewTemplate(
         "Review the wizard payload against the relevant Saudi regulator citation",
         "راجع حمولة المعالج وفق المرجع التنظيمي السعودي ذي الصلة",
@@ -357,11 +675,6 @@ public class AiSuggestionService {
             "اتخذ قراراً (اعتماد/رفض/قيد المراجعة) مع سبب موثق."),
         "REVIEW", 50);
 
-    /**
-     * Ordered per-wizard review templates. Evaluated top-to-bottom (first match
-     * wins), mirroring the original if/else ladder: five workflowId-substring
-     * matches, then a BCM module match, then the generic fallback.
-     */
     private static final List<ReviewMatcher> REVIEW_TEMPLATES = List.of(
         new ReviewMatcher((wf, mod) -> wf.contains("pdpl-breach"), new ReviewTemplate(
             "Personal-data breach — verify the 72-hour SDAIA clock",
@@ -482,9 +795,10 @@ public class AiSuggestionService {
 
     // ── helpers ──────────────────────────────────────────────────────
 
-    private AiSuggestion persist(String feature, String entity, Long entityId,
-                                 Object input, Object output,
-                                 BigDecimal confidence, String rationale) {
+    @Transactional
+    public AiSuggestion persist(String feature, String entity, Long entityId,
+                                Object input, Object output,
+                                BigDecimal confidence, String rationale) {
         AiSuggestion s = new AiSuggestion();
         s.setOrganisationId(org());
         s.setFeatureCode(feature);
@@ -506,6 +820,46 @@ public class AiSuggestionService {
             + ", entity=" + entity + "#" + entityId
             + ", confidence=" + confidence);
         return saved;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJsonMap(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Empty LLM response");
+        }
+        String cleaned = raw.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        cleaned = cleaned.trim();
+        try {
+            return mapper.readValue(cleaned, Map.class);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Failed to parse JSON map from LLM response: " + ex.getMessage(), ex);
+        }
+    }
+
+    private static BigDecimal extractConfidence(Map<String, Object> map, int defaultVal) {
+        Object confObj = map.get("confidence");
+        if (confObj instanceof Number num) {
+            double d = num.doubleValue();
+            d = Math.max(0.0, Math.min(100.0, d));
+            return BigDecimal.valueOf(Math.round(d * 100.0) / 100.0);
+        }
+        return BigDecimal.valueOf(defaultVal);
+    }
+
+    private static String extractRationale(Map<String, Object> map, String defaultRationale) {
+        Object ratObj = map.get("rationale");
+        if (ratObj instanceof String s && !s.isBlank()) {
+            return s.trim();
+        }
+        return defaultRationale;
     }
 
     private static String safe(String s)   { return s == null ? "" : s; }
