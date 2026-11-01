@@ -325,7 +325,7 @@ grc:
       model: ${LLM_MODEL:gpt-4o-mini}
       openai-model: ${LLM_OPENAI_MODEL:gpt-4o-mini}
       gemini-model: ${LLM_GEMINI_MODEL:gemini-1.5-flash}
-      glm-model: ${LLM_GLM_MODEL:glm-4-flash}
+      glm-model: ${LLM_GLM_MODEL:glm-4.7}
       api-key: ${LLM_API_KEY:}
       openai-api-key: ${OPENAI_API_KEY:${LLM_OPENAI_API_KEY:}}
       gemini-api-key: ${GEMINI_API_KEY:${LLM_GEMINI_API_KEY:}}

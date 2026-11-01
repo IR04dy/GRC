@@ -84,8 +84,8 @@ public class LlmProperties {
     /** Dedicated Gemini model (defaults to gemini-1.5-flash). */
     private String geminiModel = "gemini-1.5-flash";
 
-    /** Dedicated GLM model (defaults to glm-4-flash). */
-    private String glmModel = "glm-4-flash";
+    /** Dedicated GLM model (defaults to glm-4.7). */
+    private String glmModel = "glm-4.7";
 
     /** Generic API key for OpenAI-compatible / Azure / Anthropic / authenticated local endpoints. */
     private String apiKey = "";
@@ -163,7 +163,7 @@ public class LlmProperties {
         return switch (p) {
             case OPENAI -> firstNonBlank(openaiModel, model);
             case GEMINI -> firstNonBlank(geminiModel, "gemini-1.5-flash");
-            case GLM -> firstNonBlank(glmModel, "glm-4-flash");
+            case GLM -> firstNonBlank(glmModel, "glm-4.7");
             default -> model;
         };
     }
