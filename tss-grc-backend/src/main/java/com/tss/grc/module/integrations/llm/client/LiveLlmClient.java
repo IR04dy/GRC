@@ -201,6 +201,8 @@ public class LiveLlmClient implements LlmClient {
         body.put("messages", messages);
         body.put("temperature", req.temperature() != null ? req.temperature() : props.getTemperature());
         body.put("max_tokens", req.maxOutputTokens() != null ? req.maxOutputTokens() : props.getMaxOutputTokens());
+        // Disable internal chain-of-thought reasoning to prevent 120s timeout on heavy regulatory text
+        body.put("thinking", Map.of("type", "disabled"));
 
         Map<String, Object> raw = withRetry("GLM", () -> {
             byte[] responseBytes = http.post()
