@@ -10,9 +10,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>Supports local OpenAI-compatible runtimes on customer machines
  * (Ollama, vLLM, LM Studio, llama.cpp via {@link Provider#LOCAL_OPENAI})
- * as well as hosted providers ({@link Provider#GEMINI},
+ * as well as hosted providers ({@link Provider#OPENAI}, {@link Provider#GEMINI},
  * {@link Provider#OPENAI_COMPATIBLE}, {@link Provider#AZURE_OPENAI},
  * {@link Provider#ANTHROPIC}).
+ *
+ * <p>Supports multi-provider failover: when a primary provider is configured
+ * alongside an active {@link #fallbackProvider}, transient or quota failures
+ * on the primary automatically cascade to the fallback provider.
  *
  * <p>Defaults to {@link Mode#STUB} so offline unit/contract builds and CI
  * never make outbound network calls or require API keys.
@@ -28,11 +32,13 @@ public class LlmProperties {
     }
 
     public enum Provider {
-        LOCAL_OPENAI,
+        OPENAI,
         GEMINI,
+        LOCAL_OPENAI,
         OPENAI_COMPATIBLE,
         AZURE_OPENAI,
-        ANTHROPIC
+        ANTHROPIC,
+        NONE
     }
 
     /** Master kill-switch for LLM-backed features. */
@@ -41,11 +47,14 @@ public class LlmProperties {
     /** STUB (deterministic offline JSON) or LIVE (real HTTP inference). */
     private Mode mode = Mode.STUB;
 
-    /** Active provider when mode=LIVE. */
-    private Provider provider = Provider.GEMINI;
+    /** Primary provider when mode=LIVE. Defaults to OPENAI. */
+    private Provider provider = Provider.OPENAI;
 
-    /** OpenAI-compatible or local runtime base URL (e.g. http://localhost:11434/v1). */
-    private String baseUrl = "http://localhost:11434/v1";
+    /** Secondary fallback provider when primary fails or lacks credentials. Defaults to GEMINI. */
+    private Provider fallbackProvider = Provider.GEMINI;
+
+    /** OpenAI official REST API base URL. */
+    private String openaiBaseUrl = "https://api.openai.com/v1";
 
     /** Google Gemini REST API base URL. */
     private String geminiBaseUrl = "https://generativelanguage.googleapis.com/v1beta";
@@ -53,14 +62,26 @@ public class LlmProperties {
     /** Anthropic Messages API base URL. */
     private String anthropicBaseUrl = "https://api.anthropic.com/v1";
 
+    /** Local OpenAI or OpenAI-compatible endpoint base URL. */
+    private String baseUrl = "http://localhost:11434/v1";
+
     /** Azure OpenAI API version query parameter. */
     private String azureApiVersion = "2024-10-21";
 
-    /** Model identifier or Azure deployment name. */
-    private String model = "gemini-1.5-flash";
+    /** Generic model identifier (used if provider-specific model is unset). */
+    private String model = "gpt-4o-mini";
+
+    /** Dedicated OpenAI model (defaults to gpt-4o-mini). */
+    private String openaiModel = "gpt-4o-mini";
+
+    /** Dedicated Gemini model (defaults to gemini-1.5-flash). */
+    private String geminiModel = "gemini-1.5-flash";
 
     /** Generic API key for OpenAI-compatible / Azure / Anthropic / authenticated local endpoints. */
     private String apiKey = "";
+
+    /** Dedicated OpenAI API key (preferred when provider=OPENAI; falls back to apiKey). */
+    private String openaiApiKey = "";
 
     /** Dedicated Gemini API key (preferred when provider=GEMINI; falls back to apiKey). */
     private String geminiApiKey = "";
@@ -86,22 +107,48 @@ public class LlmProperties {
     /** Per-tenant rolling 24h token ceiling (input + output tokens). 0 or negative = unlimited. */
     private long tenantDailyTokenQuota = 500_000L;
 
-    /** Resolve the effective API key for the active provider without leaking it in logs. */
-    public String resolveApiKey() {
-        return switch (provider) {
+    /** Resolve the effective API key for the given provider without leaking it in logs. */
+    public String resolveApiKey(Provider p) {
+        if (p == null) return "";
+        return switch (p) {
+            case OPENAI -> firstNonBlank(openaiApiKey, apiKey);
             case GEMINI -> firstNonBlank(geminiApiKey, apiKey);
             case ANTHROPIC -> firstNonBlank(anthropicApiKey, apiKey);
             case AZURE_OPENAI -> firstNonBlank(azureApiKey, apiKey);
-            case LOCAL_OPENAI, OPENAI_COMPATIBLE -> trimToEmpty(apiKey);
+            case OPENAI_COMPATIBLE -> firstNonBlank(openaiApiKey, apiKey);
+            case LOCAL_OPENAI, NONE -> trimToEmpty(apiKey);
         };
     }
 
-    /** True when the active provider either requires no key (LOCAL_OPENAI) or has one configured. */
-    public boolean hasRequiredCredentials() {
-        if (provider == Provider.LOCAL_OPENAI) {
+    /** Resolve the effective API key for the active primary provider. */
+    public String resolveApiKey() {
+        return resolveApiKey(provider);
+    }
+
+    /** True when the given provider either requires no key (LOCAL_OPENAI) or has one configured. */
+    public boolean hasRequiredCredentials(Provider p) {
+        if (p == null || p == Provider.NONE) {
+            return false;
+        }
+        if (p == Provider.LOCAL_OPENAI) {
             return true;
         }
-        return !resolveApiKey().isEmpty();
+        return !resolveApiKey(p).isEmpty();
+    }
+
+    /** True when either the primary provider or the fallback provider has credentials. */
+    public boolean hasRequiredCredentials() {
+        return hasRequiredCredentials(provider) || hasRequiredCredentials(fallbackProvider);
+    }
+
+    /** Resolve the effective model identifier for the given provider. */
+    public String resolveModel(Provider p) {
+        if (p == null) return model;
+        return switch (p) {
+            case OPENAI -> firstNonBlank(openaiModel, model);
+            case GEMINI -> firstNonBlank(geminiModel, "gemini-1.5-flash");
+            default -> model;
+        };
     }
 
     private static String firstNonBlank(String primary, String fallback) {

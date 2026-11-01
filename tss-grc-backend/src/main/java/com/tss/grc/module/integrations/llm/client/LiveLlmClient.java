@@ -61,24 +61,124 @@ public class LiveLlmClient implements LlmClient {
 
     @Override
     public LlmResponse complete(LlmRequest request) {
-        if (!props.hasRequiredCredentials()) {
-            throw new LlmGatewayException("CREDENTIALS_MISSING",
-                "LLM provider " + props.getProvider() + " requires an API key in LIVE mode.");
+        LlmProperties.Provider primary = props.getProvider();
+        LlmProperties.Provider fallback = props.getFallbackProvider();
+
+        // 1. Try primary provider if credentials exist or LOCAL_OPENAI
+        if (props.hasRequiredCredentials(primary)) {
+            try {
+                return executeProvider(primary, request);
+            } catch (Exception ex) {
+                log.warn("[LLM] Primary provider {} failed ({}). Attempting fallback provider {}...",
+                    primary, ex.getMessage(), fallback);
+                if (fallback != null && fallback != LlmProperties.Provider.NONE
+                        && fallback != primary && props.hasRequiredCredentials(fallback)) {
+                    log.info("[LLM] Routing request to fallback provider {}...", fallback);
+                    return executeProvider(fallback, request);
+                }
+                if (ex instanceof LlmGatewayException gex) throw gex;
+                throw new LlmGatewayException("PRIMARY_FAILED",
+                    "LLM primary provider " + primary + " failed: " + ex.getMessage(), ex);
+            }
         }
+
+        // 2. If primary has no key, but fallback does, use fallback directly
+        if (fallback != null && fallback != LlmProperties.Provider.NONE
+                && props.hasRequiredCredentials(fallback)) {
+            log.info("[LLM] Primary provider {} credentials missing; routing to fallback provider {}",
+                primary, fallback);
+            return executeProvider(fallback, request);
+        }
+
+        throw new LlmGatewayException("CREDENTIALS_MISSING",
+            "Neither primary provider " + primary + " nor fallback provider " + fallback + " has valid API credentials configured.");
+    }
+
+    private LlmResponse executeProvider(LlmProperties.Provider p, LlmRequest request) {
         long start = System.currentTimeMillis();
-        return switch (props.getProvider()) {
+        return switch (p) {
+            case OPENAI -> callOpenAi(request, start);
             case GEMINI -> callGemini(request, start);
             case LOCAL_OPENAI, OPENAI_COMPATIBLE -> callOpenAiCompatible(request, start, false);
             case AZURE_OPENAI -> callOpenAiCompatible(request, start, true);
             case ANTHROPIC -> callAnthropic(request, start);
+            case NONE -> throw new IllegalStateException("No provider configured");
         };
     }
 
     @SuppressWarnings("unchecked")
+    private LlmResponse callOpenAi(LlmRequest req, long startMs) {
+        String apiKey = props.resolveApiKey(LlmProperties.Provider.OPENAI);
+        String base = stripTrailingSlash(props.getOpenaiBaseUrl());
+        String model = props.resolveModel(LlmProperties.Provider.OPENAI);
+        String uri = base + "/chat/completions";
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        List<Map<String, String>> messages = (req.systemPrompt() != null && !req.systemPrompt().isBlank())
+            ? List.of(
+                Map.of("role", "system", "content", req.systemPrompt()),
+                Map.of("role", "user", "content", req.userPrompt()))
+            : List.of(Map.of("role", "user", "content", req.userPrompt()));
+        body.put("messages", messages);
+        body.put("temperature", req.temperature() != null ? req.temperature() : props.getTemperature());
+        body.put("max_tokens", req.maxOutputTokens() != null ? req.maxOutputTokens() : props.getMaxOutputTokens());
+        if (req.jsonMode()) {
+            body.put("response_format", Map.of("type", "json_object"));
+        }
+
+        Map<String, Object> raw = withRetry("OPENAI", () -> http.post()
+            .uri(uri)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(Map.class));
+
+        if (raw == null) {
+            throw new LlmGatewayException("EMPTY_RESPONSE", "OpenAI returned an empty response body.");
+        }
+
+        String text = "";
+        String finishReason = "stop";
+        if (raw.get("choices") instanceof List<?> choices && !choices.isEmpty()
+                && choices.get(0) instanceof Map<?, ?> firstChoice) {
+            if (firstChoice.get("finish_reason") != null) {
+                finishReason = String.valueOf(firstChoice.get("finish_reason"));
+            }
+            if (firstChoice.get("message") instanceof Map<?, ?> msg && msg.get("content") != null) {
+                text = String.valueOf(msg.get("content"));
+            }
+        }
+        if (text.isBlank()) {
+            throw new LlmGatewayException("EMPTY_CONTENT", "OpenAI response contained no message content.");
+        }
+
+        String resolvedModel = raw.get("model") != null ? String.valueOf(raw.get("model")) : model;
+        int inTok = estimateTokens(req.systemPrompt()) + estimateTokens(req.userPrompt());
+        int outTok = estimateTokens(text);
+        if (raw.get("usage") instanceof Map<?, ?> usage) {
+            inTok = intOrDefault(usage.get("prompt_tokens"), inTok);
+            outTok = intOrDefault(usage.get("completion_tokens"), outTok);
+        }
+
+        return new LlmResponse(
+            text,
+            "OPENAI",
+            resolvedModel,
+            inTok,
+            outTok,
+            Math.max(1L, System.currentTimeMillis() - startMs),
+            finishReason
+        );
+    }
+
+    @SuppressWarnings("unchecked")
     private LlmResponse callGemini(LlmRequest req, long startMs) {
-        String apiKey = props.resolveApiKey();
+        String apiKey = props.resolveApiKey(LlmProperties.Provider.GEMINI);
         String base = stripTrailingSlash(props.getGeminiBaseUrl());
-        String model = props.getModel();
+        String model = props.resolveModel(LlmProperties.Provider.GEMINI);
         String uri = base + "/models/" + model + ":generateContent";
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -144,7 +244,7 @@ public class LiveLlmClient implements LlmClient {
 
         return new LlmResponse(
             text,
-            props.getProvider().name(),
+            "GEMINI",
             model,
             inTok,
             outTok,
@@ -288,7 +388,7 @@ public class LiveLlmClient implements LlmClient {
 
         return new LlmResponse(
             text,
-            props.getProvider().name(),
+            "GEMINI",
             model,
             inTok,
             outTok,

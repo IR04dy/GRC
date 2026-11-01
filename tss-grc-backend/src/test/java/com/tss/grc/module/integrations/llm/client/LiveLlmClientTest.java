@@ -200,4 +200,86 @@ class LiveLlmClientTest {
             .isEqualTo("PROVIDER_4XX");
         server.verify();
     }
+
+    @Test
+    void openaiDirectAdapterSendsBearerTokenAndParsesChoices() {
+        LlmProperties props = new LlmProperties();
+        props.setMode(LlmProperties.Mode.LIVE);
+        props.setProvider(LlmProperties.Provider.OPENAI);
+        props.setOpenaiBaseUrl("https://api.openai.com/v1");
+        props.setOpenaiModel("gpt-4o-mini");
+        props.setOpenaiApiKey("sk-test-openai-1234");
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+
+        server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("Authorization", "Bearer sk-test-openai-1234"))
+            .andExpect(jsonPath("$.model").value("gpt-4o-mini"))
+            .andExpect(jsonPath("$.response_format.type").value("json_object"))
+            .andRespond(withSuccess("""
+                {
+                  "model": "gpt-4o-mini",
+                  "choices": [{
+                    "message": { "role": "assistant", "content": "{\\"titleEn\\":\\"OpenAI Policy\\"}" },
+                    "finish_reason": "stop"
+                  }],
+                  "usage": { "prompt_tokens": 250, "completion_tokens": 120 }
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        LlmResponse resp = client.complete(sampleReq());
+        server.verify();
+
+        assertThat(resp.provider()).isEqualTo("OPENAI");
+        assertThat(resp.model()).isEqualTo("gpt-4o-mini");
+        assertThat(resp.content()).isEqualTo("{\"titleEn\":\"OpenAI Policy\"}");
+        assertThat(resp.inputTokens()).isEqualTo(250);
+        assertThat(resp.outputTokens()).isEqualTo(120);
+    }
+
+    @Test
+    void primaryOpenAiFallsBackToGeminiWhenPrimaryFails() {
+        LlmProperties props = new LlmProperties();
+        props.setMode(LlmProperties.Mode.LIVE);
+        props.setProvider(LlmProperties.Provider.OPENAI);
+        props.setFallbackProvider(LlmProperties.Provider.GEMINI);
+        props.setOpenaiBaseUrl("https://api.openai.com/v1");
+        props.setOpenaiApiKey("sk-test-openai-1234");
+        props.setGeminiBaseUrl("https://generativelanguage.googleapis.com/v1beta");
+        props.setGeminiModel("gemini-1.5-flash");
+        props.setGeminiApiKey("gemini-test-key-5678");
+        props.setMaxRetries(0); // Fail fast to trigger fallback immediately
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+
+        // Primary OpenAI fails with rate limit / error
+        server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+            .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body("{\"error\":\"rate_limit_exceeded\"}"));
+
+        // Fallback Gemini succeeds
+        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("x-goog-api-key", "gemini-test-key-5678"))
+            .andRespond(withSuccess("""
+                {
+                  "candidates": [{
+                    "content": { "parts": [{ "text": "{\\"titleEn\\":\\"Fallback Gemini Policy\\"}" }] },
+                    "finishReason": "STOP"
+                  }],
+                  "usageMetadata": { "promptTokenCount": 200, "candidatesTokenCount": 90 }
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        LlmResponse resp = client.complete(sampleReq());
+        server.verify();
+
+        assertThat(resp.provider()).isEqualTo("GEMINI");
+        assertThat(resp.model()).isEqualTo("gemini-1.5-flash");
+        assertThat(resp.content()).isEqualTo("{\"titleEn\":\"Fallback Gemini Policy\"}");
+    }
 }
