@@ -1,15 +1,19 @@
 package com.tss.grc.module.integrations.llm.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Wires {@link LlmProperties} and a dedicated {@link RestClient} with read
@@ -41,12 +45,22 @@ public class LlmIntegrationConfig {
     }
 
     @Bean("llmRestClient")
-    public RestClient llmRestClient() {
+    public RestClient llmRestClient(ObjectMapper objectMapper) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(15));
         factory.setReadTimeout(Duration.ofSeconds(Math.max(5, props.getTimeoutSeconds())));
+
+        // Support application/json and upstream proxies that return application/octet-stream or text/plain
+        MappingJackson2HttpMessageConverter jacksonConverter = new MappingJackson2HttpMessageConverter(objectMapper);
+        jacksonConverter.setSupportedMediaTypes(List.of(
+            MediaType.APPLICATION_JSON,
+            MediaType.APPLICATION_OCTET_STREAM,
+            new MediaType("application", "*+json")
+        ));
+
         return RestClient.builder()
             .requestFactory(factory)
+            .messageConverters(converters -> converters.add(0, jacksonConverter))
             .build();
     }
 }

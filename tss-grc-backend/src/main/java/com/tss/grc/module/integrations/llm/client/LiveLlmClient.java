@@ -1,5 +1,7 @@
 package com.tss.grc.module.integrations.llm.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.integrations.llm.config.LlmProperties;
 import com.tss.grc.module.integrations.llm.dto.LlmGatewayException;
 import com.tss.grc.module.integrations.llm.dto.LlmRequest;
@@ -50,13 +52,16 @@ public class LiveLlmClient implements LlmClient {
 
     private final LlmProperties props;
     private final RestClient http;
+    private final ObjectMapper objectMapper;
 
     public LiveLlmClient(
         LlmProperties props,
-        @Qualifier("llmRestClient") RestClient http
+        @Qualifier("llmRestClient") RestClient http,
+        ObjectMapper objectMapper
     ) {
         this.props = props;
         this.http = http;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -197,14 +202,24 @@ public class LiveLlmClient implements LlmClient {
         body.put("temperature", req.temperature() != null ? req.temperature() : props.getTemperature());
         body.put("max_tokens", req.maxOutputTokens() != null ? req.maxOutputTokens() : props.getMaxOutputTokens());
 
-        Map<String, Object> raw = withRetry("GLM", () -> http.post()
-            .uri(uri)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-            .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.APPLICATION_JSON)
-            .body(body)
-            .retrieve()
-            .body(Map.class));
+        Map<String, Object> raw = withRetry("GLM", () -> {
+            byte[] responseBytes = http.post()
+                .uri(uri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(byte[].class);
+            if (responseBytes == null || responseBytes.length == 0) {
+                return null;
+            }
+            try {
+                return objectMapper.readValue(responseBytes, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception ex) {
+                throw new LlmGatewayException("DESERIALIZATION_FAILED", "Failed to deserialize GLM response: " + ex.getMessage(), ex);
+            }
+        });
 
         if (raw == null) {
             throw new LlmGatewayException("EMPTY_RESPONSE", "GLM returned an empty response body.");

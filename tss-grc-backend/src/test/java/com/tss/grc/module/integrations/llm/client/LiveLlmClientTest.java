@@ -1,5 +1,6 @@
 package com.tss.grc.module.integrations.llm.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.integrations.llm.config.LlmProperties;
 import com.tss.grc.module.integrations.llm.dto.LlmGatewayException;
 import com.tss.grc.module.integrations.llm.dto.LlmRequest;
@@ -24,6 +25,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class LiveLlmClientTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static LlmRequest sampleReq() {
         return new LlmRequest(
@@ -50,7 +53,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"))
             .andExpect(method(HttpMethod.POST))
@@ -91,7 +94,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         server.expect(requestTo("http://localhost:11434/v1/chat/completions"))
             .andExpect(method(HttpMethod.POST))
@@ -128,7 +131,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder azBuilder = RestClient.builder();
         MockRestServiceServer azServer = MockRestServiceServer.bindTo(azBuilder).build();
-        LiveLlmClient azClient = new LiveLlmClient(azProps, azBuilder.build());
+        LiveLlmClient azClient = new LiveLlmClient(azProps, azBuilder.build(), OBJECT_MAPPER);
 
         azServer.expect(requestTo("https://ksa-openai.openai.azure.com/openai/deployments/gpt-4o-deploy/chat/completions?api-version=2024-10-21"))
             .andExpect(header("api-key", "az-key-999"))
@@ -151,7 +154,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder anBuilder = RestClient.builder();
         MockRestServiceServer anServer = MockRestServiceServer.bindTo(anBuilder).build();
-        LiveLlmClient anClient = new LiveLlmClient(anProps, anBuilder.build());
+        LiveLlmClient anClient = new LiveLlmClient(anProps, anBuilder.build(), OBJECT_MAPPER);
 
         anServer.expect(requestTo("https://api.anthropic.com/v1/messages"))
             .andExpect(header("x-api-key", "sk-ant-test"))
@@ -178,7 +181,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         server.expect(requestTo("http://localhost:11434/v1/chat/completions"))
             .andRespond(withServiceUnavailable());
@@ -212,7 +215,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
             .andExpect(method(HttpMethod.POST))
@@ -255,7 +258,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         // Primary OpenAI fails with rate limit / error
         server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
@@ -299,7 +302,7 @@ class LiveLlmClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        LiveLlmClient client = new LiveLlmClient(props, builder.build());
+        LiveLlmClient client = new LiveLlmClient(props, builder.build(), OBJECT_MAPPER);
 
         // 1. Primary OpenAI fails
         server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
