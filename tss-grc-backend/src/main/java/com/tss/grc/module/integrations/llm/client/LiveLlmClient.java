@@ -205,19 +205,19 @@ public class LiveLlmClient implements LlmClient {
         body.put("thinking", Map.of("type", "disabled"));
 
         Map<String, Object> raw = withRetry("GLM", () -> {
-            byte[] responseBytes = http.post()
+            String rawJson = http.post()
                 .uri(uri)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(byte[].class);
-            if (responseBytes == null || responseBytes.length == 0) {
+                .body(String.class);
+            if (rawJson == null || rawJson.isBlank()) {
                 return null;
             }
             try {
-                return objectMapper.readValue(responseBytes, new TypeReference<Map<String, Object>>() {});
+                return objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
             } catch (Exception ex) {
                 throw new LlmGatewayException("DESERIALIZATION_FAILED", "Failed to deserialize GLM response: " + ex.getMessage(), ex);
             }
