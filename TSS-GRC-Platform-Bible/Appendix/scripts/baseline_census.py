@@ -73,8 +73,8 @@ PUBLISHED_AS_OF = "2026-08-05"          # ← bump ONLY when the doc is regenera
 PUBLISHED = {
     "module_packages": 59,
     "module_loc": 205_767,
-    "entities_strict": 419,             # FILES declaring an entity (the doc published 417: a substring
-    "entity_decls": 432,                # count). Entity CLASSES — 13 more, all in data_officer.
+    "entities_strict": 421,             # FILES declaring an entity (the doc published 417: a substring
+    "entity_decls": 434,                # count). Entity CLASSES — 13 more, all in data_officer.
     "endpoints": 2_215,        # +1 F2-178 (GET .../registry/linkage-coverage); +1 pre-existing drift
     "writes": 1_238,
     "main_preauthorize": 2_203,
@@ -111,7 +111,7 @@ PUBLISHED = {
     "zero_test_packages": 3,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 388,          # +V400 (F2-461, the two untrusted constraints V265 left
+    "migration_files": 389,          # +V400 (F2-461, the two untrusted constraints V265 left
                                      # behind, verified in place with WITH CHECK CHECK
                                      # CONSTRAINT). +V398 (F2-433, audit_eng.engagements code uniqueness made
                                      #   FILTERED -- V396 fixed nine registers of this shape and
@@ -136,7 +136,7 @@ PUBLISHED = {
                                      #   code-less alert. Ships with the writer that makes it safe
                                      #   (F2-183): AmlAlertService now mints the code.
                                      #   Previously +V380 (F2-255, AUDIT_LOG:WRITE).
-    "migration_head": 400,
+    "migration_head": 401,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against

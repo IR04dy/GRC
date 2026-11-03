@@ -1,0 +1,49 @@
+# LiteLLM Proxy Configuration for TSS GRC Platform
+model_list:
+  # Primary GRC Default Model: Z.ai GLM 4.7
+  - model_name: grc-default
+    litellm_params:
+      model: openai/glm-4.7
+      api_base: "https://api.z.ai/api/paas/v4"
+      api_key: "os.environ/GLM_API_KEY"
+
+  - model_name: glm-4.7
+    litellm_params:
+      model: openai/glm-4.7
+      api_base: "https://api.z.ai/api/paas/v4"
+      api_key: "os.environ/GLM_API_KEY"
+
+  - model_name: grc-gemini
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: grc-openai
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  - model_name: grc-local
+    litellm_params:
+      model: ollama/llama3
+      api_base: "http://localhost:11434"
+
+litellm_settings:
+  cache: true
+  cache_type: "local"
+
+  # Fallback routing across models
+  fallbacks:
+    - grc-default: ["grc-gemini", "grc-openai"]
+
+  # Enforce Guardrails Hook
+  callbacks:
+    - "gateway_hook.proxy_handler_instance"
+
+router_settings:
+  routing_strategy: "latency-based-routing"
+  num_retries: 2
+  timeout: 45
+
+general_settings:
+  master_key: "sk-tss-grc-gateway-master-key"
