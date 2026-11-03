@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ai.entity.AiSuggestion;
 import com.tss.grc.module.ai.repository.AiSuggestionRepository;
+import com.tss.grc.module.integrations.aigateway.service.AiGatewayService;
 import com.tss.grc.module.integrations.llm.dto.LlmResponse;
-import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +49,7 @@ class AiSuggestionServiceTest {
 
     @Mock private AiSuggestionRepository repo;
     @Mock private AuditLogService audit;
-    @Mock private LlmGatewayService llmGateway;
+    @Mock private AiGatewayService llmGateway;
     @Spy private ObjectMapper mapper = new ObjectMapper();
     @InjectMocks private AiSuggestionService service;
 

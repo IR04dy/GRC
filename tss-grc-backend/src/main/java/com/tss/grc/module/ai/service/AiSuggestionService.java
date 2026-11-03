@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ai.entity.AiSuggestion;
 import com.tss.grc.module.ai.repository.AiSuggestionRepository;
+import com.tss.grc.module.integrations.aigateway.service.AiGatewayService;
 import com.tss.grc.module.integrations.llm.dto.LlmRequest;
 import com.tss.grc.module.integrations.llm.dto.LlmResponse;
-import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +24,8 @@ import java.util.*;
  *
  * <p>Persists each AI generation as an {@link AiSuggestion} draft so a human can
  * accept or reject the suggestion before it mutates any real record.
- * Powered by {@link LlmGatewayService} with automatic fallback to deterministic
- * heuristics whenever the LLM gateway is unconfigured, disabled, or unavailable.
+ * Powered by {@link AiGatewayService} with automatic fallback to deterministic
+ * heuristics whenever the AI gateway is unconfigured, disabled, or unavailable.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,9 +36,12 @@ public class AiSuggestionService {
     private final AiSuggestionRepository repo;
     private final AuditLogService audit;
     private final ObjectMapper mapper;
-    private final LlmGatewayService llmGateway;
+    private final AiGatewayService llmGateway;
 
-    private Long org() { return TenantContext.getCurrentTenant(); }
+    private Long org() {
+        Long tenant = TenantContext.getCurrentTenant();
+        return tenant != null ? tenant : 1L;
+    }
 
     // ── DTOs ──────────────────────────────────────────────────────────
 
@@ -76,6 +79,9 @@ public class AiSuggestionService {
     // ══════════════════════════════════════════════════════════════════
 
     public AiSuggestion suggestRiskDescription(RiskDescriptionInput in) {
+        if (in == null) {
+            in = new RiskDescriptionInput(null, "", null, null, null);
+        }
         Long orgId = org();
         if (orgId != null && llmGateway != null) {
             try {
@@ -837,6 +843,11 @@ public class AiSuggestionService {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
         }
         cleaned = cleaned.trim();
+        int firstBrace = cleaned.indexOf('{');
+        int lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+        }
         try {
             return mapper.readValue(cleaned, Map.class);
         } catch (Exception ex) {

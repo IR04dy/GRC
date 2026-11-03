@@ -8,8 +8,8 @@ import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
+import com.tss.grc.module.integrations.aigateway.service.AiGatewayService;
 import com.tss.grc.module.integrations.llm.dto.LlmStatusDto;
-import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.policy.drafting.dto.PolicyDraftDtos.AcceptPolicyDraftRequest;
 import com.tss.grc.module.policy.drafting.dto.PolicyDraftDtos.CreatePolicyDraftRequest;
@@ -55,7 +55,7 @@ public class PolicyDraftService {
     private final PolicyDocumentFrameworkMappingRepository frameworkMappingRepo;
     private final FrameworkRepository frameworkRepo;
     private final ControlRepository controlRepo;
-    private final LlmGatewayService llmGateway;
+    private final AiGatewayService llmGateway;
     private final PolicyDraftAsyncWorker asyncWorker;
     private final AuditLogService audit;
     private final ObjectMapper objectMapper;
@@ -70,7 +70,7 @@ public class PolicyDraftService {
         PolicyDocumentFrameworkMappingRepository frameworkMappingRepo,
         FrameworkRepository frameworkRepo,
         ControlRepository controlRepo,
-        LlmGatewayService llmGateway,
+        AiGatewayService llmGateway,
         PolicyDraftAsyncWorker asyncWorker,
         AuditLogService audit,
         ObjectMapper objectMapper,

@@ -6,9 +6,9 @@ import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
+import com.tss.grc.module.integrations.aigateway.service.AiGatewayService;
 import com.tss.grc.module.integrations.llm.dto.LlmRequest;
 import com.tss.grc.module.integrations.llm.dto.LlmResponse;
-import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
@@ -54,7 +54,7 @@ public class PolicyDraftAsyncWorker {
     private final ControlRepository controlRepo;
     private final PolicyDraftPromptBuilder promptBuilder;
     private final PolicyDraftOutputValidator validator;
-    private final LlmGatewayService llmGateway;
+    private final AiGatewayService llmGateway;
     private final AuditLogService audit;
     private final NotificationService notifications;
     private final ObjectMapper objectMapper;
@@ -70,7 +70,7 @@ public class PolicyDraftAsyncWorker {
         ControlRepository controlRepo,
         PolicyDraftPromptBuilder promptBuilder,
         PolicyDraftOutputValidator validator,
-        LlmGatewayService llmGateway,
+        AiGatewayService llmGateway,
         AuditLogService audit,
         NotificationService notifications,
         ObjectMapper objectMapper,

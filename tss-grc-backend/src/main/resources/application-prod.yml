@@ -213,9 +213,9 @@ grc:
     from-email: ${NOTIFY_FROM_EMAIL:noreply@tss-grc.com}
     from-name: TSS GRC Platform
   integrations:
-    llm:
-      # OFF in prod by default until operator configures a local runtime or approved cloud provider.
-      enabled: ${LLM_ENABLED:false}
+    ai-gateway:
+      # OFF in prod by default until operator configures the gateway endpoint.
+      enabled: ${AI_GATEWAY_ENABLED:false}
 
 springdoc:
   swagger-ui:

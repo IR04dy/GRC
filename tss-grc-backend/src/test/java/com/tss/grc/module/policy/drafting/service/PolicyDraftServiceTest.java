@@ -7,8 +7,8 @@ import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
+import com.tss.grc.module.integrations.aigateway.service.AiGatewayService;
 import com.tss.grc.module.integrations.llm.dto.LlmResponse;
-import com.tss.grc.module.integrations.llm.service.LlmGatewayService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
@@ -53,7 +53,7 @@ class PolicyDraftServiceTest {
     private FrameworkRepository frameworkRepo;
     private ControlRepository controlRepo;
     private OrganisationRepository orgRepo;
-    private LlmGatewayService llmGateway;
+    private AiGatewayService llmGateway;
     private PolicyDraftAsyncWorker asyncWorker;
     private AuditLogService audit;
     private NotificationService notifications;
@@ -78,7 +78,7 @@ class PolicyDraftServiceTest {
         frameworkRepo = mock(FrameworkRepository.class);
         controlRepo = mock(ControlRepository.class);
         orgRepo = mock(OrganisationRepository.class);
-        llmGateway = mock(LlmGatewayService.class);
+        llmGateway = mock(AiGatewayService.class);
         audit = mock(AuditLogService.class);
         notifications = mock(NotificationService.class);
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
