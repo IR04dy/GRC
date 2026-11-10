@@ -10,10 +10,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Replaces the embedded, multi-vendor LLM gateway with a single, unified
  * OpenAI-compatible gateway proxy handling caching, load balancing, PII masking,
  * and security guardrails.
+ *
+ * <p>Bound from {@code grc.integrations.ai-gateway}, like the other integrations. Off by
+ * default and with no default key: an operator turns it on and supplies the key, and
+ * {@link AiGatewayConfig} refuses to start a LIVE, enabled gateway without one.
  */
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "grc.ai-gateway")
+@ConfigurationProperties(prefix = "grc.integrations.ai-gateway")
 public class AiGatewayProperties {
 
     public enum Mode {
@@ -21,8 +25,8 @@ public class AiGatewayProperties {
         LIVE
     }
 
-    /** Master kill-switch for AI Gateway backed features. */
-    private boolean enabled = true;
+    /** Master kill-switch for AI Gateway backed features. Off unless configured. */
+    private boolean enabled = false;
 
     /** STUB (deterministic offline) or LIVE (HTTP inference to AI Gateway). */
     private Mode mode = Mode.LIVE;
@@ -33,8 +37,8 @@ public class AiGatewayProperties {
     /** Gateway model alias (e.g. grc-default, gpt-4o-mini, gemini-1.5-flash). */
     private String model = "grc-default";
 
-    /** Virtual Master API key for the AI Gateway. */
-    private String apiKey = "sk-tss-grc-gateway-master-key";
+    /** Virtual master API key for the AI Gateway. No default; required when enabled in LIVE mode. */
+    private String apiKey;
 
     /** Gateway HTTP request timeout in seconds. */
     private int timeoutSeconds = 60;

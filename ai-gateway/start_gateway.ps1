@@ -14,7 +14,10 @@ Write-Host "==========================================================" -Foregro
 
 $Port = if ($env:GATEWAY_PORT) { $env:GATEWAY_PORT } else { "4000" }
 $env:GATEWAY_PORT = $Port
-$env:GATEWAY_MASTER_KEY = if ($env:GATEWAY_MASTER_KEY) { $env:GATEWAY_MASTER_KEY } else { "sk-tss-grc-gateway-master-key" }
+if (-not $env:GATEWAY_MASTER_KEY) {
+    Write-Error "GATEWAY_MASTER_KEY is not set. Set it to the backend's AI_GATEWAY_API_KEY value."
+    exit 1
+}
 
 # Check Python 3.10 or py launcher
 if (Get-Command py -ErrorAction SilentlyContinue) {
@@ -28,7 +31,7 @@ if (Get-Command py -ErrorAction SilentlyContinue) {
 
 Write-Host "[+] Using Python runtime: $PythonCmd" -ForegroundColor Green
 Write-Host "[+] AI Gateway Port: $Port" -ForegroundColor Green
-Write-Host "[+] Master Virtual Key: $env:GATEWAY_MASTER_KEY" -ForegroundColor Green
+Write-Host "[+] Master key: set (not shown)" -ForegroundColor Green
 Write-Host "[+] Guardrails: PII Masking (PDPL), Prompt Injection, Hallucination Grounding" -ForegroundColor Green
 Write-Host "[+] Endpoints:" -ForegroundColor Yellow
 Write-Host "    - OpenAI API : http://localhost:$Port/v1/chat/completions" -ForegroundColor Yellow

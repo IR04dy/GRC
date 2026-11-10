@@ -29,8 +29,11 @@ model_list:
       api_base: "http://localhost:11434"
 
 litellm_settings:
-  cache: true
-  cache_type: "local"
+  # Reply cache off. LiteLLM builds its cache key from the request parameters, and the tenant
+  # (X-Organisation-Id) is a header, so tenants would share replies. The hook also checks for
+  # hallucinations only after the call and cannot keep a flagged reply out of LiteLLM's cache.
+  # gateway_server.py has a cache that does both.
+  cache: false
 
   # Fallback routing across models
   fallbacks:
@@ -46,4 +49,5 @@ router_settings:
   timeout: 45
 
 general_settings:
-  master_key: "sk-tss-grc-gateway-master-key"
+  # Required, no default: the same value as the backend's AI_GATEWAY_API_KEY.
+  master_key: "os.environ/GATEWAY_MASTER_KEY"

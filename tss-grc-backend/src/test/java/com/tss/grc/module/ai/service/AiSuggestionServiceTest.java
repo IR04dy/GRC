@@ -11,21 +11,31 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import jakarta.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -38,6 +48,7 @@ import static org.mockito.Mockito.when;
  *   <li>review() refuses to mutate a suggestion from another tenant (404)</li>
  *   <li>BIA RTO/RPO recommendation maps tier correctly</li>
  *   <li>board summary tone reflects threshold inputs</li>
+ *   <li>persist() saves the suggestion and its audit row in one transaction</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -50,11 +61,13 @@ class AiSuggestionServiceTest {
     @Mock private AiSuggestionRepository repo;
     @Mock private AuditLogService audit;
     @Mock private AiGatewayService llmGateway;
+    @Mock private PlatformTransactionManager txManager;
     @Spy private ObjectMapper mapper = new ObjectMapper();
     @InjectMocks private AiSuggestionService service;
 
     @BeforeEach void setUp() {
         TenantContext.setCurrentTenant(ORG_ID);
+        when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(repo.save(any(AiSuggestion.class))).thenAnswer(inv -> {
             AiSuggestion s = inv.getArgument(0);
             if (s.getId() == null) s.setId(101L);
@@ -63,6 +76,33 @@ class AiSuggestionServiceTest {
     }
 
     @AfterEach void tearDown() { TenantContext.clear(); }
+
+    // ── persist(): one transaction for the suggestion and its audit row ──
+    // Every caller is a self-call from an untransacted generator, so an @Transactional on
+    // persist() never applied; these pin the boundary the template now opens.
+
+    @Test void persist_savesSuggestionAndAuditRowInsideOneCommittedTransaction() {
+        service.persist("RISK_DESCRIPTION", "Risk", 42L, Map.of("k", "v"), Map.of("o", "p"),
+            new BigDecimal("0.50"), "rule");
+
+        InOrder order = inOrder(txManager, repo, audit);
+        order.verify(txManager).getTransaction(any());
+        order.verify(repo).save(any(AiSuggestion.class));
+        order.verify(audit).log(eq("DRAFT"), eq("AiSuggestion"), eq(101L), anyString());
+        order.verify(txManager).commit(any());
+    }
+
+    @Test void persist_rollsTheSaveBackWhenTheAuditWriteFails() {
+        doThrow(new IllegalStateException("audit store down"))
+            .when(audit).log(anyString(), anyString(), any(), anyString());
+
+        assertThatThrownBy(() -> service.persist("RISK_DESCRIPTION", "Risk", 42L,
+                Map.of(), Map.of(), new BigDecimal("0.50"), "rule"))
+            .isInstanceOf(IllegalStateException.class);
+
+        verify(txManager).rollback(any());
+        verify(txManager, never()).commit(any());
+    }
 
     // ── Fallback Heuristic Generators ────────────────────────────────
 

@@ -13,7 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,8 +26,14 @@ import java.util.*;
  *
  * <p>Persists each AI generation as an {@link AiSuggestion} draft so a human can
  * accept or reject the suggestion before it mutates any real record.
- * Powered by {@link AiGatewayService} with automatic fallback to deterministic
- * heuristics whenever the AI gateway is unconfigured, disabled, or unavailable.
+ *
+ * <p>Each feature first asks {@link AiGatewayService} for a model-generated draft. When
+ * that call throws (gateway disabled, over quota, unavailable, request blocked) or the
+ * reply is not the expected JSON shape - which includes every STUB-mode reply - the
+ * feature falls back to a rule-based heuristic and logs the fallback at WARN. Heuristic
+ * output is not model output: it is keyword and threshold rules over the input, and its
+ * rationale describes the rule. The record does not store which path produced it, so a
+ * reviewer should read every suggestion as a draft to check, never as an assessment.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +45,7 @@ public class AiSuggestionService {
     private final AuditLogService audit;
     private final ObjectMapper mapper;
     private final AiGatewayService llmGateway;
+    private final PlatformTransactionManager txManager;
 
     private Long org() {
         Long tenant = TenantContext.getCurrentTenant();
@@ -134,8 +143,9 @@ public class AiSuggestionService {
                         return persist("RISK_DESCRIPTION", "Risk", in.riskId(), in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM risk description suggestion reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM risk description suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM risk description suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackRiskDescription(in, "Heuristic expansion using title + category.");
@@ -224,8 +234,9 @@ public class AiSuggestionService {
                         return persist("BIA_RTO_RPO", "Service", in.serviceId(), in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM BIA suggestion reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM BIA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM BIA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackBiaRtoRpo(in);
@@ -314,8 +325,9 @@ public class AiSuggestionService {
                         return persist("EVIDENCE_QUALITY", "EvidenceItem", in.evidenceId(), in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM evidence quality review reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM evidence quality review unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM evidence quality review unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackEvidenceQuality(in);
@@ -413,8 +425,9 @@ public class AiSuggestionService {
                         return persist("INCIDENT_ROOT_CAUSE", "CrisisEvent", in.crisisEventId(), in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM incident RCA suggestion reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM incident RCA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM incident RCA suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackIncidentRootCause(in);
@@ -508,8 +521,9 @@ public class AiSuggestionService {
                         return persist("BOARD_SUMMARY", "Dashboard", null, in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM board summary reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM board summary draft unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM board summary draft unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackBoardSummary(in);
@@ -616,8 +630,9 @@ public class AiSuggestionService {
                             in, output, conf, rationale);
                     }
                 }
+                log.warn("LLM workflow review suggestion reply had no usable draft, falling back to heuristic");
             } catch (Exception ex) {
-                log.info("LLM workflow review suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
+                log.warn("LLM workflow review suggestion unavailable ({}), falling back to heuristic", ex.getMessage());
             }
         }
         return fallbackWorkflowSubmissionReview(in);
@@ -801,10 +816,22 @@ public class AiSuggestionService {
 
     // ── helpers ──────────────────────────────────────────────────────
 
-    @Transactional
+    /**
+     * Saves the suggestion and its DRAFT audit row in one transaction. Every caller is a
+     * generator in this class that keeps the model call outside any transaction (PERF-IO-003),
+     * so this is always a self-call and an {@code @Transactional} here never applied: the two
+     * writes committed separately. The template opens the boundary itself.
+     */
     public AiSuggestion persist(String feature, String entity, Long entityId,
                                 Object input, Object output,
                                 BigDecimal confidence, String rationale) {
+        return new TransactionTemplate(txManager).execute(status ->
+            saveWithAudit(feature, entity, entityId, input, output, confidence, rationale));
+    }
+
+    private AiSuggestion saveWithAudit(String feature, String entity, Long entityId,
+                                       Object input, Object output,
+                                       BigDecimal confidence, String rationale) {
         AiSuggestion s = new AiSuggestion();
         s.setOrganisationId(org());
         s.setFeatureCode(feature);

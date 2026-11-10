@@ -26,10 +26,21 @@ public class AiGatewayConfig {
         this.props = props;
     }
 
+    /**
+     * Refuses to start a LIVE, enabled gateway with no API key. Without this the first
+     * AI request would be the first sign of the misconfiguration, sent unauthenticated.
+     */
     @PostConstruct
-    void logStartup() {
-        log.info("[AI Gateway] enabled={} mode={} baseUrl={} model={}",
-            props.isEnabled(), props.getMode(), props.getBaseUrl(), props.getModel());
+    void checkStartup() {
+        log.info("[AI Gateway] enabled={} mode={} baseUrl={} model={} apiKeySet={}",
+            props.isEnabled(), props.getMode(), props.getBaseUrl(), props.getModel(),
+            props.hasRequiredCredentials());
+        if (props.isEnabled() && props.getMode() == AiGatewayProperties.Mode.LIVE
+                && !props.hasRequiredCredentials()) {
+            throw new IllegalStateException(
+                "grc.integrations.ai-gateway is enabled in LIVE mode but no api-key is set. "
+                    + "Set AI_GATEWAY_API_KEY, or set AI_GATEWAY_ENABLED=false.");
+        }
     }
 
     @Bean("aiGatewayRestClient")

@@ -1,15 +1,22 @@
 """
 Standalone AI Gateway Server for TSS GRC Platform
 - OpenAI-compatible API on port 4000 (POST /v1/chat/completions and POST /chat/completions)
-- High-Performance In-Memory Cache (Exact + Semantic hash with TTL)
+- In-memory reply cache: exact match on tenant (X-Organisation-Id) + model + the whole masked
+  request, bounded LRU with TTL. Replies flagged as likely hallucinations are never cached, and
+  requests that name no tenant are not cached at all.
 - Open-Source Guardrails:
     * Pre-Call: Prompt Injection & Jailbreak Defense (Blocks with HTTP 400)
     * Pre-Call: PII Masking & Redaction (Saudi PDPL National ID, Iqama, Phone, IBAN, Email)
     * Post-Call: Hallucination Detection (GRC control validation & fact overlap)
-- Upstream Forwarding (OpenAI, Gemini) OR Deterministic Offline GRC Mock Mode
+- Upstream Forwarding (Z.ai GLM, OpenAI, Gemini). With no upstream configured the gateway
+  answers HTTP 503; it never makes up a reply.
 - Telemetry & Metrics (GET /metrics, GET /health)
+- Every endpoint except /health needs "Authorization: Bearer <GATEWAY_MASTER_KEY>". The server
+  will not start without that key, listens on 127.0.0.1 unless GATEWAY_HOST says otherwise,
+  and sends CORS headers only to origins listed in GATEWAY_CORS_ORIGINS.
 """
 
+import hmac
 import json
 import logging
 import os
@@ -17,6 +24,8 @@ import sys
 import time
 import hashlib
 import re
+import threading
+from collections import OrderedDict
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Dict, Any, Optional
 import urllib.request
@@ -52,11 +61,62 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [AIG
 logger = logging.getLogger("AIGateway")
 
 PORT = int(os.environ.get("GATEWAY_PORT", "4000"))
-MASTER_KEY = os.environ.get("GATEWAY_MASTER_KEY", "sk-tss-grc-gateway-master-key")
+HOST = os.environ.get("GATEWAY_HOST", "127.0.0.1")
+# No default: the server refuses to start without a key (see require_master_key).
+MASTER_KEY = os.environ.get("GATEWAY_MASTER_KEY", "").strip()
+# Browser origins allowed to call the gateway, comma-separated. Empty: no CORS headers at all.
+CORS_ORIGINS = {o.strip() for o in os.environ.get("GATEWAY_CORS_ORIGINS", "").split(",") if o.strip()}
 CACHE_TTL_SECONDS = int(os.environ.get("GATEWAY_CACHE_TTL", "3600"))
+# Most replies kept at once; past this the least recently used one is dropped. 0 turns the cache off.
+CACHE_MAX_ENTRIES = int(os.environ.get("GATEWAY_CACHE_MAX_ENTRIES", "1000"))
+
+
+class ResponseCache:
+    """Thread-safe LRU of upstream replies.
+
+    An entry expires ttl_seconds after it was stored (a hit does not extend it). Past max_entries
+    the least recently used entry is dropped. A size or TTL of 0 turns caching off.
+    """
+
+    def __init__(self, max_entries: int, ttl_seconds: float, clock=time.monotonic):
+        self.max_entries = max_entries
+        self.ttl_seconds = ttl_seconds
+        self._clock = clock
+        self._entries: "OrderedDict[str, tuple]" = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[dict]:
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                return None
+            stored_at, response = entry
+            if self._clock() - stored_at >= self.ttl_seconds:
+                del self._entries[key]
+                return None
+            self._entries.move_to_end(key)
+            return response
+
+    def put(self, key: str, response: dict):
+        if self.max_entries <= 0 or self.ttl_seconds <= 0:
+            return
+        with self._lock:
+            self._entries[key] = (self._clock(), response)
+            self._entries.move_to_end(key)
+            while len(self._entries) > self.max_entries:
+                self._entries.popitem(last=False)
+
+    def clear(self):
+        with self._lock:
+            self._entries.clear()
+
+    def __len__(self):
+        with self._lock:
+            return len(self._entries)
+
 
 # Global In-Memory Cache and Metrics State
-CACHE_STORE: Dict[str, Dict[str, Any]] = {}
+RESPONSE_CACHE = ResponseCache(CACHE_MAX_ENTRIES, CACHE_TTL_SECONDS)
 METRICS = {
     "total_requests": 0,
     "cache_hits": 0,
@@ -76,15 +136,15 @@ safety_guardrail = SafetyGuardrail()
 hallucination_detector = HallucinationDetector(hallucination_threshold=0.65)
 
 
-def generate_cache_key(model: str, messages: list, temperature: float) -> str:
-    """Generate SHA-256 cache key based on normalized messages and model."""
-    normalized_msgs = []
-    for m in messages:
-        role = m.get("role", "")
-        content = (m.get("content", "") or "").strip().lower()
-        normalized_msgs.append(f"{role}:{content}")
-    raw_key = f"{model}|{temperature}|{'||'.join(normalized_msgs)}"
-    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+def generate_cache_key(tenant: str, model: str, payload: dict) -> str:
+    """SHA-256 over the tenant, the model and the whole (already PII-masked) request body.
+
+    Every request field is in the key, so a reply is reused only for the same tenant, model, exact
+    message text and parameters (temperature, max_tokens, response_format, ...).
+    """
+    canonical = json.dumps({"tenant": tenant, "model": model, "request": payload},
+                           sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def call_upstream_glm(payload: dict, api_key: str, base_url: str = "https://api.z.ai/api/paas/v4") -> dict:
@@ -141,8 +201,9 @@ def call_upstream_gemini(payload: dict, api_key: str) -> dict:
     model = payload.get("model", "gemini-1.5-flash")
     if "/" in model:
         model = model.split("/")[-1]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    
+    # The key goes in a header, not the query string: URLs end up in logs and tracebacks.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
     contents = []
     system_instruction = None
     for m in payload.get("messages", []):
@@ -169,7 +230,12 @@ def call_upstream_gemini(payload: dict, api_key: str) -> dict:
         gemini_body["generationConfig"] = gen_cfg
 
     data_bytes = json.dumps(gemini_body).encode("utf-8")
-    req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
+    req = urllib.request.Request(
+        url,
+        data=data_bytes,
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        method="POST"
+    )
     with urllib.request.urlopen(req, timeout=45) as resp:
         raw = json.loads(resp.read().decode("utf-8"))
 
@@ -204,83 +270,52 @@ def call_upstream_gemini(payload: dict, api_key: str) -> dict:
     }
 
 
-def generate_mock_grc_response(model: str, messages: list, json_mode: bool) -> dict:
-    """High-fidelity deterministic response for offline development and testing."""
-    user_prompt = ""
-    system_prompt = ""
-    for m in messages:
-        if m.get("role") == "user":
-            user_prompt = m.get("content", "")
-        elif m.get("role") == "system":
-            system_prompt = m.get("content", "")
-
-    user_lower = user_prompt.lower()
-    if json_mode or "json" in user_prompt.lower() or "json" in system_prompt.lower():
-        content = json.dumps({
-            "status": "APPROVED",
-            "risk_score": 4.2,
-            "applicable_controls": ["ECC-1-1-1", "ECC-1-2-1", "PDPL-Article-12"],
-            "assessment": "Drafted policy aligns with NCA ECC cybersecurity domain and PDPL data protection requirements.",
-            "recommendations": [
-                "Implement role-based access control (RBAC) on personal data repositories.",
-                "Maintain audit trail logs in platform ledger for at least 12 months."
-            ]
-        }, indent=2)
-    elif any(term in user_lower for term in ("policy", "risk", "audit", "compliance", "nca", "ecc", "pdpl", "sama", "control", "draft", "service", "bia")):
-        content = (
-            "### AI Gateway Policy & Control Assessment\n\n"
-            "1. **Executive Summary**: The requested controls comply with the Kingdom's regulatory posture.\n"
-            "2. **Applicable Mandates**: NCA ECC-1-1 (Cybersecurity Governance) and Saudi PDPL Article 12 (Data Minimization).\n"
-            "3. **Control Status**: Implementation approved with automated continuous monitoring."
-        )
-    else:
-        content = (
-            f"I am the enterprise AI Gateway for TSS GRC Platform, specialized in Saudi regulatory compliance "
-            f"(NCA ECC, Saudi PDPL, SAMA CSF). For live non-GRC queries, configure OPENAI_API_KEY or GEMINI_API_KEY. "
-            f"Received prompt: '{user_prompt.strip()}'."
-        )
-
-    return {
-        "id": f"chatcmpl-mock-{int(time.time()*1000)}",
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": content},
-                "finish_reason": "stop"
-            }
-        ],
-        "usage": {
-            "prompt_tokens": len(user_prompt.split()) + 15,
-            "completion_tokens": len(content.split()),
-            "total_tokens": len(user_prompt.split()) + len(content.split()) + 15
-        }
-    }
+def require_master_key():
+    """Refuse to start without a master key: an unauthenticated gateway spends upstream credit for anyone."""
+    if not MASTER_KEY:
+        raise SystemExit("GATEWAY_MASTER_KEY is not set. Set it to the backend's AI_GATEWAY_API_KEY value.")
 
 
 class GatewayRequestHandler(BaseHTTPRequestHandler):
+
+    def _cors_headers(self) -> dict:
+        """CORS headers for an allow-listed Origin only; anything else gets none, so browsers block it."""
+        origin = self.headers.get("Origin")
+        if not origin or origin not in CORS_ORIGINS:
+            return {}
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Vary": "Origin",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Organisation-Id, X-Feature-Code",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        }
+
+    def _authorized(self) -> bool:
+        scheme, _, token = self.headers.get("Authorization", "").partition(" ")
+        if not MASTER_KEY or scheme.lower() != "bearer":
+            return False
+        return hmac.compare_digest(token.strip().encode("utf-8"), MASTER_KEY.encode("utf-8"))
+
+    def _reject_unauthorized(self):
+        self._send_json(401, {
+            "error": {"message": "Missing or invalid gateway API key.", "type": "authentication_error"}
+        }, headers={"WWW-Authenticate": "Bearer"})
 
     def _send_json(self, status: int, data: dict, headers: Optional[dict] = None):
         body = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        if headers:
-            for k, v in headers.items():
-                self.send_header(k, str(v))
+        for k, v in {**self._cors_headers(), **(headers or {})}.items():
+            self.send_header(k, str(v))
         self.end_headers()
         self.wfile.write(body)
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_response(204)
+        for k, v in self._cors_headers().items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):
@@ -288,9 +323,11 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {
                 "status": "healthy",
                 "service": "TSS GRC AI Gateway",
-                "cache_size": len(CACHE_STORE),
+                "cache_size": len(RESPONSE_CACHE),
                 "uptime_seconds": round(time.time() - METRICS["uptime_start"], 1)
             })
+        elif not self._authorized():
+            self._reject_unauthorized()
         elif self.path in ("/metrics", "/v1/metrics"):
             hit_rate = 0.0
             if (METRICS["cache_hits"] + METRICS["cache_misses"]) > 0:
@@ -298,7 +335,9 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {
                 **METRICS,
                 "cache_hit_rate_pct": hit_rate,
-                "active_cache_entries": len(CACHE_STORE),
+                "active_cache_entries": len(RESPONSE_CACHE),
+                "cache_max_entries": RESPONSE_CACHE.max_entries,
+                "cache_ttl_seconds": RESPONSE_CACHE.ttl_seconds,
                 "guardrails": {
                     "pii_masking_enabled": True,
                     "prompt_injection_defense_enabled": True,
@@ -311,8 +350,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                 "data": [
                     {"id": "grc-default", "object": "model", "owned_by": "tss-grc"},
                     {"id": "gpt-4o-mini", "object": "model", "owned_by": "openai"},
-                    {"id": "gemini-1.5-flash", "object": "model", "owned_by": "google"},
-                    {"id": "ollama/llama3", "object": "model", "owned_by": "local"}
+                    {"id": "gemini-1.5-flash", "object": "model", "owned_by": "google"}
+                    # No local model: this server has no Ollama/vLLM route, so it does not advertise one.
                 ]
             })
         else:
@@ -324,6 +363,10 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
 
         if self.path not in ("/chat/completions", "/v1/chat/completions"):
             self._send_json(404, {"error": "Endpoint not found. Use /chat/completions or /v1/chat/completions"})
+            return
+
+        if not self._authorized():
+            self._reject_unauthorized()
             return
 
         # 1. Read & Parse Payload
@@ -338,8 +381,6 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
 
         model = payload.get("model", "grc-default")
         messages = payload.get("messages", [])
-        temperature = payload.get("temperature", 0.2)
-        json_mode = payload.get("response_format", {}).get("type") == "json_object"
 
         # 2. GUARDRAIL 1: SAFETY, CREDENTIAL PROTECTION, & PROMPT INJECTION DEFENSE (Pre-Call)
         for msg in messages:
@@ -396,24 +437,26 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             METRICS["pii_masked_count"] += pii_masked_in_request
             logger.info(f"PII Redacted: {pii_masked_in_request} sensitive items masked before LLM call.")
 
-        # 4. CACHE LOOKUP (In-Memory Semantic & Exact Cache)
-        cache_key = generate_cache_key(model, messages, temperature)
-        cached = CACHE_STORE.get(cache_key)
-        if cached and (time.time() - cached["timestamp"]) < CACHE_TTL_SECONDS:
+        # 4. CACHE LOOKUP: exact match on tenant + model + the whole masked request. A request that
+        #    names no tenant (X-Organisation-Id) is neither served from nor stored in the cache.
+        tenant = self.headers.get("X-Organisation-Id", "").strip()
+        cache_key = generate_cache_key(tenant, model, payload) if tenant else None
+        cached = RESPONSE_CACHE.get(cache_key) if cache_key else None
+        if cached is not None:
             METRICS["cache_hits"] += 1
             duration_ms = int((time.time() - start_time) * 1000)
             logger.info(f"CACHE HIT [key={cache_key[:8]}] - Served in {duration_ms}ms")
-            resp_data = cached["response"]
-            self._send_json(200, resp_data, headers={
+            self._send_json(200, cached, headers={
                 "X-Cache": "HIT",
                 "X-Latency-Ms": duration_ms,
                 "X-Guardrail-Pii-Masked": pii_masked_in_request
             })
             return
 
-        METRICS["cache_misses"] += 1
+        if cache_key:
+            METRICS["cache_misses"] += 1
 
-        # 5. EXECUTION: Upstream Call OR Offline GRC Mock
+        # 5. EXECUTION: Upstream Call. No matching upstream means 503, never a made-up reply.
         response_data: Optional[dict] = None
         glm_key = os.environ.get("GLM_API_KEY", "")
         glm_base_url = os.environ.get("GLM_BASE_URL", "https://api.z.ai/api/paas/v4")
@@ -430,18 +473,29 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             elif openai_key and ("gpt" in model.lower() or "openai" in model.lower()):
                 logger.info(f"Forwarding to upstream OpenAI (model={model})")
                 response_data = call_upstream_openai(payload, openai_key)
-            else:
-                logger.info(f"Using high-fidelity local GRC engine (model={model})")
-                response_data = generate_mock_grc_response(model, messages, json_mode)
         except Exception as ex:
             METRICS["errors"] += 1
+            # Details stay in the log: the exception text can carry upstream bodies or URLs.
             logger.error(f"Upstream inference failure: {ex}", exc_info=True)
             self._send_json(502, {
                 "error": {
-                    "message": f"Gateway upstream call failed: {str(ex)}",
+                    "message": "Gateway upstream call failed.",
                     "type": "gateway_upstream_error"
                 }
             })
+            return
+
+        if response_data is None:
+            METRICS["errors"] += 1
+            logger.error(f"No upstream configured for model={model}; answering 503")
+            self._send_json(503, {
+                "error": {
+                    "message": "No upstream model is configured for this request "
+                               "(set GLM_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY).",
+                    "type": "no_upstream_configured",
+                    "code": "NO_UPSTREAM"
+                }
+            }, headers={"X-Guardrail-Pii-Masked": pii_masked_in_request})
             return
 
         # 6. GUARDRAIL 3: POST-CALL HALLUCINATION & GROUNDING CHECK
@@ -454,17 +508,19 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             METRICS["hallucinations_detected"] += 1
             logger.warning(f"Hallucination detected (score={hal_result.hallucination_score}) in response: {hal_result.warnings}")
 
-        # 7. SAVE TO CACHE
-        CACHE_STORE[cache_key] = {
-            "timestamp": time.time(),
-            "response": response_data
-        }
+        # 7. SAVE TO CACHE. A reply flagged as a likely hallucination goes back once, with its risk
+        #    header, and is never replayed from the cache.
+        key_label = cache_key[:8] if cache_key else "-"
+        if cache_key and hal_result.is_hallucination:
+            logger.warning(f"NOT CACHED [key={key_label}]: reply flagged as a likely hallucination")
+        elif cache_key:
+            RESPONSE_CACHE.put(cache_key, response_data)
 
         duration_ms = int((time.time() - start_time) * 1000)
-        logger.info(f"PROCESSED [key={cache_key[:8]}] in {duration_ms}ms (PII Masked: {pii_masked_in_request}, Hal-Score: {hal_result.hallucination_score})")
+        logger.info(f"PROCESSED [key={key_label}] in {duration_ms}ms (PII Masked: {pii_masked_in_request}, Hal-Score: {hal_result.hallucination_score})")
 
         self._send_json(200, response_data, headers={
-            "X-Cache": "MISS",
+            "X-Cache": "MISS" if cache_key else "BYPASS",
             "X-Latency-Ms": duration_ms,
             "X-Guardrail-Pii-Masked": pii_masked_in_request,
             "X-Guardrail-Hallucination-Risk": hal_result.hallucination_score
@@ -472,10 +528,12 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server():
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), GatewayRequestHandler)
-    prov = "Z.ai GLM (glm-4.7) [LIVE]" if os.environ.get("GLM_API_KEY") else ("OpenAI [LIVE]" if os.environ.get("OPENAI_API_KEY") else ("Gemini [LIVE]" if os.environ.get("GEMINI_API_KEY") else "Offline Mock Engine"))
+    require_master_key()
+    server = ThreadingHTTPServer((HOST, PORT), GatewayRequestHandler)
+    prov = "Z.ai GLM (glm-4.7) [LIVE]" if os.environ.get("GLM_API_KEY") else ("OpenAI [LIVE]" if os.environ.get("OPENAI_API_KEY") else ("Gemini [LIVE]" if os.environ.get("GEMINI_API_KEY") else "none (requests get HTTP 503)"))
     print(f"============================================================")
-    print(f"  TSS GRC AI Gateway Running on http://127.0.0.1:{PORT}")
+    print(f"  TSS GRC AI Gateway Running on http://{HOST}:{PORT}")
+    print(f"  CORS Origins    : {', '.join(sorted(CORS_ORIGINS)) or 'none'}")
     print(f"  Live Provider   : {prov}")
     print(f"  OpenAI Endpoint : http://127.0.0.1:{PORT}/v1/chat/completions")
     print(f"  Health Check    : http://127.0.0.1:{PORT}/health")

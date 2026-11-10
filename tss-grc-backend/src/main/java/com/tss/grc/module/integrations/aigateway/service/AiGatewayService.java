@@ -8,6 +8,8 @@ import com.tss.grc.module.integrations.llm.dto.LlmResponse;
 import com.tss.grc.module.integrations.llm.dto.LlmStatusDto;
 import com.tss.grc.module.integrations.llm.entity.LlmCallLog;
 import com.tss.grc.module.integrations.llm.repository.LlmCallLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -19,6 +21,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Enterprise AI Gateway Service facade for TSS GRC Platform.
@@ -27,14 +30,29 @@ import java.util.Locale;
  * <ul>
  *   <li><b>PERF-IO-003:</b> No DB connection held across inference. Quota reads and audit
  *       ledger inserts execute in short {@code REQUIRES_NEW} transactions.</li>
- *   <li><b>Tenant Quota Protection:</b> Enforces daily token ceilings before outbound dispatch.</li>
+ *   <li><b>Tenant Quota Protection:</b> Enforces daily token ceilings before outbound dispatch.
+ *       Each call reserves its estimated tokens under a per-tenant lock until its ledger row
+ *       is written, so concurrent calls see each other. The reservation lives in this JVM:
+ *       in a cluster each instance enforces separately, so a tenant can overshoot by about
+ *       one call per instance.</li>
  *   <li><b>Append-only Telemetry:</b> Logs all completions in {@code platform.llm_call_log}.</li>
  * </ul>
  */
 @Service
 public class AiGatewayService {
 
+    private static final Logger log = LoggerFactory.getLogger(AiGatewayService.class);
+
     private static final int ERROR_MSG_MAX = 2000;
+
+    /** Output tokens reserved for a request that sets no {@code maxOutputTokens}. */
+    static final long DEFAULT_OUTPUT_RESERVATION = 2048L;
+
+    /** Tokens reserved by calls that passed the quota check and are not yet in the ledger. */
+    private final ConcurrentHashMap<Long, Long> inFlightTokens = new ConcurrentHashMap<>();
+
+    /** One monitor per tenant for check-and-reserve; one entry per organisation, never evicted. */
+    private final ConcurrentHashMap<Long, Object> quotaLocks = new ConcurrentHashMap<>();
 
     private final AiGatewayProperties props;
     private final AiGatewayClient client;
@@ -107,41 +125,87 @@ public class AiGatewayService {
         }
 
         long quota = props.getTenantDailyTokenQuota();
+        long reserved = 0L;
         if (quota > 0) {
-            Long usedObj = readOnlyTx.execute(
-                s -> callLogRepo.sumTokensSince(organisationId, LocalDateTime.now().minusHours(24)));
-            long used = usedObj == null ? 0L : usedObj;
-            if (used >= quota) {
-                String msg = String.format(Locale.ROOT,
-                    "Daily tenant token quota exceeded (%d / %d tokens in the last 24h).", used, quota);
+            reserved = estimateTokens(request);
+            String refusal = tryReserve(organisationId, quota, reserved);
+            if (refusal != null) {
                 persistCallLog(organisationId, request, provider, props.getModel(), digest,
-                    0, 0, 0L, "QUOTA_EXCEEDED", null, msg);
-                throw new LlmGatewayException("QUOTA_EXCEEDED", msg);
+                    0, 0, 0L, "QUOTA_EXCEEDED", null, refusal);
+                throw new LlmGatewayException("QUOTA_EXCEEDED", refusal);
             }
         }
 
         long startMs = System.currentTimeMillis();
         try {
-            LlmResponse response = client.complete(organisationId, request);
-            long latency = Math.max(1L, System.currentTimeMillis() - startMs);
+            try {
+                LlmResponse response = client.complete(organisationId, request);
+                long latency = Math.max(1L, System.currentTimeMillis() - startMs);
 
-            persistCallLog(organisationId, request, provider, props.getModel(), digest,
-                response.inputTokens(), response.outputTokens(), latency,
-                "SUCCEEDED", response.finishReason(), null);
+                persistCallLog(organisationId, request, provider, props.getModel(), digest,
+                    response.inputTokens(), response.outputTokens(), latency,
+                    "SUCCEEDED", response.finishReason(), null);
 
-            return response;
+                return response;
 
-        } catch (LlmGatewayException ex) {
-            long latency = Math.max(1L, System.currentTimeMillis() - startMs);
-            persistCallLog(organisationId, request, provider, props.getModel(), digest,
-                0, 0, latency, "FAILED", null, ex.getMessage());
-            throw ex;
-        } catch (Exception ex) {
-            long latency = Math.max(1L, System.currentTimeMillis() - startMs);
-            persistCallLog(organisationId, request, provider, props.getModel(), digest,
-                0, 0, latency, "FAILED", null, ex.getMessage());
-            throw new LlmGatewayException("EXECUTION_FAILED", "AI Gateway call failed: " + ex.getMessage(), ex);
+            } catch (LlmGatewayException ex) {
+                long latency = Math.max(1L, System.currentTimeMillis() - startMs);
+                persistCallLog(organisationId, request, provider, props.getModel(), digest,
+                    0, 0, latency, "FAILED", null, ex.getMessage());
+                throw ex;
+            } catch (Exception ex) {
+                long latency = Math.max(1L, System.currentTimeMillis() - startMs);
+                persistCallLog(organisationId, request, provider, props.getModel(), digest,
+                    0, 0, latency, "FAILED", null, ex.getMessage());
+                throw new LlmGatewayException("EXECUTION_FAILED", "AI Gateway call failed: " + ex.getMessage(), ex);
+            }
+        } finally {
+            // After the call-log row is committed, never before: see tryReserve.
+            release(organisationId, reserved);
         }
+    }
+
+    /**
+     * Checks the quota and reserves {@code tokens} for one call, atomically per tenant.
+     * Returns null when reserved, or the refusal message.
+     *
+     * <p>A call may start only while the ledger's 24h total plus the tokens reserved by calls
+     * still in progress is below the quota, so concurrent requests cannot all pass on the
+     * same stale total. In-flight is read before the ledger: a call that finishes in between
+     * commits its row before releasing its reservation, so it is counted once or twice,
+     * never zero times.
+     */
+    private String tryReserve(Long organisationId, long quota, long tokens) {
+        synchronized (quotaLocks.computeIfAbsent(organisationId, k -> new Object())) {
+            long inFlight = inFlightTokens.getOrDefault(organisationId, 0L);
+            Long usedObj = readOnlyTx.execute(
+                s -> callLogRepo.sumTokensSince(organisationId, LocalDateTime.now().minusHours(24)));
+            long used = usedObj == null ? 0L : usedObj;
+            if (used + inFlight >= quota) {
+                return String.format(Locale.ROOT,
+                    "Daily tenant token quota exceeded (%d / %d tokens in the last 24h, %d reserved by calls in progress).",
+                    used, quota, inFlight);
+            }
+            inFlightTokens.merge(organisationId, tokens, Long::sum);
+            return null;
+        }
+    }
+
+    private void release(Long organisationId, long tokens) {
+        if (tokens > 0) {
+            inFlightTokens.computeIfPresent(organisationId, (k, v) -> v > tokens ? v - tokens : null);
+        }
+    }
+
+    /**
+     * Upper-bound guess at a call's tokens: about three prompt characters per token (cautious
+     * for Arabic, generous for English) plus the output ceiling, or a default when unset.
+     */
+    static long estimateTokens(LlmRequest req) {
+        long chars = (req.systemPrompt() == null ? 0 : req.systemPrompt().length())
+            + (req.userPrompt() == null ? 0 : req.userPrompt().length());
+        long output = req.maxOutputTokens() != null ? req.maxOutputTokens() : DEFAULT_OUTPUT_RESERVATION;
+        return (chars + 2) / 3 + output;
     }
 
     private void persistCallLog(
@@ -180,7 +244,10 @@ public class AiGatewayService {
                 callLogRepo.save(row);
             });
         } catch (Exception ex) {
-            // Never break business flow if telemetry insert fails
+            // The business flow carries on, but a lost row is a lost audit record and, for a
+            // SUCCEEDED call, tokens the quota never sees - so it must be loud.
+            log.error("[AI Gateway] Failed to write llm_call_log row: org={} feature={} status={} tokens={}",
+                organisationId, req.featureCode(), status, inTok + outTok, ex);
         }
     }
 

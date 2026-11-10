@@ -5,14 +5,17 @@ services:
   litellm-gateway:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: tss_ai_gateway
+    # Published on the host's loopback only; the backend reaches it at localhost:4000.
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./gateway_hook.py:/app/gateway_hook.py
       - ./guardrails:/app/guardrails
     environment:
       - PORT=4000
+      # Required: config.yaml reads the master key from here, and compose refuses to start without it.
+      - GATEWAY_MASTER_KEY=${GATEWAY_MASTER_KEY:?Set GATEWAY_MASTER_KEY to the backend's AI_GATEWAY_API_KEY value}
       - STORE_MODEL_IN_DB=False
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -28,7 +31,7 @@ services:
     image: redis:7-alpine
     container_name: tss_ai_gateway_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -39,7 +42,7 @@ services:
     image: mcr.microsoft.com/presidio-analyzer:latest
     container_name: tss_ai_presidio
     ports:
-      - "5001:3000"
+      - "127.0.0.1:5001:3000"
     restart: unless-stopped
 
 volumes:

@@ -32,8 +32,14 @@ import java.util.Map;
  *   <li>Standard OpenAI-compatible JSON payload dispatch</li>
  *   <li>Guardrail response header inspection (Cache hits, PII masked, Hallucination risk)</li>
  *   <li>Security violation interception (e.g. Prompt Injection HTTP 400)</li>
- *   <li>Deterministic STUB fallback for offline environments and unit testing</li>
+ *   <li>An explicit, labelled STUB mode for offline environments and unit testing</li>
  * </ul>
+ *
+ * <p>LIVE mode never falls back to the stub. A transport failure, a timeout or an
+ * unparseable reply throws {@code GATEWAY_UNAVAILABLE}: a silent fallback would hand the
+ * caller text no model produced, and on a regulated surface (a policy draft, a control
+ * assessment) that text would be read as generated content. The stub itself fabricates
+ * nothing — it returns a marker saying no model was called.
  */
 @Component
 public class AiGatewayClient {
@@ -99,8 +105,13 @@ public class AiGatewayClient {
                         throw new LlmGatewayException("PROMPT_INJECTION_BLOCKED",
                             "Request was blocked by enterprise AI Gateway security guardrails (Prompt Injection Detected).");
                     }
+                    // The upstream body can echo provider internals or prompt fragments; it is
+                    // logged here and kept out of the exception, which is persisted to the call
+                    // log and may reach a client.
+                    log.error("[AI Gateway] uri={} returned HTTP {} (body length {})",
+                        uri, responseObj.getStatusCode(), errJson.length());
                     throw new LlmGatewayException("GATEWAY_ERROR",
-                        "AI Gateway returned HTTP " + responseObj.getStatusCode() + ": " + errJson);
+                        "AI Gateway returned HTTP " + responseObj.getStatusCode().value());
                 })
                 .toEntity(String.class);
 
@@ -156,49 +167,30 @@ public class AiGatewayClient {
         } catch (LlmGatewayException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.warn("[AI Gateway] Request to {} failed ({}), falling back to deterministic safe response",
-                uri, ex.getMessage());
-            return generateStubResponse(req, startMs);
+            log.error("[AI Gateway] Request to {} failed: {}", uri, ex.getClass().getSimpleName(), ex);
+            throw new LlmGatewayException("GATEWAY_UNAVAILABLE",
+                "AI Gateway request failed: " + ex.getClass().getSimpleName(), ex);
         }
     }
 
-    private LlmResponse generateStubResponse(LlmRequest req, long startMs) {
-        String content;
-        if (req.jsonMode() || req.userPrompt().contains("json") || (req.systemPrompt() != null && req.systemPrompt().contains("json"))) {
-            if ("POLICY_DRAFT".equals(req.featureCode())) {
-                content = """
-                    {
-                      "titleEn": "Cybersecurity and Data Protection Policy",
-                      "titleAr": "سياسة الأمن السيبراني وحماية البيانات",
-                      "summaryEn": "Mandates security controls aligned with NCA ECC and PDPL.",
-                      "summaryAr": "تحدد الضوابط الأمنية المتوافقة مع ضوابط الهيئة الوطنية للأمن السيبراني ونظام حماية البيانات الشخصية.",
-                      "contentMdEn": "# 1. Purpose\\nDefines organizational security requirements.\\n\\n# 2. Scope\\nApplies enterprise-wide.\\n\\n# 3. Policy Statements\\nAccess control is mandatory.",
-                      "contentMdAr": "# 1. الهدف\\nتحديد المتطلبات الأمنية للمنظمة.\\n\\n# 2. النطاق\\nينطبق على مستوى المنظمة.\\n\\n# 3. بنود السياسة\\nالتحكم في الوصول إلزامي.",
-                      "clauses": [
-                        {"sectionNumber": "1", "titleEn": "Purpose", "titleAr": "الهدف", "bodyEn": "Establishes safeguards.", "bodyAr": "تضع الضمانات الأمنية."}
-                      ],
-                      "citedControlCodes": ["ECC-1-1-1"],
-                      "assumptions": ["Enterprise operates in Saudi Arabia under PDPL."]
-                    }
-                    """;
-            } else {
-                content = """
-                    {
-                      "causes": ["Insufficient access reviews", "Lack of MFA enforcement"],
-                      "consequences": ["Unauthorized data access risk", "Regulatory non-compliance"],
-                      "qualityScore": 85,
-                      "verdict": "ADEQUATE",
-                      "rootCauseDraftEn": "Root cause identified in process governance gap.",
-                      "summaryEn": "The risk profile remains within acceptable tolerance.",
-                      "tone": "BALANCED"
-                    }
-                    """;
-            }
-        } else {
-            content = "The requested GRC operation has been verified against regulatory compliance standards.";
-        }
+    /** Marker returned for a JSON-mode request in STUB mode. Carries no generated content. */
+    public static final String STUB_JSON = "{\"stub\": true, \"notice\": \"STUB mode - no model was called\"}";
 
+    /** Marker returned for a text request in STUB mode. Carries no generated content. */
+    public static final String STUB_TEXT = "[STUB - no model was called; this is not generated content]";
+
+    /** Provider label on every STUB response, so a caller and the call log can tell it apart. */
+    public static final String STUB_PROVIDER = "STUB";
+
+    /**
+     * The STUB response. It deliberately fabricates nothing: no policy text, no control codes,
+     * no scores or verdicts. A caller that needs shaped output must treat a stub response as
+     * "no draft available", which is what it is. Token counts are zero because no model ran,
+     * so stub traffic never consumes tenant quota.
+     */
+    private LlmResponse generateStubResponse(LlmRequest req, long startMs) {
+        String content = req.jsonMode() ? STUB_JSON : STUB_TEXT;
         long latency = Math.max(1L, System.currentTimeMillis() - startMs);
-        return new LlmResponse(content, "AI_GATEWAY_STUB", props.getModel(), 120, 250, latency, "stop");
+        return new LlmResponse(content, STUB_PROVIDER, props.getModel(), 0, 0, latency, "stub");
     }
 }

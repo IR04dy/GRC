@@ -158,6 +158,21 @@ class SingletonMutableStateContractTest {
             new Holding(Verdict.CONCURRENT,
                 "ip -> Window, mutated on every public request through compute(...) -- atomic -- "
                 + "with a size-triggered removeIf sweep above 10,000 keys"));
+        DECLARED.put("com.tss.grc.module.integrations.aigateway.service.AiGatewayService"
+            + "#inFlightTokens",
+            new Holding(Verdict.CONCURRENT,
+                "organisationId -> tokens reserved by that tenant's gateway calls in progress "
+                + "(fix/ai-gateway-hardening slice B). Reserved with merge(...) under the tenant's "
+                + "quotaLocks monitor, released with an atomic computeIfPresent that drops the key "
+                + "at zero. Keyed by tenant and read only for the calling tenant, so no cross-tenant "
+                + "read; per instance by design, so a cluster enforces the quota per node"));
+        DECLARED.put("com.tss.grc.module.integrations.aigateway.service.AiGatewayService"
+            + "#quotaLocks",
+            new Holding(Verdict.CONCURRENT,
+                "organisationId -> plain monitor object, created with computeIfAbsent so two "
+                + "callers of one tenant share one lock; it serialises read-ledger-then-reserve per "
+                + "tenant. One entry per organisation ever metered, never evicted -- bounded by the "
+                + "tenant count"));
         // ⚠ These four are the DEFECT this slice found, and the reason each one now holds is the
         //   fix. Every one of them had isHealthy() writing to the recorder WITHOUT the modifier
         //   its three sibling writers hold -- and isHealthy is reachable in every profile, because

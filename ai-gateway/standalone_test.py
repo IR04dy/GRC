@@ -11,6 +11,9 @@ Tests:
 Can be run in automated batch mode or interactive mode:
   py standalone_test.py          # Runs full automated test suite
   py standalone_test.py --chat   # Interactive prompt sandbox
+
+Needs GATEWAY_API_KEY (or GATEWAY_MASTER_KEY) set to the gateway's master key. Tests 2 and 3
+need a configured upstream model; without one the gateway answers 503 and they report SKIPPED.
 """
 
 import json
@@ -21,7 +24,9 @@ import urllib.request
 import urllib.error
 
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:4000")
-API_KEY = os.environ.get("GATEWAY_API_KEY", "sk-tss-grc-gateway-master-key")
+# The gateway master key. No default: the gateway rejects requests without it.
+API_KEY = os.environ.get("GATEWAY_API_KEY") or os.environ.get("GATEWAY_MASTER_KEY", "")
+TEST_TENANT = os.environ.get("GATEWAY_TEST_TENANT", "standalone-test")
 
 # ANSI color codes
 GREEN = "\033[92m"
@@ -54,7 +59,9 @@ def send_chat_completion(messages: list, model: str = "grc-default", json_mode: 
         data=data_bytes,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}"
+            "Authorization": f"Bearer {API_KEY}",
+            # The gateway caches per tenant and does not cache a request that names none.
+            "X-Organisation-Id": TEST_TENANT
         },
         method="POST"
     )
@@ -83,6 +90,11 @@ def get_header(headers: dict, name: str, default: str = "") -> str:
     return default
 
 
+def no_upstream(status: int, body: dict) -> bool:
+    """True when the gateway answered 503 because no upstream model is configured."""
+    return status == 503 and body.get("error", {}).get("code") == "NO_UPSTREAM"
+
+
 def test_health_and_metrics():
     print_header("TEST 1: Health & Metrics Endpoint Probe")
     try:
@@ -90,7 +102,8 @@ def test_health_and_metrics():
             health = json.loads(r.read().decode("utf-8"))
             print(f"  [+] Health: {GREEN}{health.get('status')}{RESET} (Uptime: {health.get('uptime_seconds')}s)")
 
-        with urllib.request.urlopen(f"{GATEWAY_URL}/metrics", timeout=5) as r:
+        metrics_req = urllib.request.Request(f"{GATEWAY_URL}/metrics", headers={"Authorization": f"Bearer {API_KEY}"})
+        with urllib.request.urlopen(metrics_req, timeout=5) as r:
             metrics = json.loads(r.read().decode("utf-8"))
             print(f"  [+] Metrics: Total={metrics.get('total_requests')}, Cache Hits={metrics.get('cache_hits')}, Injections Blocked={metrics.get('injections_blocked')}")
             print(f"  {GREEN}PASS: Health & Telemetry endpoints are fully operational.{RESET}")
@@ -107,6 +120,9 @@ def test_basic_completion():
         {"role": "user", "content": "Explain the significance of NCA ECC governance domain in 2 sentences."}
     ]
     status, body, headers, elapsed = send_chat_completion(messages)
+    if no_upstream(status, body):
+        print(f"  {YELLOW}SKIP: no upstream model configured (HTTP 503).{RESET}")
+        return None
     if status == 200 and "choices" in body and len(body["choices"]) > 0:
         content = body["choices"][0]["message"]["content"]
         tokens = body.get("usage", {}).get("total_tokens", 0)
@@ -128,6 +144,9 @@ def test_cache_hit():
     status1, body1, headers1, elapsed1 = send_chat_completion(messages)
     cache_header1 = get_header(headers1, "X-Cache", "UNKNOWN")
     print(f"      Request 1: Status={status1}, Cache={cache_header1}, Latency={elapsed1}ms")
+    if no_upstream(status1, body1):
+        print(f"  {YELLOW}SKIP: no upstream model configured (HTTP 503), so nothing is cached.{RESET}")
+        return None
 
     print("  [*] Sending Request 2 (Identical Call - Expecting Cache HIT)...")
     status2, body2, headers2, elapsed2 = send_chat_completion(messages)
@@ -300,18 +319,24 @@ def run_all_tests():
 
     print_header("TEST SUMMARY RESULTS")
     passed = sum(1 for _, ok in results if ok)
+    skipped = sum(1 for _, ok in results if ok is None)
     for name, ok in results:
-        status_str = f"{GREEN}PASSED{RESET}" if ok else f"{RED}FAILED{RESET}"
+        if ok is None:
+            status_str = f"{YELLOW}SKIPPED{RESET}"
+        else:
+            status_str = f"{GREEN}PASSED{RESET}" if ok else f"{RED}FAILED{RESET}"
         print(f"  * {name:<35} : {status_str}")
 
-    print(f"\nScore: {passed}/{len(results)} tests passed.")
-    if passed == len(results):
+    print(f"\nScore: {passed}/{len(results) - skipped} tests passed ({skipped} skipped).")
+    if passed == len(results) - skipped:
         print(f"{GREEN}{BOLD}ALL AI GATEWAY & GUARDRAIL TESTS PASSED SUCCESSFULLY!{RESET}\n")
     else:
         print(f"{RED}{BOLD}SOME TESTS FAILED. Check gateway status.{RESET}\n")
 
 
 if __name__ == "__main__":
+    if not API_KEY:
+        sys.exit("Set GATEWAY_API_KEY (or GATEWAY_MASTER_KEY) to the gateway's master key.")
     if len(sys.argv) > 1 and sys.argv[1] == "--chat":
         interactive_sandbox()
     else:

@@ -17,10 +17,12 @@ import java.util.UUID;
  * an accepted suggestion deterministically — e.g. an accepted
  * RISK_DESCRIPTION fills cause/consequence fields on the parent Risk.
  *
- * <p>This round ships heuristic generators (no LLM gateway yet) — the
- * shape is identical, so swapping in an actual provider later means
- * changing one private method per feature, not the API or the audit
- * trail.
+ * <p>The output comes from one of two sources in {@code AiSuggestionService}: the
+ * AI gateway, or a rule-based heuristic used when the gateway call fails or returns
+ * no usable draft. Both produce the same JSON shape and this record does not say
+ * which one ran - only the free-text {@code rationale} hints at it. Heuristic output
+ * is not model output, and neither source changes a real entity until a human
+ * accepts the suggestion.
  */
 @Entity
 @Table(schema = "ai", name = "ai_suggestions")
