@@ -110,10 +110,24 @@ class GatewayServerTest(unittest.TestCase):
 
     def test_metrics_and_models_need_the_key_but_health_does_not(self):
         self.assertEqual(request(f"{self.base}/metrics")[0], 401)
+        self.assertEqual(request(f"{self.base}/metrics/prometheus")[0], 401)
         self.assertEqual(request(f"{self.base}/v1/models")[0], 401)
         auth = {"Authorization": f"Bearer {TEST_KEY}"}
         self.assertEqual(request(f"{self.base}/metrics", headers=auth)[0], 200)
         self.assertEqual(request(f"{self.base}/health")[0], 200)
+
+        prom_req = urllib.request.Request(f"{self.base}/metrics/prometheus", headers=auth)
+        with urllib.request.urlopen(prom_req, timeout=5) as r:
+            prom_text = r.read().decode("utf-8")
+            self.assertEqual(r.status, 200)
+            self.assertIn("ai_gateway_up 1", prom_text)
+            self.assertIn("ai_gateway_requests_total", prom_text)
+
+        with urllib.request.urlopen(f"{self.base}/dashboard", timeout=5) as r:
+            dash_html = r.read().decode("utf-8")
+            self.assertEqual(r.status, 200)
+            self.assertIn("TSS GRC — AI Gateway", dash_html)
+            self.assertIn(json.dumps(TEST_KEY), dash_html)
 
     def test_require_master_key_refuses_an_empty_key(self):
         with mock.patch.object(gateway_server, "MASTER_KEY", ""):
@@ -303,6 +317,7 @@ class GatewayStartupTest(unittest.TestCase):
 
     def test_server_refuses_to_start_without_a_master_key(self):
         env = self.clean_env()
+        env["GATEWAY_MASTER_KEY"] = ""
         env["GATEWAY_PORT"] = "0"
         proc = subprocess.run([sys.executable, os.path.join(GATEWAY_DIR, "gateway_server.py")],
                               env=env, capture_output=True, text=True, timeout=60)

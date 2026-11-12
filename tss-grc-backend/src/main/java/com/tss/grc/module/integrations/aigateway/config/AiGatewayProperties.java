@@ -41,7 +41,7 @@ public class AiGatewayProperties {
     private String apiKey;
 
     /** Gateway HTTP request timeout in seconds. */
-    private int timeoutSeconds = 60;
+    private int timeoutSeconds = 180;
 
     /** Daily token quota per tenant enforced at the application tier. */
     private long tenantDailyTokenQuota = 500000L;

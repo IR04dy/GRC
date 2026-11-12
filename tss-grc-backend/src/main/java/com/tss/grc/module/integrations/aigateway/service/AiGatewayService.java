@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -81,17 +82,38 @@ public class AiGatewayService {
     }
 
     /**
-     * Inspect non-sensitive gateway status and current 24h tenant token consumption.
+     * Inspect non-sensitive gateway status, current 24h tenant token consumption,
+     * live guardrail counters, and the tenant's recent call log.
      */
     public LlmStatusDto status(Long organisationId) {
         long used = 0L;
+        List<LlmStatusDto.RecentCallItem> recentCalls = List.of();
         if (organisationId != null) {
             Long sum = readOnlyTx.execute(
                 s -> callLogRepo.sumTokensSince(organisationId, LocalDateTime.now().minusHours(24)));
             used = sum == null ? 0L : sum;
+            List<LlmCallLog> rows = readOnlyTx.execute(
+                s -> callLogRepo.findTop15ByOrganisationIdOrderByIdDesc(organisationId));
+            if (rows != null) {
+                recentCalls = rows.stream()
+                    .map(r -> new LlmStatusDto.RecentCallItem(
+                        r.getId(),
+                        r.getFeatureCode(),
+                        r.getProvider(),
+                        r.getModel(),
+                        r.getInputTokens() == null ? 0 : r.getInputTokens(),
+                        r.getOutputTokens() == null ? 0 : r.getOutputTokens(),
+                        r.getLatencyMs() == null ? 0L : r.getLatencyMs(),
+                        r.getStatus(),
+                        r.getFinishReason(),
+                        r.getCreatedAt() == null ? null : r.getCreatedAt().toString()
+                    ))
+                    .toList();
+            }
         }
         boolean credsOk = props.getMode() == AiGatewayProperties.Mode.STUB || props.hasRequiredCredentials();
         String effectiveProvider = props.getMode() == AiGatewayProperties.Mode.STUB ? "STUB" : "AI_GATEWAY";
+        LlmStatusDto.GatewayMetricsSummary gwMetrics = client.fetchMetrics();
 
         return new LlmStatusDto(
             props.isEnabled(),
@@ -100,7 +122,9 @@ public class AiGatewayService {
             props.getModel(),
             credsOk,
             props.getTenantDailyTokenQuota(),
-            used
+            used,
+            gwMetrics,
+            recentCalls
         );
     }
 

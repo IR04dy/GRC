@@ -12,6 +12,36 @@ export type PolicyDraftStatus =
   | 'ACCEPTED'
   | 'REJECTED';
 
+export interface GatewayMetricsSummary {
+  reachable: boolean;
+  totalRequests: number;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheHitRatePct: number;
+  activeCacheEntries: number;
+  cacheMaxEntries: number;
+  cacheTtlSeconds: number;
+  piiMaskedCount: number;
+  injectionsBlocked: number;
+  safetyViolationsBlocked: number;
+  hallucinationsDetected: number;
+  errors: number;
+  avgLatencyMs: number;
+}
+
+export interface RecentCallItem {
+  id: number;
+  featureCode: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  status: string;
+  finishReason: string | null;
+  createdAt: string | null;
+}
+
 export interface LlmStatusDto {
   enabled: boolean;
   mode: 'STUB' | 'LIVE';
@@ -20,6 +50,8 @@ export interface LlmStatusDto {
   credentialsConfigured: boolean;
   dailyTokenQuota: number;
   tokensUsedLast24h: number;
+  gatewayMetrics?: GatewayMetricsSummary | null;
+  recentCalls?: RecentCallItem[];
 }
 
 export interface CreatePolicyDraftRequest {

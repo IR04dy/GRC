@@ -6,6 +6,7 @@ import com.tss.grc.module.integrations.aigateway.config.AiGatewayProperties;
 import com.tss.grc.module.integrations.llm.dto.LlmGatewayException;
 import com.tss.grc.module.integrations.llm.dto.LlmRequest;
 import com.tss.grc.module.integrations.llm.dto.LlmResponse;
+import com.tss.grc.module.integrations.llm.dto.LlmStatusDto.GatewayMetricsSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -192,5 +193,56 @@ public class AiGatewayClient {
         String content = req.jsonMode() ? STUB_JSON : STUB_TEXT;
         long latency = Math.max(1L, System.currentTimeMillis() - startMs);
         return new LlmResponse(content, STUB_PROVIDER, props.getModel(), 0, 0, latency, "stub");
+    }
+
+    /**
+     * Fetches non-sensitive operational and guardrail counters from the gateway's {@code /metrics}
+     * endpoint. Returns {@code null} when disabled, in STUB mode, or when the gateway is unreachable.
+     */
+    public GatewayMetricsSummary fetchMetrics() {
+        if (!props.isEnabled() || props.getMode() == AiGatewayProperties.Mode.STUB || !props.hasRequiredCredentials()) {
+            return null;
+        }
+        String base = props.getBaseUrl().replaceAll("/+$", "");
+        String metricsUri = base + "/metrics";
+        try {
+            String rawJson = http.get()
+                .uri(metricsUri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(String.class);
+            if (rawJson == null || rawJson.isBlank()) {
+                return null;
+            }
+            Map<String, Object> m = objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+            return new GatewayMetricsSummary(
+                true,
+                asLong(m.get("total_requests")),
+                asLong(m.get("cache_hits")),
+                asLong(m.get("cache_misses")),
+                asDouble(m.get("cache_hit_rate_pct")),
+                (int) asLong(m.get("active_cache_entries")),
+                (int) asLong(m.get("cache_max_entries")),
+                (int) asLong(m.get("cache_ttl_seconds")),
+                asLong(m.get("pii_masked_count")),
+                asLong(m.get("injections_blocked")),
+                asLong(m.get("safety_violations_blocked")),
+                asLong(m.get("hallucinations_detected")),
+                asLong(m.get("errors")),
+                asDouble(m.get("avg_latency_ms"))
+            );
+        } catch (Exception ex) {
+            log.debug("[AI Gateway] Telemetry probe to {} did not succeed: {}", metricsUri, ex.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private static long asLong(Object o) {
+        return o instanceof Number n ? n.longValue() : 0L;
+    }
+
+    private static double asDouble(Object o) {
+        return o instanceof Number n ? n.doubleValue() : 0.0;
     }
 }

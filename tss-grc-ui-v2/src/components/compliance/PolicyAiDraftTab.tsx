@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Sparkles, RefreshCw, Eye, CheckCircle2, XCircle, Save, AlertTriangle, Trash2, Download } from 'lucide-react';
+import { Sparkles, RefreshCw, Eye, CheckCircle2, XCircle, Save, AlertTriangle, Trash2, Download, Activity } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -117,6 +117,7 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
 
   const [draftToDelete, setDraftToDelete] = useState<PolicyDraftResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showMonitor, setShowMonitor] = useState(false);
 
   const reload = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -344,6 +345,9 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
         Icon={Sparkles}
         action={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button size="sm" variant="secondary" Icon={Activity} onClick={() => { void reload(true); setShowMonitor(true); }}>
+              {isAr ? 'مراقبة بوابة الذكاء الاصطناعي' : 'Gateway Monitor'}
+            </Button>
             <Button size="sm" variant="ghost" Icon={RefreshCw} onClick={() => void reload()}>
               {isAr ? 'تحديث' : 'Refresh'}
             </Button>
@@ -850,6 +854,152 @@ export function PolicyAiDraftTab({ onAccepted }: { onAccepted?: () => void }) {
           {isAr
             ? `هل أنت متأكد من رغبتك في حذف مسودة السياسة (${draftToDelete?.externalId})؟ لا يمكن التراجع عن هذا الإجراء.`
             : `Are you sure you want to delete policy draft "${draftToDelete?.externalId}"? This action cannot be undone.`}
+        </div>
+      </Modal>
+
+      {/* 6. AI Gateway & Guardrails Telemetry Monitor Modal */}
+      <Modal
+        open={showMonitor}
+        title={isAr ? 'لوحة مراقبة بوابة الذكاء الاصطناعي وضوابط الحماية السعودية' : 'AI Gateway & Saudi Guardrails Telemetry Monitor'}
+        onClose={() => setShowMonitor(false)}
+        size="lg"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              {isAr
+                ? 'نقطة Prometheus متاحة على 127.0.0.1:4000/metrics/prometheus ولوحة مستقلة على /dashboard'
+                : 'Prometheus exporter at 127.0.0.1:4000/metrics/prometheus · Standalone dashboard at 127.0.0.1:4000/dashboard'}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button size="sm" variant="secondary" Icon={RefreshCw} onClick={() => void reload(true)}>
+                {isAr ? 'تحديث المؤشرات' : 'Refresh Telemetry'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowMonitor(false)}>
+                {isAr ? 'إغلاق' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* KPI Summary Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 12 }}>
+            <div style={{ padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {isAr ? 'حالة البوابة والنموذج' : 'Gateway & Model Status'}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Badge tone={gateway?.enabled && gateway?.gatewayMetrics?.reachable ? 'ok' : (gateway?.enabled ? 'warn' : 'neutral')}>
+                  {gateway?.enabled ? (gateway?.gatewayMetrics?.reachable ? 'ONLINE' : gateway.mode) : 'DISABLED'}
+                </Badge>
+                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{gateway?.model ?? 'grc-default'}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {isAr ? 'متوسط الاستجابة:' : 'Avg Latency:'} <strong>{gateway?.gatewayMetrics?.avgLatencyMs ?? 0} ms</strong>
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {isAr ? 'استهلاك الرموز (24 ساعة)' : '24h Tenant Token Quota'}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6 }}>
+                {(gateway?.tokensUsedLast24h ?? 0).toLocaleString()} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-3)' }}>/ {(gateway?.dailyTokenQuota ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {gateway?.dailyTokenQuota
+                  ? `${Math.min(100, Math.round(((gateway.tokensUsedLast24h || 0) / gateway.dailyTokenQuota) * 100))}% ${isAr ? 'مستهلك' : 'utilized'}`
+                  : (isAr ? 'غير محدود' : 'Unlimited')}
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {isAr ? 'كفاءة التخزين المؤقت (LRU)' : 'Reply Cache Hit Rate'}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6, color: 'var(--brand)' }}>
+                {gateway?.gatewayMetrics?.cacheHitRatePct ?? 0}%
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {gateway?.gatewayMetrics?.cacheHits ?? 0} HIT / {gateway?.gatewayMetrics?.cacheMisses ?? 0} MISS ({gateway?.gatewayMetrics?.activeCacheEntries ?? 0}/{gateway?.gatewayMetrics?.cacheMaxEntries ?? 1000})
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {isAr ? 'حجب البيانات الشخصية (PDPL)' : 'PDPL PII Masked'}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6 }}>
+                {gateway?.gatewayMetrics?.piiMaskedCount ?? 0}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {isAr ? 'هوية وطنية، إقامة، آيبان، جوال' : 'National ID, Iqama, IBAN, Phone'}
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {isAr ? 'الهجمات والهلوسة المكتشفة' : 'Guardrail Blocks & Flags'}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6 }}>
+                {(gateway?.gatewayMetrics?.injectionsBlocked ?? 0) +
+                  (gateway?.gatewayMetrics?.safetyViolationsBlocked ?? 0) +
+                  (gateway?.gatewayMetrics?.hallucinationsDetected ?? 0)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {gateway?.gatewayMetrics?.injectionsBlocked ?? 0} Inj · {gateway?.gatewayMetrics?.safetyViolationsBlocked ?? 0} Safety · {gateway?.gatewayMetrics?.hallucinationsDetected ?? 0} Hal
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Call Log Table (platform.llm_call_log) */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>
+              {isAr ? 'سجل استدعاءات الذكاء الاصطناعي الأخير (platform.llm_call_log)' : 'Recent AI Gateway Call Ledger (platform.llm_call_log)'}
+            </div>
+            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+              <table className="grc-table" style={{ width: '100%', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>{isAr ? 'الميزة' : 'Feature'}</th>
+                    <th>{isAr ? 'النموذج' : 'Model'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th>{isAr ? 'الرموز (إدخال / إخراج)' : 'Tokens (In / Out)'}</th>
+                    <th>{isAr ? 'سبب التوقف' : 'Finish'}</th>
+                    <th>{isAr ? 'الزمن' : 'Latency'}</th>
+                    <th>{isAr ? 'الوقت' : 'Timestamp'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!gateway?.recentCalls || gateway.recentCalls.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: 16, color: 'var(--ink-3)' }}>
+                        {isAr ? 'لا توجد سجلات استدعاء حتى الآن.' : 'No gateway call records yet.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    gateway.recentCalls.map(c => (
+                      <tr key={c.id}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{c.id}</td>
+                        <td><Badge tone="info">{c.featureCode}</Badge></td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{c.model}</td>
+                        <td>
+                          <Badge tone={c.status === 'SUCCEEDED' ? 'ok' : (c.status === 'QUOTA_EXCEEDED' ? 'warn' : 'crit')}>
+                            {c.status}
+                          </Badge>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)' }}>{c.inputTokens} / <strong>{c.outputTokens}</strong></td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{c.finishReason ?? '—'}</td>
+                        <td>{(c.latencyMs / 1000).toFixed(1)}s</td>
+                        <td style={{ fontSize: 11, color: 'var(--ink-3)' }}>{c.createdAt ? c.createdAt.replace('T', ' ').slice(0, 19) : '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

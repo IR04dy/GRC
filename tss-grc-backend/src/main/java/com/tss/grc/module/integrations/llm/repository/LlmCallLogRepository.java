@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface LlmCallLogRepository extends JpaRepository<LlmCallLog, Long> {
 
@@ -18,4 +19,6 @@ public interface LlmCallLogRepository extends JpaRepository<LlmCallLog, Long> {
         @Param("organisationId") Long organisationId,
         @Param("since") LocalDateTime since
     );
+
+    List<LlmCallLog> findTop15ByOrganisationIdOrderByIdDesc(Long organisationId);
 }

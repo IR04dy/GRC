@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # 1. TSS GRC Standalone AI Gateway (127.0.0.1:4000/metrics/prometheus)
+  - job_name: "tss-ai-gateway"
+    metrics_path: "/metrics/prometheus"
+    scheme: "http"
+    authorization:
+      type: "Bearer"
+      # Replace with your GATEWAY_MASTER_KEY or mount via credentials_file
+      credentials: "${GATEWAY_MASTER_KEY}"
+    static_configs:
+      - targets: ["127.0.0.1:4000"]
+        labels:
+          service: "tss-ai-gateway"
+          environment: "dev"
+
+  # 2. TSS GRC Spring Boot Backend Micrometer Prometheus Endpoint (127.0.0.1:8084/actuator/prometheus)
+  - job_name: "tss-grc-backend"
+    metrics_path: "/actuator/prometheus"
+    scheme: "http"
+    static_configs:
+      - targets: ["127.0.0.1:8084"]
+        labels:
+          service: "tss-grc-backend"
+          environment: "dev"

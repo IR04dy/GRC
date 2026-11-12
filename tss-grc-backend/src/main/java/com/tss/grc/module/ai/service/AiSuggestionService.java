@@ -129,7 +129,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    1200,
+                    null,
                     0.3,
                     List.of()
                 );
@@ -219,7 +219,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    800,
+                    null,
                     0.2,
                     List.of()
                 );
@@ -310,7 +310,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    800,
+                    null,
                     0.2,
                     List.of()
                 );
@@ -410,7 +410,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    1200,
+                    null,
                     0.3,
                     List.of()
                 );
@@ -506,7 +506,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    1200,
+                    null,
                     0.3,
                     List.of()
                 );
@@ -614,7 +614,7 @@ public class AiSuggestionService {
                     systemPrompt,
                     userPrompt,
                     true,
-                    1000,
+                    null,
                     0.2,
                     List.of()
                 );
